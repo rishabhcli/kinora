@@ -11,6 +11,25 @@ zones              = ["ap-southeast-1a", "ap-southeast-1b"]
 project     = "kinora"
 environment = "prod"
 
+# --- Network access control (no insecure defaults — you MUST set these) ---
+# Use specific CIDRs (example values below are TEST-NET-3 docs ranges, not real).
+# admin_cidr  -> who can reach the public API (8000): your frontend/LB or office egress.
+# ssh_cidr    -> who can SSH (22): ideally a bastion/VPN /32. Kept separate from app access.
+# The MCP port (8765) is locked to intra-VPC only in main.tf — it is never internet-facing.
+admin_cidr = "203.0.113.10/32"
+ssh_cidr   = "203.0.113.10/32"
+
+# --- Application auth / CORS (the env the app now enforces in non-local) ---
+# cors_origins   -> the deployed frontend origin(s); no "*" (credentialed CORS).
+# jwt_secret     -> leave empty/commented to AUTO-GENERATE a strong secret (recommended).
+# mcp_auth_token -> leave empty/commented to AUTO-GENERATE a strong bearer (recommended).
+# Read the generated values after apply:
+#   terraform output -raw jwt_secret
+#   terraform output -raw mcp_auth_token
+cors_origins = ["https://kinora.example.com"]
+# jwt_secret     = ""
+# mcp_auth_token = ""
+
 # --- OSS (must be globally unique) ---
 oss_bucket_name = "kinora-assets-yourorg"
 

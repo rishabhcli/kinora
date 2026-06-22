@@ -18,6 +18,12 @@ locals {
   # Resolve the DB / Redis passwords: use the provided value or a generated one.
   db_password    = var.db_account_password != "" ? var.db_account_password : random_password.db.result
   redis_password = var.redis_password != "" ? var.redis_password : random_password.redis.result
+
+  # Resolve the app auth secrets the same way: a provided value or a strong
+  # auto-generated one. These are injected into the node env (cloud-init) so prod
+  # never boots with the insecure built-in jwt_secret / an unauthenticated MCP.
+  jwt_secret     = var.jwt_secret != "" ? var.jwt_secret : random_password.jwt.result
+  mcp_auth_token = var.mcp_auth_token != "" ? var.mcp_auth_token : random_password.mcp.result
 }
 
 # URL-safe charset (letters/digits + - _) so the generated secrets drop cleanly
@@ -30,6 +36,21 @@ resource "random_password" "db" {
 
 resource "random_password" "redis" {
   length           = 24
+  special          = true
+  override_special = "-_"
+}
+
+# App auth secrets. URL-safe charset (letters/digits + - _) keeps them safe in an
+# env file value and as an HTTP bearer header. Longer than the DB/Redis passwords
+# because they're signing/auth secrets, not DSN credentials.
+resource "random_password" "jwt" {
+  length           = 48
+  special          = true
+  override_special = "-_"
+}
+
+resource "random_password" "mcp" {
+  length           = 48
   special          = true
   override_special = "-_"
 }
@@ -78,7 +99,13 @@ resource "alicloud_security_group" "data" {
   tags                = local.common_tags
 }
 
-# -- App tier ingress (lock var.admin_cidr down in production) --------------- #
+# -- App tier ingress -------------------------------------------------------- #
+# Three distinct, fail-closed rules instead of one wide-open admin_cidr:
+#   * API (8000)  -> var.admin_cidr  (your frontend/LB or office egress)
+#   * SSH (22)    -> var.ssh_cidr    (a bastion/VPN /32; separate from app access)
+#   * MCP (8765)  -> intra-VPC only  (source = app SG, like the data tier) so the
+#                    canon-memory server is NEVER internet-facing. The MCP bearer
+#                    (MCP_AUTH_TOKEN) is defense-in-depth on top of this.
 
 resource "alicloud_security_group_rule" "app_api" {
   type              = "ingress"
@@ -91,15 +118,17 @@ resource "alicloud_security_group_rule" "app_api" {
   priority          = 1
 }
 
+# MCP is reachable only from other app-tier nodes (api/render-worker), never the
+# internet — same source-security-group pattern as the RDS/Tair data tier.
 resource "alicloud_security_group_rule" "app_mcp" {
-  type              = "ingress"
-  ip_protocol       = "tcp"
-  port_range        = "8765/8765"
-  security_group_id = alicloud_security_group.app.id
-  cidr_ip           = var.admin_cidr
-  nic_type          = "intranet"
-  policy            = "accept"
-  priority          = 1
+  type                     = "ingress"
+  ip_protocol              = "tcp"
+  port_range               = "8765/8765"
+  security_group_id        = alicloud_security_group.app.id
+  source_security_group_id = alicloud_security_group.app.id
+  nic_type                 = "intranet"
+  policy                   = "accept"
+  priority                 = 1
 }
 
 resource "alicloud_security_group_rule" "app_ssh" {
@@ -107,7 +136,7 @@ resource "alicloud_security_group_rule" "app_ssh" {
   ip_protocol       = "tcp"
   port_range        = "22/22"
   security_group_id = alicloud_security_group.app.id
-  cidr_ip           = var.admin_cidr
+  cidr_ip           = var.ssh_cidr
   nic_type          = "intranet"
   policy            = "accept"
   priority          = 1

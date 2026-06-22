@@ -65,6 +65,18 @@ output "redis_url" {
   sensitive   = true
 }
 
+output "jwt_secret" {
+  description = "JWT signing secret injected as JWT_SECRET (auto-generated when var.jwt_secret was empty). Read with: terraform output -raw jwt_secret"
+  value       = local.jwt_secret
+  sensitive   = true
+}
+
+output "mcp_auth_token" {
+  description = "Bearer token the MCP server requires, injected as MCP_AUTH_TOKEN (auto-generated when var.mcp_auth_token was empty). Read with: terraform output -raw mcp_auth_token"
+  value       = local.mcp_auth_token
+  sensitive   = true
+}
+
 output "next_steps" {
   description = "Post-apply checklist."
   value = join("\n", [

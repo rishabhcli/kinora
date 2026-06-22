@@ -27,7 +27,11 @@ locals {
   # OSS exposes an S3-compatible endpoint; the app's boto3 ObjectStore targets it.
   oss_s3_endpoint = "https://oss-${var.region}.aliyuncs.com"
 
-  # Common runtime env injected into every node's container.
+  # Common runtime env injected into every node's container. JWT_SECRET and
+  # MCP_AUTH_TOKEN are shared across roles (the api verifies JWTs and calls MCP;
+  # the mcp node requires the bearer; workers may call MCP too) — every node runs
+  # the same image, matching docker-compose's shared x-backend env. CORS only
+  # affects the api but is harmless elsewhere; it's rendered as a comma list.
   cloud_init_common = {
     image              = var.container_image
     app_env            = var.environment
@@ -41,6 +45,9 @@ locals {
     dashscope_api_key  = var.dashscope_api_key
     dashscope_base_url = var.dashscope_base_url
     kinora_live_video  = var.kinora_live_video ? "true" : "false"
+    jwt_secret         = local.jwt_secret
+    mcp_auth_token     = local.mcp_auth_token
+    cors_origins       = join(",", var.cors_origins)
   }
 }
 

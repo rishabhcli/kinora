@@ -214,6 +214,8 @@ All config flows through typed settings (`backend/app/core/config.py`); see [`.e
 
 The budget service enforces the ceiling with a real append-only ledger and a transaction-scoped lock; the gate prevents silent credit burn. Real Wan renders spend real, metered DashScope credits — flip the gate on deliberately.
 
+**Auth model — local vs cloud.** The API/MCP enforce three env values: `JWT_SECRET` (the app refuses to boot in non-local on the insecure built-in default), `MCP_AUTH_TOKEN` (the bearer the MCP server requires), and `CORS_ORIGINS` (the allowed browser origin[s]; credentialed CORS, so **no wildcard**). Locally these are pre-wired with **dev** values in `infra/docker-compose.yml` (and `APP_ENV` stays `local`, so the JWT default is tolerated), so `make stack-up` just works. In **cloud** they're real secrets provisioned + injected by Terraform/cloud-init — `jwt_secret`/`mcp_auth_token` auto-generate and `cors_origins` is required (see [Deploy to Alibaba Cloud](#deploy-to-alibaba-cloud)).
+
 ## Deploy to Alibaba Cloud
 
 `infra/terraform/` is ready-to-apply IaC (validated with `terraform validate` + `terraform fmt`; **not** applied — it needs your credentials). It provisions VPC + security groups, **OSS** (object storage), **ApsaraDB RDS for PostgreSQL** (pgvector), **Tair/Redis**, and **ECS** nodes for `api` + `render-worker` + `mcp` — each running the same image with its role command via cloud-init.
@@ -223,6 +225,20 @@ cd infra/terraform
 cp terraform.tfvars.example terraform.tfvars   # add Alibaba creds + DashScope key (gitignored)
 terraform init && terraform validate && terraform plan && terraform apply
 ```
+
+**Production security model (set before `apply` — it fails closed):**
+
+| Input | Required? | What it does |
+|---|---|---|
+| `admin_cidr` | **yes** (no default; rejects `0.0.0.0/0`) | CIDR allowed to reach the **API (8000)** — your frontend/LB or office egress |
+| `ssh_cidr` | **yes** (no default; rejects `0.0.0.0/0`) | CIDR allowed to **SSH (22)** — ideally a bastion/VPN `/32`, kept separate from app access |
+| `cors_origins` | **yes** (no default; no `*`) | The deployed **frontend origin(s)**, injected as `CORS_ORIGINS` (credentialed CORS can't use a wildcard) |
+| `jwt_secret` | auto-generates if empty | Injected as `JWT_SECRET` so prod never boots on the insecure built-in default |
+| `mcp_auth_token` | auto-generates if empty | Injected as `MCP_AUTH_TOKEN`, the bearer the MCP server requires |
+
+The **MCP port (8765) is intra-VPC only** (never internet-facing); the bearer token is defense-in-depth on top. cloud-init writes these into each node's env **without** shell tracing, so secrets never land in `cloud-init-output.log`. Read back the generated secrets with `terraform output -raw jwt_secret` / `-raw mcp_auth_token`. For real prod, prefer KMS / Secrets Manager / OOS over user_data.
+
+The **frontend image** (`infra/docker/frontend.Dockerfile`) is a reproducible `npm ci` build served by **nginx** (SPA history fallback + an `/api` reverse proxy that covers REST, SSE, and the Director WebSocket) — not `vite preview`. Deploy it behind a CDN/LB or alongside the API and point the proxy at the api service.
 
 The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py), kinora.md §12.6) is a real render worker that demonstrably uses **OSS** + **DashScope** — it reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than duplicating logic. See [`deploy/README.md`](./deploy/README.md) and [`infra/terraform/README.md`](./infra/terraform/README.md).
 
