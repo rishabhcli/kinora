@@ -1,0 +1,36 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Secrets can also come from
+# the ALICLOUD_ACCESS_KEY / ALICLOUD_SECRET_KEY env vars instead of this file.
+
+# --- Credentials + region ---
+alicloud_access_key = "LTAI_xxxxxxxxxxxxxxxxxxxx"
+alicloud_secret_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+region              = "ap-southeast-1"
+zones              = ["ap-southeast-1a", "ap-southeast-1b"]
+
+# --- Naming ---
+project     = "kinora"
+environment = "prod"
+
+# --- OSS (must be globally unique) ---
+oss_bucket_name = "kinora-assets-yourorg"
+
+# --- RDS PostgreSQL (region-specific class; >= 14 for pgvector) ---
+rds_engine_version   = "16.0"
+rds_instance_type    = "pg.n2.small.1"
+rds_instance_storage = 50
+# db_account_password = ""   # leave empty to auto-generate a strong one
+
+# --- Tair / Redis (region-specific class) ---
+redis_instance_class = "redis.master.small.default"
+redis_engine_version = "7.0"
+# redis_password      = ""   # leave empty to auto-generate
+
+# --- ECS app tier ---
+ecs_instance_type   = "ecs.g7.large"
+ecs_password        = "Change-This-Str0ng-Passw0rd"
+render_worker_count = 2
+
+# --- Application runtime ---
+container_image   = "registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest"
+dashscope_api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+kinora_live_video = false  # flip to true only when you intend to spend Wan video-seconds

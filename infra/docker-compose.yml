@@ -1,22 +1,41 @@
-# Kinora local stack.
+# Kinora local stack — the real process model (kinora.md §6).
 #
-# Brings up the full data plane (Postgres+pgvector, Redis, MinIO) plus the
-# backend API, the scheduler/worker/mcp services, the frontend, and Prometheus.
+# Data plane:  postgres (pgvector) + redis + minio (+ one-shot bucket bootstrap)
+# Schema:      migrate (one-shot `alembic upgrade head`, runs before the app)
+# App plane:   api (FastAPI; runs the Scheduler in-process + the idle-sweeper and
+#              triggers Phase-A ingest as a background task on upload),
+#              render-worker (`python -m app.queue.worker`, drains the Redis
+#              priority queue and runs the real per-shot pipeline / degradation
+#              ladder), mcp (`python -m app.mcp.run --http`, the canon-memory
+#              MCP server), frontend, prometheus.
 #
-# Usage (from infra/):  docker compose up -d
-# Validate config:      docker compose config -q
+# NOTE on services that DON'T exist as separate processes (kept honest):
+#   * scheduler  — there is no standalone scheduler process: the Scheduler control
+#                  plane runs IN-PROCESS in `api` (driven by the intent/seek
+#                  endpoints + a background idle-sweeper, §4.7/§4.9).
+#   * ingest     — ingest also runs IN-PROCESS in `api` (a background task spawned
+#                  on PDF upload, §9.1). A one-shot CLI exists for re-ingest:
+#                  `docker compose run --rm api python -m app.ingest.worker <book_id>`.
+#
+# Usage (from infra/):
+#   docker compose build
+#   docker compose up -d                 # brings up data plane, runs migrate, starts app
+#   docker compose run --rm migrate      # (re-)apply migrations on demand
+#   docker compose config -q             # validate this file
 
 name: kinora
 
-# Shared definition for every service built from the backend image. Workers and
-# the API reuse this; only their `command` differs.
+# Shared definition for every service built from the backend image. The workers,
+# the API, the MCP server, and the one-shot migrate job reuse this; only their
+# `command` and `depends_on` differ.
 x-backend: &backend
   build:
     context: ..
     dockerfile: infra/docker/backend.Dockerfile
   image: kinora-backend:local
-  # backend/.env holds the real DashScope key locally; optional so the config
-  # still validates (and CI/cloud can inject env another way) when it's absent.
+  # backend/.env holds the real DashScope key + KINORA_LIVE_VIDEO locally; optional
+  # so the config still validates (and CI/cloud can inject env another way) when
+  # it's absent.
   env_file:
     - path: ../backend/.env
       required: false
@@ -25,18 +44,8 @@ x-backend: &backend
     DATABASE_URL: postgresql+asyncpg://kinora:kinora@postgres:5432/kinora
     REDIS_URL: redis://redis:6379/0
     S3_ENDPOINT_URL: http://minio:9000
-  depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
-    minio:
-      condition: service_healthy
-    minio-bootstrap:
-      condition: service_completed_successfully
   networks:
     - kinora
-  restart: unless-stopped
 
 services:
   postgres:
@@ -119,30 +128,80 @@ services:
       - kinora
     restart: "no"
 
+  # One-shot: apply the Alembic schema (the image WORKDIR /app holds alembic.ini +
+  # migrations/). The app services wait for this to finish before they start.
+  migrate:
+    <<: *backend
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     <<: *backend
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # The runtime image has no curl; use the bundled Python stdlib instead.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
 
-  # NOTE: scheduler/worker/mcp entrypoints (python -m app.workers.<name>) are
-  # implemented in later phases. Until then they idle so the stack is valid and
-  # the containers stay up for wiring/testing.
-  scheduler:
-    <<: *backend
-    command: ["sh", "-c", "echo 'kinora scheduler - implemented in later phase' && sleep infinity"]
-
+  # The real render worker: drains the Redis priority queue, runs the per-shot
+  # render pipeline, and (with KINORA_LIVE_VIDEO off / under budget pressure)
+  # steps down the real ffmpeg degradation ladder. Scale with `--scale render-worker=N`.
   render-worker:
     <<: *backend
-    command: ["sh", "-c", "echo 'kinora render-worker - implemented in later phase' && sleep infinity"]
+    command: ["python", "-m", "app.queue.worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
-  ingest-worker:
-    <<: *backend
-    command: ["sh", "-c", "echo 'kinora ingest-worker - implemented in later phase' && sleep infinity"]
-
+  # The MCP canon-memory server over streamable-HTTP (the §8.3 tool surface).
   mcp:
     <<: *backend
-    command: ["sh", "-c", "echo 'kinora mcp canon-memory service - implemented in later phase' && sleep infinity"]
+    command: ["python", "-m", "app.mcp.run", "--http", "--host", "0.0.0.0", "--port", "8765"]
+    ports:
+      - "8765:8765"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
   frontend:
     build:
@@ -152,7 +211,8 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - kinora
     restart: unless-stopped
@@ -168,7 +228,8 @@ services:
     ports:
       - "9090:9090"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - kinora
     restart: unless-stopped

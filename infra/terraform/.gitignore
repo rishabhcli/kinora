@@ -1,0 +1,17 @@
+# Terraform working files — never commit provider binaries, state, or secrets.
+.terraform/
+.terraform.tfstate.lock.info
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Secrets / local overrides (terraform.tfvars.example IS committed).
+terraform.tfvars
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Keep .terraform.lock.hcl committed (records provider selections).

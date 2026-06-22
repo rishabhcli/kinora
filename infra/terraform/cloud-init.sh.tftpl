@@ -1,0 +1,37 @@
+#!/bin/bash
+# Kinora ECS node bootstrap (${role}). Installs Docker, writes the runtime env,
+# and runs the backend container with this node's command. Rendered by Terraform
+# (templatefile); values are interpolated from the managed-service outputs.
+set -euxo pipefail
+
+# --- Docker (Aliyun Linux 3 / dnf) ---
+dnf install -y docker || yum install -y docker
+systemctl enable --now docker
+
+# --- Runtime environment (no secrets are committed; injected at apply time) ---
+install -d -m 0750 /etc/kinora
+cat > /etc/kinora/kinora.env <<'ENV'
+APP_ENV=${app_env}
+DATABASE_URL=${database_url}
+REDIS_URL=${redis_url}
+S3_ENDPOINT_URL=${s3_endpoint_url}
+S3_REGION=${s3_region}
+S3_BUCKET=${s3_bucket}
+S3_ACCESS_KEY=${s3_access_key}
+S3_SECRET_KEY=${s3_secret_key}
+DASHSCOPE_API_KEY=${dashscope_api_key}
+DASHSCOPE_BASE_URL=${dashscope_base_url}
+KINORA_LIVE_VIDEO=${kinora_live_video}
+ENV
+chmod 0640 /etc/kinora/kinora.env
+
+# --- Pull + run the backend image with this node's command ---
+# If the image lives in a private ACR, add a `docker login` here (or attach a RAM
+# role + use the ACR credential helper) before the pull.
+docker pull "${image}"
+docker rm -f kinora-${role} 2>/dev/null || true
+docker run -d --name kinora-${role} \
+  --restart always \
+  --env-file /etc/kinora/kinora.env \
+  ${publish} \
+  "${image}" ${command}

@@ -10,7 +10,9 @@ The book stays on screen. As the film plays, a narrator reads the text aloud, th
 | **Primary track** | Track 2 — AI Showrunner (also covers Track 1 · MemoryAgent and Track 3 · Agent Society) |
 | **Deadline** | Jul 9, 2026 · 2:00pm PDT |
 | **Deployment** | Alibaba Cloud — ECS / Function Compute · OSS · DashScope / Model Studio |
-| **Status** | Design complete · implementation in progress (see [roadmap](#roadmap)) |
+| **Status** | **Built and runnable** — full backend + React frontend, real Qwen/Wan/CosyVoice, real persistence/queue/budget. Bring it up with `docker compose`; deploy with `infra/terraform`. |
+
+> **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → open `http://localhost:5173`. See [Run it locally](#run-it-locally).
 
 ---
 
@@ -125,38 +127,126 @@ The full diagram, the per-shot state machine, and the end-to-end sequence are in
 - **Models (Qwen Cloud / DashScope)** — Qwen3.7-Max (orchestration), Qwen3.7-Plus / Qwen3.5-Plus (high-volume agents), Qwen3-VL (page reading + QA), Wan 2.7 (character video: reference-to-video / first-last-frame / continuation), HappyHorse 1.0 (establishing shots), CosyVoice v3-plus (narration + voice cloning + word timestamps).
 - **Backend (Alibaba Cloud)** — stateless agent services + Scheduler on ECS / Function Compute; clips, frames, audio, and the canon vault in OSS; an idempotent, cancellable, dead-lettered render queue on the managed broker.
 
+## Project layout
+
+```
+backend/      FastAPI app, six-agent crew, MCP canon-memory server, render pipeline,
+              scheduler + Redis queue, budget service, eval harness, Alembic migrations
+frontend/     React + Vite + TypeScript two-pane workspace (PDF ⟷ video, SyncEngine)
+infra/        docker-compose.yml (the local stack) + terraform/ (Alibaba Cloud IaC)
+deploy/       alibaba_render_worker.py — the §12.6 OSS + DashScope proof artifact
+assets/books/ the bundled public-domain demo book + its PyMuPDF build script
+Makefile      install / stack-up / migrate / worker / mcp / seed-demo / test / …
+kinora.md     the full technical design (architecture, agents, pipeline, memory, budget)
+```
+
+## The real process model
+
+Every backend role is the same image with a different command (see `infra/docker-compose.yml`):
+
+| Service | Command | Role |
+|---|---|---|
+| `api` | `uvicorn app.main:app` | REST + SSE/WS; **runs the Scheduler in-process** + the idle-sweeper; **triggers Phase-A ingest** as a background task on upload |
+| `render-worker` | `python -m app.queue.worker` | Drains the Redis priority queue; runs the per-shot pipeline / the ffmpeg degradation ladder |
+| `mcp` | `python -m app.mcp.run --http` | The canon-memory MCP server (the §8.3 tool surface) |
+| `migrate` | `alembic -c alembic.ini upgrade head` | One-shot schema apply (runs before the app) |
+| `postgres` / `redis` / `minio` | — | Postgres+pgvector · Redis · S3-compatible object storage |
+
+There is **no** separate scheduler or ingest process — both run inside `api` (a one-shot
+`python -m app.ingest.worker <book_id>` CLI exists for re-ingest).
+
+## Run it locally
+
+**Prerequisites:** Docker + Docker Compose, and a DashScope (Model Studio, intl) API key.
+
+```bash
+# 1. Configure secrets (backend/.env is gitignored; .env.example is the template).
+cp .env.example backend/.env
+#    edit backend/.env: set DASHSCOPE_API_KEY=sk-...   (KINORA_LIVE_VIDEO stays false)
+#    and set TTS_MODEL=qwen3-tts-flash  (preset-voice narration; see Configuration)
+
+# 2. Build + bring up the whole stack (data plane, migrate, api, render-worker, mcp, frontend).
+make stack-up                 # == cd infra && docker compose up -d --build
+#    migrations run automatically via the one-shot `migrate` service.
+
+# 3. Seed the bundled public-domain demo book through the REAL flow (register → upload → ingest).
+make seed-demo                # == python backend/scripts/seed_demo.py --via api
+
+# 4. Open the workspace.
+open http://localhost:5173    # API: http://localhost:8000/docs · Prometheus: http://localhost:9090
+```
+
+### Local dev without Docker (venv)
+
+```bash
+make install                  # backend/.venv + pip install -e .[dev]
+cd infra && docker compose up -d postgres redis minio minio-bootstrap   # just the data plane
+make migrate                  # alembic upgrade head
+# then, in separate shells:
+cd backend && .venv/bin/uvicorn app.main:app --reload     # api (scheduler + ingest in-process)
+make worker                   # python -m app.queue.worker
+make mcp                      # python -m app.mcp.run --http
+make seed-demo SEED_ARGS="--via direct"   # or run ingest in-process, no server needed
+```
+
+## Verify the end-to-end loop
+
+With `KINORA_LIVE_VIDEO` **off** (the default — no Wan spend), the full loop still runs end to end:
+
+1. **Ingest** — `seed-demo` uploads the demo PDF; Phase A extracts pages + per-word boxes, runs Qwen-VL page analysis, builds the versioned canon (characters/locations/props/style), plans the shot list + source-span index, and identity-locks keyframes + voices. The book reaches `status: ready`.
+2. **Session + scroll** — create a reading session and send `intent_update`s; the Scheduler fills the committed buffer under the dual-watermark and enqueues **keyframe** work across the speculative horizon (zero video-seconds).
+3. **Render** — the `render-worker` drains the queue. With the live gate off it steps down the **degradation ladder** and produces a **real Ken-Burns mp4** over the locked keyframe (muxed with CosyVoice narration), surfaced as a `clip_ready` event — **zero video-seconds spent**. The budget ledger stays at 0.
+4. **Go live** — flip `KINORA_LIVE_VIDEO=1` and the same committed lane renders **real Wan 2.7 video** through the Critic/cache/budget path, hot-swapping into the workspace; the budget service decrements and enforces the hard ceiling.
+
+This loop is exercised by the backend test suite (`make test`, against throwaway Postgres+Redis+MinIO) and by `make seed-demo`.
+
+## Configuration & the go-live gate
+
+All config flows through typed settings (`backend/app/core/config.py`); see [`.env.example`](./.env.example) for every key. The ones that matter most:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `DASHSCOPE_API_KEY` | — (**required**) | Model Studio (intl) key. Only in gitignored `backend/.env`. |
+| `KINORA_LIVE_VIDEO` | `false` | **Go-live gate (§11.1).** Off = the pipeline degrades to Ken-Burns (zero Wan spend) while you iterate. On = real Wan video renders. |
+| `TTS_MODEL` | `qwen3-tts-vc` | TTS model. **Set `TTS_MODEL=qwen3-tts-flash` for the demo** — ingest assigns *preset* Qwen3-TTS voices (Cherry, Ryan, …), which the `-flash` model serves; `-vc` is the voice-*clone* model and expects an enrolled voice. |
+| `BUDGET_CEILING_VIDEO_S` | `1650` | Hard cap on total video-seconds. Per-session/per-scene sub-caps also apply. |
+| `WATERMARK_LOW_S` / `_HIGH_S` / `COMMIT_HORIZON_S` | `25 / 75 / 45` | Scheduler buffer + promotion horizons. |
+
+The budget service enforces the ceiling with a real append-only ledger and a transaction-scoped lock; the gate prevents silent credit burn. Real Wan renders spend real, metered DashScope credits — flip the gate on deliberately.
+
+## Deploy to Alibaba Cloud
+
+`infra/terraform/` is ready-to-apply IaC (validated with `terraform validate` + `terraform fmt`; **not** applied — it needs your credentials). It provisions VPC + security groups, **OSS** (object storage), **ApsaraDB RDS for PostgreSQL** (pgvector), **Tair/Redis**, and **ECS** nodes for `api` + `render-worker` + `mcp` — each running the same image with its role command via cloud-init.
+
+```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars   # add Alibaba creds + DashScope key (gitignored)
+terraform init && terraform validate && terraform plan && terraform apply
+```
+
+The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py), kinora.md §12.6) is a real render worker that demonstrably uses **OSS** + **DashScope** — it reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than duplicating logic. See [`deploy/README.md`](./deploy/README.md) and [`infra/terraform/README.md`](./infra/terraform/README.md).
+
 ## Repository contents
 
-| File | What it is |
+| Path | What it is |
 |---|---|
-| [`README.md`](./README.md) | You are here — the project front door. |
+| [`backend/`](./backend) · [`frontend/`](./frontend) | The built application (Python backend · React frontend). |
+| [`infra/`](./infra) · [`deploy/`](./deploy) · [`assets/`](./assets) | Local stack + Alibaba IaC · §12.6 proof artifact · demo book. |
+| [`kinora.md`](./kinora.md) | The full technical design — architecture, agents, pipeline, memory, budget. |
 | [`what-is-kinora.md`](./what-is-kinora.md) | Plain-English explainer. **Start here if you're non-technical.** |
-| [`kinora.md`](./kinora.md) | The full technical design — architecture, agents, generation pipeline, memory layer, budget accounting, build plan. |
-| [`hackathon_description.md`](./hackathon_description.md) | The hackathon's rules, tracks, requirements, and judging criteria. |
-
-## Roadmap
-
-The 18-day build plan (full detail in [`kinora.md` §15](./kinora.md#15-build-plan--18-days)) targets the **core loop on one book**, not the whole vision:
-
-- [ ] Shelf + two-pane workspace; Viewer mode with working PDF ↔ video ↔ word sync
-- [ ] Ingest one short, public-domain, illustrated story (Phase A: canon + source-span index)
-- [ ] Canon graph for 2–3 characters with locked reference images + cloned voices
-- [ ] Generation-on-scroll on one chapter — Scheduler, watermark buffer, keyframe speculation
-- [ ] Full per-shot pipeline on a 60–90s sequence (ingest → keyframe → video → narration → critic → stitch)
-- [ ] One Director edit: region-select → instruction → canon update → single shot regenerates
-- [ ] Metrics panel: CCS + accepted-footage efficiency, crew vs. single-agent baseline
+| [`hackathon_description.md`](./hackathon_description.md) | The hackathon's rules, tracks, and judging criteria. |
 
 ## Submission readiness
 
 Tracked against the Devpost requirements (see [`hackathon_description.md`](./hackathon_description.md)):
 
-- [ ] **Open-source license** file, visible in the repo's About section *(required — to be added)*
-- [ ] **Proof of Alibaba Cloud deployment** — short recording + a linked repo file using OSS + DashScope (the worker in [`kinora.md` §12.6](./kinora.md#126-deployment-on-alibaba-cloud-a-hard-submission-requirement))
-- [ ] **Architecture diagram** (exported from §6)
+- [x] **Open-source license** — [`LICENSE`](./LICENSE) (Apache-2.0), visible in the repo's About section
+- [x] **Proof of Alibaba Cloud deployment** — [`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py) uses OSS + DashScope (record it running per [`deploy/README.md`](./deploy/README.md))
+- [x] **Architecture diagram** — see [Architecture](#architecture) and [`kinora.md` §6](./kinora.md#6-system-architecture)
 - [ ] **~3-minute demo video** (public on YouTube / Vimeo / Facebook Video)
-- [ ] **Text description** of features + functionality
+- [x] **Text description** of features + functionality (this README + `kinora.md`)
 - [x] **Track identified** — Track 2, AI Showrunner
 
 ## License
 
-An open-source license is **required** for the hackathon submission and has not been added yet. Add a `LICENSE` file (e.g. MIT or Apache-2.0) and set the repository description before submitting so it's detectable at the top of the repo page.
+[Apache-2.0](./LICENSE).
