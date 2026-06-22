@@ -1,0 +1,184 @@
+# Kinora local stack.
+#
+# Brings up the full data plane (Postgres+pgvector, Redis, MinIO) plus the
+# backend API, the scheduler/worker/mcp services, the frontend, and Prometheus.
+#
+# Usage (from infra/):  docker compose up -d
+# Validate config:      docker compose config -q
+
+name: kinora
+
+# Shared definition for every service built from the backend image. Workers and
+# the API reuse this; only their `command` differs.
+x-backend: &backend
+  build:
+    context: ..
+    dockerfile: infra/docker/backend.Dockerfile
+  image: kinora-backend:local
+  # backend/.env holds the real DashScope key locally; optional so the config
+  # still validates (and CI/cloud can inject env another way) when it's absent.
+  env_file:
+    - path: ../backend/.env
+      required: false
+  environment:
+    # Override the localhost defaults with in-network service hostnames.
+    DATABASE_URL: postgresql+asyncpg://kinora:kinora@postgres:5432/kinora
+    REDIS_URL: redis://redis:6379/0
+    S3_ENDPOINT_URL: http://minio:9000
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+    minio-bootstrap:
+      condition: service_completed_successfully
+  networks:
+    - kinora
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: kinora
+      POSTGRES_PASSWORD: kinora
+      POSTGRES_DB: kinora
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kinora -d kinora"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - kinora
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - kinora
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: kinora
+      MINIO_ROOT_PASSWORD: kinora-secret
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      # MinIO exposes a liveness probe at /minio/health/live (curl ships in the image).
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    networks:
+      - kinora
+    restart: unless-stopped
+
+  # One-shot: wait for MinIO and create the kinora bucket idempotently.
+  minio-bootstrap:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        until mc alias set kinora http://minio:9000 kinora kinora-secret; do
+          echo "waiting for minio..."; sleep 2;
+        done
+        mc mb --ignore-existing kinora/kinora
+        # Public read keeps signed-URL plumbing optional for local dev; flip to
+        # `mc anonymous set none` to keep the bucket private.
+        mc anonymous set download kinora/kinora || true
+        echo "minio bootstrap complete"
+    networks:
+      - kinora
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+
+  # NOTE: scheduler/worker/mcp entrypoints (python -m app.workers.<name>) are
+  # implemented in later phases. Until then they idle so the stack is valid and
+  # the containers stay up for wiring/testing.
+  scheduler:
+    <<: *backend
+    command: ["sh", "-c", "echo 'kinora scheduler - implemented in later phase' && sleep infinity"]
+
+  render-worker:
+    <<: *backend
+    command: ["sh", "-c", "echo 'kinora render-worker - implemented in later phase' && sleep infinity"]
+
+  ingest-worker:
+    <<: *backend
+    command: ["sh", "-c", "echo 'kinora ingest-worker - implemented in later phase' && sleep infinity"]
+
+  mcp:
+    <<: *backend
+    command: ["sh", "-c", "echo 'kinora mcp canon-memory service - implemented in later phase' && sleep infinity"]
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/docker/frontend.Dockerfile
+    image: kinora-frontend:local
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    networks:
+      - kinora
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+    networks:
+      - kinora
+    restart: unless-stopped
+
+networks:
+  kinora:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  promdata:

@@ -1,0 +1,30 @@
+# --- Secrets (never commit real keys) ---
+.env
+**/.env
+# .env.example IS committed (it only contains placeholders)
+
+# --- Python ---
+.venv/
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+dist/
+
+# --- Object storage / local artifacts ---
+storage/
+
+# --- Logs ---
+*.log
+
+# --- OS ---
+.DS_Store
