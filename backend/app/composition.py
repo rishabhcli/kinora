@@ -1,0 +1,472 @@
+"""The composition root — wire every subsystem into one runnable :class:`Container`.
+
+This is the single place the dependency-injection seams the earlier phases left
+open are satisfied:
+
+* the memory layer's :class:`~app.memory.interfaces.RenderEnqueuer` seam (Phase 4
+  shipped a ``NotWired`` default) is satisfied by the **real**
+  :class:`~app.queue.enqueuer.RedisRenderEnqueuer` over the Redis priority queue;
+* the :class:`~app.memory.interfaces.ShotPlanner` seam is satisfied by the **real**
+  :class:`~app.agents.adapter.Adapter`.
+
+Both are injected into :class:`~app.mcp.tools.MemoryTools` (so the MCP ``shot.render``
+tool enqueues real render jobs and ``shot.plan`` runs the real Adapter), and the
+same enqueuer drives Director-mode targeted regen.
+
+Everything heavy is built lazily: constructing a :class:`Container` opens no
+sockets and needs no network, so ``create_app()`` and the ``/health`` probe work
+with ``DASHSCOPE_API_KEY=test`` and no infrastructure. Providers (DashScope
+clients), the render pipeline, and the ingest pipeline are imported and
+constructed only on first use.
+
+The provider-calling collaborators are also exposed as overridable *seams*
+(:attr:`Container.comment_classifier`, :attr:`Container.regen_runner`,
+:attr:`Container.ingest_runner`, :attr:`Container.shot_planner`,
+:attr:`Container.embedder`) so tests can drive the gateway end-to-end without the
+network while production uses the real defaults.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Protocol
+
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from app.core.config import Settings, get_settings
+from app.core.logging import get_logger
+from app.db.models.enums import RenderPriority
+from app.memory.budget_service import BudgetLimits, BudgetService
+from app.memory.interfaces import Embedder, RenderEnqueuer, ShotPlanner, ShotSpec
+from app.queue.enqueuer import RedisRenderEnqueuer
+from app.queue.redis_queue import RedisRenderQueue, book_channel, session_channel
+from app.redis.client import RedisClient
+from app.scheduler.intent import IntentController
+from app.scheduler.model import SchedulerStore
+from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
+from app.storage.object_store import ObjectStore
+
+if TYPE_CHECKING:
+    from app.mcp.tools import MemoryTools
+    from app.providers import Providers
+    from app.scheduler.keyframe import KeyframeService
+
+logger = get_logger("app.composition")
+
+SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
+
+
+# --------------------------------------------------------------------------- #
+# Director-mode seam results + protocols
+# --------------------------------------------------------------------------- #
+
+
+class CommentRoute(BaseModel):
+    """How a Director region-comment was routed by the intent classifier (§5.4)."""
+
+    agent: str
+    aspect: str
+    message: str
+
+
+class RegenOutcome(BaseModel):
+    """The result of regenerating one shot after a Director edit (§8.7)."""
+
+    shot_id: str
+    status: str
+    oss_url: str | None = None
+    qa: dict[str, object] | None = None
+
+
+class CommentClassifier(Protocol):
+    """Classify a Director note + bound shot to an agent route (the §5.4 router)."""
+
+    async def classify(self, note: str, *, shot_context: str | None = None) -> CommentRoute: ...
+
+
+#: ``run_regen(book_id, shot_id, session_id) -> RegenOutcome`` — render one shot.
+RegenRunner = Callable[[str, str, str | None], Awaitable[RegenOutcome]]
+#: ``run_ingest(book_id, pdf_bytes, session_id) -> None`` — Phase A for a book.
+IngestRunner = Callable[[str, bytes, str | None], Awaitable[None]]
+
+
+def make_session_factory(maker: async_sessionmaker[AsyncSession]) -> SessionFactory:
+    """Build a committing unit-of-work factory bound to ``maker``.
+
+    Mirrors :func:`app.db.session.get_session`: commit on clean exit, roll back on
+    error. Repositories only ``flush``, so this boundary owns the transaction.
+    """
+
+    @asynccontextmanager
+    async def factory() -> AsyncIterator[AsyncSession]:
+        async with maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    return factory
+
+
+# --------------------------------------------------------------------------- #
+# Default (real) comment classifier — a cheap Qwen chat() call (§5.4)
+# --------------------------------------------------------------------------- #
+
+
+class _ChatCommentClassifier:
+    """Route a Director note with one cheap ``chat()`` call (kinora.md §5.4).
+
+    "Make her coat red" -> Cinematographer (look) + Continuity; "too fast" ->
+    Cinematographer (pacing); "wrong room" -> Continuity (room). The model picks
+    one primary agent; deterministic keyword fallbacks keep it robust if the
+    reply is unusable.
+    """
+
+    _SYSTEM = (
+        "You route a film director's note to ONE agent. Reply with strict JSON: "
+        '{"agent": "cinematographer"|"continuity", "aspect": "pacing"|"look"|'
+        '"room"|"canon"|"composition", "message": "<one-line restatement>"}. '
+        "Pacing/look/composition -> cinematographer. Wrong room/location, "
+        "object/canon contradiction, character appearance continuity -> continuity."
+    )
+
+    def __init__(self, chat: object, model: str) -> None:
+        self._chat = chat
+        self._model = model
+
+    async def classify(self, note: str, *, shot_context: str | None = None) -> CommentRoute:
+        user = note if not shot_context else f"{note}\n\n[shot context: {shot_context}]"
+        messages = [
+            {"role": "system", "content": self._SYSTEM},
+            {"role": "user", "content": user},
+        ]
+        try:
+            raw = await self._chat.chat_json(  # type: ignore[attr-defined]
+                messages, self._model, temperature=0.0, max_tokens=200, stream=False
+            )
+        except Exception as exc:  # noqa: BLE001 - never fail a comment on classifier error
+            logger.warning("director.classify_failed", error=str(exc))
+            return self._fallback(note)
+        if not isinstance(raw, dict):
+            return self._fallback(note)
+        agent = str(raw.get("agent", "")).lower().strip()
+        aspect = str(raw.get("aspect", "")).lower().strip()
+        if agent not in {"cinematographer", "continuity"}:
+            return self._fallback(note)
+        message = str(raw.get("message") or note)
+        return CommentRoute(agent=agent, aspect=aspect or "look", message=message)
+
+    @staticmethod
+    def _fallback(note: str) -> CommentRoute:
+        text = note.lower()
+        if any(w in text for w in ("room", "place", "location", "where", "wrong", "should be")):
+            return CommentRoute(agent="continuity", aspect="room", message=note)
+        if any(w in text for w in ("fast", "slow", "pace", "pacing", "speed", "linger")):
+            return CommentRoute(agent="cinematographer", aspect="pacing", message=note)
+        return CommentRoute(agent="cinematographer", aspect="look", message=note)
+
+
+# --------------------------------------------------------------------------- #
+# The Container
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class Container:
+    """Every wired subsystem, behind one typed handle stored on ``app.state``.
+
+    Construction is pure (no I/O). Connections open on first use and are closed
+    by :meth:`shutdown`.
+    """
+
+    settings: Settings
+    engine: AsyncEngine
+    sessionmaker: async_sessionmaker[AsyncSession]
+    session_factory: SessionFactory
+    redis: RedisClient
+    object_store: ObjectStore
+    queue: RedisRenderQueue
+    render_enqueuer: RenderEnqueuer
+    scheduler_store: SchedulerStore
+    keyframe_maintainer: QueueKeyframeMaintainer
+    budget_limits: BudgetLimits
+
+    # -- overridable seams (None => lazily built real default) --------------- #
+    embedder: Embedder | None = None
+    shot_planner: ShotPlanner | None = None
+    comment_classifier: CommentClassifier | None = None
+    regen_runner: RegenRunner | None = None
+    ingest_runner: IngestRunner | None = None
+
+    # -- private lazy caches ------------------------------------------------- #
+    _providers: Providers | None = field(default=None, repr=False)
+    _tools: MemoryTools | None = field(default=None, repr=False)
+    _keyframe_service: KeyframeService | None = field(default=None, repr=False)
+    _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
+
+    # -- providers (lazy; constructing them needs the key but no network) ---- #
+
+    @property
+    def providers(self) -> Providers:
+        """The shared DashScope provider bundle (constructed on first use)."""
+        if self._providers is None:
+            from app.providers import create_providers
+
+            self._providers = create_providers(self.settings)
+        return self._providers
+
+    def _embedder(self) -> Embedder:
+        return self.embedder if self.embedder is not None else self.providers.embeddings
+
+    def _planner(self) -> ShotPlanner:
+        if self.shot_planner is not None:
+            return self.shot_planner
+        from app.agents.adapter import Adapter
+
+        # Bind the Adapter to THIS container's unit of work so ``shot.plan`` reads
+        # the same database the rest of the container writes (not the global one).
+        self.shot_planner = Adapter(
+            self.providers, settings=self.settings, session_factory=self.session_factory
+        )
+        return self.shot_planner
+
+    # -- the MCP tool layer: the single DI-seam satisfaction point ----------- #
+
+    def build_tools(self) -> MemoryTools:
+        """Build the §8.3 :class:`MemoryTools` with the REAL enqueuer + planner.
+
+        ``shot.render`` enqueues through the real :class:`RedisRenderEnqueuer`;
+        ``shot.plan`` runs the real :class:`Adapter`. Cached after first build.
+        """
+        if self._tools is None:
+            from app.mcp.tools import MemoryTools
+
+            self._tools = MemoryTools(
+                embedder=self._embedder(),
+                session_factory=self.session_factory,
+                blob_store=self.object_store,
+                limits=self.budget_limits,
+                enqueuer=self.render_enqueuer,
+                planner=self._planner(),
+            )
+        return self._tools
+
+    @property
+    def keyframe_service(self) -> KeyframeService:
+        """The cheap keyframe lane (image-gen stills, zero video-seconds, §4.4)."""
+        if self._keyframe_service is None:
+            from app.scheduler.keyframe import KeyframeService
+
+            self._keyframe_service = KeyframeService(
+                image=self.providers.image,
+                object_store=self.object_store,
+                redis=self.redis,
+                settings=self.settings,
+            )
+        return self._keyframe_service
+
+    # -- per-request scheduler stack (bound to a request DB session) --------- #
+
+    def build_scheduler(self, session: AsyncSession) -> SchedulerService:
+        """Build a :class:`SchedulerService` bound to ``session`` (budget + spans)."""
+        from app.db.repositories.budget import BudgetRepo
+        from app.db.repositories.shot import SourceSpanRepo
+
+        return SchedulerService(
+            queue=self.queue,
+            budget=BudgetService(repo=BudgetRepo(session), limits=self.budget_limits),
+            shots=SourceSpanRepo(session),
+            keyframes=self.keyframe_maintainer,
+            store=self.scheduler_store,
+            settings=self.settings,
+        )
+
+    def build_intent_controller(self, session: AsyncSession) -> IntentController:
+        """Build the §4.7/§4.8 :class:`IntentController` over a request session."""
+        return IntentController(
+            service=self.build_scheduler(session),
+            store=self.scheduler_store,
+            settings=self.settings,
+        )
+
+    # -- Director seams ------------------------------------------------------ #
+
+    def _classifier(self) -> CommentClassifier:
+        if self.comment_classifier is not None:
+            return self.comment_classifier
+        self.comment_classifier = _ChatCommentClassifier(
+            self.providers.chat, self.settings.chat_model_adapter
+        )
+        return self.comment_classifier
+
+    async def classify_comment(
+        self, note: str, *, shot_context: str | None = None
+    ) -> CommentRoute:
+        """Route a Director note to an agent (cheap chat() classifier, §5.4)."""
+        return await self._classifier().classify(note, shot_context=shot_context)
+
+    async def run_regen(
+        self, book_id: str, shot_id: str, session_id: str | None = None
+    ) -> RegenOutcome:
+        """Regenerate one shot through the real render pipeline (or the seam)."""
+        if self.regen_runner is not None:
+            return await self.regen_runner(book_id, shot_id, session_id)
+        return await self._default_run_regen(book_id, shot_id, session_id)
+
+    async def _default_run_regen(
+        self, book_id: str, shot_id: str, session_id: str | None
+    ) -> RegenOutcome:
+        from app.render.pipeline import build_render_pipeline
+
+        async with self.session_factory() as db:
+            pipeline = build_render_pipeline(
+                db,
+                providers=self.providers,
+                object_store=self.object_store,
+                settings=self.settings,
+            )
+            result = await pipeline.render_shot(book_id, shot_id, session_id=session_id)
+        return RegenOutcome(
+            shot_id=result.shot_id,
+            status=result.status.value,
+            oss_url=result.clip_url,
+            qa=result.qa,
+        )
+
+    async def run_ingest(
+        self, book_id: str, pdf_bytes: bytes, session_id: str | None = None
+    ) -> None:
+        """Run Phase A ingest for a book, publishing progress events (or the seam)."""
+        if self.ingest_runner is not None:
+            await self.ingest_runner(book_id, pdf_bytes, session_id)
+            return
+        await self._default_run_ingest(book_id, pdf_bytes, session_id)
+
+    async def _default_run_ingest(
+        self, book_id: str, pdf_bytes: bytes, session_id: str | None
+    ) -> None:
+        from app.ingest.service import ingest_pdf
+
+        channel = session_channel(session_id) if session_id else book_channel(book_id)
+
+        async def progress(stage: str, pct: float) -> None:
+            await self.redis.publish(
+                channel,
+                {"event": "ingest_progress", "book_id": book_id, "stage": stage, "pct": pct},
+            )
+
+        await ingest_pdf(
+            book_id,
+            pdf_bytes,
+            providers=self.providers,
+            blob_store=self.object_store,
+            settings=self.settings,
+            session_factory=self.session_factory,
+            progress=progress,
+        )
+
+    # -- targeted regen enqueue (Director comment / canon edit) -------------- #
+
+    async def enqueue_regen(self, spec: ShotSpec, *, cancel_token: str | None = None) -> str:
+        """Enqueue a single shot for committed regen via the real enqueuer (§8.7)."""
+        return await self.render_enqueuer.enqueue(spec, RenderPriority.COMMITTED, cancel_token)
+
+    # -- background tasks (ingest / regen fan-out) --------------------------- #
+
+    def spawn(self, coro: Awaitable[None]) -> asyncio.Task[None]:
+        """Run ``coro`` as a tracked background task (awaited/cancelled on shutdown)."""
+        task: asyncio.Task[None] = asyncio.ensure_future(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        return task
+
+    # -- lifecycle ----------------------------------------------------------- #
+
+    async def startup(self) -> None:
+        """Lifecycle hook. Connections are lazy, so this only logs readiness."""
+        logger.info("container.startup", env=self.settings.app_env)
+
+    async def shutdown(self) -> None:
+        """Cancel background tasks, close Redis, dispose the engine, close providers."""
+        for task in list(self._bg_tasks):
+            task.cancel()
+        for task in list(self._bg_tasks):
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        with suppress(Exception):
+            await self.redis.close()
+        if self._providers is not None:
+            with suppress(Exception):
+                await self._providers.aclose()
+        with suppress(Exception):
+            await self.engine.dispose()
+        logger.info("container.shutdown")
+
+
+def build_container(settings: Settings | None = None) -> Container:
+    """Construct the fully-wired :class:`Container` from application settings.
+
+    Pure construction: no sockets are opened here. The engine, Redis client, and
+    object-store client are all lazy, so this is safe to call at import time and
+    in ``create_app()`` without infrastructure or a live DashScope key.
+    """
+    settings = settings or get_settings()
+
+    engine = create_async_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        future=True,
+    )
+    maker = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    session_factory = make_session_factory(maker)
+
+    redis = RedisClient.from_url(settings.redis_url)
+    object_store = ObjectStore.from_settings(settings)
+    queue = RedisRenderQueue(
+        redis,
+        retry_cap=settings.retry_cap,
+        session_factory=session_factory,
+    )
+    render_enqueuer: RenderEnqueuer = RedisRenderEnqueuer(queue)
+    scheduler_store = SchedulerStore(redis, session_factory=session_factory)
+    keyframe_maintainer = QueueKeyframeMaintainer(queue)
+
+    return Container(
+        settings=settings,
+        engine=engine,
+        sessionmaker=maker,
+        session_factory=session_factory,
+        redis=redis,
+        object_store=object_store,
+        queue=queue,
+        render_enqueuer=render_enqueuer,
+        scheduler_store=scheduler_store,
+        keyframe_maintainer=keyframe_maintainer,
+        budget_limits=BudgetLimits.from_settings(settings),
+    )
+
+
+__all__ = [
+    "CommentClassifier",
+    "CommentRoute",
+    "Container",
+    "IngestRunner",
+    "RegenOutcome",
+    "RegenRunner",
+    "SessionFactory",
+    "build_container",
+    "make_session_factory",
+]

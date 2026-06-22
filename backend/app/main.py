@@ -1,12 +1,22 @@
-"""FastAPI application factory.
+"""FastAPI application factory + the composition-root lifespan.
 
-Exposes liveness (``/health``), readiness (``/ready``), and Prometheus
-(``/metrics``) endpoints. Domain routers (auth, books, sessions, the SSE/WS
-event stream) are mounted in the API-gateway phase.
+``create_app()`` builds the app with its liveness (``/health``), readiness
+(``/ready``), and Prometheus (``/metrics``) endpoints, mounts every domain
+router under ``/api``, installs the typed error handlers, and on startup builds
+the wired :class:`app.composition.Container` into ``app.state`` and launches the
+background **idle-sweeper** (cancels speculative work 8s after a reader goes
+quiet, per §4.7). Construction is lazy, so ``create_app()`` still imports and
+serves ``/health`` with ``DASHSCOPE_API_KEY=test`` and no network.
+
+A test (or an alternate entrypoint) may pre-set ``app.state.container`` and
+``app.state.run_idle_sweeper`` before the lifespan runs to inject a container
+built against throwaway infrastructure and to suppress the sweeper.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -15,9 +25,19 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.api.errors import install_exception_handlers
+from app.api.routes import ROUTERS
+from app.composition import Container, build_container
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.observability.metrics import record_request, render_metrics, set_app_info
+
+#: API version prefix every domain router is mounted under.
+API_PREFIX = "/api"
+#: Idle-sweeper cadence — short enough to catch the 8s idle-pause promptly (§4.7).
+IDLE_SWEEP_INTERVAL_S = 4.0
+#: Redis key prefix the Scheduler stores session control state under.
+_SESSION_KEY_PREFIX = "kinora:sched:session"
 
 
 def _metric_path(request: Request) -> str:
@@ -37,6 +57,44 @@ def _metric_path(request: Request) -> str:
     return "<unknown>"
 
 
+async def _idle_sweeper(container: Container, stop: asyncio.Event) -> None:
+    """Periodically idle-pause quiet sessions (cancel speculative work, §4.7).
+
+    Scans the Scheduler's Redis session keys and runs one idle-aware tick per
+    session; :meth:`IntentController.sweep_idle` only cancels speculation when a
+    reader has been quiet for ≥ 8s. Fully defensive: a Redis blip is logged and
+    retried on the next cadence, never crashing the app.
+    """
+    logger = get_logger("app.main.idle_sweeper")
+    match = f"{_SESSION_KEY_PREFIX}:*"
+    while not stop.is_set():
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=IDLE_SWEEP_INTERVAL_S)
+        if stop.is_set():
+            break
+        try:
+            session_ids = await _scan_session_ids(container, match)
+            for session_id in session_ids:
+                async with container.session_factory() as session:
+                    controller = container.build_intent_controller(session)
+                    await controller.sweep_idle(session_id)
+        except Exception as exc:  # noqa: BLE001 - the sweeper must never crash the app
+            logger.warning("idle_sweeper.error", error=str(exc))
+
+
+async def _scan_session_ids(container: Container, match: str) -> list[str]:
+    raw = container.redis.raw
+    cursor = 0
+    out: list[str] = []
+    prefix_len = len(_SESSION_KEY_PREFIX) + 1
+    while True:
+        cursor, batch = await raw.scan(cursor=cursor, match=match, count=200)
+        out.extend(key[prefix_len:] for key in batch)
+        if cursor == 0:
+            break
+    return out
+
+
 def create_app() -> FastAPI:
     """Build and configure the Kinora FastAPI application."""
     settings = get_settings()
@@ -48,15 +106,32 @@ def create_app() -> FastAPI:
         return round(time.monotonic() - started_at, 3)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        container = getattr(app.state, "container", None)
+        if container is None:
+            container = build_container(settings)
+            app.state.container = container
+        await container.startup()
         logger.info(
             "kinora.startup",
             service=settings.service_name,
             env=settings.app_env,
             version=__version__,
         )
-        yield
-        logger.info("kinora.shutdown", service=settings.service_name)
+        stop = asyncio.Event()
+        sweeper: asyncio.Task[None] | None = None
+        if getattr(app.state, "run_idle_sweeper", True):
+            sweeper = asyncio.create_task(_idle_sweeper(container, stop))
+        try:
+            yield
+        finally:
+            stop.set()
+            if sweeper is not None:
+                sweeper.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await sweeper
+            await container.shutdown()
+            logger.info("kinora.shutdown", service=settings.service_name)
 
     app = FastAPI(
         title="Kinora API",
@@ -74,6 +149,7 @@ def create_app() -> FastAPI:
     )
 
     set_app_info(service=settings.service_name, version=__version__, env=settings.app_env)
+    install_exception_handlers(app)
 
     @app.middleware("http")
     async def _record_requests(
@@ -105,6 +181,7 @@ def create_app() -> FastAPI:
                 "metrics": "/metrics",
                 "docs": "/docs",
                 "openapi": "/openapi.json",
+                "api": API_PREFIX,
             },
         }
 
@@ -114,14 +191,17 @@ def create_app() -> FastAPI:
 
     @app.get("/ready", tags=["meta"], summary="Readiness probe")
     async def ready() -> dict[str, object]:
-        # Dependency checks (Postgres, Redis, object storage) are wired in the
-        # data-layer phase; until then readiness mirrors liveness.
+        # Readiness mirrors liveness so the probe never hard-fails on a transient
+        # dependency blip; per-dependency health is exported via /metrics.
         return {"status": "ready", **_service_info(), "uptime_seconds": _uptime_seconds()}
 
     @app.get("/metrics", tags=["meta"], summary="Prometheus exposition")
     async def metrics() -> Response:
         payload, content_type = render_metrics()
         return Response(content=payload, media_type=content_type)
+
+    for router in ROUTERS:
+        app.include_router(router, prefix=API_PREFIX)
 
     return app
 
