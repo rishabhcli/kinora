@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import functools
+import json
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -76,6 +77,12 @@ class ResilienceConfig:
     rate_per_s: float = 8.0
     rate_burst: int = 8
     default_timeout_s: float = 60.0
+    # Streaming uses a *per-chunk* read (idle) timeout instead of one total cap,
+    # so a multi-minute thinking generation completes as long as tokens / keep-alives
+    # keep arriving — this is what sidesteps the DashScope-intl ~60s non-streaming
+    # gateway cut-off (RemoteProtocolError: Server disconnected).
+    connect_timeout_s: float = 10.0
+    stream_idle_timeout_s: float = 120.0
 
 
 # --------------------------------------------------------------------------- #
@@ -195,6 +202,28 @@ def sdk_get(obj: Any, key: str) -> Any:
         return obj[key]
     except (KeyError, TypeError, IndexError):
         return getattr(obj, key, None)
+
+
+#: Returned by the SSE reader to mark end-of-stream (``data: [DONE]``).
+SSE_DONE = "[DONE]"
+
+#: Module-level alias so the SSE reader can parse payloads even though the
+#: streaming method takes a ``json=`` body kwarg (which shadows the module name).
+_json_loads = json.loads
+
+
+def _sse_payload(line: str) -> str | None:
+    """Extract the payload of an SSE ``data:`` line, or None for non-data lines.
+
+    Tolerates keep-alive blanks and ``:`` comment lines, and ignores other SSE
+    fields (``event:``/``id:``/``retry:``). httpx's ``aiter_lines`` already
+    reassembles lines split across network chunks, so partial-line handling is
+    covered upstream.
+    """
+    stripped = line.strip()
+    if not stripped or stripped.startswith(":") or not stripped.startswith("data:"):
+        return None
+    return stripped[len("data:") :].strip()
 
 
 def classify_status(
@@ -418,21 +447,97 @@ class ProviderClient:
             raise classify_status(resp.status_code, message=resp.text[:200]) from exc
         if resp.is_success:
             return body
-        # Error body: support both compat-mode ({"error": {...}}) and native shapes.
-        err = body.get("error") if isinstance(body, dict) else None
+        raise self._error_from_body(resp.status_code, body)
+
+    @staticmethod
+    def _error_from_body(status: int, body: Any) -> ProviderError:
+        """Build a typed error from a DashScope JSON error body (compat or native shape)."""
+        if not isinstance(body, dict):
+            return classify_status(status)
+        err = body.get("error")
+        request_id = body.get("request_id")
         if isinstance(err, dict):
-            raise classify_status(
-                resp.status_code,
+            return classify_status(
+                status,
                 code=err.get("code") or err.get("type"),
                 message=err.get("message"),
-                request_id=body.get("request_id") if isinstance(body, dict) else None,
+                request_id=request_id,
             )
-        raise classify_status(
-            resp.status_code,
-            code=body.get("code") if isinstance(body, dict) else None,
-            message=body.get("message") if isinstance(body, dict) else None,
-            request_id=body.get("request_id") if isinstance(body, dict) else None,
+        return classify_status(
+            status,
+            code=body.get("code"),
+            message=body.get("message"),
+            request_id=request_id,
         )
+
+    async def stream_sse(
+        self,
+        url: str,
+        *,
+        op: str,
+        model: str,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        connect_timeout: float | None = None,
+        idle_timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        """POST an OpenAI-compatible SSE request; return the parsed ``data:`` events.
+
+        The read timeout is applied *per chunk* (idle), with no single total cap,
+        so multi-minute generations complete as long as tokens/keep-alives keep
+        arriving — sidestepping the DashScope-intl ~60s non-streaming gateway
+        cut-off. Runs inside the shared retry/breaker/rate-limit executor; each
+        retry re-opens a fresh stream and re-collects from scratch, so accumulation
+        never mixes attempts.
+        """
+        timeout = httpx.Timeout(
+            connect=connect_timeout or self.config.connect_timeout_s,
+            read=idle_timeout or self.config.stream_idle_timeout_s,
+            write=self.config.default_timeout_s,
+            pool=connect_timeout or self.config.connect_timeout_s,
+        )
+
+        async def attempt() -> list[dict[str, Any]]:
+            events: list[dict[str, Any]] = []
+            try:
+                async with self._http.stream(
+                    "POST",
+                    url,
+                    json=json,
+                    headers=self._auth_headers(headers),
+                    timeout=timeout,
+                ) as resp:
+                    if not resp.is_success:
+                        await resp.aread()
+                        raise self._stream_error(resp)
+                    async for line in resp.aiter_lines():
+                        payload = _sse_payload(line)
+                        if payload is None:
+                            continue
+                        if payload == SSE_DONE:
+                            break
+                        try:
+                            event = _json_loads(payload)
+                        except ValueError:
+                            continue  # tolerate a malformed keep-alive-ish line
+                        if isinstance(event, dict):
+                            events.append(event)
+            except httpx.TimeoutException as exc:
+                raise ProviderTimeout(f"stream {op} idle-timed-out") from exc
+            except httpx.HTTPError as exc:
+                raise TransientProviderError(f"stream transport error calling {op}: {exc}") from exc
+            if not events:
+                raise TransientProviderError(f"stream {op} produced no events")
+            return events
+
+        return await self._execute(attempt, op=op, model=model)
+
+    def _stream_error(self, resp: httpx.Response) -> ProviderError:
+        try:
+            body = resp.json()
+        except ValueError:
+            return classify_status(resp.status_code, message=resp.text[:200])
+        return self._error_from_body(resp.status_code, body)
 
     async def download(
         self,

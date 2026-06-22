@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import os
+import time
 
 import pytest
 
@@ -57,6 +58,55 @@ async def test_live_chat() -> None:
             f"tokens(in/out)={result.input_tokens}/{result.output_tokens}"
         )
         assert result.text.strip()
+    finally:
+        await providers.aclose()
+
+
+#: A multi-beat Adapter-style paragraph (Brothers Grimm, "The Frog King" —
+#: public domain). On the qwen3 thinking models this structured JSON generation
+#: previously hit the DashScope-intl ~60s non-streaming gateway cut-off.
+_GRIMM_PARAGRAPH = (
+    "In olden times when wishing still helped one, there lived a king whose "
+    "daughters were all beautiful; and the youngest was so beautiful that the "
+    "sun itself, which has seen so much, was astonished whenever it shone in "
+    "her face. Close by the king's castle lay a great dark forest, and under an "
+    "old lime-tree in the forest was a well; and when the day was very warm, the "
+    "king's child went out into the forest and sat down by the side of the cool "
+    "fountain; and when she was bored she took a golden ball, and threw it up on "
+    "high and caught it, and this ball was her favourite plaything."
+)
+
+
+async def test_live_adapter_chat_json_streams_under_cap() -> None:
+    """The previously-timing-out Adapter generation now succeeds via streaming."""
+    providers = create_providers()
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a screenwriter adapting a book into a shot list. Output ONLY a "
+                'JSON object of the form {"beats": [...]}. Each beat has "summary" (string), '
+                '"entities" (array of names you can resolve), and "mood" (string). Produce 5 '
+                "to 6 beats. No prose, no markdown fences."
+            ),
+        },
+        {"role": "user", "content": _GRIMM_PARAGRAPH},
+    ]
+    try:
+        started = time.perf_counter()
+        # chat_json streams by default — thinking stays ON for qwen3.5-plus.
+        result = await providers.chat.chat_json(messages, get_settings().chat_model_adapter)
+        elapsed = time.perf_counter() - started
+        totals = providers.client.usage_totals
+        beats = result.get("beats") if isinstance(result, dict) else None
+        print(
+            f"\n[ADAPTER/stream] model={get_settings().chat_model_adapter} "
+            f"elapsed={elapsed:.1f}s beats={len(beats) if beats else 0} "
+            f"tokens(in/out)={totals.input_tokens}/{totals.output_tokens}"
+        )
+        assert isinstance(result, dict) and isinstance(beats, list) and len(beats) >= 5
+        assert all("summary" in b for b in beats)
+        print(f"        first beat: {beats[0]}")
     finally:
         await providers.aclose()
 
