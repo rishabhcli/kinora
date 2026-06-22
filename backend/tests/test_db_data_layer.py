@@ -49,12 +49,12 @@ pytestmark = pytest.mark.skipif(
     not _DB_URL, reason="KINORA_TEST_DATABASE_URL not set; skipping DB integration tests"
 )
 
-# A 768-d embedding pointing in one direction, padded out to the column width.
-_DIM = 768
+# A 1152-d embedding pointing in one direction, padded out to the column width.
+_DIM = 1152
 
 
 def _vec(*head: float) -> list[float]:
-    """Build a 768-d vector from a few leading components (rest zero)."""
+    """Build a 1152-d vector from a few leading components (rest zero)."""
     return list(head) + [0.0] * (_DIM - len(head))
 
 

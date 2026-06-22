@@ -79,7 +79,7 @@ def upgrade() -> None:
     sa.Column('appearance', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('voice', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('style_tokens', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('embedding', Vector(768), nullable=True),
+    sa.Column('embedding', Vector(1152), nullable=True),
     sa.Column('version', sa.Integer(), nullable=False),
     sa.Column('valid_from_beat', sa.Integer(), nullable=False),
     sa.Column('valid_to_beat', sa.Integer(), nullable=True),
@@ -173,7 +173,7 @@ def upgrade() -> None:
     sa.Column('narration', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('qa', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('cost', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('embedding', Vector(768), nullable=True),
+    sa.Column('embedding', Vector(1152), nullable=True),
     sa.Column('canon_version_at_render', sa.Integer(), nullable=True),
     sa.Column('shot_hash', sa.String(length=128), nullable=True),
     sa.Column('accepted_at', sa.DateTime(timezone=True), nullable=True),
@@ -241,15 +241,18 @@ def upgrade() -> None:
     op.create_index(op.f('ix_source_span_index_shot_id'), 'source_span_index', ['shot_id'], unique=False)
     # ### end Alembic commands ###
 
-    # pgvector approximate-nearest-neighbour indexes for cosine distance (``<=>``).
-    # Autogenerate cannot emit these; they back episodic.search (kinora.md §8.2).
+    # pgvector HNSW approximate-nearest-neighbour indexes for cosine distance
+    # (``<=>``). Autogenerate cannot emit these; they back episodic.search
+    # (kinora.md §8.2). HNSW gives better recall than ivfflat and needs no
+    # training data, so it is ideal for a database that grows incrementally; the
+    # 1152-d embeddings are within HNSW's 2000-dim cosine limit.
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_entities_embedding ON entities "
-        "USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+        "USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_shots_embedding ON shots "
-        "USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+        "USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"
     )
 
 

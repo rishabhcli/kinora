@@ -121,7 +121,7 @@ class EntityRepo(BaseRepository):
         return list((await self.session.execute(stmt)).scalars().all())
 
     async def set_embedding(self, entity_id: str, embedding: Sequence[float]) -> None:
-        """Attach/replace the 768-d appearance embedding for one entity version."""
+        """Attach/replace the 1152-d appearance embedding for one entity version."""
         await self.session.execute(
             update(Entity).where(Entity.id == entity_id).values(embedding=list(embedding))
         )

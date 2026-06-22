@@ -2,7 +2,7 @@
 
 * ``shots`` is the episodic / vector store (kinora.md §8.2): every shot ever
   generated, its prompt/seed/references, output keys, narration, QA scores, and
-  a 768-d embedding for "what worked before" retrieval.
+  a 1152-d embedding for "what worked before" retrieval.
 * ``source_span_index`` is the §4.2 sorted map ``word_index → shot``. The btree
   on ``(book_id, word_index_start)`` is what resolves a scroll position to a
   shot in O(log n).
@@ -76,7 +76,7 @@ class Shot(StrIdMixin, TimestampMixin, Base):
     # {"video_seconds", "tokens"}
     cost: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1152), nullable=True)
     canon_version_at_render: Mapped[int | None] = mapped_column(Integer, nullable=True)
     shot_hash: Mapped[str | None] = mapped_column(
         String(128), unique=True, index=True, nullable=True

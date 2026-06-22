@@ -13,8 +13,9 @@ from __future__ import annotations
 
 from typing import Any
 
-# pgvector provides the SQLAlchemy ``Vector`` column type (the 768-d CLIP-style
-# appearance embedding used by the Critic's similarity check and retrieval).
+# pgvector provides the SQLAlchemy ``Vector`` column type (the 1152-d shared
+# image+text embedding from DashScope ``tongyi-embedding-vision-plus``, used by
+# the Critic's similarity check and episodic retrieval).
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
@@ -52,7 +53,7 @@ class Entity(TimestampMixin, Base):
     # Style nodes only: {"palette", "lens", "art_direction"}
     style_tokens: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1152), nullable=True)
 
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     valid_from_beat: Mapped[int] = mapped_column(Integer, nullable=False)
