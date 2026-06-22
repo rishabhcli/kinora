@@ -21,7 +21,9 @@ frontend/dist/
 dist/
 
 # --- Object storage / local artifacts ---
-storage/
+# Root-level runtime artifacts only; anchored so it does NOT match the real
+# source tree at backend/app/storage/.
+/storage/
 
 # --- Logs ---
 *.log

@@ -8,7 +8,7 @@ from app.core.logging import REDACTED, _build_processors, redact_secrets
 
 
 def _apply(event: dict[str, object]) -> dict[str, object]:
-    return redact_secrets(None, "info", event)  # type: ignore[arg-type, return-value]
+    return redact_secrets(None, "info", event)  # type: ignore[return-value]
 
 
 def test_sensitive_keys_are_redacted() -> None:
@@ -86,7 +86,7 @@ def test_full_processor_chain_renders_json_with_secret_masked() -> None:
         "api_key": "sk-LIVEKEY123456",
     }
     for proc in procs:
-        event = proc(None, "info", event)  # type: ignore[arg-type, assignment]
+        event = proc(None, "info", event)  # type: ignore[arg-type]
     assert isinstance(event, str)  # JSONRenderer terminates the chain
     rendered = json.loads(event)
     assert rendered["api_key"] == REDACTED

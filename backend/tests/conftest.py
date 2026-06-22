@@ -34,7 +34,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.composition import Container, RegenOutcome, build_container
+from app.composition import CommentRoute, Container, RegenOutcome, build_container
 from app.core.config import Settings
 from app.db import models  # noqa: F401  (register tables on Base.metadata)
 from app.db.base import Base, new_id
@@ -77,7 +77,9 @@ async def _flush_redis() -> None:
     try:
         await client.flushdb()
     finally:
-        await client.aclose()
+        # redis.asyncio exposes aclose() at runtime; the pinned types-redis stub
+        # lacks it (app.redis.client types the handle as Any for the same drift).
+        await client.aclose()  # type: ignore[attr-defined]
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -158,9 +160,7 @@ class FakeEmbedder:
 class FakeCommentClassifier:
     """Keyword router mirroring the real fallback — no chat() network in tests."""
 
-    async def classify(self, note: str, *, shot_context: str | None = None):  # noqa: ANN201
-        from app.composition import CommentRoute
-
+    async def classify(self, note: str, *, shot_context: str | None = None) -> CommentRoute:
         text_l = note.lower()
         if any(w in text_l for w in ("room", "location", "place", "wrong", "where")):
             return CommentRoute(agent="continuity", aspect="room", message=note)

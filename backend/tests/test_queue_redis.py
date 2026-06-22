@@ -20,7 +20,7 @@ import pytest
 import pytest_asyncio
 
 from app.db.models.enums import RenderJobStatus, RenderPriority
-from app.queue.redis_queue import EnqueueStatus, RedisRenderQueue, RetryDecision
+from app.queue.redis_queue import EnqueueResult, EnqueueStatus, RedisRenderQueue, RetryDecision
 from app.redis.client import RedisClient
 
 _REDIS_URL = os.environ.get("KINORA_TEST_REDIS_URL")
@@ -66,7 +66,7 @@ async def _enqueue(
     shot_hash: str,
     priority: RenderPriority = RenderPriority.COMMITTED,
     **kw: object,
-) -> object:
+) -> EnqueueResult:
     return await q.enqueue(
         shot_hash=shot_hash,
         priority=priority,
@@ -134,14 +134,14 @@ async def test_backpressure_drops_speculative_admits_committed(queue: RedisRende
     # backpressure_depth == 3 (fixture).
     for i in range(3):
         res = await _enqueue(queue, f"s{i}", RenderPriority.SPECULATIVE, job_id=f"s{i}")
-        assert res.created  # type: ignore[attr-defined]
+        assert res.created
 
     dropped = await _enqueue(queue, "s_over", RenderPriority.SPECULATIVE, job_id="s_over")
     admitted = await _enqueue(queue, "c_always", RenderPriority.COMMITTED, job_id="c_always")
 
-    assert dropped.status is EnqueueStatus.DROPPED  # type: ignore[attr-defined]
-    assert dropped.job_id is None  # type: ignore[attr-defined]
-    assert admitted.created  # committed is always admitted  # type: ignore[attr-defined]
+    assert dropped.status is EnqueueStatus.DROPPED
+    assert dropped.job_id is None
+    assert admitted.created  # committed is always admitted
     stats = await queue.stats()
     assert stats.dropped_total == 1
     print(f"\n[BACKPRESSURE] depth cap=3: 4th speculative -> dropped; "

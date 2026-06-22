@@ -161,7 +161,7 @@ async def test_live_ingest_one_grimm_page() -> None:
         await engine.dispose()
 
 
-def _refs_in_store(store: ObjectStore, entities: list) -> list[str]:  # type: ignore[type-arg]
+def _refs_in_store(store: ObjectStore, entities: list) -> list[str]:
     """Collect the locked reference-image keys recorded on the canon entities."""
     keys: list[str] = []
     for ent in entities:

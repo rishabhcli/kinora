@@ -145,7 +145,7 @@ async def test_worker_cancelled_job_releases_budget(
     queue: RedisRenderQueue, redis_client: RedisClient
 ) -> None:
     from sqlalchemy import text
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
 
     from app.db import models  # noqa: F401
@@ -163,7 +163,7 @@ async def test_worker_cancelled_job_releases_budget(
     factory = async_sessionmaker(engine, expire_on_commit=False)
 
     @asynccontextmanager
-    async def session_ctx() -> AsyncIterator[object]:
+    async def session_ctx() -> AsyncIterator[AsyncSession]:
         db = factory()
         try:
             yield db
@@ -181,9 +181,9 @@ async def test_worker_cancelled_job_releases_budget(
 
     # Real book + session rows (the budget ledger references them by FK).
     async with session_ctx() as db:
-        book = await BookRepo(db).create(title="Budget Book")  # type: ignore[arg-type]
+        book = await BookRepo(db).create(title="Budget Book")
         book_id = book.id
-        await SessionRepo(db).upsert(session_id=session_id, book_id=book_id)  # type: ignore[arg-type]
+        await SessionRepo(db).upsert(session_id=session_id, book_id=book_id)
 
     # The Scheduler's gating earmark for a promotion.
     async with session_ctx() as db:
@@ -191,7 +191,7 @@ async def test_worker_cancelled_job_releases_budget(
             5.0, session_id=session_id, scene_id="scene_c", book_id=book_id
         )
     async with session_ctx() as db:
-        used_before = await BudgetRepo(db).used_seconds(session_id=session_id)  # type: ignore[arg-type]
+        used_before = await BudgetRepo(db).used_seconds(session_id=session_id)
     assert used_before == 5.0  # earmark is outstanding
 
     async def never_called(job: QueuedJob) -> RenderResult:  # pragma: no cover
@@ -217,7 +217,7 @@ async def test_worker_cancelled_job_releases_budget(
     await worker.process_job(job)
 
     async with session_ctx() as db:
-        used_after = await BudgetRepo(db).used_seconds(session_id=session_id)  # type: ignore[arg-type]
+        used_after = await BudgetRepo(db).used_seconds(session_id=session_id)
     done = await queue.get_job("job_cancel")
     assert done is not None and done.status is RenderJobStatus.CANCELLED
     assert used_after == 0.0  # the earmark was released -> zero video-seconds spent

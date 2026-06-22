@@ -51,7 +51,7 @@ def _service(
 
 
 def _session(**kw: object) -> SchedulerSession:
-    return SchedulerSession(session_id="sess_1", book_id=BOOK_ID, **kw)  # type: ignore[arg-type]
+    return SchedulerSession(session_id="sess_1", book_id=BOOK_ID, **kw)
 
 
 # --- the §4.10 sawtooth: fill to H, idle in the band, refill below L -------- #

@@ -214,8 +214,8 @@ async def test_run_protocol_rejects_zero_runs() -> None:
 
 async def test_crew_arm_scores_canon_reference_as_perfect_ccs() -> None:
     class FakeRenderResult:
-        last_frame_key = None
-        video_seconds = 0.0
+        last_frame_key: str | None = None
+        video_seconds: float = 0.0
 
     rendered: list[str] = []
 

@@ -16,7 +16,7 @@ from tests.test_providers_base import FAST
 
 
 def _settings(*, live: bool) -> Settings:
-    return Settings(dashscope_api_key="test", kinora_live_video=live)  # type: ignore[arg-type]
+    return Settings(dashscope_api_key="test", kinora_live_video=live)
 
 
 def _client(handler: object, *, live: bool) -> ProviderClient:

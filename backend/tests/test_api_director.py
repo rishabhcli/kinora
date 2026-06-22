@@ -97,6 +97,7 @@ async def test_canon_edit_surgical_regen_only_dependent(
     await _seed_shot(container, book_id, "shot_dep", ["char_hero@v1", "loc_hall@v1"])
     await _seed_shot(container, book_id, "shot_indep", ["char_villain@v1"])
     async with container.session_factory() as session:
+        assert container.embedder is not None
         canon = CanonService(
             session, embedder=container.embedder, blob_store=container.object_store
         )
@@ -142,6 +143,7 @@ async def test_canon_edit_recomputes_dependent_shot_hash(
     book_id = await seed_owned_book(api_client, container, auth_headers)
     await _seed_shot(container, book_id, "shot_dep", ["char_hero@v1"])
     async with container.session_factory() as session:
+        assert container.embedder is not None
         canon = CanonService(
             session, embedder=container.embedder, blob_store=container.object_store
         )

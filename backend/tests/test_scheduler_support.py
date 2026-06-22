@@ -31,7 +31,10 @@ class FakeShot:
     beat_id: str | None
     scene_id: str | None
     word_index_start: int
-    duration_s: float = 5.0
+    # ``float | None`` (not ``float``) so FakeShot structurally satisfies the
+    # SchedulerShot protocol, whose ``duration_s`` is ``float | None`` (a settable
+    # protocol attribute is invariant). Lets FakeShots stand in for ShotSource.
+    duration_s: float | None = 5.0
     prompt: str | None = None
     source_span: dict[str, Any] | None = None
 

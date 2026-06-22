@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from httpx import AsyncClient
 
 from app.api.routes import books as books_module
@@ -12,10 +13,12 @@ from app.db.models.enums import EntityType, ShotStatus
 from app.db.repositories.book import PageRepo
 from app.db.repositories.shot import ShotRepo
 from app.memory.canon_service import CanonService
-from tests.conftest import register_login, tiny_pdf
+from tests.conftest import FakeIngestRunner, register_login, tiny_pdf
 
 
-def _files(data: bytes, *, name: str = "tale.pdf", content_type: str = "application/pdf"):
+def _files(
+    data: bytes, *, name: str = "tale.pdf", content_type: str = "application/pdf"
+) -> dict[str, tuple[str, bytes, str]]:
     return {"file": (name, data, content_type)}
 
 
@@ -45,10 +48,11 @@ async def test_upload_accepts_real_pdf_and_triggers_ingest(
     book_id = book["id"]
 
     # The fake ingest runner records the trigger and marks the book ready.
-    assert isinstance(container.ingest_runner, object)
+    runner = container.ingest_runner
+    assert isinstance(runner, FakeIngestRunner)
     status = await _poll_status(api_client, auth_headers, book_id)
     assert status == "ready"
-    assert container.ingest_runner.calls == [book_id]  # type: ignore[attr-defined]
+    assert runner.calls == [book_id]
 
     shelf = await api_client.get("/api/books", headers=auth_headers)
     assert shelf.status_code == 200
@@ -72,7 +76,7 @@ async def test_upload_rejects_non_pdf(
 
 
 async def test_upload_rejects_oversize(
-    api_client: AsyncClient, auth_headers: dict[str, str], monkeypatch
+    api_client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(books_module, "MAX_PDF_BYTES", 32)
     resp = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
@@ -111,6 +115,7 @@ async def test_get_canon_vault(
     up = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
     book_id = up.json()["book"]["id"]
     async with container.session_factory() as session:
+        assert container.embedder is not None
         canon = CanonService(
             session, embedder=container.embedder, blob_store=container.object_store
         )

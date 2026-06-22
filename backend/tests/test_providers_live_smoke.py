@@ -98,6 +98,7 @@ async def test_live_adapter_chat_json_streams_under_cap() -> None:
         result = await providers.chat.chat_json(messages, get_settings().chat_model_adapter)
         elapsed = time.perf_counter() - started
         totals = providers.client.usage_totals
+        assert totals is not None
         beats = result.get("beats") if isinstance(result, dict) else None
         print(
             f"\n[ADAPTER/stream] model={get_settings().chat_model_adapter} "

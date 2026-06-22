@@ -5,14 +5,17 @@ from __future__ import annotations
 import asyncio
 import json
 import types
+from collections.abc import AsyncGenerator
+from typing import cast
 
+from fastapi import FastAPI
 from httpx import AsyncClient
 from starlette.requests import Request
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.api.routes.events import session_events
-from app.composition import build_container
+from app.composition import Container, build_container
 from app.main import create_app
 from app.queue.redis_queue import session_channel
 from tests import conftest as cf
@@ -38,7 +41,7 @@ def _as_text(chunk: object) -> str:
 
 
 async def test_sse_forwards_published_event(
-    api_client: AsyncClient, container, auth_headers: dict[str, str]
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
 ) -> None:
     """The SSE generator subscribes and forwards a §5.6 event to the client.
 
@@ -72,7 +75,7 @@ async def test_sse_forwards_published_event(
     }
     request = Request(scope, receive)
     response = await session_events(session_id, request, token=token)
-    body = response.body_iterator
+    body = cast("AsyncGenerator[bytes | str, None]", response.body_iterator)
 
     connected = await asyncio.wait_for(body.__anext__(), timeout=5.0)
     assert "connected" in _as_text(connected)
@@ -98,7 +101,7 @@ async def test_sse_forwards_published_event(
     assert payload["oss_url"] == "https://x/clip"
 
 
-def _ws_app():
+def _ws_app() -> FastAPI:
     container = build_container(build_test_settings())
     container.embedder = FakeEmbedder()
     container.comment_classifier = FakeCommentClassifier()
@@ -144,7 +147,9 @@ def test_ws_bidirectional_roundtrip() -> None:
             # client -> backend: an intent update is accepted without error.
             ws.send_json({"type": "intent_update", "focus_word": 5, "velocity": 4.0})
             # backend -> client: an event published to the channel is fanned out.
-            pub = redis_sync.Redis.from_url(cf._REDIS_URL, decode_responses=True)
+            redis_url = cf._REDIS_URL
+            assert redis_url is not None
+            pub = redis_sync.Redis.from_url(redis_url, decode_responses=True)
             try:
                 pub.publish(
                     session_channel(session_id),

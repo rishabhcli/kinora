@@ -4,6 +4,8 @@ batching, and cost accounting. The SDK call is monkeypatched (no network)."""
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Iterable
+from typing import Any, TypedDict, cast
 
 import httpx
 import pytest
@@ -67,17 +69,24 @@ class _FakeEmbResp:
         self.usage = {"input_tokens": tokens}
 
 
-def _patch_mme(monkeypatch: pytest.MonkeyPatch, vec_for) -> dict:
+class _MmeState(TypedDict):
+    calls: int
+    chunk_sizes: list[int]
+
+
+def _patch_mme(
+    monkeypatch: pytest.MonkeyPatch, vec_for: Callable[[Any], list[float]]
+) -> _MmeState:
     """Patch MultiModalEmbedding.call to echo deterministic vectors per content.
 
     Returns the embeddings reversed (out of index order) to exercise sorting.
     """
     import dashscope
 
-    state = {"calls": 0, "chunk_sizes": []}
+    state: _MmeState = {"calls": 0, "chunk_sizes": []}
 
     def fake_call(**kwargs: object) -> _FakeEmbResp:
-        chunk = list(kwargs["input"])  # type: ignore[arg-type]
+        chunk = list(cast("Iterable[Any]", kwargs["input"]))
         state["calls"] += 1
         state["chunk_sizes"].append(len(chunk))
         embs = [

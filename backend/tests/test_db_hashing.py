@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from app.db.hashing import compute_shot_hash
 
-_BASE = {
+
+class _ShotHashArgs(TypedDict):
+    """The exact keyword arguments :func:`compute_shot_hash` accepts."""
+
+    book_id: str
+    beat_id: str
+    canon_version_at_render: int
+    render_mode: str
+    seed: int
+    reference_set_hash: str
+
+
+_BASE: _ShotHashArgs = {
     "book_id": "book_grimm_snow",
     "beat_id": "beat_0034",
     "canon_version_at_render": 7,
@@ -27,12 +41,16 @@ def test_shot_hash_changes_with_each_input() -> None:
     base_hash = compute_shot_hash(**_BASE)
     # Changing ANY component must change the hash (e.g. a Director edit changes
     # reference_set_hash and only the dependent shots re-render).
-    assert compute_shot_hash(**{**_BASE, "reference_set_hash": "sha1:beef"}) != base_hash
-    assert compute_shot_hash(**{**_BASE, "seed": 99999}) != base_hash
-    assert compute_shot_hash(**{**_BASE, "canon_version_at_render": 8}) != base_hash
-    assert compute_shot_hash(**{**_BASE, "render_mode": "first_last_frame"}) != base_hash
-    assert compute_shot_hash(**{**_BASE, "beat_id": "beat_0035"}) != base_hash
-    assert compute_shot_hash(**{**_BASE, "book_id": "book_other"}) != base_hash
+    variants: list[_ShotHashArgs] = [
+        {**_BASE, "reference_set_hash": "sha1:beef"},
+        {**_BASE, "seed": 99999},
+        {**_BASE, "canon_version_at_render": 8},
+        {**_BASE, "render_mode": "first_last_frame"},
+        {**_BASE, "beat_id": "beat_0035"},
+        {**_BASE, "book_id": "book_other"},
+    ]
+    for variant in variants:
+        assert compute_shot_hash(**variant) != base_hash
 
 
 def test_shot_hash_has_no_boundary_collision() -> None:

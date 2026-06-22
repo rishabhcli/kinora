@@ -96,7 +96,9 @@ line-length = 100
 target-version = ["py311"]
 
 [tool.mypy]
-python_version = "3.11"
+# Analysis target 3.12 so numpy 2.x stubs (which use 3.12 `type` statements)
+# type-check cleanly. requires-python stays >=3.11; this only affects mypy.
+python_version = "3.12"
 disallow_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
