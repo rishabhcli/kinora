@@ -23,22 +23,24 @@ from sqlalchemy import select
 from app.api.deps import ContainerDep, CurrentUser, write_rate_limit
 from app.api.errors import APIError
 from app.api.schemas import (
-    BookListResponse,
     BookResponse,
-    BookUploadResponse,
+    CanonAppearance,
+    CanonEntityResponse,
+    CanonReferenceImage,
     CanonResponse,
     PageResponse,
-    ShotListResponse,
     ShotResponse,
 )
 from app.composition import Container
 from app.core.logging import get_logger
 from app.db.base import new_id
 from app.db.models.book import Book
+from app.db.models.entity import Entity
 from app.db.models.enums import BookStatus
 from app.db.models.shot import Shot
 from app.db.models.user import User
 from app.db.repositories.book import BookRepo, PageRepo
+from app.db.repositories.entity import EntityRepo
 from app.memory.canon_vault import CanonVault
 from app.storage.object_store import keys
 
@@ -53,6 +55,9 @@ _ALLOWED_CONTENT_TYPES = frozenset(
     {"application/pdf", "application/octet-stream", "binary/octet-stream", ""}
 )
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+#: Resolve canon "as of the latest version" — a beat beyond any real one, so the
+#: still-open (current) version of every entity is returned.
+_LATEST_BEAT = 2**31 - 1
 
 
 def _user_books_key(user_id: str) -> str:
@@ -105,11 +110,11 @@ async def _book_response(container: Container, book: Book) -> BookResponse:
         art_direction=book.art_direction,
         created_at=book.created_at.isoformat() if book.created_at else None,
         progress=pct,
-        progress_stage=stage,
+        stage=stage,
     )
 
 
-@router.post("", response_model=BookUploadResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def upload_book(
     container: ContainerDep,
     user: CurrentUser,
@@ -118,8 +123,11 @@ async def upload_book(
     title: Annotated[str | None, Form()] = None,
     author: Annotated[str | None, Form()] = None,
     art_direction: Annotated[str | None, Form()] = None,
-) -> BookUploadResponse:
-    """Validate + store a PDF, create the book, and trigger Phase A ingest."""
+) -> BookResponse:
+    """Validate + store a PDF, create the book, and trigger Phase A ingest.
+
+    Returns the freshly-created book (status ``importing``) directly — the shelf
+    prepends it and polls until it is ``ready``."""
     if file.size is not None and file.size > MAX_PDF_BYTES:
         raise APIError(
             "file_too_large", "PDF exceeds the size limit", status=413,
@@ -164,19 +172,18 @@ async def upload_book(
     container.spawn(container.run_ingest(book_id, data, None))
 
     logger.info("books.uploaded", book_id=book_id, user_id=user.id, bytes=len(data))
-    return BookUploadResponse(book=response, ingest_started=True)
+    return response
 
 
-@router.get("", response_model=BookListResponse)
-async def list_books(container: ContainerDep, user: CurrentUser) -> BookListResponse:
-    """List the books the current user has uploaded (the shelf)."""
+@router.get("", response_model=list[BookResponse])
+async def list_books(container: ContainerDep, user: CurrentUser) -> list[BookResponse]:
+    """List the books the current user has uploaded (the shelf), newest first."""
     owned = await container.redis.raw.smembers(_user_books_key(user.id))
     async with container.session_factory() as session:
         repo = BookRepo(session)
         books = [b for b in [await repo.get(bid) for bid in owned] if b is not None]
     books.sort(key=lambda b: b.created_at or _EPOCH, reverse=True)
-    items = [await _book_response(container, b) for b in books]
-    return BookListResponse(books=items)
+    return [await _book_response(container, b) for b in books]
 
 
 @router.get("/{book_id}", response_model=BookResponse)
@@ -210,25 +217,81 @@ async def get_page(
 
 @router.get("/{book_id}/canon", response_model=CanonResponse)
 async def get_canon(book_id: str, container: ContainerDep, user: CurrentUser) -> CanonResponse:
-    """The human-inspectable canon vault (markdown) for a book (§8.1)."""
+    """The book's canon graph: the entity list the Director editor renders, plus
+    the human-inspectable markdown vault export (§8.1)."""
     await _assert_owner(container, user, book_id)
     async with container.session_factory() as session:
+        # Current (latest-version) entities — what the canon editor lists/edits.
+        entities = await EntityRepo(session).list_active_at_beat(book_id, _LATEST_BEAT)
+        items = [_canon_entity_response(container, e) for e in entities]
+        # The markdown vault (§8.1) — joined into one document for inspection.
         export = await CanonVault(session, blob_store=container.object_store).export(book_id)
-    index_url = container.object_store.presigned_get_url(export.index_key)
-    return CanonResponse(
-        book_id=book_id,
-        index_key=export.index_key,
-        index_url=index_url,
-        keys=list(export.keys),
-        markdown=dict(export.files),
+    markdown = "\n\n".join(export.files.values()) or None
+    return CanonResponse(book_id=book_id, entities=items, markdown=markdown)
+
+
+def _canon_entity_response(container: Container, entity: Entity) -> CanonEntityResponse:
+    """Project a canon entity row for the Director editor (presigned ref URLs)."""
+    appearance: CanonAppearance | None = None
+    raw_appearance = entity.appearance or {}
+    if raw_appearance:
+        appearance = CanonAppearance(
+            description=raw_appearance.get("description"),
+            reference_images=_canon_reference_images(container, raw_appearance),
+        )
+    return CanonEntityResponse(
+        id=entity.entity_key,
+        type=entity.type.value,
+        name=entity.name,
+        aliases=list(entity.aliases or []),
+        description=entity.description,
+        appearance=appearance,
+        style_tokens=entity.style_tokens,
+        voice=entity.voice,
+        version=entity.version,
+        valid_from_beat=entity.valid_from_beat,
+        valid_to_beat=entity.valid_to_beat,
+        first_appearance=entity.first_appearance,
     )
 
 
-@router.get("/{book_id}/shots", response_model=ShotListResponse)
+def _canon_reference_images(
+    container: Container, appearance: dict[str, Any]
+) -> list[CanonReferenceImage]:
+    """Presign every locked reference image key into an ``oss_url`` (§8.1)."""
+    images: list[CanonReferenceImage] = []
+    raw = appearance.get("reference_images")
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            key = item.get("key") or item.get("oss_key")
+            if isinstance(key, str):
+                images.append(
+                    CanonReferenceImage(
+                        oss_url=container.object_store.presigned_get_url(key),
+                        pose=item.get("pose"),
+                        locked=bool(item.get("locked", False)),
+                    )
+                )
+    ref_keys = appearance.get("reference_image_keys")
+    if isinstance(ref_keys, list):
+        locked = bool(appearance.get("locked", False))
+        for key in ref_keys:
+            if isinstance(key, str):
+                images.append(
+                    CanonReferenceImage(
+                        oss_url=container.object_store.presigned_get_url(key), locked=locked
+                    )
+                )
+    return images
+
+
+@router.get("/{book_id}/shots", response_model=list[ShotResponse])
 async def list_shots(
     book_id: str, container: ContainerDep, user: CurrentUser
-) -> ShotListResponse:
-    """The book's shots (the §5.4 shot timeline)."""
+) -> list[ShotResponse]:
+    """The book's shots (the §5.4 shot timeline) as a bare array."""
     await _assert_owner(container, user, book_id)
     async with container.session_factory() as session:
         stmt = (
@@ -237,8 +300,7 @@ async def list_shots(
             .order_by(Shot.scene_id, Shot.beat_id, Shot.id)
         )
         rows = list((await session.execute(stmt)).scalars().all())
-    shots = [_shot_response(container, row) for row in rows]
-    return ShotListResponse(book_id=book_id, shots=shots)
+    return [_shot_response(container, row) for row in rows]
 
 
 def _shot_response(container: Container, shot: Shot) -> ShotResponse:
@@ -251,6 +313,7 @@ def _shot_response(container: Container, shot: Shot) -> ShotResponse:
         shot_id=shot.id,
         beat_id=shot.beat_id,
         scene_id=shot.scene_id,
+        source_span=shot.source_span,
         status=shot.status.value,
         render_mode=shot.render_mode,
         duration_s=shot.duration_s,

@@ -40,16 +40,17 @@ test.describe("director", () => {
     const { bookId } = await openSeededBook(page);
     await switchMode(page, "Director");
     await openDirectorTab(page, "canon");
-    await expect(page.getByText(/canon/i).first()).toBeVisible();
+    // The canon editor lists the real entities from GET /api/books/:id/canon
+    // (the `entities` array — no shim). The seeded Style node is the edit target.
+    await expect(page.getByText("Painterly storybook")).toBeVisible();
 
     // Submit the canon edit on the Style node, exercising the real surgical
     // dependent-shot regen (§8.7). It is posted through the same authenticated
-    // /api path the app uses (the canon editor's entity list is empty against
-    // the real /canon endpoint — a reported Phase-9/10 gap). Editing the Style
-    // node avoids any locked-reference embed in the request path. The POST is
-    // fired without awaiting its body: the backend re-renders the dependent
-    // shots in the background (a slow path on a stub model key), and we assert
-    // the POST fired here and the client's regen_done handling below.
+    // /api path the app uses; editing the Style node avoids any locked-reference
+    // embed in the request path. The POST is fired without awaiting its body:
+    // the backend re-renders the dependent shots in the background (a slow path
+    // on a stub model key), and we assert the POST fired here and the client's
+    // regen_done handling below.
     const canonEdit = page.waitForRequest(
       (r) => /\/api\/books\/[^/]+\/canon_edit$/.test(r.url()) && r.method() === "POST",
     );

@@ -122,7 +122,7 @@ async def test_canon_edit_surgical_regen_only_dependent(
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["version"] == 2
-        assert body["regenerated_shots"] == ["shot_dep"]
+        assert body["affected_shot_ids"] == ["shot_dep"]
         assert body["skipped_shots"] == 1
 
         # Only the dependent shot was enqueued (surgical re-render, §8.7).

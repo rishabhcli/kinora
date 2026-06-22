@@ -70,7 +70,12 @@ class UserResponse(BaseModel):
 
 
 class BookResponse(BaseModel):
-    """A book on the shelf, with its import status and progress (§5.1)."""
+    """A book on the shelf, with its import status and progress (§5.1).
+
+    The collection endpoints (``GET /books``) return a *bare* ``list`` of these,
+    and the upload endpoint returns a bare ``BookResponse`` — the frontend client
+    parses ``Book[]`` / ``Book`` directly (no envelope).
+    """
 
     id: str
     title: str
@@ -80,13 +85,8 @@ class BookResponse(BaseModel):
     art_direction: str | None = None
     created_at: str | None = None
     progress: float | None = None
-    progress_stage: str | None = None
-
-
-class BookListResponse(BaseModel):
-    """The shelf — a user's books, newest first."""
-
-    books: list[BookResponse] = Field(default_factory=list)
+    #: Current ingest stage label (the frontend reads ``book.stage``).
+    stage: str | None = None
 
 
 class PageResponse(BaseModel):
@@ -99,42 +99,67 @@ class PageResponse(BaseModel):
     word_boxes: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class CanonReferenceImage(BaseModel):
+    """A locked reference image projected for the Director's canon editor."""
+
+    oss_url: str
+    pose: str | None = None
+    locked: bool | None = None
+
+
+class CanonAppearance(BaseModel):
+    """An entity's appearance block with presigned reference-image URLs."""
+
+    description: str | None = None
+    reference_images: list[CanonReferenceImage] = Field(default_factory=list)
+
+
+class CanonEntityResponse(BaseModel):
+    """One canon entity (current version) projected for the §5.4 canon editor.
+
+    ``id`` is the stable ``entity_key`` (what the canon-edit call targets), not
+    the per-version DB row id.
+    """
+
+    id: str
+    type: str
+    name: str
+    aliases: list[str] = Field(default_factory=list)
+    description: str | None = None
+    appearance: CanonAppearance | None = None
+    style_tokens: dict[str, Any] | None = None
+    voice: dict[str, Any] | None = None
+    version: int
+    valid_from_beat: int | None = None
+    valid_to_beat: int | None = None
+    first_appearance: dict[str, Any] | None = None
+
+
 class CanonResponse(BaseModel):
-    """The human-inspectable canon vault for a book (§8.1)."""
+    """The canon graph for a book: the entity list the Director editor renders,
+    plus the optional human-inspectable markdown vault export (§8.1)."""
 
     book_id: str
-    index_key: str
-    index_url: str | None = None
-    keys: list[str] = Field(default_factory=list)
-    markdown: dict[str, str] = Field(default_factory=dict)
+    entities: list[CanonEntityResponse] = Field(default_factory=list)
+    markdown: str | None = None
 
 
 class ShotResponse(BaseModel):
-    """A shot's episodic record projected for the timeline / Director tools."""
+    """A shot's episodic record projected for the timeline / Director tools.
+
+    Includes ``source_span`` so the client's SyncEngine can sort/seek by reading
+    position; the §5.4 timeline returns a *bare* ``list`` of these."""
 
     shot_id: str
     beat_id: str | None = None
     scene_id: str | None = None
+    source_span: dict[str, Any] | None = None
     status: str
     render_mode: str | None = None
     duration_s: float | None = None
     qa: dict[str, Any] | None = None
     clip_url: str | None = None
     reference_image_ids: list[str] = Field(default_factory=list)
-
-
-class ShotListResponse(BaseModel):
-    """A book's shots (the §5.4 shot timeline)."""
-
-    book_id: str
-    shots: list[ShotResponse] = Field(default_factory=list)
-
-
-class BookUploadResponse(BaseModel):
-    """The result of accepting a PDF upload and triggering ingest (§9.1)."""
-
-    book: BookResponse
-    ingest_started: bool
 
 
 # --------------------------------------------------------------------------- #
@@ -244,11 +269,14 @@ class CanonEditRequest(BaseModel):
 
 
 class CanonEditResponse(BaseModel):
-    """The new entity version + the dependent shots queued for regen (§8.7)."""
+    """The new entity version + the dependent shots queued for regen (§8.7).
+
+    ``affected_shot_ids`` are the dependent shots the edit re-rendered — the name
+    the frontend's canon editor reads to mark those shots "rendering"."""
 
     entity_key: str
     version: int
-    regenerated_shots: list[str] = Field(default_factory=list)
+    affected_shot_ids: list[str] = Field(default_factory=list)
     skipped_shots: int = 0
 
 
@@ -289,11 +317,12 @@ class ErrorResponse(BaseModel):
 
 
 __all__ = [
-    "BookListResponse",
     "BookResponse",
-    "BookUploadResponse",
+    "CanonAppearance",
     "CanonEditRequest",
     "CanonEditResponse",
+    "CanonEntityResponse",
+    "CanonReferenceImage",
     "CanonResponse",
     "CommentRequest",
     "CommentResponse",
@@ -310,7 +339,6 @@ __all__ = [
     "SeekRequest",
     "SeekResponse",
     "SessionResponse",
-    "ShotListResponse",
     "ShotResponse",
     "TokenResponse",
     "UserResponse",

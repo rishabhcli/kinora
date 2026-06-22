@@ -1,18 +1,15 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
-import { installApiCompat } from "./compat";
 import { SEED, shotLabel } from "./seed";
 
 /**
- * The extended `test` every spec imports. It auto-installs the API-compat shim
- * (see `compat.ts`) on each page so the real UI runs against the real backend.
+ * The `test` every spec imports. The frontend runs directly against the REAL
+ * backend contract — there is no compatibility shim: GET /api/books and
+ * /api/books/:id/shots return bare arrays, each shot carries `source_span`, and
+ * /api/books/:id/canon returns an `entities` array. (Phase-13's `compat.ts` has
+ * been deleted now that those mismatches are fixed in the API itself.)
  */
-export const test = base.extend({
-  page: async ({ page }, use) => {
-    await installApiCompat(page);
-    await use(page);
-  },
-});
+export const test = base;
 
 export { expect };
 

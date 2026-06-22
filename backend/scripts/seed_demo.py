@@ -87,7 +87,7 @@ def seed_via_api(
         if up.status_code not in (200, 201):
             print(f"upload failed: {up.status_code} {up.text}", file=sys.stderr)
             return 1
-        book = up.json()["book"]
+        book = up.json()
         book_id = book["id"]
         print(f"uploaded book {book_id!r} (status={book['status']}); ingesting...")
 
@@ -98,7 +98,7 @@ def seed_via_api(
             resp.raise_for_status()
             payload = resp.json()
             status = payload["status"]
-            stage = payload.get("progress_stage")
+            stage = payload.get("stage")
             pct = payload.get("progress")
             print(f"  status={status} stage={stage} pct={pct}")
             if status in ("ready", "failed"):

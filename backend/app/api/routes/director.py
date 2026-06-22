@@ -242,7 +242,7 @@ async def canon_edit(
     return CanonEditResponse(
         entity_key=body.entity_key,
         version=version,
-        regenerated_shots=regenerated,
+        affected_shot_ids=regenerated,
         skipped_shots=skipped,
     )
 

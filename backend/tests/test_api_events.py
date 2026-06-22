@@ -138,7 +138,7 @@ def test_ws_bidirectional_roundtrip() -> None:
         up = tc.post(
             "/api/books", headers=headers, files={"file": ("t.pdf", tiny_pdf(), "application/pdf")}
         )
-        book_id = up.json()["book"]["id"]
+        book_id = up.json()["id"]
         session_id = tc.post(
             "/api/sessions", headers=headers, json={"book_id": book_id}
         ).json()["session_id"]

@@ -40,9 +40,8 @@ async def test_upload_accepts_real_pdf_and_triggers_ingest(
         "/api/books", headers=auth_headers, files=_files(tiny_pdf()), data={"title": "My Tale"}
     )
     assert resp.status_code == 201, resp.text
-    body = resp.json()
-    assert body["ingest_started"] is True
-    book = body["book"]
+    # The upload returns the freshly-created book directly (a bare Book, no envelope).
+    book = resp.json()
     assert book["title"] == "My Tale"
     assert book["status"] in {"importing", "ready"}
     book_id = book["id"]
@@ -56,7 +55,8 @@ async def test_upload_accepts_real_pdf_and_triggers_ingest(
 
     shelf = await api_client.get("/api/books", headers=auth_headers)
     assert shelf.status_code == 200
-    assert any(b["id"] == book_id for b in shelf.json()["books"])
+    # The shelf is a bare array of books (no envelope).
+    assert any(b["id"] == book_id for b in shelf.json())
 
 
 async def test_upload_rejects_non_pdf(
@@ -88,7 +88,7 @@ async def test_get_page_returns_text_and_boxes(
     api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
 ) -> None:
     up = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
-    book_id = up.json()["book"]["id"]
+    book_id = up.json()["id"]
     async with container.session_factory() as session:
         await PageRepo(session).create(
             book_id=book_id,
@@ -113,7 +113,7 @@ async def test_get_canon_vault(
     api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
 ) -> None:
     up = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
-    book_id = up.json()["book"]["id"]
+    book_id = up.json()["id"]
     async with container.session_factory() as session:
         assert container.embedder is not None
         canon = CanonService(
@@ -130,23 +130,29 @@ async def test_get_canon_vault(
     resp = await api_client.get(f"/api/books/{book_id}/canon", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
-    assert body["index_url"].startswith("http")
-    blob = "\n".join(body["markdown"].values())
-    assert "char_hero" in blob
-    assert "Brave Hero" in blob
+    # The canon graph projects the current-version entities the editor renders,
+    # keyed by entity_key (what the canon-edit call targets), plus the markdown vault.
+    entities = body["entities"]
+    hero = next(e for e in entities if e["id"] == "char_hero")
+    assert hero["name"] == "Brave Hero"
+    assert hero["type"] == "character"
+    assert hero["version"] == 1
+    assert "char_hero" in body["markdown"]
+    assert "Brave Hero" in body["markdown"]
 
 
 async def test_list_shots(
     api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
 ) -> None:
     up = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
-    book_id = up.json()["book"]["id"]
+    book_id = up.json()["id"]
     async with container.session_factory() as session:
         await ShotRepo(session).create(
             id="shot_1",
             book_id=book_id,
             beat_id="beat_1",
             scene_id="scene_1",
+            source_span={"page": 1, "para": 1, "word_range": [0, 9]},
             status=ShotStatus.ACCEPTED,
             render_mode="reference_to_video",
             duration_s=5.0,
@@ -157,10 +163,14 @@ async def test_list_shots(
 
     resp = await api_client.get(f"/api/books/{book_id}/shots", headers=auth_headers)
     assert resp.status_code == 200
-    shots = resp.json()["shots"]
+    # The shot timeline is a bare array; each shot carries its source_span so the
+    # client's SyncEngine can sort/seek by reading position.
+    shots = resp.json()
     assert len(shots) == 1
     assert shots[0]["shot_id"] == "shot_1"
     assert shots[0]["status"] == "accepted"
+    assert shots[0]["source_span"] == {"page": 1, "para": 1, "word_range": [0, 9]}
+    assert shots[0]["qa"]["verdict"] == "pass"
     assert shots[0]["clip_url"] and shots[0]["clip_url"].startswith("http")
 
 
@@ -168,7 +178,7 @@ async def test_book_not_owned_is_404(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
     up = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
-    book_id = up.json()["book"]["id"]
+    book_id = up.json()["id"]
 
     other = await register_login(api_client, "intruder@example.com")
     resp = await api_client.get(f"/api/books/{book_id}", headers=other)
