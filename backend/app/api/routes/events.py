@@ -66,7 +66,8 @@ def _bearer_token(request_headers: Any, query_token: str | None) -> str | None:
 async def _owned_session_row(container: Container, user: User, session_id: str) -> SessionRow:
     async with container.session_factory() as session:
         row = await SessionRepo(session).get(session_id)
-    if row is None or (row.user_id is not None and row.user_id != user.id):
+    # Fail closed: a NULL-owner session belongs to nobody (not everybody).
+    if row is None or row.user_id != user.id:
         raise APIError("session_not_found", "no such session for this user", status=404)
     return row
 

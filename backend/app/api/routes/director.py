@@ -162,10 +162,11 @@ async def canon_edit(
     _rl: Annotated[None, Depends(write_rate_limit)],
 ) -> CanonEditResponse:
     """Edit a canon entity and surgically regen only the dependent shots (§8.7)."""
-    owns = await container.redis.raw.sismember(f"kinora:user:{user.id}:books", book_id)
+    # Durable ownership via books.user_id (fail-closed on a NULL owner).
     async with container.session_factory() as session:
-        if await BookRepo(session).get(book_id) is None or not owns:
-            raise APIError("book_not_found", "no such book for this user", status=404)
+        book = await BookRepo(session).get(book_id)
+    if book is None or book.user_id != user.id:
+        raise APIError("book_not_found", "no such book for this user", status=404)
 
     # 1. Apply the edit as a new entity version (Continuity Supervisor write, §8.1).
     async with container.session_factory() as session:

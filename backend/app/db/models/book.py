@@ -25,6 +25,12 @@ class Book(StrIdMixin, TimestampMixin, Base):
 
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     author: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Durable book ownership (kinora.md §5.1): the authoritative authz source,
+    # nullable (legacy/unowned rows resolve to "owned by nobody" — fail-closed).
+    # SET NULL on user delete so a removed account orphans rather than cascades.
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     source_pdf_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[BookStatus] = mapped_column(
         str_enum(BookStatus, "book_status"),

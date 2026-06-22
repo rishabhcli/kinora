@@ -51,7 +51,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.db.models.enums import ShotStatus
 from app.memory.budget_service import BudgetExceeded, Reservation
-from app.memory.interfaces import BlobStore, CanonSlice
+from app.memory.interfaces import BlobStore, CanonSlice, Embedder
 from app.observability import metrics
 from app.providers.errors import LiveVideoDisabled, ProviderError
 from app.providers.types import TtsResult
@@ -365,6 +365,19 @@ def _rotate_seed(seed: int) -> int:
     return (int(seed) + _SEED_STEP) & _SEED_MASK
 
 
+def _mean_vector(vectors: list[list[float]]) -> list[float]:
+    """Component-wise mean of equal-length embedding vectors (the style centroid)."""
+    if not vectors:
+        return []
+    length = len(vectors[0])
+    sums = [0.0] * length
+    for vec in vectors:
+        for i in range(length):
+            sums[i] += vec[i]
+    count = float(len(vectors))
+    return [s / count for s in sums]
+
+
 @dataclass(slots=True)
 class _RenderCtx:
     """The per-call context threaded through the orchestrator's helpers."""
@@ -420,6 +433,7 @@ class RenderPipeline:
         narrator: Narrator,
         conflict_resolver: ConflictResolving | None = None,
         image_gen: ImageGen | None = None,
+        embedder: Embedder | None = None,
         settings: Settings | None = None,
         default_voice: str = "Cherry",
         url_ttl: int = 3600,
@@ -439,6 +453,9 @@ class RenderPipeline:
         self._narrator = narrator
         self._conflict = conflict_resolver
         self._image_gen = image_gen
+        # Embeds the scene Style node's locked reference into the §9.5 style
+        # centroid the Critic measures drift against (None => style gate inert).
+        self._embedder = embedder
         self._settings = settings or get_settings()
         self._default_voice = default_voice
         self._ttl = url_ttl
@@ -575,6 +592,9 @@ class RenderPipeline:
         ref_bytes = await self._reference_bytes(ctx.canon_slice, spec)
         prev_frame = await self._prev_last_frame(ctx.canon_slice)
         locked_ref = await self._first_locked_ref_bytes(ctx.canon_slice)
+        # §9.5 style gate: a real scene style centroid (the Style node's locked
+        # reference embedding) so the Critic measures style_drift, not a no-op None.
+        style_centroid = await self._scene_style_centroid(ctx.canon_slice)
         cur_spec = spec
         cur_notes = list(ctx.notes)
 
@@ -609,15 +629,28 @@ class RenderPipeline:
             actual = float(output.duration_s or ctx.target_duration)
             await ctx.machine.transition(RenderState.QA)
             frames = await self._frames(output)
-            qa = await self._critic.score(
-                shot_id=ctx.shot_id,
-                clip_frames=frames,
-                canon_slice=ctx.canon_slice,
-                character_crop=frames[0] if frames else None,
-                locked_ref_image=locked_ref,
-                scene_style_centroid=None,
-                retries_exhausted=retries_exhausted,
-            )
+            try:
+                qa = await self._critic.score(
+                    shot_id=ctx.shot_id,
+                    clip_frames=frames,
+                    canon_slice=ctx.canon_slice,
+                    character_crop=frames[0] if frames else None,
+                    locked_ref_image=locked_ref,
+                    scene_style_centroid=style_centroid,
+                    retries_exhausted=retries_exhausted,
+                )
+            except (LiveVideoDisabled, ProviderError) as exc:
+                # The clip rendered (its seconds were really spent), but QA is
+                # unavailable. Commit the spend and ship a degraded, playable
+                # result rather than letting the worker retry into the DLQ — the
+                # film never hard-stops (§4.11/§12.4). A failed QA is a REPAIR, so
+                # step QA -> REPAIR before the ladder (the legal §9.7 edge).
+                await self._budget.commit(reservation, actual)
+                ctx.spent_video_seconds += actual
+                await ctx.machine.transition(RenderState.REPAIR)
+                return await self._degrade(
+                    ctx, cur_spec, reason=f"critic_{type(exc).__name__}", qa=None
+                )
 
             if qa.verdict is Verdict.PASS:
                 await self._budget.commit(reservation, actual)
@@ -846,9 +879,19 @@ class RenderPipeline:
     ) -> RenderResult:
         """Step down the ladder: a real Ken-Burns (or audio card) mp4 + a defect."""
         spent = ctx.spent_video_seconds if spent_video_seconds is None else spent_video_seconds
-        tts = await self._narrator.synthesize(ctx.narration_text, voice_id=ctx.voice_id)
-        audio_bytes = tts.audio_bytes or None
-        audio_dur = float(tts.duration_s or 0.0)
+        # Narration may itself fail under a provider outage — never let that turn a
+        # degrade into a crash/DLQ. A TTS failure yields a *silent* (no-audio) but
+        # still playable Ken-Burns/text card (§4.11/§12.4).
+        tts: TtsResult | None
+        try:
+            tts = await self._narrator.synthesize(ctx.narration_text, voice_id=ctx.voice_id)
+        except (LiveVideoDisabled, ProviderError) as exc:
+            logger.warning("degrade.tts_failed", shot_id=ctx.shot_id, error=str(exc))
+            tts = None
+        audio_bytes = tts.audio_bytes or None if tts is not None else None
+        audio_dur = float(tts.duration_s or 0.0) if tts is not None else 0.0
+        word_timestamps = list(tts.word_timestamps) if tts is not None else []
+        alignment = tts.alignment if tts is not None else None
         clip_dur = (
             max(ctx.target_duration, math.ceil(audio_dur)) if audio_dur > 0 else ctx.target_duration
         )
@@ -881,7 +924,7 @@ class RenderPipeline:
 
         segment = build_sync_segment(
             shot_id=ctx.shot_id,
-            word_timestamps=tts.word_timestamps,
+            word_timestamps=word_timestamps,
             source_span=ctx.span,
             page_word_boxes=self._page_boxes(ctx.page),
             duration_s=clip_dur,
@@ -890,9 +933,9 @@ class RenderPipeline:
         narration = {
             "text": ctx.narration_text,
             "audio_key": audio_key,
-            "word_timestamps": [w.model_dump(mode="json") for w in tts.word_timestamps],
+            "word_timestamps": [w.model_dump(mode="json") for w in word_timestamps],
             "sync_segment": segment.model_dump(mode="json"),
-            "alignment": tts.alignment,
+            "alignment": alignment,
         }
         await self._shots.update(
             ctx.shot_id,
@@ -1114,6 +1157,25 @@ class RenderPipeline:
                     return await self._get_bytes(ref.key)
         return None
 
+    async def _scene_style_centroid(self, canon_slice: CanonSlice) -> list[float] | None:
+        """The §9.5 scene style centroid the Critic measures style_drift against.
+
+        It is the mean embedding of the scene Style node's locked reference
+        image(s) (``canon.query`` already attaches the Style node to the slice).
+        Returns ``None`` only when there is no embedder, no style node, or no
+        present locked style reference — otherwise the style gate is *live*.
+        """
+        if self._embedder is None or canon_slice.style is None:
+            return None
+        images: list[bytes] = []
+        for ref in canon_slice.style.reference_images:
+            if ref.locked and ref.key and await self._exists(ref.key):
+                images.append(await self._get_bytes(ref.key))
+        if not images:
+            return None
+        vectors = await self._embedder.embed_images(images)
+        return _mean_vector(vectors) if vectors else None
+
     async def _frames(self, output: GeneratorOutput) -> list[bytes]:
         if not output.clip_bytes:
             return []
@@ -1204,6 +1266,7 @@ def build_render_pipeline(
         narrator=providers.tts,
         conflict_resolver=resolver,
         image_gen=providers.image,
+        embedder=embedder,
         settings=settings,
         default_voice=default_voice,
         url_ttl=url_ttl,

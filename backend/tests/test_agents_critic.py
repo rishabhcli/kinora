@@ -97,3 +97,32 @@ async def test_score_identity_drift_path(providers: Providers) -> None:  # noqa:
     assert record.verdict is Verdict.FAIL
     assert record.ccs == 0.0
     assert record.repair_action is RepairAction.REGEN_TIGHTEN_REFS
+
+
+async def test_score_style_drift_fails_gate(providers: Providers) -> None:  # noqa: F811
+    """Fix 4: a clip whose style diverges from the scene centroid fails the §9.5
+    style gate (style_drift > 0.08 → FAIL → reprompt_style). Identity is held at
+    CCS 1.0 so the failure is unambiguously the *style* check."""
+    providers.embeddings.embed_images = OneHotEmbedder()  # type: ignore[method-assign]
+    providers.vl.analyze_json = JsonSequencer(  # type: ignore[method-assign]
+        {"timeline_ok": True, "motion_artifact": 0.05, "reason": "palette drift"}
+    )
+    frame = b"\x89PNG-frame"
+    # A centroid on a *different* one-hot axis than the clip's style → cosine 0 →
+    # style_drift 1.0 (deterministic; never a hash collision with the frame).
+    frame_axis = one_hot(frame).index(1.0)
+    centroid = [0.0] * 1152
+    centroid[(frame_axis + 7) % 1152] = 1.0
+
+    record = await Critic(providers).score(
+        shot_id="shot_style",
+        clip_frames=[frame],
+        canon_slice=_empty_slice(),
+        character_crop=b"same",
+        locked_ref_image=b"same",  # CCS 1.0 — isolates the style gate
+        scene_style_centroid=centroid,
+    )
+    assert record.ccs == 1.0
+    assert record.style_drift > 0.08
+    assert record.verdict is Verdict.FAIL
+    assert record.repair_action is RepairAction.REPROMPT_STYLE

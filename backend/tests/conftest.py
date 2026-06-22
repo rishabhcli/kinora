@@ -267,14 +267,17 @@ async def seed_owned_book(
     status: BookStatus = BookStatus.READY,
     art_direction: str | None = None,
 ) -> str:
-    """Create a book row + register the caller as its owner (no upload/ingest)."""
+    """Create a book row owned by the caller (durable books.user_id; no upload/ingest)."""
     uid = await user_id_for(client, headers)
     book_id = new_id()
     async with container.session_factory() as session:
         await BookRepo(session).create(
-            title=title, book_id=book_id, status=status, art_direction=art_direction
+            title=title,
+            book_id=book_id,
+            user_id=uid,
+            status=status,
+            art_direction=art_direction,
         )
-    await container.redis.raw.sadd(f"kinora:user:{uid}:books", book_id)
     return book_id
 
 

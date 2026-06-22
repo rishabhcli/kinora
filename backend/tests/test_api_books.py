@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 import pytest
+from fastapi import UploadFile
 from httpx import AsyncClient
 
+from app.api.errors import APIError
 from app.api.routes import books as books_module
 from app.composition import Container
-from app.db.models.enums import EntityType, ShotStatus
-from app.db.repositories.book import PageRepo
+from app.db.base import new_id
+from app.db.models.enums import BookStatus, EntityType, ShotStatus
+from app.db.repositories.book import BookRepo, PageRepo
 from app.db.repositories.shot import ShotRepo
 from app.memory.canon_service import CanonService
 from tests.conftest import FakeIngestRunner, register_login, tiny_pdf
@@ -184,3 +188,79 @@ async def test_book_not_owned_is_404(
     resp = await api_client.get(f"/api/books/{book_id}", headers=other)
     assert resp.status_code == 404
     assert resp.json()["error"]["type"] == "book_not_found"
+
+
+async def test_book_with_null_owner_is_inaccessible(
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
+) -> None:
+    """Fix 10: a book with no durable owner (user_id NULL) belongs to nobody."""
+    book_id = new_id()
+    async with container.session_factory() as session:
+        # Created with no user_id — a legacy/orphaned row.
+        await BookRepo(session).create(title="Orphan", book_id=book_id, status=BookStatus.READY)
+    resp = await api_client.get(f"/api/books/{book_id}", headers=auth_headers)
+    assert resp.status_code == 404
+    assert resp.json()["error"]["type"] == "book_not_found"
+
+
+async def test_upload_sets_durable_owner_and_lists_it(
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
+) -> None:
+    """Fix 10: upload persists books.user_id; the shelf reads it (no Redis needed)."""
+    up = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
+    book_id = up.json()["id"]
+    async with container.session_factory() as session:
+        book = await BookRepo(session).get(book_id)
+    assert book is not None and book.user_id is not None
+    shelf = await api_client.get("/api/books", headers=auth_headers)
+    assert any(b["id"] == book_id for b in shelf.json())
+
+
+# --------------------------------------------------------------------------- #
+# Fix 6: upload DoS + per-user ingest quota
+# --------------------------------------------------------------------------- #
+
+
+async def test_read_capped_aborts_without_buffering_whole_body() -> None:
+    """The streaming reader aborts the instant the cap is crossed (no full buffer)."""
+    chunk = books_module._READ_CHUNK
+
+    class _BigUpload:
+        def __init__(self, total_chunks: int) -> None:
+            self._left = total_chunks
+            self.served = 0
+
+        async def read(self, size: int = -1) -> bytes:
+            if self._left <= 0:
+                return b""
+            self._left -= 1
+            self.served += 1
+            return b"\x00" * chunk
+
+    fake = _BigUpload(total_chunks=100)  # would be 100 MiB if read in full
+    cap = 2 * chunk  # 2 MiB
+    with pytest.raises(APIError) as excinfo:
+        await books_module._read_capped(cast("UploadFile", fake), cap)
+    assert excinfo.value.status == 413
+    # Aborted after crossing the cap — only ~3 chunks pulled, not all 100.
+    assert fake.served <= 3
+
+
+async def test_upload_rejects_too_many_pages(
+    api_client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(books_module, "MAX_INGEST_PAGES", 0)
+    resp = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
+    assert resp.status_code == 413
+    assert resp.json()["error"]["type"] == "too_many_pages"
+
+
+async def test_upload_enforces_max_books_per_user(
+    api_client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(books_module, "MAX_BOOKS_PER_USER", 1)
+    first = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
+    assert first.status_code == 201
+    second = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
+    assert second.status_code == 429
+    assert second.json()["error"]["type"] == "book_quota_exceeded"

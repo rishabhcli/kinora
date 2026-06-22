@@ -1,14 +1,15 @@
-"""``python -m app.mcp.run`` — run the MCP canon-memory server with real services.
+"""``python -m app.mcp.run`` — run the MCP canon-memory server with REAL services.
 
-Wires the real dependencies (the DB session factory, the multimodal embeddings
-provider, the object store, and the persistent budget) into :class:`MemoryTools`
-and serves the §8.3 tool surface. The render/queue and Adapter seams default to
-:class:`NotWired` implementations — Phase 8 injects the real render backend; this
-is an explicit DI seam, while every other tool is fully functional.
+Wires the deployed MCP through the **composition root** so the §8.3 tool surface
+is fully real: ``shot.render`` enqueues through the real
+:class:`~app.queue.enqueuer.RedisRenderEnqueuer` (the Redis priority queue) and
+``shot.plan`` runs the real :class:`~app.agents.adapter.Adapter` — no
+``NotWired`` seams. The streamable-HTTP transport is gated by ``MCP_AUTH_TOKEN``
+(:func:`app.mcp.server.build_streamable_http_app`).
 
 Usage:
     python -m app.mcp.run            # stdio transport (default)
-    python -m app.mcp.run --http     # streamable-HTTP transport
+    python -m app.mcp.run --http     # streamable-HTTP transport (:8765)
 """
 
 from __future__ import annotations
@@ -17,31 +18,19 @@ import argparse
 
 import anyio
 
-from app.core.config import get_settings
-from app.db.session import get_session
+from app.composition import build_container
 from app.mcp.server import build_streamable_http_app, run_stdio
 from app.mcp.tools import MemoryTools
-from app.memory.budget_service import BudgetLimits
-from app.memory.interfaces import NotWiredRenderEnqueuer, NotWiredShotPlanner
 
 
 def build_default_tools() -> MemoryTools:
-    """Construct :class:`MemoryTools` wired to the real providers and stores."""
-    # Imported lazily so importing this module does not construct provider
-    # clients (and so tests can build MemoryTools with doubles instead).
-    from app.providers import create_providers
-    from app.storage.object_store import ObjectStore
+    """Construct :class:`MemoryTools` wired to the REAL render + planner seams.
 
-    settings = get_settings()
-    providers = create_providers(settings)
-    return MemoryTools(
-        embedder=providers.embeddings,
-        session_factory=get_session,
-        blob_store=ObjectStore.from_settings(settings),
-        limits=BudgetLimits.from_settings(settings),
-        enqueuer=NotWiredRenderEnqueuer(),
-        planner=NotWiredShotPlanner(),
-    )
+    Reuses :func:`app.composition.build_container` (the single DI-seam
+    satisfaction point) so the deployed server exposes the same fully-real tools
+    the API gateway uses — never the ``NotWired`` placeholders.
+    """
+    return build_container().build_tools()
 
 
 def main(argv: list[str] | None = None) -> None:

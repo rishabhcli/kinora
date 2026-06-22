@@ -28,13 +28,14 @@ from app.db.base import Base
 from app.db.models.enums import EntityType, RenderPriority
 from app.db.repositories.beat import BeatRepo
 from app.db.repositories.book import BookRepo
+from app.db.repositories.budget import BudgetRepo
 from app.db.repositories.scene import SceneRepo
 from app.db.repositories.shot import ShotCacheRepo, ShotRepo
 from app.mcp import schemas
 from app.mcp.server import build_server
 from app.mcp.skills import QwenSkillDispatcher
 from app.mcp.tools import TOOL_DEFS, MemoryTools, SessionFactory
-from app.memory.budget_service import BudgetLimits
+from app.memory.budget_service import BudgetLimits, BudgetService
 from app.memory.canon_service import CanonService
 from app.memory.episodic_service import EpisodicService
 from app.memory.interfaces import NotWired, ShotSpec
@@ -45,6 +46,13 @@ pytestmark = pytest.mark.skipif(
 )
 
 _DIM = 1152
+_LIMITS = BudgetLimits(
+    ceiling_video_s=100.0,
+    per_session_s=50.0,
+    per_scene_s=30.0,
+    low_floor_s=10.0,
+    live_video=False,
+)
 
 
 class FakeEmbedder:
@@ -124,13 +132,7 @@ def _tools(
     return MemoryTools(
         embedder=embedder or FakeEmbedder(),
         session_factory=_factory(sessionmaker),
-        limits=BudgetLimits(
-            ceiling_video_s=100.0,
-            per_session_s=50.0,
-            per_scene_s=30.0,
-            low_floor_s=10.0,
-            live_video=False,
-        ),
+        limits=_LIMITS,
         enqueuer=enqueuer,
         planner=planner or FakePlanner(),
     )
@@ -193,7 +195,16 @@ async def test_mcp_protocol_roundtrip(maker: async_sessionmaker[AsyncSession]) -
         assert budget_data["can_render_live"] is False
 
 
-async def test_shot_render_cache_miss_then_hit(maker: async_sessionmaker[AsyncSession]) -> None:
+async def test_shot_render_miss_enqueues_without_pre_reserving_budget(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """shot.render must NOT pre-reserve budget (the §8.7 leak/double-count fix).
+
+    On a miss it only enqueues; the RenderPipeline owns the single authoritative
+    reserve → commit/release lifecycle. So the ledger is unchanged right after the
+    enqueue (no leaked phantom reservation), and when the pipeline later reserves +
+    commits the real seconds the budget drops by 5s *exactly once* — never 10s.
+    """
     book_id, scene_id, beat_id = await _seed_book(maker)
     enqueuer = FakeEnqueuer()
     tools = _tools(maker, enqueuer=enqueuer)
@@ -211,20 +222,51 @@ async def test_shot_render_cache_miss_then_hit(maker: async_sessionmaker[AsyncSe
         priority="committed",
     )
 
-    # Miss → reserve budget + enqueue via the injected RenderEnqueuer.
     miss = await tools.shot_render(render_args)
     assert miss.status == "enqueued"
     assert miss.cached is False
     assert miss.job_id == "job_test_1"
-    assert miss.video_seconds == 5.0
+    assert miss.reservation_id is None  # shot.render reserves nothing
     assert len(enqueuer.calls) == 1
     spec, priority, _token = enqueuer.calls[0]
     assert spec.shot_hash == miss.shot_hash
     assert spec.reference_set_hash == miss.reference_set_hash
     assert priority == RenderPriority.COMMITTED
 
+    # No leak: the budget ledger is untouched by the enqueue.
     after_miss = (await tools.budget_remaining(schemas.BudgetRemainingInput())).remaining_video_s
-    assert after_miss == pytest.approx(baseline - 5.0)
+    assert after_miss == pytest.approx(baseline)
+
+    # The single authoritative lifecycle (the pipeline) charges the real seconds ONCE:
+    # reserve + commit on the same reservation nets to 5s used (not 10s).
+    async with _factory(maker)() as session:
+        budget = BudgetService(repo=BudgetRepo(session), limits=_LIMITS)
+        reservation = await budget.reserve(5.0, scene_id=scene_id, book_id=book_id)
+        await budget.commit(reservation, 5.0)
+
+    after_render = (await tools.budget_remaining(schemas.BudgetRemainingInput())).remaining_video_s
+    assert after_render == pytest.approx(baseline - 5.0)
+
+
+async def test_shot_render_cache_hit_serves_zero_video_seconds(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    book_id, scene_id, beat_id = await _seed_book(maker)
+    enqueuer = FakeEnqueuer()
+    tools = _tools(maker, enqueuer=enqueuer)
+
+    render_args = schemas.ShotRenderInput(
+        book_id=book_id,
+        beat_id=beat_id,
+        scene_id=scene_id,
+        render_mode="reference_to_video",
+        seed=11,
+        reference_image_ids=["char_hero@v1"],
+        target_duration_s=5.0,
+        priority="committed",
+    )
+    miss = await tools.shot_render(render_args)
+    assert miss.status == "enqueued"
 
     # Populate the cache for that shot_hash → the next identical render is a hit.
     async with _factory(maker)() as session:
@@ -235,6 +277,7 @@ async def test_shot_render_cache_miss_then_hit(maker: async_sessionmaker[AsyncSe
             video_seconds=5.0,
         )
 
+    baseline = (await tools.budget_remaining(schemas.BudgetRemainingInput())).remaining_video_s
     hit = await tools.shot_render(render_args)
     assert hit.status == "cache_hit"
     assert hit.cached is True
@@ -243,7 +286,7 @@ async def test_shot_render_cache_miss_then_hit(maker: async_sessionmaker[AsyncSe
     assert len(enqueuer.calls) == 1  # no second enqueue
 
     after_hit = (await tools.budget_remaining(schemas.BudgetRemainingInput())).remaining_video_s
-    assert after_hit == pytest.approx(after_miss)  # a hit reserves nothing
+    assert after_hit == pytest.approx(baseline)  # a hit reserves nothing
 
 
 async def test_shot_plan_seam(maker: async_sessionmaker[AsyncSession]) -> None:

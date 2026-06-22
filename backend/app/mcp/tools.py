@@ -183,67 +183,53 @@ class MemoryTools:
                 seed=inp.seed,
                 reference_image_ids=inp.reference_image_ids,
             )
-            if look.hit:
-                # Cache hit: serve the cached clip, spend zero video-seconds (§8.7).
-                return schemas.ShotRenderOutput(
-                    status="cache_hit",
-                    cached=True,
-                    shot_hash=look.shot_hash,
-                    reference_set_hash=look.reference_set_hash,
-                    clip_url=look.clip_url,
-                    last_frame_url=look.last_frame_url,
-                    video_seconds=0.0,
-                )
-
-            budget = self._budget(session)
-            try:
-                reservation = await budget.reserve(
-                    inp.target_duration_s,
-                    session_id=inp.session_id,
-                    scene_id=inp.scene_id,
-                    book_id=inp.book_id,
-                )
-            except BudgetExceeded as exc:
-                remaining = await budget.remaining()
-                return schemas.ShotRenderOutput(
-                    status="budget_exceeded",
-                    cached=False,
-                    shot_hash=look.shot_hash,
-                    reference_set_hash=look.reference_set_hash,
-                    video_seconds=0.0,
-                    remaining_video_s=remaining,
-                    reason=str(exc),
-                )
-
-            spec = ShotSpec(
-                book_id=inp.book_id,
-                beat_id=inp.beat_id,
-                scene_id=inp.scene_id,
-                shot_id=inp.shot_id,
-                render_mode=inp.render_mode,
-                prompt=inp.prompt,
-                negative_prompt=inp.negative_prompt,
-                reference_image_ids=inp.reference_image_ids,
-                camera=inp.camera,
-                seed=inp.seed,
-                target_duration_s=inp.target_duration_s,
-                canon_version_at_render=inp.canon_version_at_render,
-                reference_set_hash=look.reference_set_hash,
-                shot_hash=look.shot_hash,
-                end_frame_ref=inp.end_frame_ref,
-            )
-            job_id = await self._enqueuer.enqueue(
-                spec, RenderPriority(inp.priority), inp.cancel_token
-            )
+        if look.hit:
+            # Cache hit: serve the cached clip, spend zero video-seconds (§8.7).
             return schemas.ShotRenderOutput(
-                status="enqueued",
-                cached=False,
+                status="cache_hit",
+                cached=True,
                 shot_hash=look.shot_hash,
                 reference_set_hash=look.reference_set_hash,
-                reservation_id=reservation.id,
-                job_id=job_id,
-                video_seconds=inp.target_duration_s,
+                clip_url=look.clip_url,
+                last_frame_url=look.last_frame_url,
+                video_seconds=0.0,
             )
+
+        # Cache miss: enqueue the render. Budget is NOT pre-reserved here. The
+        # RenderPipeline's reserve → render → commit/release is the *single*
+        # authoritative budget lifecycle for the render (exactly as the Scheduler
+        # path's gating earmark is released to it at worker hand-off). Pre-reserving
+        # here double-counted the budget *and* leaked: this enqueue carries no
+        # reservation_id, so the worker could never release the earmark and the
+        # pipeline reserved a second time (permanent outstanding reservation).
+        spec = ShotSpec(
+            book_id=inp.book_id,
+            beat_id=inp.beat_id,
+            scene_id=inp.scene_id,
+            shot_id=inp.shot_id,
+            render_mode=inp.render_mode,
+            prompt=inp.prompt,
+            negative_prompt=inp.negative_prompt,
+            reference_image_ids=inp.reference_image_ids,
+            camera=inp.camera,
+            seed=inp.seed,
+            target_duration_s=inp.target_duration_s,
+            canon_version_at_render=inp.canon_version_at_render,
+            reference_set_hash=look.reference_set_hash,
+            shot_hash=look.shot_hash,
+            end_frame_ref=inp.end_frame_ref,
+        )
+        job_id = await self._enqueuer.enqueue(spec, RenderPriority(inp.priority), inp.cancel_token)
+        return schemas.ShotRenderOutput(
+            status="enqueued",
+            cached=False,
+            shot_hash=look.shot_hash,
+            reference_set_hash=look.reference_set_hash,
+            job_id=job_id,
+            # An *estimate* of what the render will spend; the pipeline reserves and
+            # commits the real seconds. shot.render itself reserves nothing.
+            video_seconds=inp.target_duration_s,
+        )
 
     async def shot_status(self, inp: schemas.ShotStatusInput) -> schemas.ShotStatusOutput:
         async with self._sf() as session:
@@ -456,8 +442,9 @@ TOOL_DEFS: list[ToolDef] = [
     ToolDef(
         "shot.render",
         "Render a shot: check the content-hash cache first (hit => cached clip "
-        "at zero video-seconds); on a miss, reserve budget and enqueue the "
-        "render (honours cache + budget).",
+        "at zero video-seconds); on a miss, enqueue the render. Budget is not "
+        "reserved here — the render pipeline owns the authoritative "
+        "reserve/commit/release lifecycle, so the budget is never double-counted.",
         schemas.ShotRenderInput,
         "shot_render",
     ),

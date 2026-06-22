@@ -29,11 +29,11 @@ import contextlib
 import signal
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
-from app.db.models.enums import RenderPriority
+from app.db.models.enums import RenderPriority, ShotStatus
 from app.memory.budget_service import Reservation
 from app.queue.redis_queue import (
     LANE_ORDER,
@@ -44,7 +44,14 @@ from app.queue.redis_queue import (
 )
 from app.render.pipeline import RenderResult, UnknownShotError
 
+if TYPE_CHECKING:
+    from app.render.stitch import StitchResult
+
 logger = get_logger("app.queue.worker")
+
+#: A shot is "terminal" (no longer fillable) once accepted or degraded; a scene
+#: is stitched when every one of its shots is terminal (§9.6).
+_TERMINAL_SHOT = frozenset({ShotStatus.ACCEPTED, ShotStatus.DEGRADED})
 
 # A claimed shot render returns the pipeline's structured result.
 ShotRunner = Callable[[QueuedJob], Awaitable[RenderResult]]
@@ -81,6 +88,7 @@ class RenderWorker:
         providers: Any | None = None,
         object_store: Any | None = None,
         poll_interval_s: float = 0.25,
+        lease_heartbeat_s: float = 30.0,
     ) -> None:
         self._queue = queue
         self._redis = redis
@@ -92,6 +100,9 @@ class RenderWorker:
         self._providers = providers
         self._object_store = object_store
         self._poll = poll_interval_s
+        # Cadence the worker re-extends a job's lease at while it actively renders;
+        # well under the queue lease so a slow render is never reaped (§12.1).
+        self._lease_heartbeat_s = lease_heartbeat_s
 
     @property
     def queue(self) -> RedisRenderQueue:
@@ -139,7 +150,7 @@ class RenderWorker:
 
         runner = self._run_shot or self._default_run_shot
         try:
-            result = await runner(job)
+            result = await self._run_with_lease_heartbeat(job, runner)
         except _PERMANENT as exc:
             logger.warning("worker.permanent_failure", job_id=job.id, error=str(exc))
             await self._queue.retry(job.id, error=str(exc), now_ms=self._far_future())
@@ -164,6 +175,32 @@ class RenderWorker:
             rung=result.rung,
             video_seconds=result.video_seconds,
         )
+        # §9.6: once this shot completes its scene, stitch the accepted clips and
+        # publish ``scene_stitched`` (absolute-time sync map). Best-effort — a
+        # stitch failure must never undo the ack or fail the render.
+        await self._maybe_stitch_scene(job, result)
+
+    async def _run_with_lease_heartbeat(
+        self, job: QueuedJob, runner: ShotRunner
+    ) -> RenderResult:
+        """Run the render while heartbeating its lease so the reaper can't steal it."""
+        stop = asyncio.Event()
+        beat = asyncio.create_task(self._lease_heartbeat(job.id, stop))
+        try:
+            return await runner(job)
+        finally:
+            stop.set()
+            beat.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await beat
+
+    async def _lease_heartbeat(self, job_id: str, stop: asyncio.Event) -> None:
+        while not stop.is_set():
+            await self._sleep_or_stop(stop, self._lease_heartbeat_s)
+            if stop.is_set():
+                break
+            with contextlib.suppress(Exception):
+                await self._queue.extend_lease(job_id)
 
     async def _process_keyframe(self, job: QueuedJob) -> None:
         runner = self._run_keyframe
@@ -259,6 +296,76 @@ class RenderWorker:
             "video_seconds": result.video_seconds,
         }
         await self._redis.publish(channel, payload)
+
+    # -- scene stitch + ship (§9.6) ------------------------------------------ #
+
+    async def _maybe_stitch_scene(self, job: QueuedJob, result: RenderResult) -> None:
+        """Stitch the scene + publish ``scene_stitched`` once the scene completes.
+
+        Triggered when a shot reaches a terminal state: if every shot in the scene
+        is now terminal (and at least one accepted), concat the accepted clips,
+        merge the per-shot sync segments into one scene map in **absolute** video
+        time (``merge_sync_segments``), and publish it. Best-effort and fully
+        guarded so a stitch problem never breaks the just-acked render.
+        """
+        if self._object_store is None or self._session_factory is None:
+            return  # stitching needs the DB + object store (wired by build_worker)
+        scene_id = job.scene_id
+        if not scene_id or result.status not in _TERMINAL_SHOT:
+            return
+        try:
+            stitched = await self._stitch_scene_if_complete(scene_id)
+        except Exception as exc:  # noqa: BLE001 - stitching must never fail the render
+            logger.warning("worker.scene_stitch_failed", scene_id=scene_id, error=str(exc))
+            return
+        if stitched is not None:
+            await self._publish_scene_stitched(job, stitched)
+
+    async def _stitch_scene_if_complete(self, scene_id: str) -> StitchResult | None:
+        from app.render.stitch import SceneStitcher
+
+        assert self._session_factory is not None
+        assert self._object_store is not None
+        async with self._session_factory() as db:
+            if not await self._scene_complete(db, scene_id):
+                return None
+            return await SceneStitcher(db, object_store=self._object_store).stitch_scene(scene_id)
+
+    @staticmethod
+    async def _scene_complete(db: Any, scene_id: str) -> bool:
+        """True once every shot in the scene is terminal and at least one accepted."""
+        from sqlalchemy import select
+
+        from app.db.models.shot import Shot
+
+        rows = list(
+            (await db.execute(select(Shot.status).where(Shot.scene_id == scene_id)))
+            .scalars()
+            .all()
+        )
+        if not rows or any(status not in _TERMINAL_SHOT for status in rows):
+            return False
+        return any(status is ShotStatus.ACCEPTED for status in rows)
+
+    async def _publish_scene_stitched(self, job: QueuedJob, stitched: StitchResult) -> None:
+        channel = (
+            session_channel(job.session_id) if job.session_id else book_channel(job.book_id)
+        )
+        await self._redis.publish(
+            channel,
+            {
+                "event": "scene_stitched",
+                "scene_id": stitched.scene_id,
+                "oss_url": stitched.clip_url,
+                "sync_map": stitched.sync_map.model_dump(mode="json"),
+            },
+        )
+        logger.info(
+            "worker.scene_stitched",
+            scene_id=stitched.scene_id,
+            shots=stitched.shot_count,
+            duration_s=stitched.duration_s,
+        )
 
     # -- run loop ------------------------------------------------------------ #
 

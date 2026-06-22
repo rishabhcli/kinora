@@ -269,6 +269,7 @@ async def seed_e2e(
         await BookRepo(session).create(
             title=BOOK_TITLE,
             author=BOOK_AUTHOR,
+            user_id=user_id,
             source_pdf_key=keys.pdf(BOOK_ID),
             status=BookStatus.READY,
             num_pages=len(rendered),

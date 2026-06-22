@@ -240,6 +240,34 @@ async def test_retry_backoff_then_deadletter(queue: RedisRenderQueue) -> None:
           f"dlq_len={await queue.dlq_len()} deadletter_total={stats.deadletter_total}")
 
 
+async def test_extend_lease_prevents_premature_reap(redis_client: RedisClient) -> None:
+    """Fix 11: a heartbeat extends a leased job's deadline so a slow render is not
+    reaped + re-claimed mid-flight (which would double-submit and double-spend)."""
+    ns = f"kinora:test:rq:{uuid.uuid4().hex[:10]}"
+    q = RedisRenderQueue(redis_client, namespace=ns, lease_ms=1000)
+    try:
+        base = _BASE_MS
+        await q.enqueue(
+            shot_hash="slow", priority=RenderPriority.COMMITTED, book_id="b",
+            job_id="slow", now_ms=base,
+        )
+        claimed = await q.claim(now_ms=base)  # leased until base + 1000
+        assert claimed is not None
+
+        # Heartbeat at +500ms pushes the lease out to base + 1500.
+        assert await q.extend_lease("slow", now_ms=base + 500) is True
+        # At base + 1001 the ORIGINAL lease would have expired; the extension holds it.
+        assert await q.reap_expired(now_ms=base + 1001) == 0
+        # Past the extended lease, crash-recovery reaping still reclaims it.
+        assert await q.reap_expired(now_ms=base + 1501) == 1
+        # A job that is not currently leased cannot be extended (late heartbeat no-op).
+        assert await q.extend_lease("ghost", now_ms=base) is False
+        print("\n[LEASE] heartbeat extended a leased job past its original deadline; "
+              "reaper held off until the extended lease expired")
+    finally:
+        await q.purge()
+
+
 async def test_depth_and_stats_snapshot(queue: RedisRenderQueue) -> None:
     await _enqueue(queue, "c1", RenderPriority.COMMITTED, job_id="c1")
     await _enqueue(queue, "c2", RenderPriority.COMMITTED, job_id="c2")

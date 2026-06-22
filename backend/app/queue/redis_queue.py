@@ -288,7 +288,14 @@ class RedisRenderQueue:
         *,
         namespace: str = "kinora:rq",
         backpressure_depth: int = 64,
-        lease_ms: int = 120_000,
+        # The worker lease must exceed the *whole* render window or the reaper can
+        # reclaim a job that is still rendering and a second worker re-submits it —
+        # double video spend under live video (§12.1). A committed render polls Wan
+        # up to providers.video poll timeout (600s) plus QA + the degrade ladder, so
+        # the default lease is 15 min (> that window). The worker *also* heartbeats
+        # the lease while actively rendering (``extend_lease``), so this is only the
+        # ceiling for a missed heartbeat, not the steady-state guarantee.
+        lease_ms: int = 900_000,
         retry_cap: int = 2,
         retry_backoff_s: Sequence[float] = (2.0, 8.0, 30.0),
         success_ttl_s: int = 3600,
@@ -695,6 +702,25 @@ class RedisRenderQueue:
         return int(value) if value else 0
 
     # -- lease recovery ------------------------------------------------------ #
+
+    async def extend_lease(
+        self, job_id: str, *, now_ms: int | None = None, lease_ms: int | None = None
+    ) -> bool:
+        """Heartbeat: push a leased job's processing deadline out by one lease.
+
+        Re-scores the job in the processing set to ``now + lease`` so a render that
+        outlasts the original lease is not reaped + re-claimed mid-flight (which
+        would double-submit it and double-spend video, §12.1). Returns ``False``
+        when the job is no longer leased (acked/cancelled/never claimed), so a late
+        heartbeat after completion is a harmless no-op.
+        """
+        now = self._now(now_ms)
+        lease = self._lease_ms if lease_ms is None else lease_ms
+        if await self._redis.zscore(self._processing_key, job_id) is None:
+            return False
+        await self._redis.zadd(self._processing_key, {job_id: now + lease})
+        await self._redis.hset(self._job_key(job_id), "lease_until", str(now + lease))
+        return True
 
     async def reap_expired(self, *, now_ms: int | None = None) -> int:
         """Re-queue jobs whose worker lease expired (crash recovery)."""

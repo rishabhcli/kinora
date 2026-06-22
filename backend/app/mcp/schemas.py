@@ -192,8 +192,11 @@ class ShotRenderInput(BaseModel):
 class ShotRenderOutput(BaseModel):
     """Result of ``shot.render``.
 
-    ``status`` is one of ``cache_hit`` (0 video-seconds), ``enqueued`` (budget
-    reserved + job enqueued), or ``budget_exceeded`` (a cap blocked the render).
+    ``status`` is ``cache_hit`` (0 video-seconds, §8.7) or ``enqueued`` (a render
+    job was enqueued). ``shot.render`` does **not** reserve budget — the
+    RenderPipeline owns the single reserve → commit/release lifecycle, so the
+    budget can never be double-counted or leaked. ``video_seconds`` on an
+    ``enqueued`` result is the *estimate* the pipeline will spend.
     """
 
     status: str

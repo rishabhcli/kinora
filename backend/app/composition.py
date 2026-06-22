@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -390,6 +391,33 @@ class Container:
         self._bg_tasks.add(task)
         task.add_done_callback(self._bg_tasks.discard)
         return task
+
+    # -- readiness probe (the /ready gate, §12) ------------------------------ #
+
+    async def check_readiness(self) -> dict[str, bool]:
+        """Probe the critical dependencies for the readiness gate.
+
+        Postgres via ``SELECT 1`` and Redis via ``PING``; each probe is guarded so
+        it returns ``False`` (never raises) when its dependency is unreachable, so
+        ``/ready`` can answer 503 rather than 500.
+        """
+        return {"postgres": await self._check_postgres(), "redis": await self._check_redis()}
+
+    async def _check_postgres(self) -> bool:
+        try:
+            async with self.sessionmaker() as session:
+                await session.execute(text("SELECT 1"))
+            return True
+        except Exception as exc:  # noqa: BLE001 - readiness probe must never raise
+            logger.warning("readiness.postgres_down", error=str(exc))
+            return False
+
+    async def _check_redis(self) -> bool:
+        try:
+            return bool(await self.redis.ping())
+        except Exception as exc:  # noqa: BLE001 - readiness probe must never raise
+            logger.warning("readiness.redis_down", error=str(exc))
+            return False
 
     # -- lifecycle ----------------------------------------------------------- #
 

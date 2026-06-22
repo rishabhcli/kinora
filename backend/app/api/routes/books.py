@@ -13,7 +13,6 @@ timeline.
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import anyio
@@ -50,22 +49,61 @@ router = APIRouter(prefix="/books", tags=["books"])
 
 #: Hard upload size cap — generous for an illustrated PDF, bounded for safety.
 MAX_PDF_BYTES = 50 * 1024 * 1024
+#: Per-book page cap — bounds Phase-A (token-only) DashScope spend; the spec's
+#: working maximum is a ~300-page book (kinora.md §11.1). Enforced after we know
+#: the extracted page count, before any ingest is triggered.
+MAX_INGEST_PAGES = 300
+#: Max books a single user may own — a coarse per-tenant ingest quota.
+MAX_BOOKS_PER_USER = 50
+#: Streaming read chunk; the upload body is read in chunks and aborted the moment
+#: it crosses ``MAX_PDF_BYTES`` so an oversized body is never fully buffered.
+_READ_CHUNK = 1 << 20  # 1 MiB
 _PDF_MAGIC = b"%PDF-"
 _ALLOWED_CONTENT_TYPES = frozenset(
     {"application/pdf", "application/octet-stream", "binary/octet-stream", ""}
 )
-_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 #: Resolve canon "as of the latest version" — a beat beyond any real one, so the
 #: still-open (current) version of every entity is returned.
 _LATEST_BEAT = 2**31 - 1
 
 
-def _user_books_key(user_id: str) -> str:
-    return f"kinora:user:{user_id}:books"
-
-
 def _progress_key(book_id: str) -> str:
     return f"kinora:book:progress:{book_id}"
+
+
+async def _read_capped(file: UploadFile, cap: int) -> bytes:
+    """Read an upload in chunks, aborting once it exceeds ``cap`` bytes.
+
+    Never buffers more than ``cap`` + one chunk: an oversized body is rejected
+    mid-stream rather than read into memory in full (the upload-DoS fix).
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(_READ_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > cap:
+            raise APIError(
+                "file_too_large",
+                "PDF exceeds the size limit",
+                status=413,
+                detail={"max_bytes": cap},
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _pdf_page_count(data: bytes) -> int:
+    """Cheap page count via PyMuPDF (no rasterization) — the extraction count."""
+    import fitz  # PyMuPDF
+
+    doc = fitz.open(stream=data, filetype="pdf")
+    try:
+        return int(doc.page_count)
+    finally:
+        doc.close()
 
 
 def _sanitize_filename(name: str | None) -> str:
@@ -83,11 +121,14 @@ def _title_from(filename: str, given: str | None) -> str:
 
 
 async def _assert_owner(container: Container, user: User, book_id: str) -> Book:
-    """Load a book the user owns, or 404 (ownership is tracked in Redis)."""
-    owned = await container.redis.raw.sismember(_user_books_key(user.id), book_id)
+    """Load a book the user owns, or 404.
+
+    Ownership is the durable ``books.user_id`` column (the source of truth); a row
+    with a NULL owner is accessible to nobody (fail-closed).
+    """
     async with container.session_factory() as session:
         book = await BookRepo(session).get(book_id)
-    if book is None or not owned:
+    if book is None or book.user_id != user.id:
         raise APIError("book_not_found", "no such book for this user", status=404)
     return book
 
@@ -127,26 +168,48 @@ async def upload_book(
     """Validate + store a PDF, create the book, and trigger Phase A ingest.
 
     Returns the freshly-created book (status ``importing``) directly — the shelf
-    prepends it and polls until it is ``ready``."""
-    if file.size is not None and file.size > MAX_PDF_BYTES:
-        raise APIError(
-            "file_too_large", "PDF exceeds the size limit", status=413,
-            detail={"max_bytes": MAX_PDF_BYTES},
-        )
+    prepends it and polls until it is ``ready``.
+
+    Defends the ingest pipeline: the content-type is checked, the per-user book
+    quota is enforced, the body is read **streaming** (aborting the moment it
+    crosses ``MAX_PDF_BYTES`` rather than buffering an oversized payload), and the
+    page count is capped (``MAX_INGEST_PAGES``) before any token-spending ingest
+    is triggered."""
     if file.content_type is not None and file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise APIError(
             "unsupported_media_type", "expected a PDF upload", status=415,
             detail={"content_type": file.content_type},
         )
 
-    data = await file.read()
-    if len(data) > MAX_PDF_BYTES:
+    # Per-user ingest quota (durable books.user_id), checked before reading the body.
+    async with container.session_factory() as session:
+        owned = await BookRepo(session).count_for_user(user.id)
+    if owned >= MAX_BOOKS_PER_USER:
         raise APIError(
-            "file_too_large", "PDF exceeds the size limit", status=413,
-            detail={"max_bytes": MAX_PDF_BYTES},
+            "book_quota_exceeded",
+            "per-user book limit reached",
+            status=429,
+            detail={"max_books": MAX_BOOKS_PER_USER},
         )
+
+    # Stream the read, aborting once it exceeds the cap (no unbounded buffering).
+    data = await _read_capped(file, MAX_PDF_BYTES)
     if not data[:1024].lstrip().startswith(_PDF_MAGIC):
         raise APIError("invalid_pdf", "file is not a valid PDF (missing %PDF header)", status=400)
+
+    # Page cap: enforced on the extracted page count, before any ingest runs (so a
+    # pathologically long PDF can never drive unbounded DashScope spend, §11.1).
+    try:
+        page_count = await anyio.to_thread.run_sync(_pdf_page_count, data)
+    except Exception as exc:  # noqa: BLE001 - any parse failure => not a usable PDF
+        raise APIError("invalid_pdf", "file is not a readable PDF", status=400) from exc
+    if page_count > MAX_INGEST_PAGES:
+        raise APIError(
+            "too_many_pages",
+            "PDF exceeds the per-book page limit",
+            status=413,
+            detail={"max_pages": MAX_INGEST_PAGES, "pages": page_count},
+        )
 
     book_id = new_id()
     pdf_key = keys.pdf(book_id)
@@ -158,6 +221,7 @@ async def upload_book(
         book = await BookRepo(session).create(
             title=_title_from(file.filename or "", title),
             author=(author.strip()[:512] if author else None),
+            user_id=user.id,
             source_pdf_key=pdf_key,
             status=BookStatus.IMPORTING,
             art_direction=(art_direction.strip() if art_direction else None),
@@ -165,24 +229,22 @@ async def upload_book(
         )
         response = await _book_response(container, book)
 
-    await container.redis.raw.sadd(_user_books_key(user.id), book_id)
     await container.redis.set_json(_progress_key(book_id), {"stage": "importing", "pct": 0.0})
 
     # Phase A runs out-of-band; the response returns immediately (§9.1).
     container.spawn(container.run_ingest(book_id, data, None))
 
-    logger.info("books.uploaded", book_id=book_id, user_id=user.id, bytes=len(data))
+    logger.info(
+        "books.uploaded", book_id=book_id, user_id=user.id, bytes=len(data), pages=page_count
+    )
     return response
 
 
 @router.get("", response_model=list[BookResponse])
 async def list_books(container: ContainerDep, user: CurrentUser) -> list[BookResponse]:
-    """List the books the current user has uploaded (the shelf), newest first."""
-    owned = await container.redis.raw.smembers(_user_books_key(user.id))
+    """List the books the current user owns (the shelf), newest first."""
     async with container.session_factory() as session:
-        repo = BookRepo(session)
-        books = [b for b in [await repo.get(bid) for bid in owned] if b is not None]
-    books.sort(key=lambda b: b.created_at or _EPOCH, reverse=True)
+        books = await BookRepo(session).list_for_user(user.id)
     return [await _book_response(container, b) for b in books]
 
 

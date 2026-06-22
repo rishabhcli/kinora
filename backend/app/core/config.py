@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+#: The insecure JWT secret placeholder. Booting with this outside ``local`` is a
+#: hard error (see :meth:`Settings._guard_production_secrets`).
+DEFAULT_JWT_SECRET = "change-me-in-prod"  # noqa: S105 - sentinel, not a real credential
 
 
 class Settings(BaseSettings):
@@ -98,9 +103,15 @@ class Settings(BaseSettings):
     retry_cap: int = 2
 
     # --- Auth (JWT) ---
-    jwt_secret: str = "change-me-in-prod"
+    jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"
     access_token_ttl_s: int = 86400
+
+    # --- MCP control surface (the deployed canon-memory server, §8.3/§14) ---
+    # When set, the streamable-HTTP MCP requires ``Authorization: Bearer <token>``.
+    # Outside ``local`` it is mandatory: the HTTP MCP refuses to start without it
+    # (an unauthenticated control surface must never run in prod, §12).
+    mcp_auth_token: str | None = None
 
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -109,6 +120,22 @@ class Settings(BaseSettings):
     def is_local(self) -> bool:
         """True when running in the local development environment."""
         return self.app_env.lower() == "local"
+
+    @model_validator(mode="after")
+    def _guard_production_secrets(self) -> Settings:
+        """Refuse to boot with the insecure default JWT secret outside ``local``.
+
+        ``JWT_SECRET`` defaults to a well-known placeholder so the app runs out of
+        the box locally; shipping that placeholder to any non-local environment
+        would let anyone mint valid tokens, so we hard-fail at settings load
+        (which fails ``create_app`` / the lifespan / every entrypoint).
+        """
+        if not self.is_local and self.jwt_secret == DEFAULT_JWT_SECRET:
+            raise ValueError(
+                "JWT_SECRET must be set to a real secret when APP_ENV is not 'local' "
+                "(refusing to boot with the insecure default 'change-me-in-prod')."
+            )
+        return self
 
 
 @lru_cache

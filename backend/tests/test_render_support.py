@@ -139,11 +139,16 @@ SHOT_ID = "shot_00042"
 PAGE = 12
 WORD_RANGE = (100, 102)
 REF_KEY = "refs/book_demo/char_x/front.png"
+STYLE_REF_KEY = "refs/book_demo/style_main/key.png"
 STATE_ID = "state_sword_001"
 
 
-def make_slice(*, with_endpoint: bool = False) -> CanonSlice:
-    """A minimal but real :class:`CanonSlice` (one voiced, locked-ref character)."""
+def make_slice(*, with_endpoint: bool = False, with_style: bool = False) -> CanonSlice:
+    """A minimal but real :class:`CanonSlice` (one voiced, locked-ref character).
+
+    ``with_style`` attaches a Style node carrying a locked reference keyframe — the
+    source the pipeline embeds into the §9.5 scene style centroid.
+    """
     character = CanonEntitySlice(
         entity_key="char_x",
         type="character",
@@ -167,6 +172,19 @@ def make_slice(*, with_endpoint: bool = False) -> CanonSlice:
         if with_endpoint
         else None
     )
+    style = (
+        CanonEntitySlice(
+            entity_key="style_main",
+            type="style",
+            name="Painterly storybook",
+            version=1,
+            style_tokens={"palette": "cool", "lens": "wide"},
+            reference_images=[RefImage(key=STYLE_REF_KEY, url=None, pose="key", locked=True)],
+            valid_from_beat=1,
+        )
+        if with_style
+        else None
+    )
     return CanonSlice(
         book_id=BOOK_ID,
         beat_id=BEAT_ID,
@@ -175,6 +193,7 @@ def make_slice(*, with_endpoint: bool = False) -> CanonSlice:
         characters=[character],
         active_states=[state],
         previous_endpoint=endpoint,
+        style=style,
     )
 
 
@@ -499,11 +518,16 @@ class FakeGenerator:
 
 
 class FakeCritic:
-    """Drives the REAL §9.5 routing (``decide_qa``) from canned metrics per call."""
+    """Drives the REAL §9.5 routing (``decide_qa``) from canned metrics per call.
+
+    Set ``raises`` to a provider error to simulate the Critic itself failing (the
+    §4.11 crash-proofing path).
+    """
 
     def __init__(self, metrics: list[dict[str, Any]]) -> None:
         self._metrics = metrics
         self.calls = 0
+        self.raises: Exception | None = None
 
     async def score(
         self,
@@ -517,6 +541,8 @@ class FakeCritic:
         textual_evolution_supported: bool = False,
         retries_exhausted: bool = False,
     ) -> QARecord:
+        if self.raises is not None:
+            raise self.raises
         metrics = self._metrics[min(self.calls, len(self._metrics) - 1)]
         self.calls += 1
         verdict, action, score = decide_qa(
@@ -545,9 +571,12 @@ class FakeNarrator:
     def __init__(self, result: TtsResult | None = None) -> None:
         self._result = result or tts_result()
         self.calls = 0
+        self.raises: Exception | None = None
 
     async def synthesize(self, text: str, *, voice_id: str) -> TtsResult:
         self.calls += 1
+        if self.raises is not None:
+            raise self.raises
         return self._result
 
 

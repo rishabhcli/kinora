@@ -15,18 +15,23 @@ from dataclasses import dataclass
 
 import pytest
 
+from app.agents.contracts import QARecord
+from app.agents.critic import decide_qa
 from app.core.config import Settings
 from app.db.models.enums import ShotStatus
+from app.memory.interfaces import CanonSlice
 from app.render import degrade
 from app.render.conflict import ConflictResolver
 from app.render.pipeline import RenderPipeline, RenderResult
 from app.storage.object_store import keys
+from tests.conftest import FakeEmbedder
 from tests.test_render_support import (
     BEAT_ID,
     BOOK_ID,
     REF_KEY,
     SCENE_ID,
     SHOT_ID,
+    STYLE_REF_KEY,
     FakeBeat,
     FakeBudget,
     FakeCache,
@@ -396,6 +401,158 @@ async def test_timeline_conflict_evolve_canon_writes_state_then_regenerates() ->
     assert bundle.evolver is not None
     assert len(bundle.evolver.asserts) == 1  # canon evolved via a real assert_state
     assert bundle.designer.calls == 2
+
+
+# --------------------------------------------------------------------------- #
+# Style-drift gate (§9.5): the scene style centroid is now real (Fix 4)
+# --------------------------------------------------------------------------- #
+
+
+class StyleSpyCritic:
+    """Records the ``scene_style_centroid`` the pipeline passes and fails the style
+    gate whenever one is present, so the once-inert gate is exercised end-to-end.
+    CCS / timeline / motion are forced to pass to isolate the *style* check."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.received_centroids: list[list[float] | None] = []
+
+    async def score(
+        self,
+        *,
+        shot_id: str,
+        clip_frames: list[bytes],
+        canon_slice: CanonSlice,
+        character_crop: bytes | None = None,
+        locked_ref_image: bytes | None = None,
+        scene_style_centroid: list[float] | None = None,
+        textual_evolution_supported: bool = False,
+        retries_exhausted: bool = False,
+    ) -> QARecord:
+        self.calls += 1
+        self.received_centroids.append(scene_style_centroid)
+        style_drift = 0.0 if scene_style_centroid is None else 0.5  # divergent clip
+        verdict, action, score = decide_qa(
+            0.95, style_drift, True, 0.05, retries_exhausted=retries_exhausted
+        )
+        return QARecord(
+            shot_id=shot_id,
+            ccs=0.95,
+            style_drift=style_drift,
+            timeline_ok=True,
+            contradicting_state_id=None,
+            motion_artifact=0.05,
+            score=score,
+            verdict=verdict,
+            reason="style-spy",
+            repair_action=action,
+        )
+
+
+async def test_pipeline_computes_real_style_centroid_and_drives_the_gate() -> None:
+    """Fix 4: the pipeline embeds the Style node's locked reference into a real
+    scene style centroid and passes it to the Critic on every scoring call (it
+    used to pass ``None``, making the §9.5 style gate inert). With a divergent
+    clip the now-live gate fires, the repair loop exhausts, and the shot degrades.
+    """
+    shot = FakeShot(
+        id=SHOT_ID,
+        book_id=BOOK_ID,
+        beat_id=BEAT_ID,
+        scene_id=SCENE_ID,
+        source_span=dict(_SPAN),
+        duration_s=5.0,
+    )
+    beat = FakeBeat(
+        id=BEAT_ID,
+        book_id=BOOK_ID,
+        scene_id=SCENE_ID,
+        beat_index=7,
+        summary="X stands at the window.",
+        entities=["char_x"],
+        described_visuals="a quiet figure at a frosted window",
+        mood="still",
+        source_span=dict(_SPAN),
+    )
+    page = FakePage(word_boxes=word_boxes(), image_key=None, text="She stood still")
+    embedder = FakeEmbedder()
+    spy = StyleSpyCritic()
+    store = FakeObjectStore({STYLE_REF_KEY: png_bytes(800, 600), REF_KEY: png_bytes(640, 360)})
+
+    pipeline = RenderPipeline(
+        canon=FakeCanon(make_slice(with_style=True)),
+        episodic=FakeEpisodic(),
+        cache=FakeCache(),
+        budget=FakeBudget(live=True),
+        object_store=store,
+        shots=FakeShotRepo(shot),
+        beats=FakeBeatRepoFor(beat),
+        pages=FakePageRepoFor(page),
+        defects=FakeDefectRepo(),
+        designer=FakeDesigner(),
+        generator=FakeGenerator(),
+        critic=spy,
+        narrator=FakeNarrator(),
+        embedder=embedder,
+        settings=Settings(dashscope_api_key="test"),
+    )
+    result = await pipeline.render_shot(BOOK_ID, SHOT_ID)
+
+    # The centroid was computed from the Style node's locked reference (not None).
+    assert spy.received_centroids
+    assert all(c is not None for c in spy.received_centroids)
+    expected = (await embedder.embed_images([png_bytes(800, 600)]))[0]
+    assert spy.received_centroids[0] == expected
+    # The live gate now has teeth: a divergent clip degrades (was silently accepted).
+    assert result.status is ShotStatus.DEGRADED
+
+
+# --------------------------------------------------------------------------- #
+# Live-path degradation crash-proofing (§4.11): Critic / TTS provider failures
+# --------------------------------------------------------------------------- #
+
+
+async def test_critic_provider_error_degrades_instead_of_dlq() -> None:
+    """Fix 5: a ProviderError from the Critic yields a degraded, playable result
+    (the rendered seconds are committed) rather than bubbling up to a worker DLQ."""
+    from app.providers.errors import ProviderError
+
+    bundle = make_bundle(
+        critic_metrics=[_PASS],
+        budget_live=True,
+        seed_store={REF_KEY: png_bytes(640, 360)},  # a locked ref → Ken-Burns rung
+    )
+    bundle.critic.raises = ProviderError("VL critic is down")
+
+    result = await bundle.pipeline.render_shot(BOOK_ID, SHOT_ID)
+
+    assert result.status is ShotStatus.DEGRADED
+    assert bundle.generator.calls == 1  # rendered once, then degraded (no retry storm)
+    assert bundle.budget.committed == [5.0]  # the rendered seconds were charged once
+    clip = bundle.store.store[keys.clip(BOOK_ID, SHOT_ID)]
+    assert degrade.probe(clip).has_video is True
+    assert bundle.defects.logged[0]["detail"]["reason"].startswith("critic_")
+
+
+async def test_tts_provider_error_in_degrade_yields_silent_playable_clip() -> None:
+    """Fix 5: a ProviderError from the TTS inside _degrade still yields a degraded,
+    playable (silent) clip — never a crash/DLQ."""
+    from app.providers.errors import ProviderError
+
+    bundle = make_bundle(
+        critic_metrics=[_PASS],
+        budget_live=False,  # straight to the degradation ladder
+        seed_store={keys.keyframe(BOOK_ID, BEAT_ID): png_bytes(1280, 720)},
+    )
+    bundle.narrator.raises = ProviderError("TTS is down")
+
+    result = await bundle.pipeline.render_shot(BOOK_ID, SHOT_ID)
+
+    assert result.status is ShotStatus.DEGRADED
+    clip = bundle.store.store[keys.clip(BOOK_ID, SHOT_ID)]
+    info = degrade.probe(clip)
+    assert info.has_video is True  # playable video even with no narration audio
+    assert degrade.verify_playable(clip) is True
 
 
 # --------------------------------------------------------------------------- #

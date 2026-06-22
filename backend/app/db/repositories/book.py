@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from app.db.base import new_id
 from app.db.models.book import Book, Page
@@ -21,6 +21,7 @@ class BookRepo(BaseRepository):
         *,
         title: str,
         author: str | None = None,
+        user_id: str | None = None,
         source_pdf_key: str | None = None,
         status: BookStatus = BookStatus.IMPORTING,
         num_pages: int | None = None,
@@ -30,11 +31,12 @@ class BookRepo(BaseRepository):
         commit_horizon_s: float | None = None,
         book_id: str | None = None,
     ) -> Book:
-        """Insert a new book row."""
+        """Insert a new book row (with its durable owner when known)."""
         book = Book(
             id=book_id or new_id(),
             title=title,
             author=author,
+            user_id=user_id,
             source_pdf_key=source_pdf_key,
             status=status,
             num_pages=num_pages,
@@ -55,6 +57,18 @@ class BookRepo(BaseRepository):
         """Return all books, newest first (the shelf)."""
         stmt = select(Book).order_by(Book.created_at.desc())
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def list_for_user(self, user_id: str) -> list[Book]:
+        """Return the books owned by ``user_id`` (durable shelf), newest first."""
+        stmt = (
+            select(Book).where(Book.user_id == user_id).order_by(Book.created_at.desc())
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def count_for_user(self, user_id: str) -> int:
+        """Count the books owned by ``user_id`` (the per-user ingest quota gate)."""
+        stmt = select(func.count()).select_from(Book).where(Book.user_id == user_id)
+        return int((await self.session.execute(stmt)).scalar_one())
 
     async def set_status(self, book_id: str, status: BookStatus) -> None:
         """Transition a book's import status."""

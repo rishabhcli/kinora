@@ -54,7 +54,9 @@ async def _owned_session(container: Container, user: User, session_id: str) -> S
     """Load a session row the user owns (404 if missing / not theirs)."""
     async with container.session_factory() as session:
         row = await SessionRepo(session).get(session_id)
-    if row is None or (row.user_id is not None and row.user_id != user.id):
+    # Fail closed: a session with no owner (user_id is NULL) is accessible to
+    # nobody — only the matching owner may read/drive it.
+    if row is None or row.user_id != user.id:
         raise APIError("session_not_found", "no such session for this user", status=404)
     return row
 
@@ -82,15 +84,11 @@ async def create_session(
 ) -> SessionResponse:
     """Open a reading session against a book (Redis control state + a durable row)."""
     mode = _parse_mode(body.mode)
+    # Ownership is the durable books.user_id (the source of truth); a NULL-owner
+    # book belongs to nobody (fail-closed).
     async with container.session_factory() as session:
         book = await BookRepo(session).get(body.book_id)
-        if book is None:
-            raise APIError("book_not_found", "no such book", status=404)
-
-    owns_book = await container.redis.raw.sismember(
-        f"kinora:user:{user.id}:books", body.book_id
-    )
-    if not owns_book:
+    if book is None or book.user_id != user.id:
         raise APIError("book_not_found", "no such book for this user", status=404)
 
     session_id = f"sess_{new_id()[:16]}"

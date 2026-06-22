@@ -23,6 +23,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.errors import install_exception_handlers
@@ -196,10 +197,26 @@ def create_app() -> FastAPI:
         return {"status": "ok", **_service_info(), "uptime_seconds": _uptime_seconds()}
 
     @app.get("/ready", tags=["meta"], summary="Readiness probe")
-    async def ready() -> dict[str, object]:
-        # Readiness mirrors liveness so the probe never hard-fails on a transient
-        # dependency blip; per-dependency health is exported via /metrics.
-        return {"status": "ready", **_service_info(), "uptime_seconds": _uptime_seconds()}
+    async def ready(request: Request) -> Response:
+        # Readiness actively probes the critical dependencies (Postgres SELECT 1 +
+        # Redis PING) and answers 503 when any is down, so a load balancer / k8s
+        # readiness gate stops routing traffic to an instance that cannot serve.
+        # /health stays a pure liveness check.
+        info: dict[str, object] = {
+            "status": "ready",
+            **_service_info(),
+            "uptime_seconds": _uptime_seconds(),
+        }
+        container = getattr(request.app.state, "container", None)
+        probe = getattr(container, "check_readiness", None)
+        if probe is None:
+            return JSONResponse(info)
+        checks = await probe()
+        info["checks"] = checks
+        if all(checks.values()):
+            return JSONResponse(info)
+        info["status"] = "not_ready"
+        return JSONResponse(info, status_code=503)
 
     @app.get("/metrics", tags=["meta"], summary="Prometheus exposition")
     async def metrics() -> Response:

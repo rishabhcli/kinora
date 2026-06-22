@@ -6,6 +6,7 @@ from httpx import AsyncClient
 
 from app.composition import Container
 from app.db.models.enums import RenderPriority, ShotStatus
+from app.db.repositories.session import SessionRepo
 from app.db.repositories.shot import ShotRepo, SourceSpanRepo
 from tests.conftest import register_login, seed_owned_book
 
@@ -124,3 +125,17 @@ async def test_session_not_owned_is_404(
     other = await register_login(api_client, "stranger@example.com")
     resp = await api_client.get(f"/api/sessions/{session_id}", headers=other)
     assert resp.status_code == 404
+
+
+async def test_session_with_null_owner_is_inaccessible(
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
+) -> None:
+    """Fix 7: a session with no owner (user_id NULL) is accessible to nobody (fail closed)."""
+    book_id = await seed_owned_book(api_client, container, auth_headers)
+    async with container.session_factory() as session:
+        await SessionRepo(session).upsert(
+            session_id="sess_orphan", book_id=book_id, user_id=None
+        )
+    resp = await api_client.get("/api/sessions/sess_orphan", headers=auth_headers)
+    assert resp.status_code == 404
+    assert resp.json()["error"]["type"] == "session_not_found"

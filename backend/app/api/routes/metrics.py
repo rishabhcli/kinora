@@ -57,11 +57,10 @@ class BufferTracePoint(BaseModel):
 
 
 async def _owned_book_id(container: Container, user: User, book_id: str) -> None:
-    """404 unless ``book_id`` exists and is owned by ``user`` (ownership in Redis)."""
-    owned = await container.redis.raw.sismember(f"kinora:user:{user.id}:books", book_id)
+    """404 unless ``book_id`` exists and is owned by ``user`` (durable books.user_id)."""
     async with container.session_factory() as session:
         book = await BookRepo(session).get(book_id)
-    if book is None or not owned:
+    if book is None or book.user_id != user.id:
         raise APIError("book_not_found", "no such book for this user", status=404)
 
 
@@ -81,7 +80,8 @@ async def get_buffer_trace(
     """
     async with container.session_factory() as session:
         row = await SessionRepo(session).get(session_id)
-    if row is None or (row.user_id is not None and row.user_id != user.id):
+    # Fail closed: a NULL-owner session is not accessible to anyone.
+    if row is None or row.user_id != user.id:
         raise APIError("session_not_found", "no such session for this user", status=404)
 
     focus_word = row.focus_word
