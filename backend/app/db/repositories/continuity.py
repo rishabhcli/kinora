@@ -1,0 +1,85 @@
+"""Repository for versioned continuity states + forgetting (kinora.md §8.5)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy import func, or_, select, update
+
+from app.db.base import new_id
+from app.db.models.continuity import ContinuityState
+from app.db.repositories.base import BaseRepository
+
+
+class ContinuityStateRepo(BaseRepository):
+    """Assert, retire (forget), and query beat-scoped continuity facts."""
+
+    async def assert_state(
+        self,
+        *,
+        book_id: str,
+        subject_entity_key: str,
+        predicate: str,
+        object_value: str,
+        valid_from_beat: int,
+        source_span: dict[str, Any] | None = None,
+        state_id: str | None = None,
+    ) -> str:
+        """Add a versioned fact valid from ``valid_from_beat`` (open-ended)."""
+        max_version = (
+            await self.session.execute(
+                select(func.max(ContinuityState.version)).where(
+                    ContinuityState.book_id == book_id,
+                    ContinuityState.subject_entity_key == subject_entity_key,
+                    ContinuityState.predicate == predicate,
+                )
+            )
+        ).scalar_one_or_none()
+
+        state = ContinuityState(
+            id=state_id or new_id(),
+            book_id=book_id,
+            subject_entity_key=subject_entity_key,
+            predicate=predicate,
+            object_value=object_value,
+            valid_from_beat=valid_from_beat,
+            valid_to_beat=None,
+            version=(max_version or 0) + 1,
+            source_span=source_span,
+        )
+        self.session.add(state)
+        await self.session.flush()
+        return state.id
+
+    async def retire_state(self, state_id: str, valid_to_beat: int) -> None:
+        """Forgetting: close a fact's validity interval at ``valid_to_beat``.
+
+        The row is preserved (for backward/time-travel reads) but drops out of
+        the active set for any beat after ``valid_to_beat``.
+        """
+        await self.session.execute(
+            update(ContinuityState)
+            .where(ContinuityState.id == state_id)
+            .values(valid_to_beat=valid_to_beat)
+        )
+        await self.session.flush()
+
+    async def active_states_at_beat(
+        self, book_id: str, beat: int, *, subject_entity_key: str | None = None
+    ) -> list[ContinuityState]:
+        """Return only the facts whose interval contains ``beat`` (retired ones excluded)."""
+        stmt = (
+            select(ContinuityState)
+            .where(
+                ContinuityState.book_id == book_id,
+                ContinuityState.valid_from_beat <= beat,
+                or_(
+                    ContinuityState.valid_to_beat.is_(None),
+                    ContinuityState.valid_to_beat >= beat,
+                ),
+            )
+            .order_by(ContinuityState.valid_from_beat, ContinuityState.version)
+        )
+        if subject_entity_key is not None:
+            stmt = stmt.where(ContinuityState.subject_entity_key == subject_entity_key)
+        return list((await self.session.execute(stmt)).scalars().all())

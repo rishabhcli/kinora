@@ -20,6 +20,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
 
+# Importing the models package registers every table on ``Base.metadata`` so
+# autogenerate sees the full schema.
+from app.db.base import Base
+from app.db import models  # noqa: F401  (import for side effect: table registration)
+
 # Alembic Config object, providing access to .ini values.
 config = context.config
 
@@ -30,8 +35,8 @@ if config.config_file_name is not None:
 # Inject the runtime (async) database URL from Settings.
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
-# Phase 2 plugs in real model metadata here; None means "no autogenerate target yet".
-target_metadata = None
+# Real model metadata is now the autogenerate target.
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

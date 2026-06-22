@@ -1,0 +1,56 @@
+"""Unit tests for the §8.7 content-hash helper (no services required)."""
+
+from __future__ import annotations
+
+from app.db.hashing import compute_shot_hash
+
+_BASE = {
+    "book_id": "book_grimm_snow",
+    "beat_id": "beat_0034",
+    "canon_version_at_render": 7,
+    "render_mode": "reference_to_video",
+    "seed": 88123,
+    "reference_set_hash": "sha1:af83",
+}
+
+
+def test_shot_hash_is_deterministic() -> None:
+    first = compute_shot_hash(**_BASE)
+    second = compute_shot_hash(**_BASE)
+    assert first == second
+    # SHA-1 hex digest.
+    assert len(first) == 40
+    assert all(c in "0123456789abcdef" for c in first)
+
+
+def test_shot_hash_changes_with_each_input() -> None:
+    base_hash = compute_shot_hash(**_BASE)
+    # Changing ANY component must change the hash (e.g. a Director edit changes
+    # reference_set_hash and only the dependent shots re-render).
+    assert compute_shot_hash(**{**_BASE, "reference_set_hash": "sha1:beef"}) != base_hash
+    assert compute_shot_hash(**{**_BASE, "seed": 99999}) != base_hash
+    assert compute_shot_hash(**{**_BASE, "canon_version_at_render": 8}) != base_hash
+    assert compute_shot_hash(**{**_BASE, "render_mode": "first_last_frame"}) != base_hash
+    assert compute_shot_hash(**{**_BASE, "beat_id": "beat_0035"}) != base_hash
+    assert compute_shot_hash(**{**_BASE, "book_id": "book_other"}) != base_hash
+
+
+def test_shot_hash_has_no_boundary_collision() -> None:
+    # The unit-separator keeps ("a", "bc") distinct from ("ab", "c").
+    left = compute_shot_hash(
+        book_id="a",
+        beat_id="bc",
+        canon_version_at_render=1,
+        render_mode="m",
+        seed=0,
+        reference_set_hash="r",
+    )
+    right = compute_shot_hash(
+        book_id="ab",
+        beat_id="c",
+        canon_version_at_render=1,
+        render_mode="m",
+        seed=0,
+        reference_set_hash="r",
+    )
+    assert left != right
