@@ -79,6 +79,39 @@ describe("seekTargetForWord (scroll → video)", () => {
     const map: SyncMap = { scene_id: "scene_005", segments: [segment] };
     expect(seekTargetForWord(map, 1)).toBeNull();
   });
+
+  it("treats stitched word times as absolute (no video_start_s double offset)", () => {
+    // A stitched segment: it starts 10s into the scene clip and its word times
+    // are already absolute scene-clip times (kinora.md §9.6).
+    const stitched: SyncMap = {
+      scene_id: "scene_005",
+      segments: [
+        {
+          ...segment,
+          video_start_s: 10,
+          words: [
+            { word_index: 4501, text: "She", t_start: 10.1, t_end: 10.32 },
+            { word_index: 4502, text: "stood", t_start: 10.32, t_end: 10.61 },
+          ],
+        },
+      ],
+    };
+    // Local (default) double-counts: 10 + 10.32 = 20.32.
+    expect(seekTargetForWord(stitched, 4502)?.videoTimeS).toBeCloseTo(20.32);
+    // Absolute uses the word time directly.
+    expect(seekTargetForWord(stitched, 4502, true)?.videoTimeS).toBeCloseTo(10.32);
+  });
+});
+
+describe("shotIndexForWord tolerates a shot with no source_span", () => {
+  it("treats a spanless shot as sorting after real words rather than throwing", () => {
+    const spanned: Shot[] = [
+      { shot_id: "s1", beat_id: "b1", scene_id: "sc1", status: "accepted", source_span: { page: 1, word_range: [0, 30] } },
+      { shot_id: "s2", beat_id: "b2", scene_id: "sc1", status: "accepted", source_span: null },
+    ];
+    expect(() => shotIndexForWord(spanned, 10)).not.toThrow();
+    expect(shotIndexForWord(spanned, 10)).toBe(0);
+  });
 });
 
 describe("source-span index (shotForWord)", () => {

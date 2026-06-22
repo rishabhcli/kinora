@@ -159,7 +159,10 @@ export function VideoStage({
                     currentShotId={snap.currentShotId}
                     onSelect={(shot) => {
                       setSelectedShotId(shot.shot_id);
-                      engine.seek(shot.source_span.word_range[0]);
+                      // A spanless shot can't resolve to a reading position;
+                      // still select it for commenting, just don't seek.
+                      const start = shot.source_span?.word_range?.[0];
+                      if (typeof start === "number") engine.seek(start);
                     }}
                   />
                 ) : null}

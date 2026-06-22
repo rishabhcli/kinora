@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Shot, SyncSegment } from "../api/types";
+import type { Shot, SyncMap, SyncSegment } from "../api/types";
 import { SyncEngine, type SyncEngineConfig } from "./SyncEngine";
 
 function makeEngine(overrides: Partial<SyncEngineConfig> = {}) {
@@ -173,6 +173,153 @@ describe("SyncEngine — seek bridge + clip hot-swap", () => {
     engine.seek(5, 0);
     engine.registerRegen("s1", "clip1_v2.mp4");
     expect(engine.getSnapshot().videoSrc).toBe("clip1_v2.mp4");
+  });
+});
+
+describe("SyncEngine — seek re-seeds the playhead on a cold shot (§4.8 regression)", () => {
+  it("catches a bridged cold shot up to the intended offset, not the previous shot's stale time", () => {
+    const { engine } = makeEngine();
+    engine.setShots(shots);
+
+    // s1 is cached and playing; advance its playhead deep into the clip (t=4.6).
+    const seg1: SyncSegment = {
+      shot_id: "s1",
+      video_start_s: 0,
+      video_end_s: 5,
+      page: 1,
+      page_turn_at_s: 4.8,
+      words: [{ word_index: 0, text: "x", t_start: 0, t_end: 5 }],
+    };
+    engine.registerClip("s1", "clip1.mp4", seg1);
+    engine.seek(0, 0);
+    engine.onVideoTime(4.6, 2000); // currentLocalTimeS is now 4.6 (s1's playhead)
+    expect(engine.getSnapshot().currentShotId).toBe("s1");
+
+    // Jump to the START of cold s2 (word 30) — its clip is not cached yet, so we
+    // bridge with no <video>.
+    engine.seek(30, 3000);
+    let snap = engine.getSnapshot();
+    expect(snap.currentShotId).toBe("s2");
+    expect(snap.videoSrc).toBeNull();
+    expect(snap.bridging).toBe(true);
+
+    // clip_ready(s2) lands → must start at ~0 (the intended offset for s2), NOT
+    // 4.6 (s1's stale playhead). This is the bug under test.
+    const seg2: SyncSegment = {
+      shot_id: "s2",
+      video_start_s: 0,
+      video_end_s: 5,
+      page: 2,
+      page_turn_at_s: 4.8,
+      words: [{ word_index: 30, text: "y", t_start: 0, t_end: 5 }],
+    };
+    engine.registerClip("s2", "clip2.mp4", seg2);
+    snap = engine.getSnapshot();
+    expect(snap.videoSrc).toBe("clip2.mp4");
+    expect(snap.seekToS).toBeCloseTo(0);
+    expect(snap.seekToS).not.toBeCloseTo(4.6);
+  });
+});
+
+describe("SyncEngine — setShots null-guard (fix #2: a spanless shot can't blank the pane)", () => {
+  it("drops shots with no source_span instead of throwing while sorting", () => {
+    const { engine } = makeEngine();
+    const spanless: Shot = {
+      shot_id: "sx",
+      beat_id: "bx",
+      scene_id: "sc1",
+      status: "planned",
+      source_span: null,
+      est_duration_s: 5,
+    };
+    expect(() => engine.setShots([spanless, ...shots])).not.toThrow();
+
+    // The well-formed shots are still indexed and seekable.
+    engine.seek(45, 0);
+    expect(engine.getSnapshot().currentShotId).toBe("s2");
+    engine.seek(5, 0);
+    expect(engine.getSnapshot().currentShotId).toBe("s1");
+  });
+});
+
+describe("SyncEngine — scene_stitched timing (fix #4, §9.6)", () => {
+  const stitchedMap: SyncMap = {
+    scene_id: "sc1",
+    segments: [
+      {
+        shot_id: "s1",
+        video_start_s: 0,
+        video_end_s: 5,
+        page: 1,
+        page_turn_at_s: 4.8,
+        words: [{ word_index: 0, text: "a", t_start: 0.1, t_end: 1 }],
+      },
+      {
+        shot_id: "s2",
+        video_start_s: 5, // s2 starts 5s into the scene clip
+        video_end_s: 10,
+        page: 2,
+        page_turn_at_s: 9.8,
+        words: [{ word_index: 30, text: "b", t_start: 5.2, t_end: 6 }], // ABSOLUTE
+      },
+    ],
+  };
+
+  it("resolves a stitched seek to the ABSOLUTE word time (no double offset)", () => {
+    const { engine } = makeEngine();
+    engine.setShots(shots);
+    engine.registerScene(stitchedMap, "scene.mp4");
+
+    engine.seek(30, 0); // start of shot 2
+    const snap = engine.getSnapshot();
+    expect(snap.videoSrc).toBe("scene.mp4");
+    expect(snap.currentShotId).toBe("s2");
+    // 5.2 (absolute) — NOT video_start_s(5) + t_start(5.2) = 10.2.
+    expect(snap.seekToS).toBeCloseTo(5.2);
+  });
+
+  it("advances currentShotId + karaoke + page across segment boundaries using absolute time", () => {
+    const { engine } = makeEngine();
+    engine.setShots(shots);
+    engine.registerScene(stitchedMap, "scene.mp4");
+
+    engine.seek(0, 0); // play the scene clip from its head
+    engine.onVideoTime(0.5, 5000); // grace expired → video owns
+    let snap = engine.getSnapshot();
+    expect(snap.currentShotId).toBe("s1");
+    expect(snap.activeWordIndex).toBe(0);
+    expect(snap.currentPage).toBe(1);
+
+    engine.onVideoTime(5.3, 5100); // crossed into s2's [5, 10) window
+    snap = engine.getSnapshot();
+    expect(snap.currentShotId).toBe("s2");
+    expect(snap.activeWordIndex).toBe(30);
+    expect(snap.currentPage).toBe(2);
+  });
+
+  it("keeps per-shot (LOCAL) timing working unchanged", () => {
+    const { engine } = makeEngine();
+    engine.setShots(shots);
+    const segLocal: SyncSegment = {
+      shot_id: "s2",
+      video_start_s: 0, // per-shot clips are local
+      video_end_s: 5,
+      page: 2,
+      page_turn_at_s: 4.8,
+      words: [{ word_index: 30, text: "b", t_start: 0.2, t_end: 1 }],
+    };
+    engine.registerClip("s2", "clip2.mp4", segLocal);
+
+    engine.seek(30, 0);
+    let snap = engine.getSnapshot();
+    expect(snap.videoSrc).toBe("clip2.mp4");
+    expect(snap.seekToS).toBeCloseTo(0.2); // video_start_s(0) + t_start(0.2)
+
+    engine.onVideoTime(0.3, 5000);
+    snap = engine.getSnapshot();
+    expect(snap.currentShotId).toBe("s2");
+    expect(snap.activeWordIndex).toBe(30);
+    expect(snap.currentPage).toBe(2);
   });
 });
 

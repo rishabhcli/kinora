@@ -68,13 +68,16 @@ export interface SourceSpan {
   word_range: [number, number];
 }
 
+// Mirrors the backend `ShotStatus` enum (app/db/models/enums.py, kinora.md §9.7).
 export type ShotStatus =
   | "planned"
   | "keyframed"
+  | "promoted"
   | "rendering"
+  | "qa"
   | "accepted"
   | "degraded"
-  | "failed";
+  | "conflict";
 
 export interface ShotQA {
   ccs: number;
@@ -90,7 +93,12 @@ export interface Shot {
   shot_id: string;
   beat_id: string;
   scene_id: string;
-  source_span: SourceSpan;
+  /**
+   * The reading-position span. The backend (`ShotResponse.source_span`) can send
+   * `null` for a shot whose span has not been resolved yet, so consumers must
+   * guard before sorting/seeking by it (see `SyncEngine.setShots`).
+   */
+  source_span?: SourceSpan | null;
   status: ShotStatus;
   qa?: ShotQA;
   est_duration_s?: number;
@@ -127,9 +135,11 @@ export interface CanonEntity {
     reference_audio_url?: string;
   };
   version: number;
-  valid_from_beat?: string;
-  valid_to_beat?: string | null;
-  first_appearance?: { page: number; beat_id: string };
+  /** Beat indices the version is valid across — the backend sends ints. */
+  valid_from_beat?: number | null;
+  valid_to_beat?: number | null;
+  /** Where the entity first appears; `beat_id` is not always populated. */
+  first_appearance?: { page: number; beat_id?: string } | null;
 }
 
 export interface CanonGraph {

@@ -39,6 +39,33 @@ describe("eventsStore", () => {
     expect(s.feed).toHaveLength(5);
   });
 
+  it("surfaces an agent_activity-embedded conflict as a conflict card (deduped)", () => {
+    const { push } = useEventsStore.getState();
+    push({
+      type: "agent_activity",
+      data: {
+        agent: "Continuity",
+        message: "Raised a continuity conflict",
+        conflict: {
+          conflict_id: "cf9",
+          claim: "her coat is red",
+          canon_fact: "her coat is blue",
+          options: [{ id: "honor", action: "Honor canon" }],
+        },
+      },
+    });
+    let s = useEventsStore.getState();
+    expect(s.agentFeed).toHaveLength(1);
+    expect(s.conflicts).toHaveLength(1);
+    expect(s.conflicts[0].conflict_id).toBe("cf9");
+    expect(s.conflicts[0].options).toHaveLength(1);
+
+    // A later conflict_choice for the same id must not duplicate the card.
+    push({ type: "conflict_choice", data: { conflict_id: "cf9", options: [] } });
+    s = useEventsStore.getState();
+    expect(s.conflicts).toHaveLength(1);
+  });
+
   it("dedupes conflicts by id and resolves them", () => {
     const { push } = useEventsStore.getState();
     push({ type: "conflict_choice", data: { conflict_id: "cf1", options: [] } });

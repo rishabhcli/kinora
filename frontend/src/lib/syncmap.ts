@@ -64,9 +64,21 @@ export interface SeekTarget {
 /**
  * Scroll→video: resolve a focus word to a shot and an in-shot timestamp via
  * the sync map. Picks the segment whose word range contains `w`, then the
- * word at-or-just-before `w`, and returns its absolute start time.
+ * word at-or-just-before `w`, and returns its target video time.
+ *
+ * Timing follows the shared sync-map contract (kinora.md §9.4 / §9.6):
+ * - **per-shot** (`clip_ready`) segments are LOCAL — `video_start_s === 0` and
+ *   `word.t_start` is clip-local — so the target is `video_start_s + t_start`.
+ * - **stitched** (`scene_stitched`) segments are ABSOLUTE — `video_start_s` is
+ *   the shot's offset within the scene clip and `word.t_start` is already a
+ *   scene-clip time — so the target is `t_start` itself. Pass `absolute=true`
+ *   to avoid double-counting `video_start_s`.
  */
-export function seekTargetForWord(map: SyncMap, w: number): SeekTarget | null {
+export function seekTargetForWord(
+  map: SyncMap,
+  w: number,
+  absolute = false,
+): SeekTarget | null {
   for (const segment of map.segments) {
     const words = segment.words;
     if (words.length === 0) continue;
@@ -80,11 +92,21 @@ export function seekTargetForWord(map: SyncMap, w: number): SeekTarget | null {
     }
     return {
       shotId: segment.shot_id,
-      videoTimeS: segment.video_start_s + chosen.t_start,
+      videoTimeS: absolute ? chosen.t_start : segment.video_start_s + chosen.t_start,
       segment,
     };
   }
   return null;
+}
+
+/**
+ * Start of a shot's word range, or +Infinity when the shot has no resolved
+ * `source_span` (so the binary search below treats a spanless shot as sorting
+ * after every real word rather than throwing — see `SyncEngine.setShots`).
+ */
+function spanStart(shot: Shot): number {
+  const start = shot.source_span?.word_range?.[0];
+  return typeof start === "number" ? start : Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -99,7 +121,7 @@ export function shotIndexForWord(shots: Shot[], w: number): number | null {
   let ans = -1;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
-    if (shots[mid].source_span.word_range[0] <= w) {
+    if (spanStart(shots[mid]) <= w) {
       ans = mid;
       lo = mid + 1;
     } else {

@@ -2,6 +2,7 @@ import type {
   IntentUpdate,
   SessionMode,
   Shot,
+  SourceSpan,
   SyncMap,
   SyncSegment,
 } from "../api/types";
@@ -90,6 +91,12 @@ export class SyncEngine {
   private keyframesByShot = new Map<string, string>();
   private keyframesByBeat = new Map<string, string>();
   private beatByShot = new Map<string, string>();
+  /**
+   * Stitched-scene segments keyed by their (single) scene clip URL, sorted by
+   * `video_start_s`. Presence of a URL here means its timeline is ABSOLUTE
+   * (kinora.md §9.6); per-shot clip URLs are absent → LOCAL timing.
+   */
+  private stitchedSegmentsByUrl = new Map<string, SyncSegment[]>();
 
   private owner: ControlOwner = "video";
   private graceUntilMs = 0;
@@ -98,6 +105,13 @@ export class SyncEngine {
   private velocityValue: number;
   private currentShotId: string | null = null;
   private currentLocalTimeS = 0;
+  /**
+   * In-shot offset captured at seek/scroll time for a shot we had to bridge
+   * (its clip wasn't cached yet). When `registerClip` later catches that shot
+   * up, it seeks here — NOT to the stale `currentLocalTimeS` of the shot we
+   * came from (kinora.md §4.8). `null` once consumed / when nothing is pending.
+   */
+  private intendedLocalS: number | null = null;
   private budgetRemaining: number | null = null;
 
   private intentTimer: ReturnType<typeof setTimeout> | null = null;
@@ -141,7 +155,14 @@ export class SyncEngine {
 
   // -- Configuration --------------------------------------------------------
   setShots(shots: Shot[]): void {
-    this.shots = [...shots].sort(
+    // The backend can send a shot with a null/malformed source_span. Sorting by
+    // `source_span.word_range[0]` would then throw and blank the whole
+    // workspace, so drop spanless shots before sorting the source-span index.
+    const withSpan = shots.filter(
+      (s): s is Shot & { source_span: SourceSpan } =>
+        !!s.source_span && Number.isFinite(s.source_span.word_range?.[0]),
+    );
+    this.shots = withSpan.sort(
       (a, b) => a.source_span.word_range[0] - b.source_span.word_range[0],
     );
     this.shotIndexById.clear();
@@ -189,17 +210,28 @@ export class SyncEngine {
     const shot = shotForWord(this.shots, word);
     if (shot) {
       this.currentShotId = shot.shot_id;
-      this.snapshot = { ...this.snapshot, currentPage: shot.source_span.page };
+      this.snapshot = {
+        ...this.snapshot,
+        currentPage: shot.source_span?.page ?? this.snapshot.currentPage,
+      };
       // 2. Bridge instantly with the keyframe under a Ken-Burns pan.
       this.showBridge(shot);
       // If the clip already exists (e.g. a backward seek → cache hit), play it.
       const url = this.clips.get(shot.shot_id);
       if (url) {
         const seg = this.segments.get(shot.shot_id);
-        const target = seg ? seekTargetForWord({ scene_id: "", segments: [seg] }, word) : null;
+        const absolute = this.isStitchedUrl(url);
+        const target = seg
+          ? seekTargetForWord({ scene_id: "", segments: [seg] }, word, absolute)
+          : null;
         this.setVideoSrc(url);
-        this.requestSeek(target ? target.videoTimeS : 0);
+        this.requestSeek(target ? target.videoTimeS : (seg?.video_start_s ?? 0));
+        this.intendedLocalS = null;
       } else {
+        // Cold shot: remember WHERE in the new shot we want to land so the
+        // real clip catches up to the intended offset, not the previous shot's
+        // stale playhead (kinora.md §4.8).
+        this.intendedLocalS = this.intendedOffsetFor(shot, word);
         this.setVideoSrc(null);
       }
     }
@@ -237,12 +269,20 @@ export class SyncEngine {
       this.owner = "video";
     }
 
+    // While a single continuous stitched clip plays, advance the current shot as
+    // the (absolute) playhead crosses each segment boundary so karaoke and the
+    // page-turn track the right shot (kinora.md §9.6).
+    this.advanceStitchedShot(videoTimeS);
+
     const seg = this.currentSegment();
     let activeWord: number | null = this.snapshot.activeWordIndex;
     let page: number | null = this.snapshot.currentPage;
     if (seg) {
-      const lt = localTime(seg, videoTimeS);
-      activeWord = activeWordIndexAt(seg.words, lt);
+      // Stitched (scene) clips carry ABSOLUTE word times → use videoTime as-is;
+      // per-shot clips are LOCAL → subtract the segment start (= 0). See §9.4.
+      const absolute = this.isStitchedUrl(this.snapshot.videoSrc);
+      const wordTime = absolute ? videoTimeS : localTime(seg, videoTimeS);
+      activeWord = activeWordIndexAt(seg.words, wordTime);
       page = shouldTurnPage(seg, videoTimeS) ? this.nextPage(seg) : seg.page;
     }
     this.snapshot = {
@@ -274,8 +314,11 @@ export class SyncEngine {
       // The hidden buffer already warmed this URL → swap is seamless.
       this.setVideoSrc(url);
       this.requestSeek(0);
+      this.intendedLocalS = null;
       this.snapshot = { ...this.snapshot, bridging: false, bridgeKeyframeUrl: null };
     } else {
+      // The next shot is cold → bridge from its start when its clip lands.
+      this.intendedLocalS = 0;
       this.showBridge(next);
       this.setVideoSrc(null);
     }
@@ -291,9 +334,12 @@ export class SyncEngine {
     if (segment) this.segments.set(shotId, segment);
 
     if (this.currentShotId === shotId && (this.snapshot.bridging || !this.snapshot.videoSrc)) {
-      // We were bridging this exact shot → the real clip catches up.
+      // We were bridging this exact shot → the real clip catches up to the
+      // offset captured at seek/scroll time (§4.8), falling back to the live
+      // playhead only when no intent was recorded.
       this.setVideoSrc(url);
-      this.requestSeek(this.currentLocalTimeS);
+      this.requestSeek(this.intendedLocalS ?? this.currentLocalTimeS);
+      this.intendedLocalS = null;
     } else if (this.isImmediateNext(shotId)) {
       this.snapshot = { ...this.snapshot, preloadSrc: url }; // warm the buffer
     }
@@ -310,7 +356,11 @@ export class SyncEngine {
 
   /** scene_stitched → replace per-shot playback with the stitched scene. */
   registerScene(map: SyncMap, url: string): void {
-    for (const seg of map.segments) {
+    // One clip for the whole scene: its segments share `url` and their word /
+    // page_turn times are ABSOLUTE on that clip's timeline (kinora.md §9.6).
+    const ordered = [...map.segments].sort((a, b) => a.video_start_s - b.video_start_s);
+    this.stitchedSegmentsByUrl.set(url, ordered);
+    for (const seg of ordered) {
       this.segments.set(seg.shot_id, seg);
       this.clips.set(seg.shot_id, url);
     }
@@ -351,13 +401,55 @@ export class SyncEngine {
     const seg = this.segments.get(shot.shot_id);
     const url = this.clips.get(shot.shot_id);
     if (seg && url) {
-      const target = seekTargetForWord({ scene_id: "", segments: [seg] }, focusWord);
+      const absolute = this.isStitchedUrl(url);
+      const target = seekTargetForWord({ scene_id: "", segments: [seg] }, focusWord, absolute);
       this.setVideoSrc(url);
       this.requestSeek(target ? target.videoTimeS : seg.video_start_s);
+      this.intendedLocalS = null;
       this.snapshot = { ...this.snapshot, bridging: false, bridgeKeyframeUrl: null };
     } else {
+      this.intendedLocalS = this.intendedOffsetFor(shot, focusWord);
       this.showBridge(shot);
       this.setVideoSrc(null);
+    }
+  }
+
+  /** Whether a clip URL is a stitched scene clip (ABSOLUTE timing) vs per-shot. */
+  private isStitchedUrl(url: string | null): boolean {
+    return url !== null && this.stitchedSegmentsByUrl.has(url);
+  }
+
+  /**
+   * The in-shot offset to land on for `word`, used to catch up a bridged shot
+   * when its clip finally arrives. Resolves via the sync segment when known
+   * (respecting absolute vs local timing); a cold shot with no segment yet
+   * starts at 0 (kinora.md §4.8).
+   */
+  private intendedOffsetFor(shot: Shot, word: number): number {
+    const seg = this.segments.get(shot.shot_id);
+    if (!seg) return 0;
+    const absolute = this.isStitchedUrl(this.clips.get(shot.shot_id) ?? null);
+    const target = seekTargetForWord({ scene_id: "", segments: [seg] }, word, absolute);
+    return target ? target.videoTimeS : seg.video_start_s;
+  }
+
+  /**
+   * Within a continuous stitched-scene clip, point `currentShotId` at the
+   * segment whose [video_start_s, next.video_start_s) window contains the
+   * absolute `videoTimeS`. No-op for per-shot playback (kinora.md §9.6).
+   */
+  private advanceStitchedShot(videoTimeS: number): void {
+    const segs = this.snapshot.videoSrc
+      ? this.stitchedSegmentsByUrl.get(this.snapshot.videoSrc)
+      : undefined;
+    if (!segs) return;
+    let activeShot = this.currentShotId;
+    for (const seg of segs) {
+      if (videoTimeS >= seg.video_start_s) activeShot = seg.shot_id;
+      else break;
+    }
+    if (activeShot && activeShot !== this.currentShotId) {
+      this.currentShotId = activeShot;
     }
   }
 

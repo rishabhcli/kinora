@@ -1,6 +1,6 @@
 import clsx from "clsx";
 
-import type { Shot } from "../../../api/types";
+import type { Shot, ShotStatus } from "../../../api/types";
 import { coverGradient } from "../../../lib/cover";
 import { useEventsStore } from "../../../stores/eventsStore";
 
@@ -25,13 +25,15 @@ function QaBadge({ shot }: { shot: Shot }) {
       </span>
     );
   }
-  const labels: Record<string, string> = {
+  const labels: Record<ShotStatus, string> = {
     planned: "planned",
     keyframed: "keyframe",
+    promoted: "promoted",
     rendering: "rendering",
+    qa: "reviewing",
     accepted: "ready",
     degraded: "degraded",
-    failed: "failed",
+    conflict: "conflict",
   };
   return (
     <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[0.6rem] font-medium text-kinora-muted">

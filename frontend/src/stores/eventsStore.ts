@@ -89,9 +89,25 @@ export const useEventsStore = create<EventsState>((set) => ({
         case "budget_low":
           patch.budgetRemaining = event.data.remaining_s;
           break;
-        case "agent_activity":
+        case "agent_activity": {
           patch.agentFeed = [...state.agentFeed, stored].slice(-FEED_CAP);
+          // An agent message can embed a continuity conflict; surface it as a
+          // ConflictCard (deduped by id) instead of only logging it to the feed.
+          const embedded = event.data.conflict;
+          if (embedded && !state.conflicts.some((c) => c.conflict_id === embedded.conflict_id)) {
+            patch.conflicts = [
+              ...state.conflicts,
+              {
+                conflict_id: embedded.conflict_id,
+                options: embedded.options,
+                claim: embedded.claim,
+                canon_fact: embedded.canon_fact,
+                shot_id: embedded.shot_id,
+              },
+            ];
+          }
           break;
+        }
         case "conflict_choice": {
           const exists = state.conflicts.some(
             (c) => c.conflict_id === event.data.conflict_id,

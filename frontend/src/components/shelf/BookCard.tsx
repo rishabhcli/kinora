@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import type { Book } from "../../api/types";
 import { coverGradient, initials } from "../../lib/cover";
+import { useEventsStore } from "../../stores/eventsStore";
 
 function progressPct(progress: number): number {
   const pct = progress <= 1 ? progress * 100 : progress;
@@ -35,12 +36,16 @@ function Cover({ book }: { book: Book }) {
 }
 
 function StatusLine({ book }: { book: Book }) {
+  // Prefer a live ingest_progress event (kinora.md §5.1 / §5.6) when one has
+  // arrived for this book; fall back to the polled book fields otherwise.
+  const live = useEventsStore((s) => s.ingestProgress[book.id]);
   if (book.status === "importing") {
-    const pct = progressPct(book.progress);
+    const stage = live?.stage ?? book.stage ?? "preparing";
+    const pct = progressPct(live?.pct ?? book.progress);
     return (
       <div className="mt-2">
         <div className="flex items-center justify-between text-[0.7rem] text-kinora-iris">
-          <span>{book.stage ?? "preparing"}…</span>
+          <span>{stage}…</span>
           <span className="tabular-nums">{pct}%</span>
         </div>
         <div className="shimmer-track mt-1 h-1 w-full overflow-hidden rounded-full bg-kinora-line">
