@@ -2,8 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted Inter (latin subset). Self-hosting avoids a third-party request,
+   keeps the page working offline, and removes a privacy/tracking vector. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin-700-normal.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 html,
@@ -18,4 +53,33 @@ body {
   color: theme("colors.kinora.mist");
   font-family: theme("fontFamily.sans");
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background-color: theme("colors.kinora.glow");
+  color: #ffffff;
+}
+
+/* A single, consistent keyboard-focus ring for every interactive element.
+   Uses :focus-visible so it never shows on mouse clicks. */
+:focus-visible {
+  outline: 2px solid theme("colors.kinora.iris");
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect users who ask the OS to minimise motion: drop animations,
+   transitions, and smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

@@ -1,0 +1,16 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kinora">
+  <defs>
+    <linearGradient id="k-bg" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8b6dff"/>
+      <stop offset="1" stop-color="#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="k-play" x1="13" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e8e9f3"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#k-bg)"/>
+  <rect x="2.5" y="2.5" width="27" height="27" rx="7.5" fill="none" stroke="#ffffff" stroke-opacity="0.18"/>
+  <path d="M6.5 9.5C6.5 8.4 7.4 7.6 8.5 7.8L11 8.3V24.2L8.5 24.7C7.4 24.9 6.5 24.1 6.5 23V9.5Z" fill="#ffffff" fill-opacity="0.30"/>
+  <path d="M13.2 11.1C13.2 10.0 14.4 9.3 15.4 9.8L22.8 13.9C23.8 14.5 23.8 15.9 22.8 16.5L15.4 20.6C14.4 21.1 13.2 20.4 13.2 19.3V11.1Z" fill="url(#k-play)"/>
+</svg>
