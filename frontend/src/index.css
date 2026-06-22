@@ -83,3 +83,99 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+@layer components {
+  /* The liquid-glass surface that the whole app is built from: a frosted,
+     slightly translucent panel with a soft top sheen and a hairline edge. */
+  .glass {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
+      rgba(20, 20, 31, 0.66);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+      0 24px 60px -28px rgba(0, 0, 0, 0.75);
+  }
+
+  .glass-strong {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02)),
+      rgba(27, 27, 43, 0.82);
+    backdrop-filter: blur(26px) saturate(170%);
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+      0 30px 80px -30px rgba(0, 0, 0, 0.8);
+  }
+
+  /* The segmented Viewer | Director control track. */
+  .glass-segment {
+    background: rgba(11, 11, 18, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) inset;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Client-side Ken-Burns bridge: a slow zoom/drift over a still keyframe used
+     while real video renders (kinora.md §4.4 / §4.8). Duration/origin are
+     driven by CSS variables so the SyncEngine can vary the pan per seek. */
+  .ken-burns-bridge {
+    animation: ken-burns var(--kb-duration, 18s) ease-out alternate infinite;
+    transform-origin: var(--kb-origin, 50% 40%);
+    will-change: transform;
+  }
+
+  /* Thin sweeping highlight used on importing book covers / buffering states. */
+  .shimmer-track {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer-track::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(167, 139, 250, 0.28),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  /* The moving karaoke highlight painted over a rasterised page word. */
+  .karaoke-active {
+    background: rgba(124, 92, 255, 0.34);
+    box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.5), 0 0 18px rgba(124, 92, 255, 0.35);
+    border-radius: 3px;
+  }
+  .karaoke-played {
+    background: rgba(124, 92, 255, 0.12);
+    border-radius: 3px;
+  }
+
+  /* Hide scrollbars on the virtualised reader without losing scrollability. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(167, 139, 250, 0.35) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(167, 139, 250, 0.3);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
