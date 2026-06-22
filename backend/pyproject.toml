@@ -51,6 +51,14 @@ dev = [
     "httpx>=0.27",
     "asgi-lifespan>=2.1",
 ]
+# Optional OpenTelemetry tracing (§12). Imported lazily by
+# app.observability.tracing so the backend runs as a clean no-op when these are
+# absent or OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+otel = [
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

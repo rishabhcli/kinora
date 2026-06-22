@@ -41,6 +41,7 @@ from typing import Any
 
 from app.core.logging import get_logger
 from app.db.models.enums import RenderJobStatus, RenderPriority
+from app.observability import metrics
 
 logger = get_logger("app.queue.redis_queue")
 
@@ -411,6 +412,7 @@ class RedisRenderQueue:
 
         if status is EnqueueStatus.DROPPED:
             await self._redis.incr(self._stat_key("dropped_total"))
+            metrics.inc_job("dropped")
             logger.info("queue.dropped", shot_hash=shot_hash, priority=priority.value)
             return EnqueueResult(status=status, job_id=None)
 
@@ -419,6 +421,7 @@ class RedisRenderQueue:
             return EnqueueResult(status=status, job_id=resolved)
 
         await self._redis.incr(self._stat_key("enqueued_total"))
+        metrics.inc_job("enqueued")
         if priority is RenderPriority.COMMITTED:
             await self._preempt_speculative()
         await self._mirror_create(
@@ -511,6 +514,7 @@ class RedisRenderQueue:
             # then let it expire (the shot cache is the durable dedup after that).
             await self._redis.expire(self._shot_key(job.shot_hash), self._success_ttl_s)
         await self._redis.incr(self._stat_key("succeeded_total"))
+        metrics.inc_job("succeeded")
         await self._mirror_status(job_id, RenderJobStatus.SUCCEEDED)
 
     async def retry(
@@ -537,6 +541,8 @@ class RedisRenderQueue:
             if job.cancel_token:
                 await self._redis.srem(self._token_key(job.cancel_token), job_id)
             await self._redis.incr(self._stat_key("deadletter_total"))
+            metrics.inc_job("deadletter")
+            metrics.inc_dlq()
             logger.warning("queue.deadletter", job_id=job_id, attempts=attempts, error=error)
             await self._mirror_status(job_id, RenderJobStatus.DEADLETTER, attempts=attempts)
             return RetryOutcome(decision=RetryDecision.DEADLETTER, attempts=attempts)
@@ -547,6 +553,7 @@ class RedisRenderQueue:
         mapping["ready_at"] = str(ready_at)
         await self._redis.hset(job_key, mapping=mapping)
         await self._redis.zadd(self._lane_key(job.priority), {job_id: ready_at})
+        metrics.inc_job("retrying")
         logger.info("queue.retry", job_id=job_id, attempts=attempts, delay_s=delay_s)
         await self._mirror_status(job_id, RenderJobStatus.RETRYING, attempts=attempts)
         return RetryOutcome(decision=RetryDecision.RETRY, attempts=attempts, delay_s=delay_s)
@@ -562,6 +569,8 @@ class RedisRenderQueue:
             if job.cancel_token:
                 await self._redis.srem(self._token_key(job.cancel_token), job_id)
         await self._redis.incr(self._stat_key("cancelled_total"))
+        metrics.inc_job("cancelled")
+        metrics.inc_cancellations()
         await self._mirror_status(job_id, RenderJobStatus.CANCELLED)
 
     # -- cancellation -------------------------------------------------------- #
@@ -662,8 +671,14 @@ class RedisRenderQueue:
         return int(await self._redis.llen(self._dlq_key))
 
     async def stats(self) -> QueueStats:
-        """A snapshot of lane depths plus lifetime counters."""
+        """A snapshot of lane depths plus lifetime counters.
+
+        Doubles as the refresh point for the live ``queue_depth`` gauge so a
+        scrape (or the worker's periodic snapshot) reflects current depth.
+        """
         depths = {p.value: await self.depth(p) for p in LANE_ORDER}
+        for lane, depth in depths.items():
+            metrics.set_queue_depth(lane, depth)
         return QueueStats(
             depths=depths,
             processing=int(await self._redis.zcard(self._processing_key)),

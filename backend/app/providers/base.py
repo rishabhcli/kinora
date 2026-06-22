@@ -37,6 +37,7 @@ from tenacity import (
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
+from app.observability import metrics
 
 from .errors import (
     AuthenticationError,
@@ -311,6 +312,11 @@ class ProviderClient:
 
     def record_usage(self, usage: Usage) -> None:
         """Push a :class:`Usage` event to the configured sink."""
+        metrics.inc_provider_tokens(
+            model=usage.model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+        )
         try:
             self.usage_sink(usage)
         except Exception:  # noqa: BLE001 - a broken sink must never fail a call
@@ -378,15 +384,18 @@ class ProviderClient:
                         # the breaker should count. Surface immediately.
                         raise
                     await self._breaker.record_success()
+                    latency_s = time.perf_counter() - started
                     logger.info(
                         "provider.call_ok",
                         op=op,
                         model=model,
                         attempt=attempt_no,
-                        latency_ms=round((time.perf_counter() - started) * 1000, 1),
+                        latency_ms=round(latency_s * 1000, 1),
                     )
+                    metrics.observe_provider(model=model, op=op, latency_s=latency_s, ok=True)
                     return result
         except ProviderError as exc:
+            metrics.observe_provider(model=model, op=op, ok=False)
             logger.warning(
                 "provider.call_failed",
                 op=op,

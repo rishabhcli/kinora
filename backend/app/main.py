@@ -26,11 +26,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.errors import install_exception_handlers
+from app.api.middleware import SecurityHeadersMiddleware
 from app.api.routes import ROUTERS
 from app.composition import Container, build_container
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.observability.metrics import record_request, render_metrics, set_app_info
+from app.observability.tracing import init_tracing
 
 #: API version prefix every domain router is mounted under.
 API_PREFIX = "/api"
@@ -147,9 +149,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Security headers on every response (HSTS only outside local, §12).
+    app.add_middleware(SecurityHeadersMiddleware, hsts=not settings.is_local)
 
     set_app_info(service=settings.service_name, version=__version__, env=settings.app_env)
     install_exception_handlers(app)
+    # Optional OTel tracing — a clean no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+    init_tracing(app, service_name=settings.service_name)
 
     @app.middleware("http")
     async def _record_requests(

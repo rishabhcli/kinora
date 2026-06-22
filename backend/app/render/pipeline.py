@@ -24,6 +24,7 @@ muxed with narration, never a fake placeholder.
 from __future__ import annotations
 
 import math
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -51,6 +52,7 @@ from app.core.logging import get_logger
 from app.db.models.enums import ShotStatus
 from app.memory.budget_service import BudgetExceeded, Reservation
 from app.memory.interfaces import BlobStore, CanonSlice
+from app.observability import metrics
 from app.providers.errors import LiveVideoDisabled, ProviderError
 from app.providers.types import TtsResult
 from app.render.conflict import ConflictResolution
@@ -460,8 +462,29 @@ class RenderPipeline:
         Cache hit → cached clip at 0 video-seconds. Miss → design, then either
         the live Wan path (budget-reserved, Critic repair loop) or the real
         degradation ladder when the live gate is off / budget is low / retries
-        are exhausted. Returns a :class:`RenderResult`.
+        are exhausted. Returns a :class:`RenderResult`. A thin timing wrapper
+        records per-shot render latency (§12.5) without altering the logic.
         """
+        started = time.perf_counter()
+        result = await self._render_shot(
+            book_id,
+            shot_id,
+            session_id=session_id,
+            director_notes=director_notes,
+            director_present=director_present,
+        )
+        metrics.observe_render_latency(result.rung, time.perf_counter() - started)
+        return result
+
+    async def _render_shot(
+        self,
+        book_id: str,
+        shot_id: str,
+        *,
+        session_id: str | None = None,
+        director_notes: list[DirectorNote] | None = None,
+        director_present: bool = False,
+    ) -> RenderResult:
         shot = await self._shots.get(shot_id)
         if shot is None or shot.book_id != book_id:
             raise UnknownShotError(f"unknown shot for book {book_id}: {shot_id}")
@@ -535,6 +558,7 @@ class RenderPipeline:
             await self._shots.update(shot_id, shot_hash=shot_hash, reference_set_hash=ref_hash)
             await machine.transition(RenderState.ACCEPTED)
             return await self._cache_hit_result(shot_id, cached)
+        metrics.inc_cache(hit=False)  # a real miss: design done, must render/degrade
 
         # Budget-aware degradation: live gate off or remaining below the floor.
         if not self._budget.can_render_live() or await self._budget.is_low():
@@ -791,6 +815,11 @@ class RenderPipeline:
             last_frame_key=last_frame_key,
             beat=ctx.beat.id,
         )
+        metrics.inc_render_mode(spec.render_mode.value)
+        metrics.inc_video_seconds(ctx.spent_video_seconds)
+        metrics.inc_shot_accepted()
+        metrics.inc_render_retries(max(ctx.attempts - 1, 0))
+        metrics.observe_qa(ccs=qa.ccs, style_drift=qa.style_drift, motion=qa.motion_artifact)
         return RenderResult(
             shot_id=ctx.shot_id,
             status=ShotStatus.ACCEPTED,
@@ -893,6 +922,10 @@ class RenderPipeline:
             duration_s=round(clip_dur, 3),
             spent_video_seconds=round(spent, 3),
         )
+        metrics.inc_shot_degraded()
+        metrics.inc_render_mode(spec.render_mode.value)
+        metrics.inc_video_seconds(spent)
+        metrics.inc_render_retries(max(ctx.attempts - 1, 0))
         return RenderResult(
             shot_id=ctx.shot_id,
             status=ShotStatus.DEGRADED,
@@ -908,6 +941,7 @@ class RenderPipeline:
 
     async def _cache_hit_result(self, shot_id: str, cached: CachedRecord) -> RenderResult:
         """A cache hit serves the cached clip at zero video-seconds (§8.7)."""
+        metrics.inc_cache(hit=True)
         logger.info("cache.hit", shot_id=shot_id, clip_key=cached.clip_key)
         return RenderResult(
             shot_id=shot_id,
@@ -931,6 +965,8 @@ class RenderPipeline:
             shot_id=ctx.shot_id,
             conflict_id=conflict.conflict_id if conflict else None,
         )
+        metrics.inc_conflict()
+        metrics.inc_video_seconds(ctx.spent_video_seconds)
         return RenderResult(
             shot_id=ctx.shot_id,
             status=ShotStatus.CONFLICT,

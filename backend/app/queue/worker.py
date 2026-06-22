@@ -292,6 +292,9 @@ class RenderWorker:
         while not stop.is_set():
             try:
                 await self._queue.reap_expired()
+                # Refresh the live queue-depth gauges off the same cadence (§12.5);
+                # ``stats()`` updates the Prometheus gauge as a side effect.
+                await self._queue.stats()
             except Exception as exc:
                 logger.error("worker.reaper_error", error=str(exc))
             await self._sleep_or_stop(stop, 5.0)

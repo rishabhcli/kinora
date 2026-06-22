@@ -30,6 +30,7 @@ from app.core.logging import get_logger
 from app.db.base import new_id
 from app.db.models.enums import RenderPriority
 from app.memory.budget_service import BudgetExceeded, Reservation
+from app.observability import metrics
 from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult
 from app.scheduler.model import BufferedShot, SchedulerSession, SchedulerStore
 from app.scheduler.zones import eta_seconds, trajectory_is_stable
@@ -208,6 +209,11 @@ class SchedulerService:
         if self._is_idle(session, now_ms):
             cancelled = await self._cancel_speculative(session)
             session.bursting = False
+            # An idle *period* begins when we actually halt in-flight speculation;
+            # subsequent idle ticks cancel nothing and are not re-counted.
+            if cancelled:
+                metrics.inc_idle_period()
+            metrics.set_buffer_occupancy(session.session_id, session.committed_seconds_ahead)
             await self._save(session)
             logger.info("scheduler.idle", session_id=session.session_id, cancelled=cancelled)
             return SchedulerTick(
@@ -221,9 +227,13 @@ class SchedulerService:
         session.budget_remaining_s = await self._budget.remaining()
 
         # 3. Dual-watermark hysteresis fill (velocity-adaptive promotion).
+        was_bursting = session.bursting
         promoted: list[str] = []
         if allow_promotion:
             promoted = await self._fill_committed(session)
+        if session.bursting != was_bursting:
+            metrics.inc_watermark_crossing("low" if session.bursting else "high")
+        metrics.inc_promotions(len(promoted))
 
         # 4. Cheap keyframes across the speculative horizon (zero video-seconds).
         keyframed = await self._maintain_keyframes(session)
@@ -232,6 +242,7 @@ class SchedulerService:
         self._enforce_caps(session)
 
         await self._save(session)
+        metrics.set_buffer_occupancy(session.session_id, session.committed_seconds_ahead)
         tick = SchedulerTick(
             idle=False,
             promoted=promoted,
@@ -404,6 +415,7 @@ class SchedulerService:
         self, session: SchedulerSession, *, new_word: int, threshold_s: float = 120.0
     ) -> int:
         """Cancel in-flight speculative jobs now > ``threshold_s`` away (§4.8 seek)."""
+        metrics.inc_seek_event()
         velocity = session.velocity_wps or 4.0
         return await self._queue.cancel_distant(
             session.trajectory_token,
