@@ -1,0 +1,71 @@
+"""Scene stitch (kinora.md §9.6): real ffmpeg concat + cumulative sync-map merge.
+
+Two real degrade-produced mp4s concatenate into one valid mp4, and the per-shot
+sync segments merge into a scene map whose video-times / word-times / page-turns
+are shifted by the cumulative offset of the preceding shots.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from app.render import degrade
+from app.render.stitch import concat_clips, merge_sync_segments
+from app.render.sync_map import SyncSegment, SyncWord
+from tests.test_render_support import png_bytes, wav_bytes
+
+pytestmark = pytest.mark.skipif(not degrade.ffmpeg_available(), reason="no ffmpeg binary available")
+
+
+def test_concat_two_clips_into_one_valid_mp4() -> None:
+    clip_a = degrade.ken_burns_over_image(png_bytes(640, 360), 1.0, audio_bytes=wav_bytes(1.0))
+    clip_b = degrade.ken_burns_over_image(png_bytes(640, 360), 1.5)  # no audio → silence padded
+    scene = concat_clips([clip_a, clip_b], size=(640, 360))
+    info = degrade.probe(scene)
+    assert info.has_video is True
+    assert info.has_audio is True  # uniform audio layout (silence where missing)
+    assert abs(info.duration_s - 2.5) < 0.4
+    assert degrade.verify_playable(scene) is True
+
+
+def test_merge_sync_segments_has_cumulative_timestamps() -> None:
+    seg_a = SyncSegment(
+        shot_id="a",
+        video_start_s=0.0,
+        video_end_s=1.0,
+        page=1,
+        page_turn_at_s=0.8,
+        words=[SyncWord(word_index=1, text="hi", t_start=0.1, t_end=0.5, bbox=None)],
+    )
+    seg_b = SyncSegment(
+        shot_id="b",
+        video_start_s=0.0,
+        video_end_s=1.5,
+        page=2,
+        page_turn_at_s=1.3,
+        words=[SyncWord(word_index=2, text="bye", t_start=0.2, t_end=0.9, bbox=None)],
+    )
+    merged = merge_sync_segments([seg_a, seg_b], scene_id="scene_1", durations=[1.0, 1.5])
+
+    assert merged.scene_id == "scene_1"
+    assert merged.duration_s == 2.5
+    assert (merged.segments[0].video_start_s, merged.segments[0].video_end_s) == (0.0, 1.0)
+    assert (merged.segments[1].video_start_s, merged.segments[1].video_end_s) == (1.0, 2.5)
+    # Second shot's page-turn + word timings shifted by the first shot's length.
+    assert merged.segments[1].page_turn_at_s == pytest.approx(2.3)
+    assert merged.segments[1].words[0].t_start == pytest.approx(1.2)
+    assert merged.segments[1].words[0].t_end == pytest.approx(1.9)
+
+
+def test_merge_uses_segment_length_when_durations_omitted() -> None:
+    seg = SyncSegment(
+        shot_id="only",
+        video_start_s=0.0,
+        video_end_s=4.0,
+        page=1,
+        page_turn_at_s=3.8,
+        words=[],
+    )
+    merged = merge_sync_segments([seg, seg], scene_id="s")
+    assert merged.duration_s == 8.0
+    assert merged.segments[1].video_start_s == 4.0
