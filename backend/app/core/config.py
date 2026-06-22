@@ -46,6 +46,17 @@ class Settings(BaseSettings):
     video_model_i2v: str = "wan2.7-i2v"
     video_model_r2v: str = "wan2.7-r2v"
 
+    # --- Embeddings ---
+    # ``tongyi-embedding-vision-plus`` embeds BOTH images and text into one shared
+    # 1152-dim space (verified live), which is exactly what CCS (image-vs-image)
+    # and episodic shot retrieval need. The same model is used for text so canon
+    # text and image/shot vectors live in the same space. ``embed_dim`` is the
+    # canonical pgvector dimension D for entities.embedding / shots.embedding;
+    # changing it requires a DB migration.
+    embed_model_image: str = "tongyi-embedding-vision-plus"
+    embed_model_text: str = "tongyi-embedding-vision-plus"
+    embed_dim: int = 1152
+
     # --- Postgres (async SQLAlchemy URL) ---
     database_url: str = "postgresql+asyncpg://kinora:kinora@localhost:5432/kinora"
 

@@ -26,6 +26,7 @@ from .base import (
     sdk_get,
 )
 from .chat import ChatProvider
+from .embeddings import EMBED_DIM, EmbeddingProvider, cosine
 from .errors import (
     AuthenticationError,
     CircuitOpenError,
@@ -70,6 +71,7 @@ class Providers:
     image: ImageProvider
     tts: TtsProvider
     video: VideoProvider
+    embeddings: EmbeddingProvider
 
     async def aclose(self) -> None:
         await self.client.aclose()
@@ -94,16 +96,19 @@ def create_providers(
         image=ImageProvider(client),
         tts=TtsProvider(client),
         video=VideoProvider(client),
+        embeddings=EmbeddingProvider(client),
     )
 
 
 __all__ = [
+    "EMBED_DIM",
     "AuthenticationError",
     "BreakerState",
     "ChatProvider",
     "ChatResult",
     "CircuitBreaker",
     "CircuitOpenError",
+    "EmbeddingProvider",
     "ImageProvider",
     "LiveVideoDisabled",
     "LoggingUsageSink",
@@ -132,6 +137,7 @@ __all__ = [
     "WanMode",
     "WanSpec",
     "classify_status",
+    "cosine",
     "create_providers",
     "data_uri",
     "sdk_get",

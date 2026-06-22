@@ -17,7 +17,14 @@ import os
 import pytest
 
 from app.core.config import Settings, get_settings
-from app.providers import LiveVideoDisabled, WanMode, WanSpec, create_providers
+from app.providers import (
+    EMBED_DIM,
+    LiveVideoDisabled,
+    WanMode,
+    WanSpec,
+    cosine,
+    create_providers,
+)
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("KINORA_LIVE_TESTS"),
@@ -103,6 +110,26 @@ async def test_live_tts_with_word_timestamps() -> None:
         )
         assert len(result.audio_bytes) > 1000
         assert result.word_timestamps  # REQUIRED for karaoke + page-turn
+    finally:
+        await providers.aclose()
+
+
+async def test_live_embeddings_image_and_text() -> None:
+    providers = create_providers()
+    try:
+        [img_vec] = await providers.embeddings.embed_images([_tiny_png()])
+        [txt_vec] = await providers.embeddings.embed_texts(["a red square with a yellow center"])
+        self_cos = cosine(img_vec, img_vec)
+        cross_cos = cosine(img_vec, txt_vec)
+        norm = sum(x * x for x in img_vec) ** 0.5
+        print(
+            f"\n[EMBED] model=tongyi-embedding-vision-plus dim={len(img_vec)} "
+            f"(EMBED_DIM={EMBED_DIM}) unit_norm={norm:.4f}\n"
+            f"        cosine(img,img)={self_cos:.4f} cosine(img,text)={cross_cos:.4f}"
+        )
+        assert len(img_vec) == EMBED_DIM == len(txt_vec)
+        assert abs(norm - 1.0) < 1e-3
+        assert self_cos == pytest.approx(1.0, abs=1e-4)
     finally:
         await providers.aclose()
 
