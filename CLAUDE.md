@@ -4,6 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kinora turns a book/PDF into a **page-synced film that generates itself a few seconds ahead of the reader**. A crew of six AI agents share one versioned "canon" (story memory) so a long adaptation stays visually consistent. The system never pre-renders the whole film — it renders the *next few seconds* against the reader's attention.
 
+## Frontend rebuild: Electron + React Native (in progress, branch `migrate/electron-rn`)
+
+The product is being rebuilt from a website into **native apps** — Electron (desktop) + Expo/React Native (mobile) — in a pnpm + Turborepo monorepo at the repo root. The Python backend is untouched and is now a pure HTTPS+JWT API the apps call.
+
+- `packages/core/` — framework-agnostic TS shared by both apps: the typed API client (generated from the backend OpenAPI via `pnpm --filter @kinora/core gen:api`), §5.6 event schemas (Zod), the **SyncEngine** (the scroll↔video↔word playhead), the realtime `SessionSocket`, a Zustand-vanilla auth store, and query keys. Tests: `pnpm --filter @kinora/core test` (vitest).
+- `apps/desktop/` — Electron (electron-vite + React 18 + Tailwind): auth, library + PDF upload, the two-pane reading room (`PdfReader` + `VideoStage` on the shared SyncEngine), director bar + live crew activity, `safeStorage` token, electron-builder packaging. `pnpm --filter @kinora/desktop build` / `dist`.
+- `apps/mobile/` — Expo SDK 56 / React 19 / RN 0.85 (conditional screens, no router yet): login, library, and a reading room (`expo-video` + reflow read-along). `expo-secure-store` token + `eas.json`. **SDK 56 is past the knowledge cutoff — read the v56 docs (`apps/mobile/AGENTS.md`) before changing Expo APIs.**
+- Verify everything (the CI `apps` job): `pnpm install && pnpm run typecheck && pnpm --filter @kinora/desktop typecheck && pnpm --filter @kinora/mobile typecheck && pnpm --filter @kinora/core test && pnpm --filter @kinora/desktop build`.
+- The legacy `frontend/` (Vite web app) is **retained until the new apps reach verified runtime parity**, then deleted — don't delete it yet.
+- pnpm uses `node-linker=hoisted` (RN/Metro needs it); build-script approvals live in `pnpm-workspace.yaml` under `allowBuilds`.
+
 ## The two documents that explain everything
 
 - **`kinora.md`** is the authoritative technical design (architecture, agents, pipeline, memory, budget). The code references its sections everywhere as `§4.5`, `§9.7`, `§8.3`, etc. **When a docstring cites a `§`, read that section of `kinora.md` before changing the code** — the section numbers are the spec the code implements.
