@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { NATIVE_TOP_INSET, useNativeShell } from "../../hooks/useNativeShell";
 import { type UseReadingThemeResult } from "../../lib/readingTheme";
 import { ThemePopover } from "./ThemePopover";
 
@@ -67,13 +68,21 @@ export function ReadingToolbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const searchExpanded = searchOpen || search.length > 0;
+  const native = useNativeShell();
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();
   }, [searchOpen]);
 
   return (
-    <header className="drag relative z-40 flex h-16 shrink-0 items-center gap-2 border-b border-white/10 pl-24 pr-4">
+    // Inside the native shell, sit below its glass title strip and relax the
+    // traffic-light gutter (the native window owns the controls there).
+    <header
+      className={`drag relative z-40 flex shrink-0 items-center gap-2 border-b border-white/10 pr-4 ${
+        native ? "pl-5" : "h-16 pl-24"
+      }`}
+      style={native ? { paddingTop: NATIVE_TOP_INSET, height: NATIVE_TOP_INSET + 64 } : undefined}
+    >
       <IconButton label="Back to library" onClick={onBack}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M15 5l-7 7 7 7" />

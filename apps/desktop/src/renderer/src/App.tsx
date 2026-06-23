@@ -12,6 +12,10 @@ import OnboardingPage from "./routes/OnboardingPage";
 import ShelfPage from "./routes/ShelfPage";
 import WorkspacePage from "./routes/WorkspacePage";
 
+/** How long to wait for /me before falling back to login (a hung/slow backend
+ *  must not leave the app stuck on "Restoring your session…" forever). */
+const ME_TIMEOUT_MS = 6000;
+
 /** On launch, restore a persisted session from secure storage and validate via /me. */
 function useBootstrap(): void {
   useEffect(() => {
@@ -25,7 +29,12 @@ function useBootstrap(): void {
       }
       authStore.getState().setToken(token);
       authStore.getState().setAuthenticating();
-      const { data } = await api.GET("/api/auth/me");
+      // Race /me against a timeout: if the backend is unreachable or slow the
+      // boot still resolves, sending the user to login rather than hanging.
+      const timeout = new Promise<{ data?: undefined }>((resolve) => {
+        window.setTimeout(() => resolve({ data: undefined }), ME_TIMEOUT_MS);
+      });
+      const { data } = await Promise.race([api.GET("/api/auth/me"), timeout]);
       if (cancelled) return;
       if (data) {
         authStore.getState().setSession(token, data);

@@ -1,11 +1,12 @@
 import { type BookResponse, queryKeys } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { BookCover } from "../components/BookCover";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { API_BASE_URL } from "../lib/config";
@@ -33,6 +34,7 @@ export default function ShelfPage() {
   const email = useAuth((state) => state.user?.email);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [query, setQuery] = useState("");
@@ -45,6 +47,37 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  // Warm each book's page-1 cover the moment the library resolves, so covers
+  // appear instantly instead of streaming in one-by-one. We prefetch the same
+  // query BookCover reads (filling the cache so BookCover renders from it), then
+  // preload the resulting image into the browser cache via new Image().
+  useEffect(() => {
+    if (!books) return;
+    let cancelled = false;
+    for (const book of books) {
+      if (book.status !== "ready") continue;
+      void queryClient
+        .fetchQuery({
+          queryKey: queryKeys.page(book.id, 1),
+          staleTime: 5 * 60 * 1000,
+          queryFn: async () => {
+            const { data, error } = await api.GET("/api/books/{book_id}/pages/{page_number}", {
+              params: { path: { book_id: book.id, page_number: 1 } },
+            });
+            return error || !data ? null : data;
+          },
+        })
+        .then((page) => {
+          const url = page?.image_url;
+          if (!cancelled && url) new Image().src = url;
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [books, queryClient]);
 
   const q = query.trim().toLowerCase();
   const filtered = (books ?? []).filter(
@@ -81,11 +114,21 @@ export default function ShelfPage() {
   return (
     <div className="flex h-screen flex-col bg-transparent font-sans text-parchment">
       {/* Real Liquid Glass toolbar — this strip is transparent, so the window's
-          native NSGlassEffectView shows through and frosts what's behind the window. */}
-      <header className="drag relative z-30 flex h-16 shrink-0 items-center gap-3 border-b border-white/10 pl-24 pr-5">
-        <h1 className="font-display text-xl tracking-tight text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.5)]">
-          Library
-        </h1>
+          native NSGlassEffectView shows through and frosts what's behind the window.
+          Inside the native shell we sit below its glass title strip and drop the
+          redundant "Library" wordmark (the native strip already shows branding);
+          when native the left padding can relax since there's no traffic-light gutter. */}
+      <header
+        className={`drag relative z-30 flex shrink-0 items-center gap-3 border-b border-white/10 pr-5 ${
+          native ? "pl-6" : "h-16 pl-24"
+        }`}
+        style={native ? { paddingTop: NATIVE_TOP_INSET, height: NATIVE_TOP_INSET + 64 } : undefined}
+      >
+        {!native && (
+          <h1 className="font-display text-xl tracking-tight text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.5)]">
+            Library
+          </h1>
+        )}
         {email && <span className="hidden text-xs text-white/45 sm:inline">{email}</span>}
         <div className="no-drag ml-auto flex items-center gap-2">
           <SearchField value={query} onChange={setQuery} />
