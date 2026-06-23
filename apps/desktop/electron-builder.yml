@@ -13,15 +13,22 @@ mac:
     - dmg
     - zip
   artifactName: ${productName}-${version}-${arch}.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Notarization: set `notarize: true` and provide APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID in CI. The signing identity is
+  # taken from CSC_LINK / CSC_KEY_PASSWORD (base64 .p12 + password).
+  notarize: false
 win:
   target:
     - nsis
   artifactName: ${productName}-${version}-setup.${ext}
+  # Windows signing: provide CSC_LINK (base64 .pfx) + CSC_KEY_PASSWORD in CI.
 linux:
   target:
     - AppImage
     - deb
   category: AudioVideo
   artifactName: ${productName}-${version}-${arch}.${ext}
-# Code signing + notarization credentials are injected from the CI environment
-# (CSC_LINK / APPLE_ID / etc.); none are committed.
