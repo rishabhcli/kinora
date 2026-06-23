@@ -8,6 +8,8 @@ import { authStore, persistToken } from "../lib/auth";
 async function loginAndLoadUser(email: string, password: string): Promise<string | null> {
   const { data, error } = await api.POST("/api/auth/login", { body: { email, password } });
   if (error || !data) return "Invalid email or password.";
+  // Put the token in the store *before* /me so the API client authenticates it.
+  authStore.getState().setToken(data.access_token);
   persistToken(data.access_token);
   const me = await api.GET("/api/auth/me");
   if (me.error || !me.data) {

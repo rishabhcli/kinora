@@ -23,6 +23,7 @@ export function LoginScreen() {
       setBusy(false);
       return;
     }
+    authStore.getState().setToken(data.access_token);
     const me = await api.GET("/api/auth/me");
     if (me.error || !me.data) {
       setError("Could not load your account.");
