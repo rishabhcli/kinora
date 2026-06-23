@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, importGateMessage, progressPercent, queryKeys, stageLabel } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { libraryBooksQueryOptions, useLibraryEvents } from "../hooks/useLibraryEvents";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
@@ -15,7 +16,7 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+async function uploadBook(file: File): Promise<{ ok: true } | { ok: false; message: string }> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +25,15 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let message = "Couldn't add that book. Check the file and try again.";
+  try {
+    const body = (await response.json()) as { detail?: string; message?: string };
+    message = body.detail ?? body.message ?? message;
+  } catch {
+    /* non-JSON error body */
+  }
+  return { ok: false, message };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -76,6 +85,8 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
@@ -89,7 +100,10 @@ export default function ShelfPage() {
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    ...libraryBooksQueryOptions(),
   });
+
+  useLibraryEvents(Boolean(email));
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -139,20 +153,27 @@ export default function ShelfPage() {
   // doesn't drift to the top-left corner of a big empty wall.
   const sparse = filtered.length > 0 && filtered.length <= 2 && !q;
 
-  function openBook(id: string) {
+  function openBook(book: BookResponse) {
+    const gate = importGateMessage(book);
+    if (gate) {
+      setGateMessage(gate);
+      return;
+    }
     const bridge = (globalThis as { kinora?: { openBook?: (bookId: string) => Promise<void> } }).kinora;
-    if (bridge?.openBook) void bridge.openBook(id);
-    else navigate(`/book/${id}`);
+    if (bridge?.openBook) void bridge.openBook(book.id);
+    else navigate(`/book/${book.id}`);
   }
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    else setUploadError(result.message);
   }
 
   function signOut() {
@@ -183,6 +204,11 @@ export default function ShelfPage() {
         )}
         {email && <span className="hidden text-xs text-white/45 sm:inline">{email}</span>}
         <div className="no-drag ml-auto flex items-center gap-2">
+          {uploadError && (
+            <p className="max-w-xs truncate text-xs text-red-300" role="alert">
+              {uploadError}
+            </p>
+          )}
           <SearchField value={query} onChange={setQuery} />
           <button
             onClick={() => fileRef.current?.click()}
@@ -323,7 +349,7 @@ export default function ShelfPage() {
                     <BookCover
                       key={book.id}
                       book={book}
-                      onOpen={() => openBook(book.id)}
+                      onOpen={() => openBook(book)}
                       onMetrics={() => setMetricsBookId(book.id)}
                     />
                   ))}
@@ -336,6 +362,22 @@ export default function ShelfPage() {
             ))}
         </div>
       </div>
+
+      {gateMessage && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-6 sm:items-center">
+          <div className="glass max-w-sm rounded-glass px-6 py-5 text-center">
+            <p className="font-display text-lg text-white">Not quite ready</p>
+            <p className="mt-2 text-sm text-white/70">{gateMessage}</p>
+            <button
+              type="button"
+              onClick={() => setGateMessage(null)}
+              className="mt-4 rounded-xl bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       {metricsBookId && (
         <MetricsPanel

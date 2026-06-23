@@ -1,7 +1,8 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, importGateMessage, queryKeys } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   ActivityIndicator,
   Image,
   Pressable,
@@ -19,6 +20,7 @@ import {
   Surface,
 } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { libraryBooksQueryOptions, useLibraryEvents } from "../hooks/useLibraryEvents";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
@@ -68,7 +70,10 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    ...libraryBooksQueryOptions(),
   });
+
+  useLibraryEvents(Boolean(email));
 
   // Cover warming: once the library resolves, fetch each ready book's page-1
   // (into the same React Query cache the BookCard reads, so the cover is an
@@ -110,6 +115,15 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   }, [books, query]);
 
   const rows: BookResponse[][] = useMemo(() => intoRows(filtered, perRow), [filtered, perRow]);
+
+  function handleOpen(book: BookResponse) {
+    const gate = importGateMessage(book);
+    if (gate) {
+      Alert.alert("Not quite ready", gate);
+      return;
+    }
+    onOpen(book.id);
+  }
 
   function signOut() {
     persistToken(null);
@@ -169,7 +183,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     key={book.id}
                     book={book}
                     width={cardWidth}
-                    onPress={() => onOpen(book.id)}
+                    onPress={() => handleOpen(book)}
                   />
                 ))}
               </View>

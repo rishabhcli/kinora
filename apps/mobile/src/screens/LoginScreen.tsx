@@ -14,7 +14,7 @@ import { authStore, persistToken } from "../lib/auth";
 import { alpha, BOTTOM_INSET, space, TOP_INSET, type } from "../theme/tokens";
 
 /** The seeded demo reader (owns the bundled library) — one tap to explore. */
-const DEMO = { email: "e2e@kinora.test", password: "e2e-password-123" } as const;
+const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 
 type Mode = "login" | "register";
 
