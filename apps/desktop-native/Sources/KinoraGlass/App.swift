@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 /// Native macOS shell for Kinora. Built against the macOS 26+ SDK so the OS
@@ -45,7 +46,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 enum Kinora {
     static let baseURL = "http://localhost:5173"
+    static let apiBaseURL = "http://localhost:8000"
     static func url(_ path: String) -> URL { URL(string: baseURL + "/#" + path)! }
+}
+
+/// Native "Add book": pick a PDF/EPUB with the system panel and upload it to the
+/// backend with the persisted token, then refresh the library.
+enum BookUpload {
+    @MainActor static func present() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.pdf, UTType(filenameExtension: "epub") ?? .data]
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            upload(url)
+        }
+    }
+
+    static func upload(_ fileURL: URL) {
+        guard let token = TokenStore.get(),
+              let fileData = try? Data(contentsOf: fileURL),
+              let endpoint = URL(string: Kinora.apiBaseURL + "/api/books") else { return }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: endpoint)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let mime = fileURL.pathExtension.lowercased() == "epub" ? "application/epub+zip" : "application/pdf"
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append(
+            "Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n"
+                .data(using: .utf8)!
+        )
+        body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+        URLSession.shared.dataTask(with: req) { _, response, _ in
+            if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                DispatchQueue.main.async { NotificationCenter.default.post(name: .kinoraReload, object: nil) }
+            }
+        }.resume()
+    }
 }
 
 /// Durable token store mirroring the Electron safeStorage bridge; backs the
@@ -72,11 +116,16 @@ struct LibraryView: View {
 
             // Real Liquid Glass title strip (branding + drag region). The web UI
             // owns the functional controls (search / add / profile).
-            HStack {
+            HStack(spacing: 14) {
                 Text("Kinora")
                     .font(.title2)
                     .fontWeight(.semibold)
                 Spacer()
+                Button { BookUpload.present() } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.glass)
+                .help("Add a book (PDF or EPUB)")
             }
             .foregroundStyle(.primary)
             .padding(.horizontal, 22)
