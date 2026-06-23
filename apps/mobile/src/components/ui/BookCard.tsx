@@ -23,6 +23,19 @@ function spineColor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
+function stageLabel(book: BookResponse): string {
+  if (book.status === "failed") return "Import failed";
+  const stage = book.stage?.trim();
+  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
+  return "Preparing";
+}
+
+function progressPct(book: BookResponse): number {
+  const raw = book.progress;
+  if (raw == null || Number.isNaN(raw)) return 0;
+  return Math.round(Math.min(1, Math.max(0, raw)) * 100);
+}
+
 /**
  * A book standing on the shelf — its page-1 image as the cover when the book is
  * `ready`, otherwise a titled spine card in a warm hue. The bound spine edge, a
@@ -41,6 +54,9 @@ export function BookCard({
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
   const ready = book.status === "ready";
+  const failed = book.status === "failed";
+  const working = !ready && !failed;
+  const pct = progressPct(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -64,12 +80,18 @@ export function BookCard({
 
   return (
     <Pressable
-      onPress={onPress}
-      onPressIn={() => animate(1)}
-      onPressOut={() => animate(0)}
+      onPress={ready ? onPress : undefined}
+      disabled={!ready}
+      onPressIn={() => ready && animate(1)}
+      onPressOut={() => ready && animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
-      style={{ width }}
+      accessibilityState={{ disabled: !ready }}
+      accessibilityLabel={
+        ready
+          ? `Open ${book.title}${book.author ? `, by ${book.author}` : ""}`
+          : `${book.title} is still importing`
+      }
+      style={{ width, opacity: ready ? 1 : 0.82 }}
     >
       <Animated.View
         style={[styles.cover, { width, height: width * 1.5, transform: [{ translateY }] }]}
@@ -98,11 +120,19 @@ export function BookCard({
         <View pointerEvents="none" style={styles.sheen} />
 
         {!ready ? (
-          <View style={styles.statusBar}>
-            <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
-            </Text>
-          </View>
+          <>
+            <View pointerEvents="none" style={styles.importScrim} />
+            {working && pct > 0 ? (
+              <View pointerEvents="none" style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${pct}%` }]} />
+              </View>
+            ) : null}
+            <View style={styles.statusBar}>
+              <Text style={styles.statusText} numberOfLines={1}>
+                {working && pct > 0 ? `${stageLabel(book).toUpperCase()} · ${pct}%` : stageLabel(book).toUpperCase()}
+              </Text>
+            </View>
+          </>
         ) : null}
       </Animated.View>
 
@@ -152,6 +182,22 @@ const styles = StyleSheet.create({
   spineShade: { position: "absolute", top: 0, bottom: 0, left: 0, width: 7, backgroundColor: "rgba(0,0,0,0.40)" },
   spineSeam: { position: "absolute", top: 0, bottom: 0, left: 7, width: StyleSheet.hairlineWidth, backgroundColor: alpha.white12 },
   sheen: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(255,255,255,0.05)" },
+  importScrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.35)" },
+  progressTrack: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 34,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
+  },
   statusBar: {
     position: "absolute",
     left: 0,

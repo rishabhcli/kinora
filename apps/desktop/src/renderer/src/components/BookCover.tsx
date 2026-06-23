@@ -11,6 +11,13 @@ function colorFor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
+/** Percent complete [0,100] from the backend progress field (0..1). */
+function progressPct(book: BookResponse): number {
+  const raw = book.progress;
+  if (raw == null || Number.isNaN(raw)) return 0;
+  return Math.round(Math.min(1, Math.max(0, raw)) * 100);
+}
+
 /** A short, human label for a book that isn't ready yet — the import stage in
  *  sentence case, or a clean fallback. */
 function stageLabel(book: BookResponse): string {
@@ -51,8 +58,10 @@ export function BookCover({
     },
   });
   const cover = data?.image_url ?? null;
+  const pct = progressPct(book);
 
   function select() {
+    if (!ready) return;
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -107,10 +116,20 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
+              {working && pct > 0 && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-10 px-3">
+                  <div className="h-1 overflow-hidden rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-ember-glow to-ember transition-[width] duration-500 ease-out"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {working && pct > 0 ? `${stageLabel(book)} · ${pct}%` : stageLabel(book)}
                 </span>
               </div>
             </>
@@ -122,9 +141,13 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          disabled={!ready}
+          title={ready ? book.title : `${book.title} — ${stageLabel(book)}`}
+          aria-label={ready ? `Open ${book.title}` : `${book.title} is still importing`}
+          aria-disabled={!ready}
+          className={`absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep ${
+            ready ? "" : "cursor-not-allowed"
+          }`}
         />
         {ready && onMetrics && (
           <button

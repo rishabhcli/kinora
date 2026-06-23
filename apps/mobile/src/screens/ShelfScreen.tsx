@@ -19,6 +19,7 @@ import {
   Surface,
 } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { useLibraryEvents } from "../hooks/useLibraryEvents";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
@@ -70,7 +71,9 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
     },
   });
 
-  // Cover warming: once the library resolves, fetch each ready book's page-1
+  useLibraryEvents(books);
+
+  // Cover warming: once the library resolves
   // (into the same React Query cache the BookCard reads, so the cover is an
   // instant cache hit) and prime the native image cache via Image.prefetch, so
   // covers paint immediately instead of fading in per-card on scroll.
@@ -169,7 +172,9 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     key={book.id}
                     book={book}
                     width={cardWidth}
-                    onPress={() => onOpen(book.id)}
+                    onPress={() => {
+                      if (book.status === "ready") onOpen(book.id);
+                    }}
                   />
                 ))}
               </View>
