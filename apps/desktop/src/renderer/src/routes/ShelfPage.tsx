@@ -5,14 +5,14 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
-import { authStore, loadPersistedToken, persistToken } from "../lib/auth";
+import { authStore, persistToken } from "../lib/auth";
 import { API_BASE_URL } from "../lib/config";
 
 /** Upload a PDF as multipart/form-data (the typed client doesn't model binary bodies). */
 async function uploadBook(file: File): Promise<boolean> {
   const form = new FormData();
   form.append("file", file);
-  const token = authStore.getState().token ?? loadPersistedToken();
+  const token = authStore.getState().token;
   const response = await fetch(`${API_BASE_URL}/api/books`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,

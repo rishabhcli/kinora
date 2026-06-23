@@ -10,29 +10,34 @@ import LoginPage from "./routes/LoginPage";
 import ShelfPage from "./routes/ShelfPage";
 import WorkspacePage from "./routes/WorkspacePage";
 
-/** On launch, restore a persisted session by validating the token against /me. */
+/** On launch, restore a persisted session from secure storage and validate via /me. */
 function useBootstrap(): void {
   useEffect(() => {
-    const token = loadPersistedToken();
-    if (!token) {
-      authStore.getState().setAnonymous();
-      return;
-    }
-    authStore.getState().setAuthenticating();
-    void api
-      .GET("/api/auth/me")
-      .then(({ data }) => {
-        if (data) {
-          authStore.getState().setSession(token, data);
-        } else {
-          persistToken(null);
-          authStore.getState().setAnonymous();
-        }
-      })
-      .catch(() => {
+    let cancelled = false;
+    void (async () => {
+      const token = await loadPersistedToken();
+      if (cancelled) return;
+      if (!token) {
+        authStore.getState().setAnonymous();
+        return;
+      }
+      authStore.getState().setToken(token);
+      authStore.getState().setAuthenticating();
+      const { data } = await api.GET("/api/auth/me");
+      if (cancelled) return;
+      if (data) {
+        authStore.getState().setSession(token, data);
+      } else {
         persistToken(null);
         authStore.getState().setAnonymous();
-      });
+      }
+    })().catch(() => {
+      persistToken(null);
+      authStore.getState().setAnonymous();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 }
 

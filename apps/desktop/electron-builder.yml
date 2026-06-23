@@ -1,0 +1,27 @@
+appId: app.kinora.desktop
+productName: Kinora
+copyright: Kinora
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+mac:
+  category: public.app-category.entertainment
+  target:
+    - dmg
+    - zip
+  artifactName: ${productName}-${version}-${arch}.${ext}
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-setup.${ext}
+linux:
+  target:
+    - AppImage
+    - deb
+  category: AudioVideo
+  artifactName: ${productName}-${version}-${arch}.${ext}
+# Code signing + notarization credentials are injected from the CI environment
+# (CSC_LINK / APPLE_ID / etc.); none are committed.

@@ -1,6 +1,38 @@
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+
+function tokenFile(): string {
+  return join(app.getPath("userData"), "session.bin");
+}
+
+/** Encrypted token storage backed by the OS keychain via Electron safeStorage. */
+function registerSecureStorage(): void {
+  ipcMain.handle("secure:getToken", (): string | null => {
+    try {
+      const file = tokenFile();
+      if (!existsSync(file) || !safeStorage.isEncryptionAvailable()) return null;
+      return safeStorage.decryptString(readFileSync(file));
+    } catch {
+      return null;
+    }
+  });
+  ipcMain.handle("secure:setToken", (_event, token: string | null): void => {
+    try {
+      const file = tokenFile();
+      if (!token) {
+        if (existsSync(file)) rmSync(file);
+        return;
+      }
+      if (safeStorage.isEncryptionAvailable()) {
+        writeFileSync(file, safeStorage.encryptString(token));
+      }
+    } catch {
+      // Persistence is best-effort; a failure just means the user re-logs in.
+    }
+  });
+}
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -27,6 +59,7 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  registerSecureStorage();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

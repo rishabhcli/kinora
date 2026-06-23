@@ -15,6 +15,8 @@ export interface AuthState {
   token: string | null;
   user: UserResponse | null;
   setAuthenticating: () => void;
+  /** Set the token only (used while restoring a persisted session before /me). */
+  setToken: (token: string | null) => void;
   setSession: (token: string, user: UserResponse) => void;
   setAnonymous: () => void;
 }
@@ -25,6 +27,7 @@ export function createAuthStore() {
     token: null,
     user: null,
     setAuthenticating: () => set({ status: "authenticating" }),
+    setToken: (token) => set({ token }),
     setSession: (token, user) => set({ status: "authenticated", token, user }),
     setAnonymous: () => set({ status: "anonymous", token: null, user: null }),
   }));
