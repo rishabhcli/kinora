@@ -166,12 +166,13 @@ class RenderWorker:
             )
             return
 
-        await self._publish_clip_ready(job, result)
+        await self._publish_render_events(job, result)
         await self._queue.ack(job.id)
         logger.info(
-            "worker.clip_ready",
+            "worker.render_done",
             job_id=job.id,
             shot_id=result.shot_id,
+            status=result.status.value,
             rung=result.rung,
             video_seconds=result.video_seconds,
         )
@@ -278,6 +279,47 @@ class RenderWorker:
             )
 
     # -- events -------------------------------------------------------------- #
+
+    async def _publish_render_events(self, job: QueuedJob, result: RenderResult) -> None:
+        """Fan out the §5.6 event(s) appropriate to this render outcome."""
+        channel = (
+            session_channel(job.session_id)
+            if job.session_id
+            else book_channel(job.book_id)
+        )
+        if result.status is ShotStatus.CONFLICT and result.conflict is not None:
+            conflict = result.conflict.model_dump(mode="json")
+            await self._redis.publish(
+                channel,
+                {
+                    "event": "conflict_choice",
+                    "conflict_id": result.conflict.conflict_id,
+                    "options": conflict.get("options", []),
+                    "claim": result.conflict.claim,
+                    "canon_fact": result.conflict.canon_fact,
+                    "shot_id": result.shot_id,
+                },
+            )
+            await self._redis.publish(
+                channel,
+                {
+                    "event": "agent_activity",
+                    "agent": result.conflict.raised_by or "Continuity",
+                    "message": f"Continuity conflict: {result.conflict.claim}",
+                    "conflict": conflict,
+                    "shot_id": result.shot_id,
+                },
+            )
+            logger.info(
+                "worker.conflict_surfaced",
+                job_id=job.id,
+                shot_id=result.shot_id,
+                conflict_id=result.conflict.conflict_id,
+            )
+            return
+
+        if result.clip_url or result.clip_key:
+            await self._publish_clip_ready(job, result)
 
     async def _publish_clip_ready(self, job: QueuedJob, result: RenderResult) -> None:
         channel = (

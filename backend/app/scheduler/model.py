@@ -68,6 +68,8 @@ class SchedulerSession(BaseModel):
 
     # Budget mirror + idle bookkeeping (§4.7/§11.1).
     budget_remaining_s: float | None = None
+    #: True once ``budget_low`` has been announced for this session (§5.6).
+    budget_low_announced: bool = False
     last_activity_ms: int | None = None
 
     # Cancellation / trajectory (§4.8).

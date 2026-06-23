@@ -19,6 +19,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { GenerationClient } from "../sync/GenerationClient";
 import { SyncEngine } from "../sync/SyncEngine";
 import { useSyncSnapshot } from "../sync/useSyncEngine";
+import { useLibraryEvents } from "../hooks/useLibraryEvents";
 
 const MetricsPanel = lazy(() =>
   import("../metrics/MetricsPanel").then((m) => ({ default: m.MetricsPanel })),
@@ -100,8 +101,10 @@ export default function WorkspacePage() {
   const resetEvents = useEventsStore((s) => s.reset);
   const setConnection = useEventsStore((s) => s.setConnection);
   const pushEvent = useEventsStore((s) => s.push);
+  const liveIngest = useEventsStore((s) => (id ? s.ingestProgress[id] : undefined));
 
-  // 1. Load the book; poll while it is still importing.
+  // 1. Load the book; poll while it is still importing (SSE fills gaps between polls).
+  useLibraryEvents(book?.status === "importing");
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -267,16 +270,21 @@ export default function WorkspacePage() {
   }
 
   if (book.status === "importing") {
-    const pct = Math.round((book.progress <= 1 ? book.progress * 100 : book.progress) || 0);
+    const stage = liveIngest?.stage ?? book.stage ?? "analysing";
+    const rawPct = liveIngest?.pct ?? book.progress;
+    const pct = Math.round((rawPct <= 1 ? rawPct * 100 : rawPct) || 0);
     return (
       <CenterMessage>
         <p className="text-sm">
-          Preparing <span className="text-kinora-mist">{book.title}</span> — {book.stage ?? "analysing"}…
+          Preparing <span className="text-kinora-mist">{book.title}</span> — {stage}…
         </p>
-        <div className="h-1.5 w-56 overflow-hidden rounded-full bg-kinora-line">
-          <div className="h-full rounded-full bg-kinora-glow transition-[width]" style={{ width: `${pct}%` }} />
+        <div className="shimmer-track h-1.5 w-56 overflow-hidden rounded-full bg-kinora-line">
+          <div
+            className="h-full rounded-full bg-kinora-glow transition-[width] duration-300"
+            style={{ width: `${pct}%` }}
+          />
         </div>
-        <span className="text-xs tabular-nums">{pct}%</span>
+        <span className="text-xs tabular-nums text-kinora-muted">{pct}%</span>
       </CenterMessage>
     );
   }

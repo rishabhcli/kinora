@@ -70,4 +70,5 @@ def test_key_builders_layout() -> None:
     assert keys.ref("b", "char_elsa", "ref_front.png") == "refs/b/char_elsa/ref_front.png"
     assert keys.lastframe("b", "s") == "lastframes/b/s.png"
     assert keys.pdf("b") == "pdfs/b.pdf"
+    assert keys.page_image("b", 3) == "pages/b/0003.png"
     assert keys.canon("b", "elsa.md") == "canon/b/elsa.md"

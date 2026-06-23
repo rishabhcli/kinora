@@ -140,7 +140,7 @@ class TtsProvider:
         Uses the native ``qwen-voice-enrollment`` customization endpoint, which
         accepts inline base64 audio (no separate upload required).
         """
-        target = resolve_tts_model(target_model or self._settings.tts_model)
+        target = resolve_tts_model(target_model or self._settings.tts_clone_model)
         payload = {
             "model": "qwen-voice-enrollment",
             "input": {

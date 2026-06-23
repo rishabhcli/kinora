@@ -78,6 +78,16 @@ def book_channel(book_id: str) -> str:
     return f"kinora:events:book:{book_id}"
 
 
+def library_channel(user_id: str) -> str:
+    """Per-user library channel — ingest progress for the shelf (§5.1/§5.6)."""
+    return f"kinora:events:library:{user_id}"
+
+
+def book_progress_key(book_id: str) -> str:
+    """Redis key holding the latest ingest progress snapshot for polling."""
+    return f"kinora:book:progress:{book_id}"
+
+
 # --------------------------------------------------------------------------- #
 # Lua scripts (the only operations that must be atomic)
 # --------------------------------------------------------------------------- #
@@ -846,6 +856,8 @@ __all__ = [
     "RetryDecision",
     "RetryOutcome",
     "book_channel",
+    "book_progress_key",
     "iter_events",
+    "library_channel",
     "session_channel",
 ]

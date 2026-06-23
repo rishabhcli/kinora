@@ -74,8 +74,8 @@ seed-demo:
 # -- Quality gates ----------------------------------------------------------- #
 
 lint:
-	cd backend && .venv/bin/ruff check app tests
-	cd backend && .venv/bin/mypy app
+	cd backend && .venv/bin/ruff check app tests scripts
+	cd backend && .venv/bin/mypy app tests
 
 fmt:
 	cd backend && .venv/bin/black app tests

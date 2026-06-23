@@ -6,6 +6,7 @@ import { Wordmark } from "../components/common/BrandMark";
 import { BookGrid } from "../components/shelf/BookGrid";
 import { SearchBar } from "../components/shelf/SearchBar";
 import { UploadDropzone } from "../components/shelf/UploadDropzone";
+import { useLibraryEvents } from "../hooks/useLibraryEvents";
 import { useAuthStore } from "../stores/authStore";
 
 function ShelfHeader() {
@@ -65,6 +66,7 @@ export default function ShelfPage() {
   }, [refresh]);
 
   const hasImporting = (books ?? []).some((b) => b.status === "importing");
+  useLibraryEvents(hasImporting);
   useEffect(() => {
     if (!hasImporting) return undefined;
     const id = window.setInterval(() => void refresh(), 2500);

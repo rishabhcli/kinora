@@ -24,6 +24,7 @@ from contextlib import asynccontextmanager
 import pytest
 import pytest_asyncio
 
+from app.agents.contracts import ConflictObject, ConflictOption, ConflictOptionSpec, ConflictType
 from app.db.models.enums import RenderJobStatus, RenderPriority, ShotStatus
 from app.queue.redis_queue import QueuedJob, RedisRenderQueue, session_channel
 from app.queue.worker import RenderWorker
@@ -107,6 +108,61 @@ async def test_worker_success_publishes_clip_ready(
     assert done is not None and done.status is RenderJobStatus.SUCCEEDED
     print(f"\n[WORKER] clip_ready published on {channel}: shot_id={message['shot_id']} "
           f"rung={message['rung']}; job -> {done.status.value}")
+
+
+async def test_worker_conflict_publishes_conflict_events(
+    queue: RedisRenderQueue, redis_client: RedisClient
+) -> None:
+    session_id = f"sess_{uuid.uuid4().hex[:8]}"
+    conflict = ConflictObject(
+        conflict_id="cf_test",
+        raised_by="Continuity",
+        type=ConflictType.CANON_VIOLATION,
+        shot_id="shot_cf",
+        claim="She wears a red coat",
+        canon_fact="She wears a blue coat",
+        options=[
+            ConflictOptionSpec(id=ConflictOption.HONOR_CANON, action="Honor canon (keep blue coat)")
+        ],
+    )
+
+    async def fake_run_shot(job: QueuedJob) -> RenderResult:
+        return RenderResult(
+            shot_id=job.shot_id or "",
+            status=ShotStatus.CONFLICT,
+            rung="conflict",
+            qa={"verdict": "conflict"},
+            conflict=conflict,
+            video_seconds=0.0,
+        )
+
+    worker = RenderWorker(queue, redis_client, run_shot=fake_run_shot, session_factory=None)
+    await queue.enqueue(
+        shot_hash="h_conflict",
+        priority=RenderPriority.COMMITTED,
+        book_id="book_demo",
+        job_id="job_cf",
+        session_id=session_id,
+        shot_id="shot_cf",
+        target_duration_s=5.0,
+    )
+    job = await queue.claim()
+    assert job is not None
+
+    channel = session_channel(session_id)
+    messages: list[dict] = []
+    async with redis_client.subscribe(channel) as pubsub:
+        await asyncio.sleep(0.1)
+        await worker.process_job(job)
+        for _ in range(3):
+            msg = await redis_client.next_message(pubsub, timeout=3.0)
+            if isinstance(msg, dict):
+                messages.append(msg)
+
+    events = {m["event"] for m in messages}
+    assert "conflict_choice" in events
+    assert "agent_activity" in events
+    assert not any(m.get("event") == "clip_ready" for m in messages)
 
 
 # --- failure: dead-letters after the retry cap ------------------------------ #

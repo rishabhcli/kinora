@@ -16,10 +16,7 @@ The extracted rows are persisted via :class:`app.db.repositories.book.PageRepo`
 and a structured :class:`PdfExtractResult` (carrying the per-page global word
 ranges) is returned for the downstream analyse / shot-plan steps.
 
-Note: the off-limits ``app.storage`` layer ships key builders for clips /
-keyframes / refs / audio / pdfs but not for page images, so the page-image key
-helper :func:`page_image_key` lives here (a plain ``put_bytes`` to a stable
-``pages/<book>/<n>.png`` key — no change to the storage client is required).
+Note: page PNG keys use :meth:`app.storage.object_store.Keys.page_image`.
 """
 
 from __future__ import annotations
@@ -31,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.logging import get_logger
 from app.db.repositories.book import PageRepo
 from app.memory.interfaces import BlobStore
+from app.storage.object_store import keys
 
 logger = get_logger("app.ingest.pdf_extract")
 
@@ -42,8 +40,8 @@ _PNG_CONTENT_TYPE = "image/png"
 
 
 def page_image_key(book_id: str, page_number: int) -> str:
-    """Object key for a rendered page PNG (``pages/<book>/<n>.png``)."""
-    return f"pages/{book_id}/{page_number:04d}.png"
+    """Object key for a rendered page PNG (delegates to :meth:`Keys.page_image`)."""
+    return keys.page_image(book_id, page_number)
 
 
 class WordBox(BaseModel):

@@ -32,6 +32,7 @@ from app.db.models.enums import RenderPriority
 from app.memory.budget_service import BudgetExceeded, Reservation
 from app.observability import metrics
 from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult
+from app.scheduler.events import SessionEventPublisher
 from app.scheduler.model import BufferedShot, SchedulerSession, SchedulerStore
 from app.scheduler.zones import eta_seconds, trajectory_is_stable
 
@@ -176,6 +177,7 @@ class SchedulerService:
         keyframes: KeyframeMaintainer,
         store: SchedulerStore | None = None,
         settings: Settings | None = None,
+        events: SessionEventPublisher | None = None,
         idle_pause_ms: int = IDLE_PAUSE_MS,
         keyframe_cap: int = 12,
     ) -> None:
@@ -184,6 +186,7 @@ class SchedulerService:
         self._shots = shots
         self._keyframes = keyframes
         self._store = store
+        self._events = events
         settings = settings or get_settings()
         self._low = settings.watermark_low_s
         self._high = settings.watermark_high_s
@@ -225,6 +228,7 @@ class SchedulerService:
         # 2. Refresh committed-seconds-ahead from the buffer relative to w.
         session.recompute_committed_ahead()
         session.budget_remaining_s = await self._budget.remaining()
+        await self._maybe_publish_budget_low(session)
 
         # 3. Dual-watermark hysteresis fill (velocity-adaptive promotion).
         was_bursting = session.bursting
@@ -261,6 +265,28 @@ class SchedulerService:
             keyframed=len(keyframed),
         )
         return tick
+
+    async def _maybe_publish_budget_low(self, session: SchedulerSession) -> None:
+        """Announce ``budget_low`` once per low-budget episode (§5.6/§11.1)."""
+        low = await self._budget.is_low()
+        if not low:
+            session.budget_low_announced = False
+            return
+        if session.budget_low_announced or self._events is None:
+            return
+        remaining = session.budget_remaining_s
+        if remaining is None:
+            remaining = await self._budget.remaining()
+        await self._events.publish(
+            session.session_id,
+            {"event": "budget_low", "remaining_s": remaining},
+        )
+        session.budget_low_announced = True
+        logger.info(
+            "scheduler.budget_low",
+            session_id=session.session_id,
+            remaining_s=remaining,
+        )
 
     # -- watermark fill ------------------------------------------------------ #
 

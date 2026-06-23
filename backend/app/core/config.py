@@ -48,9 +48,9 @@ class Settings(BaseSettings):
     # Default narration TTS model. qwen3-tts-flash serves the PRESET voices that
     # ingest.identity_lock assigns (e.g. "Cherry", "Ryan"), so preset-voice
     # narration works out of the box. qwen3-tts-vc is the separate voice-CLONE
-    # model (it rejects preset voice ids); clone callers pass it explicitly via
-    # TtsProvider.clone_voice(target_model="qwen3-tts-vc").
+    # model (it rejects preset voice ids); clone callers use ``tts_clone_model``.
     tts_model: str = "qwen3-tts-flash"
+    tts_clone_model: str = "qwen3-tts-vc"
     # NOTE: the Wan video model ids are placeholders to be confirmed in the providers phase.
     video_model: str = "wan2.7-t2v"
     video_model_i2v: str = "wan2.7-i2v"

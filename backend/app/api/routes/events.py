@@ -32,7 +32,7 @@ from app.db.models.session import Session as SessionRow
 from app.db.models.user import User
 from app.db.repositories.session import SessionRepo
 from app.db.repositories.user import UserRepo
-from app.queue.redis_queue import book_channel, session_channel
+from app.queue.redis_queue import book_channel, library_channel, session_channel
 
 logger = get_logger("app.api.events")
 
@@ -103,6 +103,43 @@ async def session_events(
                 if isinstance(message, dict):
                     yield _sse_frame(message)
         logger.info("events.sse_closed", session_id=session_id)
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(stream(), media_type="text/event-stream", headers=headers)
+
+
+@router.get("/books/events")
+async def library_events(
+    request: Request,
+    token: str | None = Query(default=None),
+) -> StreamingResponse:
+    """SSE stream of ingest progress for the signed-in user's library (§5.1).
+
+    The shelf subscribes here for live ``ingest_progress`` events instead of
+    polling alone. Events are published on the per-user library channel while
+    Phase A runs.
+    """
+    container = get_container(request)
+    user = await _user_from_token(_bearer_token(request.headers, token), container)
+    channel = library_channel(user.id)
+
+    async def stream() -> AsyncIterator[str]:
+        async with container.redis.subscribe(channel) as pubsub:
+            yield ": connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                message = await container.redis.next_message(pubsub, timeout=KEEPALIVE_S)
+                if message is None:
+                    yield ": keepalive\n\n"
+                    continue
+                if isinstance(message, dict):
+                    yield _sse_frame(message)
+        logger.info("events.library_sse_closed", user_id=user.id)
 
     headers = {
         "Cache-Control": "no-cache",

@@ -19,6 +19,8 @@ from app.queue.redis_queue import (
     RetryDecision,
     RetryOutcome,
     book_channel,
+    book_progress_key,
+    library_channel,
     session_channel,
 )
 from app.queue.worker import RenderWorker
@@ -33,5 +35,7 @@ __all__ = [
     "RetryDecision",
     "RetryOutcome",
     "book_channel",
+    "book_progress_key",
+    "library_channel",
     "session_channel",
 ]

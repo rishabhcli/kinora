@@ -204,6 +204,12 @@ export function eventStreamUrl(sessionId: string): string {
   return `${API_BASE}/sessions/${sessionId}/events${q}`;
 }
 
+export function libraryEventsUrl(): string {
+  const token = getToken();
+  const q = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${API_BASE}/books/events${q}`;
+}
+
 export function websocketUrl(sessionId: string): string {
   const token = getToken();
   const q = token ? `?token=${encodeURIComponent(token)}` : "";

@@ -48,6 +48,11 @@ class Keys:
         return f"pdfs/{book_id}.pdf"
 
     @staticmethod
+    def page_image(book_id: str, page_number: int) -> str:
+        """Rendered page PNG from Phase-A PDF extraction."""
+        return f"pages/{book_id}/{page_number:04d}.png"
+
+    @staticmethod
     def canon(book_id: str, name: str) -> str:
         """Canon markdown-vault export artifact."""
         return f"canon/{book_id}/{name}"

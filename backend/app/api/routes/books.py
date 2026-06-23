@@ -41,6 +41,7 @@ from app.db.models.user import User
 from app.db.repositories.book import BookRepo, PageRepo
 from app.db.repositories.entity import EntityRepo
 from app.memory.canon_vault import CanonVault
+from app.queue.redis_queue import book_progress_key
 from app.storage.object_store import keys
 
 logger = get_logger("app.api.books")
@@ -65,10 +66,6 @@ _ALLOWED_CONTENT_TYPES = frozenset(
 #: Resolve canon "as of the latest version" — a beat beyond any real one, so the
 #: still-open (current) version of every entity is returned.
 _LATEST_BEAT = 2**31 - 1
-
-
-def _progress_key(book_id: str) -> str:
-    return f"kinora:book:progress:{book_id}"
 
 
 async def _read_capped(file: UploadFile, cap: int) -> bytes:
@@ -134,7 +131,7 @@ async def _assert_owner(container: Container, user: User, book_id: str) -> Book:
 
 
 async def _book_response(container: Container, book: Book) -> BookResponse:
-    progress = await container.redis.get_json(_progress_key(book.id))
+    progress = await container.redis.get_json(book_progress_key(book.id))
     pct: float | None = None
     stage: str | None = None
     if isinstance(progress, dict):
@@ -229,7 +226,7 @@ async def upload_book(
         )
         response = await _book_response(container, book)
 
-    await container.redis.set_json(_progress_key(book_id), {"stage": "importing", "pct": 0.0})
+    await container.redis.set_json(book_progress_key(book_id), {"stage": "importing", "pct": 0.0})
 
     # Phase A runs out-of-band; the response returns immediately (§9.1).
     container.spawn(container.run_ingest(book_id, data, None))

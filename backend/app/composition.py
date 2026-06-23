@@ -49,7 +49,7 @@ from app.db.models.enums import RenderPriority
 from app.memory.budget_service import BudgetLimits, BudgetService
 from app.memory.interfaces import Embedder, RenderEnqueuer, ShotPlanner, ShotSpec
 from app.queue.enqueuer import RedisRenderEnqueuer
-from app.queue.redis_queue import RedisRenderQueue, book_channel, session_channel
+from app.queue.redis_queue import RedisRenderQueue, book_channel, library_channel, session_channel
 from app.redis.client import RedisClient
 from app.scheduler.intent import IntentController
 from app.scheduler.model import SchedulerStore
@@ -283,6 +283,7 @@ class Container:
         """Build a :class:`SchedulerService` bound to ``session`` (budget + spans)."""
         from app.db.repositories.budget import BudgetRepo
         from app.db.repositories.shot import SourceSpanRepo
+        from app.scheduler.events import RedisSessionEventPublisher
 
         return SchedulerService(
             queue=self.queue,
@@ -291,6 +292,7 @@ class Container:
             keyframes=self.keyframe_maintainer,
             store=self.scheduler_store,
             settings=self.settings,
+            events=RedisSessionEventPublisher(self.redis),
         )
 
     def build_intent_controller(self, session: AsyncSession) -> IntentController:
@@ -358,14 +360,24 @@ class Container:
         self, book_id: str, pdf_bytes: bytes, session_id: str | None
     ) -> None:
         from app.ingest.service import ingest_pdf
+        from app.queue.redis_queue import book_progress_key
 
         channel = session_channel(session_id) if session_id else book_channel(book_id)
+        owner_id: str | None = None
+        async with self.session_factory() as db:
+            from app.db.repositories.book import BookRepo
+
+            book = await BookRepo(db).get(book_id)
+            owner_id = book.user_id if book is not None else None
+        lib_channel = library_channel(owner_id) if owner_id else None
 
         async def progress(stage: str, pct: float) -> None:
-            await self.redis.publish(
-                channel,
-                {"event": "ingest_progress", "book_id": book_id, "stage": stage, "pct": pct},
-            )
+            snapshot = {"stage": stage, "pct": pct}
+            message = {"event": "ingest_progress", "book_id": book_id, **snapshot}
+            await self.redis.set_json(book_progress_key(book_id), snapshot)
+            await self.redis.publish(channel, message)
+            if lib_channel is not None:
+                await self.redis.publish(lib_channel, message)
 
         await ingest_pdf(
             book_id,

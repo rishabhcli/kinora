@@ -14,10 +14,10 @@ from starlette.requests import Request
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from app.api.routes.events import session_events
+from app.api.routes.events import library_events, session_events
 from app.composition import Container, build_container
 from app.main import create_app
-from app.queue.redis_queue import session_channel
+from app.queue.redis_queue import library_channel, session_channel
 from tests import conftest as cf
 from tests.conftest import (
     FakeCommentClassifier,
@@ -99,6 +99,63 @@ async def test_sse_forwards_published_event(
     payload = json.loads(found.split("data:", 1)[1].strip())
     assert payload["shot_id"] == "shot_x"
     assert payload["oss_url"] == "https://x/clip"
+
+
+async def test_library_sse_forwards_ingest_progress(
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
+) -> None:
+    """The shelf SSE stream forwards live ingest_progress on the library channel."""
+    from app.db.repositories.user import UserRepo
+
+    token = auth_headers["Authorization"].split(" ", 1)[1]
+    async with container.session_factory() as session:
+        user = await UserRepo(session).get_by_email("owner@example.com")
+    assert user is not None
+
+    fake_app = types.SimpleNamespace(state=types.SimpleNamespace(container=container))
+
+    async def receive() -> dict[str, object]:
+        await asyncio.get_event_loop().create_future()
+        return {"type": "http.disconnect"}
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/books/events",
+        "headers": [],
+        "query_string": f"token={token}".encode(),
+        "client": ("test", 1),
+        "server": ("test", 80),
+        "scheme": "http",
+        "app": fake_app,
+    }
+    request = Request(scope, receive)
+    response = await library_events(request, token=token)
+    body = cast("AsyncGenerator[bytes | str, None]", response.body_iterator)
+
+    connected = await asyncio.wait_for(body.__anext__(), timeout=5.0)
+    assert "connected" in _as_text(connected)
+
+    await container.redis.publish(
+        library_channel(user.id),
+        {"event": "ingest_progress", "book_id": "book_x", "stage": "analyse", "pct": 0.42},
+    )
+
+    found = ""
+    try:
+        for _ in range(10):
+            chunk = _as_text(await asyncio.wait_for(body.__anext__(), timeout=6.0))
+            if "event: ingest_progress" in chunk:
+                found = chunk
+                break
+    finally:
+        await body.aclose()
+
+    assert "event: ingest_progress" in found
+    payload = json.loads(found.split("data:", 1)[1].strip())
+    assert payload["book_id"] == "book_x"
+    assert payload["stage"] == "analyse"
+    assert payload["pct"] == 0.42
 
 
 def _ws_app() -> FastAPI:
