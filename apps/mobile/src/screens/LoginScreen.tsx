@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { api } from "../lib/api";
-import { authStore } from "../lib/auth";
+import { authStore, persistToken } from "../lib/auth";
 
 export function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -30,6 +30,7 @@ export function LoginScreen() {
       setBusy(false);
       return;
     }
+    persistToken(data.access_token);
     authStore.getState().setSession(data.access_token, me.data);
   }
 
