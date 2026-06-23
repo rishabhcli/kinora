@@ -29,11 +29,13 @@ export function BookCover({
   book,
   onOpen,
   onMetrics,
+  onImportFailed,
   highlighted = false,
 }: {
   book: BookResponse;
   onOpen: () => void;
   onMetrics?: () => void;
+  onImportFailed?: () => void;
   highlighted?: boolean;
 }) {
   const [popping, setPopping] = useState(false);
@@ -56,6 +58,10 @@ export function BookCover({
   const cover = data?.image_url ?? null;
 
   function select() {
+    if (failed) {
+      onImportFailed?.();
+      return;
+    }
     if (!ready) return;
     setPopping(true);
     window.setTimeout(() => {

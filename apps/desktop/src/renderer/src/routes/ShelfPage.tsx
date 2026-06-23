@@ -66,6 +66,7 @@ export default function ShelfPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   const [highlightBookId, setHighlightBookId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
@@ -197,6 +198,7 @@ export default function ShelfPage() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
+            title="Upload a PDF or EPUB"
             className="flex h-9 items-center gap-1.5 rounded-full bg-white/[0.14] px-3.5 text-sm font-medium text-white backdrop-blur-md transition hover:bg-white/25 active:scale-[0.97] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             {uploading ? (
@@ -262,6 +264,20 @@ export default function ShelfPage() {
         </div>
       )}
 
+      {importNotice && (
+        <div className="relative z-20 mx-10 mt-3 flex items-start justify-between gap-3 rounded-xl border border-amber-200/20 bg-amber-950/45 px-4 py-3 text-sm text-amber-50 backdrop-blur-md">
+          <p>{importNotice}</p>
+          <button
+            type="button"
+            onClick={() => setImportNotice(null)}
+            aria-label="Dismiss import notice"
+            className="shrink-0 rounded-full px-2 py-0.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {importingBooks.length > 0 && (
         <div className="relative z-20 mx-10 mt-3 rounded-xl border border-ember-glow/25 bg-ember/10 px-4 py-3 text-sm text-parchment backdrop-blur-md">
           <p className="font-medium text-white">
@@ -291,6 +307,12 @@ export default function ShelfPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(100%_55%_at_50%_-8%,rgba(224,134,58,0.16),transparent_58%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_100%_at_50%_60%,transparent_38%,rgba(8,5,3,0.6))]" />
         <div className="relative mx-auto max-w-5xl">
+          {!isLoading && !empty && (
+            <p className="relative z-10 mb-6 px-5 text-xs text-white/45">
+              {filtered.length} {filtered.length === 1 ? "book" : "books"}
+              {filtered.length > PER_SHELF ? " — scroll the shelves to see them all" : ""}
+            </p>
+          )}
           {/* Loading: a couple of shelves of shimmering placeholder spines so the
               library reads as filling in, not a blank wall. */}
           {isLoading &&
@@ -335,6 +357,7 @@ export default function ShelfPage() {
                   <p className="mt-1.5 text-sm text-white/60">
                     Add a PDF or EPUB and Kinora starts the film a few seconds ahead of your page.
                   </p>
+                  <p className="mt-1 text-xs text-white/45">Supported formats: PDF, EPUB</p>
                   <button
                     onClick={() => fileRef.current?.click()}
                     disabled={uploading}
@@ -363,6 +386,11 @@ export default function ShelfPage() {
                       highlighted={book.id === highlightBookId}
                       onOpen={() => openBook(book.id)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onImportFailed={() =>
+                        setImportNotice(
+                          `"${book.title}" could not be adapted. Try uploading it again — PDF or EPUB, under the page limit — or remove it from your library.`,
+                        )
+                      }
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (
