@@ -43,6 +43,33 @@ jobs:
         run: pytest -q
 
   # ---------------------------------------------------------------------------
+  # 0. Apps — the pnpm/Turborepo monorepo: typecheck the shared core + both
+  #    shells, run the core unit tests, and build the Electron renderer. Mobile
+  #    is typecheck-only here; device/simulator e2e runs elsewhere (EAS/Maestro).
+  # ---------------------------------------------------------------------------
+  apps:
+    name: Apps (core + desktop + mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck (core + desktop + mobile)
+        run: |
+          pnpm run typecheck
+          pnpm --filter @kinora/desktop run typecheck
+          pnpm --filter @kinora/mobile run typecheck
+      - name: Test (core)
+        run: pnpm --filter @kinora/core run test
+      - name: Build (desktop renderer + main)
+        run: pnpm --filter @kinora/desktop run build
+
+  # ---------------------------------------------------------------------------
   # 2. Backend integration — Postgres(+pgvector) + Redis + MinIO as service
   #    containers; alembic upgrade head; the FULL suite incl. DB/Redis/S3 tests
   #    and the load test. Live DashScope tests stay gated off (KINORA_LIVE_TESTS
