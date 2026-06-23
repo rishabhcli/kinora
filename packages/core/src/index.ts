@@ -32,5 +32,6 @@ export * from "./sync/ladderTelemetry";
 export * from "./sync/SyncEngine";
 export * from "./realtime/socket";
 export * from "./realtime/libraryStream";
+export * from "./library/importGate";
 export * from "./stores/authStore";
 export * from "./query/keys";

@@ -18,6 +18,7 @@ import {
   SearchField,
   Surface,
 } from "../components/ui";
+import { ImportGateSheet } from "../components/ImportGateSheet";
 import { useAuth } from "../hooks/useAuth";
 import { useShelfIngestSync, shelfHasImporting } from "../hooks/useShelfIngestSync";
 import { api } from "../lib/api";
@@ -56,6 +57,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [gateBook, setGateBook] = useState<BookResponse | null>(null);
 
   const isTablet = width >= TABLET_BREAKPOINT;
   const perRow = isTablet ? Math.min(5, Math.max(3, Math.floor((width - SCREEN_PADDING * 2) / 190))) : 2;
@@ -121,6 +123,15 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
 
   const empty = !isLoading && filtered.length === 0;
 
+  function openBook(id: string) {
+    const book = books?.find((b) => b.id === id);
+    if (book && book.status !== "ready") {
+      setGateBook(book);
+      return;
+    }
+    onOpen(id);
+  }
+
   return (
     <AmbientBackdrop>
       <View style={styles.header}>
@@ -172,7 +183,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     key={book.id}
                     book={book}
                     width={cardWidth}
-                    onPress={() => onOpen(book.id)}
+                    onPress={() => openBook(book.id)}
                   />
                 ))}
               </View>
@@ -190,6 +201,10 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
           signOut();
         }}
       />
+
+      {gateBook && (
+        <ImportGateSheet book={gateBook} visible onClose={() => setGateBook(null)} />
+      )}
     </AmbientBackdrop>
   );
 }
