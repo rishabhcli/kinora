@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, queryKeys, uploadBook } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,24 +8,13 @@ import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { useLibraryEvents } from "../hooks/useLibraryEvents";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
-
-async function uploadBook(file: File): Promise<boolean> {
-  const form = new FormData();
-  form.append("file", file);
-  const token = authStore.getState().token;
-  const response = await fetch(`${API_BASE_URL}/api/books`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: form,
-  });
-  return response.ok;
-}
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
 function Shelf() {
@@ -76,11 +65,16 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [highlightBookId, setHighlightBookId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
+
+  useLibraryEvents(Boolean(email));
 
   const { data: books, isLoading } = useQuery({
     queryKey: queryKeys.books(),
@@ -89,7 +83,13 @@ export default function ShelfPage() {
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    refetchInterval: (query) => {
+      const shelf = query.state.data;
+      return shelf?.some((book) => book.status === "importing") ? 5000 : false;
+    },
   });
+
+  const importingBooks = (books ?? []).filter((book) => book.status === "importing");
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -149,10 +149,21 @@ export default function ShelfPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(API_BASE_URL, authStore.getState().token, file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (!result.ok) {
+      setUploadError(result.message);
+      return;
+    }
+    setHighlightBookId(result.book.id);
+    window.setTimeout(() => setHighlightBookId(null), 8000);
+    queryClient.setQueryData<BookResponse[]>(queryKeys.books(), (prev) => {
+      const next = prev ? [result.book, ...prev.filter((b) => b.id !== result.book.id)] : [result.book];
+      return next;
+    });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
   }
 
   function signOut() {
@@ -187,6 +198,7 @@ export default function ShelfPage() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
+            title="Upload a PDF or EPUB"
             className="flex h-9 items-center gap-1.5 rounded-full bg-white/[0.14] px-3.5 text-sm font-medium text-white backdrop-blur-md transition hover:bg-white/25 active:scale-[0.97] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             {uploading ? (
@@ -238,6 +250,47 @@ export default function ShelfPage() {
         </div>
       </header>
 
+      {uploadError && (
+        <div className="relative z-20 mx-10 mt-3 flex items-start justify-between gap-3 rounded-xl border border-red-300/25 bg-red-950/55 px-4 py-3 text-sm text-red-100 backdrop-blur-md">
+          <p>{uploadError}</p>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            aria-label="Dismiss upload error"
+            className="shrink-0 rounded-full px-2 py-0.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {importNotice && (
+        <div className="relative z-20 mx-10 mt-3 flex items-start justify-between gap-3 rounded-xl border border-amber-200/20 bg-amber-950/45 px-4 py-3 text-sm text-amber-50 backdrop-blur-md">
+          <p>{importNotice}</p>
+          <button
+            type="button"
+            onClick={() => setImportNotice(null)}
+            aria-label="Dismiss import notice"
+            className="shrink-0 rounded-full px-2 py-0.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {importingBooks.length > 0 && (
+        <div className="relative z-20 mx-10 mt-3 rounded-xl border border-ember-glow/25 bg-ember/10 px-4 py-3 text-sm text-parchment backdrop-blur-md">
+          <p className="font-medium text-white">
+            {importingBooks.length === 1
+              ? `Adapting “${importingBooks[0]!.title}”…`
+              : `Adapting ${importingBooks.length} books…`}
+          </p>
+          <p className="mt-1 text-white/65">
+            Kinora is analysing pages and planning shots. Covers unlock when a book is ready to open.
+          </p>
+        </div>
+      )}
+
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">
         {/* Back wall: a warm walnut panel with a faint vertical grain. */}
@@ -254,6 +307,12 @@ export default function ShelfPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(100%_55%_at_50%_-8%,rgba(224,134,58,0.16),transparent_58%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_100%_at_50%_60%,transparent_38%,rgba(8,5,3,0.6))]" />
         <div className="relative mx-auto max-w-5xl">
+          {!isLoading && !empty && (
+            <p className="relative z-10 mb-6 px-5 text-xs text-white/45">
+              {filtered.length} {filtered.length === 1 ? "book" : "books"}
+              {filtered.length > PER_SHELF ? " — scroll the shelves to see them all" : ""}
+            </p>
+          )}
           {/* Loading: a couple of shelves of shimmering placeholder spines so the
               library reads as filling in, not a blank wall. */}
           {isLoading &&
@@ -298,6 +357,7 @@ export default function ShelfPage() {
                   <p className="mt-1.5 text-sm text-white/60">
                     Add a PDF or EPUB and Kinora starts the film a few seconds ahead of your page.
                   </p>
+                  <p className="mt-1 text-xs text-white/45">Supported formats: PDF, EPUB</p>
                   <button
                     onClick={() => fileRef.current?.click()}
                     disabled={uploading}
@@ -323,8 +383,14 @@ export default function ShelfPage() {
                     <BookCover
                       key={book.id}
                       book={book}
+                      highlighted={book.id === highlightBookId}
                       onOpen={() => openBook(book.id)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onImportFailed={() =>
+                        setImportNotice(
+                          `"${book.title}" could not be adapted. Try uploading it again — PDF or EPUB, under the page limit — or remove it from your library.`,
+                        )
+                      }
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (

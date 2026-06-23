@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { sceneWindow, toDirectorShots } from "../components/director/shots";
+import { IngestProgressView } from "../components/IngestProgressView";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { CanonEditorPanel } from "../components/reader/canon/CanonEditorPanel";
 import { AgentActivityFeed } from "../components/reader/AgentActivityFeed";
@@ -83,6 +84,19 @@ export default function WorkspacePage() {
   const [visiblePage, setVisiblePage] = useState(1);
   const [bookmarks, setBookmarks] = useState<Record<string, number>>(loadBookmarks);
 
+  const { data: book, isLoading: bookLoading } = useQuery({
+    queryKey: queryKeys.book(bookId ?? ""),
+    enabled: Boolean(bookId),
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/books/{book_id}", {
+        params: { path: { book_id: bookId as string } },
+      });
+      if (error || !data) throw new Error("failed to load book");
+      return data;
+    },
+    refetchInterval: (query) => (query.state.data?.status === "importing" ? 5000 : false),
+  });
+
   // ⌘/Ctrl+Shift+K toggles the canon editor (§5.4 power-user shortcut).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -96,7 +110,7 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
-    if (!bookId) return;
+    if (!bookId || book?.status !== "ready") return;
     let cancelled = false;
     void api
       .POST("/api/sessions", { body: { book_id: bookId, focus_word: 0, mode: "viewer" } })
@@ -106,7 +120,7 @@ export default function WorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [bookId]);
+  }, [bookId, book?.status]);
 
   const {
     engine,
@@ -136,18 +150,6 @@ export default function WorkspacePage() {
       return next;
     });
   }, []);
-
-  const { data: book } = useQuery({
-    queryKey: queryKeys.book(bookId ?? ""),
-    enabled: Boolean(bookId),
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/books/{book_id}", {
-        params: { path: { book_id: bookId as string } },
-      });
-      if (error || !data) throw new Error("failed to load book");
-      return data;
-    },
-  });
 
   const { data: shots } = useQuery({
     queryKey: queryKeys.shots(bookId ?? ""),
@@ -273,6 +275,10 @@ export default function WorkspacePage() {
   };
 
   if (!bookId) return null;
+
+  if (!bookLoading && book && book.status !== "ready") {
+    return <IngestProgressView book={book} onBack={() => navigate("/")} />;
+  }
 
   const bookmarked = bookmarks[bookId] === visiblePage;
 

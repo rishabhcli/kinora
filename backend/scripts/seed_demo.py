@@ -38,11 +38,24 @@ import sys
 import time
 from pathlib import Path
 
-# Default to the committed demo book (repo-root/assets/books/the_frog_king.pdf).
+# Default to the committed demo books (repo-root/assets/books/*.pdf).
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PDF = _REPO_ROOT / "assets" / "books" / "the_frog_king.pdf"
+RED_RIDING_HOOD_PDF = _REPO_ROOT / "assets" / "books" / "little_red_riding_hood.pdf"
 DEFAULT_TITLE = "The Frog-King"
+RED_RIDING_HOOD_TITLE = "Little Red Riding Hood"
 DEFAULT_ART = "painterly storybook"
+RED_RIDING_HOOD_ART = "woodcut fairy tale"
+
+DEMO_BOOKS: tuple[tuple[Path, str, str, str], ...] = (
+    (DEFAULT_PDF, DEFAULT_TITLE, "Brothers Grimm (public domain)", DEFAULT_ART),
+    (
+        RED_RIDING_HOOD_PDF,
+        RED_RIDING_HOOD_TITLE,
+        "Brothers Grimm (public domain)",
+        RED_RIDING_HOOD_ART,
+    ),
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -57,6 +70,7 @@ def seed_via_api(
     email: str,
     password: str,
     title: str,
+    author: str,
     art_direction: str,
     timeout_s: float,
 ) -> int:
@@ -80,7 +94,7 @@ def seed_via_api(
         files = {"file": (pdf_path.name, pdf_bytes, "application/pdf")}
         data = {
             "title": title,
-            "author": "Brothers Grimm (public domain)",
+            "author": author,
             "art_direction": art_direction,
         }
         up = http.post("/api/books", files=files, data=data, headers=headers)
@@ -202,6 +216,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf", type=Path, default=DEFAULT_PDF, help="demo PDF path")
     parser.add_argument("--title", default=DEFAULT_TITLE)
     parser.add_argument("--art-direction", default=DEFAULT_ART)
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="seed every bundled public-domain demo book in assets/books/",
+    )
     parser.add_argument("--email", default="demo@kinora.local")
     parser.add_argument("--password", default="demo-password-123")
     parser.add_argument(
@@ -209,25 +228,38 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    pdf_path = args.pdf if args.pdf.is_absolute() else (Path.cwd() / args.pdf)
-    if not pdf_path.exists():
-        print(f"demo PDF not found: {pdf_path}", file=sys.stderr)
-        print("build it first: python assets/books/build_demo_pdf.py", file=sys.stderr)
+    if args.via == "direct" and args.all:
+        print("--all is only supported with --via api", file=sys.stderr)
         return 1
 
-    if args.via == "api":
-        return seed_via_api(
-            api_url=args.api_url,
-            pdf_path=pdf_path,
-            email=args.email,
-            password=args.password,
-            title=args.title,
-            art_direction=args.art_direction,
-            timeout_s=args.timeout,
-        )
-    return asyncio.run(
-        _seed_direct(pdf_path=pdf_path, title=args.title, art_direction=args.art_direction)
-    )
+    books = DEMO_BOOKS if args.all else ((args.pdf, args.title, "Brothers Grimm (public domain)", args.art_direction),)
+
+    for pdf_path, title, author, art_direction in books:
+        resolved = pdf_path if pdf_path.is_absolute() else (Path.cwd() / pdf_path)
+        if not resolved.exists():
+            print(f"demo PDF not found: {resolved}", file=sys.stderr)
+            print("build it first: make demo-pdf", file=sys.stderr)
+            return 1
+
+        if args.via == "api":
+            code = seed_via_api(
+                api_url=args.api_url,
+                pdf_path=resolved,
+                email=args.email,
+                password=args.password,
+                title=title,
+                author=author,
+                art_direction=art_direction,
+                timeout_s=args.timeout,
+            )
+        else:
+            code = asyncio.run(
+                _seed_direct(pdf_path=resolved, title=title, art_direction=art_direction)
+            )
+        if code != 0:
+            return code
+
+    return 0
 
 
 if __name__ == "__main__":

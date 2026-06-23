@@ -109,7 +109,20 @@ export default function LoginPage() {
                 setEmail(DEMO.email);
                 setPassword(DEMO.password);
                 setMode("login");
-                void run(DEMO.email, DEMO.password);
+                setBusy(true);
+                setError(null);
+                authStore.getState().setAuthenticating();
+                void loginAndLoadUser(DEMO.email, DEMO.password).then((message) => {
+                  if (message) {
+                    setError(
+                      `${message} Run make seed-demo after make stack-up to load the demo library, or sign in with your own account.`,
+                    );
+                    authStore.getState().setAnonymous();
+                    setBusy(false);
+                  } else {
+                    navigate("/");
+                  }
+                });
               }}
               className="rounded-lg px-2 py-1 text-white/75 transition hover:text-white"
             >
