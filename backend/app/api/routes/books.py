@@ -378,6 +378,29 @@ async def get_book(book_id: str, container: ContainerDep, user: CurrentUser) -> 
     return await _book_response(container, book)
 
 
+@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(
+    book_id: str,
+    container: ContainerDep,
+    user: CurrentUser,
+    _rl: Annotated[None, Depends(write_rate_limit)],
+) -> None:
+    """Remove a book from the user's shelf (failed imports, duplicates, etc.).
+
+    Cascades to pages, scenes, shots, and sessions. Object-store blobs are
+    removed best-effort when the source key is known.
+    """
+    book = await _assert_owner(container, user, book_id)
+    if book.source_pdf_key:
+        with anyio.move_on_after(5):
+            await anyio.to_thread.run_sync(container.object_store.delete, book.source_pdf_key)
+    async with container.session_factory() as session:
+        await BookRepo(session).delete(book_id)
+        await session.commit()
+    await container.redis.delete(book_progress_key(book_id))
+    logger.info("books.deleted", book_id=book_id, user_id=user.id)
+
+
 @router.get("/{book_id}/pages/{page_number}", response_model=PageResponse)
 async def get_page(
     book_id: str, page_number: int, container: ContainerDep, user: CurrentUser

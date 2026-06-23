@@ -11,6 +11,13 @@ function colorFor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
+/** Percent complete [0,100] from the backend progress field (0..1). */
+function progressPct(book: BookResponse): number {
+  const raw = book.progress;
+  if (raw == null || Number.isNaN(raw)) return 0;
+  return Math.round(Math.min(1, Math.max(0, raw)) * 100);
+}
+
 /** A short, human label for a book that isn't ready yet — the import stage in
  *  sentence case, or a clean fallback. */
 function stageLabel(book: BookResponse): string {
@@ -29,10 +36,12 @@ export function BookCover({
   book,
   onOpen,
   onMetrics,
+  onRemove,
 }: {
   book: BookResponse;
   onOpen: () => void;
   onMetrics?: () => void;
+  onRemove?: () => void;
 }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
@@ -51,8 +60,10 @@ export function BookCover({
     },
   });
   const cover = data?.image_url ?? null;
+  const pct = progressPct(book);
 
   function select() {
+    if (!ready) return;
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -107,10 +118,20 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
+              {working && pct > 0 && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-10 px-3">
+                  <div className="h-1 overflow-hidden rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-ember-glow to-ember transition-[width] duration-500 ease-out"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {working && pct > 0 ? `${stageLabel(book)} · ${pct}%` : stageLabel(book)}
                 </span>
               </div>
             </>
@@ -122,9 +143,13 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          disabled={!ready}
+          title={ready ? book.title : `${book.title} — ${stageLabel(book)}`}
+          aria-label={ready ? `Open ${book.title}` : `${book.title} is still importing`}
+          aria-disabled={!ready}
+          className={`absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep ${
+            ready ? "" : "cursor-not-allowed"
+          }`}
         />
         {ready && onMetrics && (
           <button
@@ -139,6 +164,22 @@ export function BookCover({
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 21V10M12 21V4M19 21v-7" />
+            </svg>
+          </button>
+        )}
+        {failed && onRemove && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            title="Remove from shelf"
+            aria-label={`Remove ${book.title} from shelf`}
+            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-red-950/75 text-red-100 opacity-100 backdrop-blur-md transition hover:bg-red-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/80"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
         )}
