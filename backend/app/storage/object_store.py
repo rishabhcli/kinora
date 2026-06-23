@@ -44,8 +44,28 @@ class Keys:
 
     @staticmethod
     def pdf(book_id: str) -> str:
-        """The uploaded source PDF."""
+        """The source document, normalised to PDF (the §9.1 extraction input).
+
+        For a PDF upload this is the uploaded file verbatim; for an EPUB it is the
+        PyMuPDF EPUB→PDF normalisation. Either way ``books.source_pdf_key`` always
+        points at a real PDF, so the resumable re-ingest path is format-agnostic.
+        """
         return f"pdfs/{book_id}.pdf"
+
+    @staticmethod
+    def epub(book_id: str) -> str:
+        """The original uploaded EPUB, kept for provenance (the PDF is derived)."""
+        return f"epubs/{book_id}.epub"
+
+    @staticmethod
+    def cover(book_id: str) -> str:
+        """A publisher-supplied cover image (EPUB) used to seed the book cover.
+
+        Written at upload when an EPUB declares a cover; the §9.1 extract step then
+        uses it as page 1's image so the existing cover mechanism (page-1 image)
+        serves it. Absent this key, page 1 is the rendered first page.
+        """
+        return f"covers/{book_id}"
 
     @staticmethod
     def page_image(book_id: str, page_number: int) -> str:

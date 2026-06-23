@@ -10,8 +10,11 @@ aggregate with their high-level methods monkeypatched (the suite-wide pattern).
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import io
 import os
+import zipfile
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
@@ -120,6 +123,92 @@ def build_test_pdf(
         return data
     finally:
         doc.close()
+
+
+#: A real 1x1 PNG (the smallest valid PNG) used as an EPUB cover in tests.
+TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+
+def build_test_epub(
+    chapters: list[str],
+    *,
+    title: str = "The Fox and the Owl",
+    author: str = "A. Author",
+    cover_png: bytes | None = TINY_PNG,
+    epub3_cover: bool = True,
+) -> bytes:
+    """Build a minimal, valid EPUB (a ZIP container) with text + an optional cover.
+
+    Mirrors :func:`build_test_pdf`: no network, no on-disk fixture — the bytes are
+    assembled in memory. Each chapter becomes one XHTML document in the spine.
+    ``epub3_cover`` selects the EPUB 3 ``properties="cover-image"`` form; set it
+    ``False`` to emit the EPUB 2 ``<meta name="cover">`` pointer instead.
+    """
+    manifest_items: list[str] = []
+    spine_items: list[str] = []
+    meta_cover = ""
+    chapter_files: dict[str, str] = {}
+
+    if cover_png is not None:
+        if epub3_cover:
+            manifest_items.append(
+                '<item id="cover-img" href="cover.png" media-type="image/png" '
+                'properties="cover-image"/>'
+            )
+        else:
+            manifest_items.append(
+                '<item id="cover-img" href="cover.png" media-type="image/png"/>'
+            )
+            meta_cover = '<meta name="cover" content="cover-img"/>'
+
+    for index, body in enumerate(chapters, start=1):
+        href = f"chap{index}.xhtml"
+        item_id = f"chap{index}"
+        manifest_items.append(
+            f'<item id="{item_id}" href="{href}" media-type="application/xhtml+xml"/>'
+        )
+        spine_items.append(f'<itemref idref="{item_id}"/>')
+        chapter_files[f"OEBPS/{href}"] = (
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<html xmlns="http://www.w3.org/1999/xhtml"><head>'
+            f"<title>Chapter {index}</title></head><body>"
+            f"<h1>Chapter {index}</h1><p>{body}</p></body></html>"
+        )
+
+    opf = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
+        'unique-identifier="bookid">'
+        '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        '<dc:identifier id="bookid">urn:uuid:kinora-test</dc:identifier>'
+        f"<dc:title>{title}</dc:title><dc:creator>{author}</dc:creator>"
+        f"<dc:language>en</dc:language>{meta_cover}</metadata>"
+        f'<manifest>{"".join(manifest_items)}</manifest>'
+        f'<spine>{"".join(spine_items)}</spine></package>'
+    )
+    container = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<container version="1.0" '
+        'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+        '<rootfile full-path="OEBPS/content.opf" '
+        'media-type="application/oebps-package+xml"/></rootfiles></container>'
+    )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # The mimetype entry must be first and stored (uncompressed) per the OCF spec.
+        zf.writestr(
+            zipfile.ZipInfo("mimetype"), "application/epub+zip", zipfile.ZIP_STORED
+        )
+        zf.writestr("META-INF/container.xml", container)
+        zf.writestr("OEBPS/content.opf", opf)
+        if cover_png is not None:
+            zf.writestr("OEBPS/cover.png", cover_png)
+        for path, html in chapter_files.items():
+            zf.writestr(path, html)
+    return buf.getvalue()
 
 
 def make_providers() -> Providers:

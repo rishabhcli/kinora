@@ -170,6 +170,7 @@ async def extract_pdf(
     pdf_bytes: bytes,
     blob_store: BlobStore,
     dpi: int = DEFAULT_DPI,
+    cover_image: tuple[bytes, str] | None = None,
 ) -> PdfExtractResult:
     """Extract, render, upload, and persist every page of a PDF.
 
@@ -180,9 +181,15 @@ async def extract_pdf(
     Args:
         session_pages: a :class:`PageRepo` bound to the active unit-of-work.
         book_id: the book these pages belong to.
-        pdf_bytes: the raw uploaded PDF.
+        pdf_bytes: the raw uploaded PDF (for an EPUB upload, the PyMuPDF
+            EPUB→PDF normalisation — see :mod:`app.ingest.epub_extract`).
         blob_store: object store the page PNGs are uploaded to.
         dpi: render resolution for the page PNGs.
+        cover_image: optional ``(bytes, content_type)`` for a publisher-supplied
+            cover (an EPUB's declared cover image). When present it is stored as
+            **page 1's image** in place of the rendered first page, so the cover
+            mechanism (page-1 image) serves the real cover. PDF uploads pass
+            ``None`` and are entirely unaffected — page 1 is the rendered page.
 
     Returns:
         The structured per-page result (incl. the global word ranges).
@@ -203,10 +210,17 @@ async def extract_pdf(
                 dpi=dpi,
                 word_offset=word_offset,
             )
-            # Upload the rendered page off the event loop (boto3 is blocking).
-            await anyio.to_thread.run_sync(
-                blob_store.put_bytes, extract.image_key, png, _PNG_CONTENT_TYPE
-            )
+            # Page 1's image is the supplied cover when one was provided (EPUB);
+            # otherwise the rendered page. Upload off the event loop (boto3 blocks).
+            if page_number == 1 and cover_image is not None:
+                cover_bytes, cover_type = cover_image
+                await anyio.to_thread.run_sync(
+                    blob_store.put_bytes, extract.image_key, cover_bytes, cover_type
+                )
+            else:
+                await anyio.to_thread.run_sync(
+                    blob_store.put_bytes, extract.image_key, png, _PNG_CONTENT_TYPE
+                )
             if page_number not in existing:
                 await session_pages.create(
                     book_id=book_id,

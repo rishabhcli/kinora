@@ -106,6 +106,9 @@ class _Context:
     options: IngestOptions
     progress: ProgressCallback | None = None
     art_direction: str | None = None
+    #: Optional publisher-supplied cover ``(bytes, content_type)`` (EPUB) used as
+    #: page 1's image; ``None`` for PDFs (page 1 is the rendered first page).
+    cover_image: tuple[bytes, str] | None = None
     _adapter: Adapter | None = field(default=None, repr=False)
 
     @property
@@ -135,18 +138,23 @@ async def ingest_pdf(
     session_factory: SessionFactory = get_session,
     progress: ProgressCallback | None = None,
     options: IngestOptions | None = None,
+    cover_image: tuple[bytes, str] | None = None,
 ) -> IngestResult:
     """Ingest ``pdf_bytes`` for ``book_id`` end-to-end (Phase A).
 
     Args:
         book_id: an existing book row (created at upload time).
-        pdf_bytes: the raw PDF.
+        pdf_bytes: the raw PDF — for an EPUB upload, the PyMuPDF EPUB→PDF
+            normalisation (:mod:`app.ingest.epub_extract`), so PDF and EPUB share
+            this one pipeline.
         providers: live provider bundle (VL, image, embeddings).
         blob_store: object store; defaults to :meth:`ObjectStore.from_settings`.
         settings: app settings (defaults to the process settings).
         session_factory: unit-of-work factory (overridden in tests).
         progress: optional async ``(stage, pct)`` milestone callback.
         options: tuning knobs.
+        cover_image: optional ``(bytes, content_type)`` for a publisher-supplied
+            cover (an EPUB's declared cover image), used as page 1's image.
 
     Returns:
         A compact :class:`IngestResult`.
@@ -165,6 +173,7 @@ async def ingest_pdf(
         session_factory=session_factory,
         options=options,
         progress=progress,
+        cover_image=cover_image,
     )
 
     await _emit(ctx, "importing", 0.0)
@@ -238,6 +247,7 @@ async def _run_pipeline(ctx: _Context, pdf_bytes: bytes) -> IngestResult:
             pdf_bytes=pdf_bytes,
             blob_store=ctx.store,
             dpi=opts.dpi,
+            cover_image=ctx.cover_image,
         )
         await BookRepo(session).set_num_pages(ctx.book_id, extract.num_pages)
     await _emit(ctx, "extract", 0.2)

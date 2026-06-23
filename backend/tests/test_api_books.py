@@ -18,12 +18,22 @@ from app.db.repositories.book import BookRepo, PageRepo
 from app.db.repositories.shot import ShotRepo
 from app.memory.canon_service import CanonService
 from tests.conftest import FakeIngestRunner, register_login, tiny_pdf
+from tests.test_ingest_support import TINY_PNG, build_test_epub
 
 
 def _files(
     data: bytes, *, name: str = "tale.pdf", content_type: str = "application/pdf"
 ) -> dict[str, tuple[str, bytes, str]]:
     return {"file": (name, data, content_type)}
+
+
+def _tiny_epub() -> bytes:
+    """A minimal valid EPUB (title + author + cover) for upload tests."""
+    return build_test_epub(
+        ["The fox runs through the forest at dawn. " + ("word " * 30)],
+        title="An EPUB Tale",
+        author="E. Pub",
+    )
 
 
 async def _poll_status(client: AsyncClient, headers: dict[str, str], book_id: str) -> str:
@@ -76,7 +86,77 @@ async def test_upload_rejects_non_pdf(
         "/api/books", headers=auth_headers, files=_files(b"not really a pdf at all")
     )
     assert bad_magic.status_code == 400
-    assert bad_magic.json()["error"]["type"] == "invalid_pdf"
+    # Neither a PDF nor an EPUB by content magic.
+    assert bad_magic.json()["error"]["type"] == "unsupported_file"
+
+
+async def test_upload_accepts_epub_and_triggers_ingest(
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
+) -> None:
+    """An EPUB upload is accepted, normalised, and ingested like a PDF (§5.1)."""
+    resp = await api_client.post(
+        "/api/books",
+        headers=auth_headers,
+        files=_files(_tiny_epub(), name="tale.epub", content_type="application/epub+zip"),
+    )
+    assert resp.status_code == 201, resp.text
+    book = resp.json()
+    # Title/author fall back to the EPUB's own metadata when not supplied.
+    assert book["title"] == "An EPUB Tale"
+    assert book["author"] == "E. Pub"
+    book_id = book["id"]
+
+    runner = container.ingest_runner
+    assert isinstance(runner, FakeIngestRunner)
+    status = await _poll_status(api_client, auth_headers, book_id)
+    assert status == "ready"
+    assert runner.calls == [book_id]
+
+    # The normalised PDF + the original EPUB + the declared cover were all stored.
+    store = container.object_store
+    from app.storage.object_store import keys
+
+    assert store.exists(keys.pdf(book_id))
+    assert store.get_bytes(keys.pdf(book_id))[:5] == b"%PDF-"
+    assert store.exists(keys.epub(book_id))
+    assert store.exists(keys.cover(book_id))
+    assert store.get_bytes(keys.cover(book_id)) == TINY_PNG
+
+
+async def test_upload_epub_explicit_title_overrides_metadata(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    """A caller-supplied title/author wins over the EPUB's embedded metadata."""
+    resp = await api_client.post(
+        "/api/books",
+        headers=auth_headers,
+        files=_files(_tiny_epub(), name="tale.epub", content_type="application/epub+zip"),
+        data={"title": "My Override", "author": "Me"},
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["title"] == "My Override"
+    assert body["author"] == "Me"
+
+
+async def test_upload_rejects_corrupt_epub(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    """A file that sniffs as an EPUB but is unreadable is rejected (not 500)."""
+    import io
+    import zipfile
+
+    # A ZIP with the EPUB mimetype but no OPF/container — passes magic, fails parse.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(zipfile.ZipInfo("mimetype"), "application/epub+zip", zipfile.ZIP_STORED)
+    resp = await api_client.post(
+        "/api/books",
+        headers=auth_headers,
+        files=_files(buf.getvalue(), name="broken.epub", content_type="application/epub+zip"),
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["type"] == "invalid_epub"
 
 
 async def test_upload_rejects_oversize(

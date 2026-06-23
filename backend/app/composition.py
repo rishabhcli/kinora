@@ -359,8 +359,11 @@ class Container:
     async def _default_run_ingest(
         self, book_id: str, pdf_bytes: bytes, session_id: str | None
     ) -> None:
+        import anyio
+
         from app.ingest.service import ingest_pdf
         from app.queue.redis_queue import book_progress_key
+        from app.storage.object_store import keys
 
         channel = session_channel(session_id) if session_id else book_channel(book_id)
         owner_id: str | None = None
@@ -379,6 +382,16 @@ class Container:
             if lib_channel is not None:
                 await self.redis.publish(lib_channel, message)
 
+        # A publisher-supplied cover (written at upload for an EPUB that declares
+        # one) becomes page 1's image; absent it, page 1 is the rendered page.
+        cover_image: tuple[bytes, str] | None = None
+        cover_key = keys.cover(book_id)
+        if await anyio.to_thread.run_sync(self.object_store.exists, cover_key):
+            from app.ingest.epub_extract import sniff_image_content_type
+
+            cover_bytes = await anyio.to_thread.run_sync(self.object_store.get_bytes, cover_key)
+            cover_image = (cover_bytes, sniff_image_content_type(cover_bytes))
+
         await ingest_pdf(
             book_id,
             pdf_bytes,
@@ -387,6 +400,7 @@ class Container:
             settings=self.settings,
             session_factory=self.session_factory,
             progress=progress,
+            cover_image=cover_image,
         )
 
     # -- targeted regen enqueue (Director comment / canon edit) -------------- #
