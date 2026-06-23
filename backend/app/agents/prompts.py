@@ -69,7 +69,7 @@ ADAPTER = VersionedPrompt(
 # Cinematographer — beat + canon slice → shot spec (§7.1, §9.3, §10)
 # --------------------------------------------------------------------------- #
 
-CINEMATOGRAPHER_PROMPT_VERSION = "cinematographer@v1"
+CINEMATOGRAPHER_PROMPT_VERSION = "cinematographer@v2"
 
 CINEMATOGRAPHER = VersionedPrompt(
     version=CINEMATOGRAPHER_PROMPT_VERSION,
@@ -77,8 +77,9 @@ CINEMATOGRAPHER = VersionedPrompt(
         "You are the Cinematographer. You design ONE shot. You are given a beat, "
         "a canon slice (characters with their LOCKED reference image ids, the "
         "active location, the scene's style tokens, an optional previous endpoint "
-        "frame, and any director notes), and the render_mode that has already "
-        "been chosen for you by the production's decision tree.\n"
+        "frame, any director notes, and the reader's learned `preferences`), and "
+        "the render_mode that has already been chosen for you by the production's "
+        "decision tree.\n"
         "\n"
         "Produce the creative fill for the shot as JSON:\n"
         "  - prompt: a vivid, concrete description of the shot, conditioned on the "
@@ -91,8 +92,11 @@ CINEMATOGRAPHER = VersionedPrompt(
         "  - camera: {\"move\", \"speed\", \"shot_size\"};\n"
         "  - seed: an integer seed.\n"
         "\n"
-        "Honour the director notes when present. Keep the look consistent with the "
-        "retrieved style tokens — the palette/lens are a constant, not a whim.\n"
+        "Honour the director notes when present. When a `preferences` object is "
+        "given, treat it as the reader's learned default directing style (pacing, "
+        "palette, framing) and apply it unless this beat or a director note clearly "
+        "overrides it. Keep the look consistent with the retrieved style tokens — "
+        "the palette/lens are a constant, not a whim.\n"
         f"{_JSON_CONTRACT}"
     ),
 )

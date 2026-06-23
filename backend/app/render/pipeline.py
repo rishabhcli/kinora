@@ -52,6 +52,8 @@ from app.core.logging import get_logger
 from app.db.models.enums import ShotStatus
 from app.memory.budget_service import BudgetExceeded, Reservation
 from app.memory.interfaces import BlobStore, CanonSlice, Embedder
+from app.memory.prefs_service import PreferencePriors
+from app.memory.prefs_signals import grade_for
 from app.observability import metrics
 from app.providers.errors import LiveVideoDisabled, ProviderError
 from app.providers.types import TtsResult
@@ -60,8 +62,11 @@ from app.render.degrade import (
     DegradeRung,
     FfmpegError,
     audio_text_card,
+    duration_for_pacing,
     extract_frames,
+    grade_filter,
     ken_burns_over_image,
+    zoom_for_camera,
 )
 from app.render.states import RenderState, ShotStateMachine
 from app.render.sync_map import build_sync_segment
@@ -266,7 +271,38 @@ class ShotDesigner(Protocol):
         *,
         shot_id: str | None = None,
         target_duration_s: float = 5.0,
+        priors: PreferencePriors | None = None,
     ) -> AgentShotSpec: ...
+
+
+class PrefsReader(Protocol):
+    """The ``PrefsService`` read seam — the reader's learned directing priors (§8.6)."""
+
+    async def get(
+        self, *, user_id: str | None = None, book_id: str | None = None
+    ) -> PreferencePriors: ...
+
+
+class _BlendingPrefsReader:
+    """Production :class:`PrefsReader`: returns the *effective* style for a book —
+    the reader's cross-book global taste blended under the book's own learned axes
+    (§8.6) — by resolving the book owner on demand. So a brand-new book is already
+    directed in the reader's taste, then specialises as they direct it."""
+
+    def __init__(self, prefs: Any, books: Any) -> None:
+        self._prefs = prefs
+        self._books = books
+
+    async def get(
+        self, *, user_id: str | None = None, book_id: str | None = None
+    ) -> PreferencePriors:
+        owner = user_id
+        if owner is None and book_id is not None:
+            book = await self._books.get(book_id)
+            owner = getattr(book, "user_id", None) if book is not None else None
+        if owner is not None and book_id is not None:
+            return await self._prefs.get_effective(user_id=owner, book_id=book_id)
+        return await self._prefs.get(user_id=owner, book_id=book_id)
 
 
 class ClipGenerator(Protocol):
@@ -353,6 +389,10 @@ class RenderResult(BaseModel):
     video_seconds: float = 0.0
     cache_hit: bool = False
     conflict: ConflictObject | None = None
+    #: The Showrunner's autonomous §7.2 decision when a conflict was auto-resolved
+    #: (honour/evolve) rather than surfaced — so the feed can show the decision
+    #: record even when the reader wasn't asked.
+    decision: dict[str, Any] | None = None
     attempts: int = 0
 
 
@@ -399,8 +439,12 @@ class _RenderCtx:
     shot_hash: str
     voice_id: str
     machine: ShotStateMachine
+    priors: PreferencePriors | None = None
     spent_video_seconds: float = 0.0
     attempts: int = 0
+    #: The Showrunner's decision when a conflict was auto-resolved (honour/evolve),
+    #: carried onto the final RenderResult so the feed shows it (§7.2).
+    pending_decision: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -434,6 +478,7 @@ class RenderPipeline:
         conflict_resolver: ConflictResolving | None = None,
         image_gen: ImageGen | None = None,
         embedder: Embedder | None = None,
+        prefs: PrefsReader | None = None,
         settings: Settings | None = None,
         default_voice: str = "Cherry",
         url_ttl: int = 3600,
@@ -453,6 +498,8 @@ class RenderPipeline:
         self._narrator = narrator
         self._conflict = conflict_resolver
         self._image_gen = image_gen
+        # The reader's learned directing priors (§8.6); None => no personalization.
+        self._prefs = prefs
         # Embeds the scene Style node's locked reference into the §9.5 style
         # centroid the Critic measures drift against (None => style gate inert).
         self._embedder = embedder
@@ -535,8 +582,14 @@ class RenderPipeline:
         target_duration = float(shot.duration_s or 5.0)
 
         await machine.transition(RenderState.CACHE_CHECK)
+        priors = await self._prefs.get(book_id=book_id) if self._prefs is not None else None
         spec = await self._designer.design_shot(
-            agent_beat, canon_slice, notes, shot_id=shot_id, target_duration_s=target_duration
+            agent_beat,
+            canon_slice,
+            notes,
+            shot_id=shot_id,
+            target_duration_s=target_duration,
+            priors=priors,
         )
         canon_version = self._canon_version(canon_slice)
         ref_hash = self._cache.reference_set_hash(spec.reference_image_ids)
@@ -567,6 +620,7 @@ class RenderPipeline:
             shot_hash=shot_hash,
             voice_id=self._voice_id(canon_slice),
             machine=machine,
+            priors=priors,
         )
 
         # Post-design cache probe (the full content hash is now known).
@@ -739,6 +793,17 @@ class RenderPipeline:
             return _ConflictOutcome(terminal=await self._accept(ctx, spec, output, qa))
 
         # honor_canon / evolve_canon → regenerate with the directive folded in.
+        # Record the Showrunner's autonomous decision so the feed shows it even
+        # though the reader was never asked (§7.2 crew transparency).
+        if resolution.decision is not None:
+            ctx.pending_decision = {
+                "conflict_id": resolution.decision.conflict_id,
+                "chosen_option": resolution.decision.chosen_option.value,
+                "reasoning": resolution.decision.reasoning,
+                "evolved_canon": resolution.decision.evolved_canon,
+                "claim": resolution.conflict.claim if resolution.conflict else None,
+                "canon_fact": resolution.conflict.canon_fact if resolution.conflict else None,
+            }
         next_notes = [
             *ctx.notes,
             DirectorNote(shot_id=ctx.shot_id, note=resolution.regen_directive),
@@ -756,6 +821,7 @@ class RenderPipeline:
             notes,
             shot_id=ctx.shot_id,
             target_duration_s=ctx.target_duration,
+            priors=ctx.priors,
         )
         return spec.model_copy(update={"seed": _rotate_seed(prev_seed)})
 
@@ -863,6 +929,7 @@ class RenderPipeline:
             sync_segment=segment.model_dump(mode="json"),
             qa=qa_dict,
             video_seconds=duration,
+            decision=ctx.pending_decision,
             attempts=ctx.attempts,
         )
 
@@ -892,16 +959,28 @@ class RenderPipeline:
         audio_dur = float(tts.duration_s or 0.0) if tts is not None else 0.0
         word_timestamps = list(tts.word_timestamps) if tts is not None else []
         alignment = tts.alignment if tts is not None else None
-        clip_dur = (
-            max(ctx.target_duration, math.ceil(audio_dur)) if audio_dur > 0 else ctx.target_duration
-        )
+        # A learned "slower" pacing prior also lets the shot linger (§8.6); never
+        # shorter than the narration so the audio still fits.
+        dwell = duration_for_pacing(ctx.target_duration, spec.camera)
+        clip_dur = max(dwell, math.ceil(audio_dur)) if audio_dur > 0 else dwell
         clip_dur = max(clip_dur, 1.0)
 
         still, rung = await self._select_keyframe(ctx, spec)
         last_frame_bytes: bytes | None = None
         if still is not None:
+            # The learned camera prior (§8.6) drives the Ken-Burns push, and the
+            # learned palette/lighting bakes in a colour/brightness grade — so a
+            # "slower / wider / warmer / darker" taste is visible even on the
+            # off-gate degrade lane (no live Wan motion).
+            zoom_max = zoom_for_camera(spec.camera)
+            applied_grade = grade_for(ctx.priors)
+            grade = grade_filter(
+                palette=applied_grade.get("palette"), lighting=applied_grade.get("lighting")
+            )
             clip_bytes = await anyio.to_thread.run_sync(
-                lambda: ken_burns_over_image(still, clip_dur, audio_bytes=audio_bytes)
+                lambda: ken_burns_over_image(
+                    still, clip_dur, audio_bytes=audio_bytes, zoom_max=zoom_max, grade=grade
+                )
             )
             last_frame_bytes = still
         else:
@@ -979,6 +1058,7 @@ class RenderPipeline:
             sync_segment=segment.model_dump(mode="json"),
             qa=qa_dict,
             video_seconds=spent,
+            decision=ctx.pending_decision,
             attempts=ctx.attempts,
         )
 
@@ -1227,14 +1307,16 @@ def build_render_pipeline(
     from app.agents.generator import Generator
     from app.agents.showrunner import Showrunner
     from app.db.repositories.beat import BeatRepo
-    from app.db.repositories.book import PageRepo
+    from app.db.repositories.book import BookRepo, PageRepo
     from app.db.repositories.budget import BudgetRepo
     from app.db.repositories.defect import DefectRepo
+    from app.db.repositories.pref import PrefsRepo
     from app.db.repositories.shot import ShotCacheRepo, ShotRepo
     from app.memory.budget_service import BudgetLimits, BudgetService
     from app.memory.cache_service import CacheService
     from app.memory.canon_service import CanonService
     from app.memory.episodic_service import EpisodicService
+    from app.memory.prefs_service import PrefsService
     from app.render.conflict import ConflictResolver
 
     shots = ShotRepo(session)
@@ -1267,6 +1349,7 @@ def build_render_pipeline(
         conflict_resolver=resolver,
         image_gen=providers.image,
         embedder=embedder,
+        prefs=_BlendingPrefsReader(PrefsService(prefs=PrefsRepo(session)), BookRepo(session)),
         settings=settings,
         default_voice=default_voice,
         url_ttl=url_ttl,

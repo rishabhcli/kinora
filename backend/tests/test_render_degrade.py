@@ -27,6 +27,17 @@ def test_ken_burns_video_only_is_a_real_mp4() -> None:
     assert degrade.verify_playable(clip) is True
 
 
+def test_ken_burns_with_learned_grade_is_a_real_mp4() -> None:
+    """A learned palette/lighting grade bakes into a still-playable clip (§8.6)."""
+    grade = degrade.grade_filter(palette="warm", lighting="dark")
+    assert grade is not None
+    clip = degrade.ken_burns_over_image(png_bytes(1280, 720), 3.0, grade=grade)
+    info = degrade.probe(clip)
+    assert info.has_video is True
+    assert info.video_codec == "h264"
+    assert degrade.verify_playable(clip) is True
+
+
 def test_ken_burns_with_audio_muxes_a_real_audio_stream() -> None:
     clip = degrade.ken_burns_over_image(png_bytes(1280, 720), 2.0, audio_bytes=wav_bytes(2.0))
     info = degrade.probe(clip)

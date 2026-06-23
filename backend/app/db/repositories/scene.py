@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from typing import Any, cast
+
+from sqlalchemy import CursorResult, delete, select
 
 from app.db.base import new_id
 from app.db.models.scene import Scene
@@ -11,6 +13,22 @@ from app.db.repositories.base import BaseRepository
 
 class SceneRepo(BaseRepository):
     """Create and query scenes; resolve the style node governing a scene."""
+
+    async def delete_for_book(self, book_id: str) -> int:
+        """Delete a book's scenes (cascading its beats); returns rows removed.
+
+        The §9.1 shot-plan step is re-runnable: a re-ingest (e.g. resuming a book
+        that previously failed mid-pipeline, after a DashScope throttle) clears the
+        prior plan first so re-inserting the same book-scoped ids does not violate
+        ``pk_scenes``. ``beats.scene_id`` is ``ON DELETE CASCADE``, so deleting a
+        book's scenes drops its beats too; shots are cleared by ``ShotRepo``.
+        """
+        result = cast(
+            "CursorResult[Any]",
+            await self.session.execute(delete(Scene).where(Scene.book_id == book_id)),
+        )
+        await self.session.flush()
+        return int(result.rowcount or 0)
 
     async def create(
         self,

@@ -95,19 +95,38 @@ async def test_worker_success_publishes_clip_ready(
     assert job is not None
 
     channel = session_channel(session_id)
+    messages = []
     async with redis_client.subscribe(channel) as pubsub:
         await asyncio.sleep(0.1)  # let the subscription register
         await worker.process_job(job)
-        message = await redis_client.next_message(pubsub, timeout=3.0)
+        # clip_ready + the three crew events publish synchronously during
+        # process_job, so drain briefly and stop as soon as they've all arrived
+        # (no lingering timeout, which would perturb the timing-sensitive suite).
+        for _ in range(10):
+            m = await redis_client.next_message(pubsub, timeout=0.25)
+            if m is None:
+                break
+            messages.append(m)
+            crew = {x.get("agent") for x in messages if x["event"] == "agent_activity"}
+            if any(x["event"] == "clip_ready" for x in messages) and {
+                "cinematographer",
+                "generator",
+                "critic",
+            } <= crew:
+                break
 
-    assert message is not None
-    assert message["event"] == "clip_ready"
-    assert message["shot_id"] == "shot_x"
-    assert message["oss_url"].endswith("shot_x.mp4")
+    clip = next((m for m in messages if m["event"] == "clip_ready"), None)
+    assert clip is not None
+    assert clip["shot_id"] == "shot_x"
+    assert clip["oss_url"].endswith("shot_x.mp4")
+    # §5.4: the crew's planning + render + QA also surface in the live feed, so a
+    # judge watches the Cinematographer/Generator/Critic work — not just the clip.
+    agents = {m.get("agent") for m in messages if m["event"] == "agent_activity"}
+    assert {"cinematographer", "generator", "critic"} <= agents
     done = await queue.get_job("job_ok")
     assert done is not None and done.status is RenderJobStatus.SUCCEEDED
-    print(f"\n[WORKER] clip_ready published on {channel}: shot_id={message['shot_id']} "
-          f"rung={message['rung']}; job -> {done.status.value}")
+    print(f"\n[WORKER] clip_ready + crew feed {sorted(agents)} on {channel}; "
+          f"job -> {done.status.value}")
 
 
 async def test_worker_conflict_publishes_conflict_events(

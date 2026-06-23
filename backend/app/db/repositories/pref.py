@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, CursorResult, delete, select
 from sqlalchemy.orm import InstrumentedAttribute
 
 from app.db.base import new_id
@@ -73,3 +73,20 @@ class PrefsRepo(BaseRepository):
             pref = existing
         await self.session.flush()
         return pref
+
+    async def delete(self, *, user_id: str | None = None, book_id: str | None = None) -> int:
+        """Delete every preference matching the given scope; return the row count.
+
+        Scoping mirrors :meth:`get` (filter on the *provided* fields), not the
+        exact-tuple semantics of :meth:`upsert_nudge`: ``delete(user_id=u)`` clears
+        a reader's prefs across **all** books (global reset), while
+        ``delete(book_id=b)`` clears just that book.
+        """
+        stmt = delete(Pref)
+        if user_id is not None:
+            stmt = stmt.where(Pref.user_id == user_id)
+        if book_id is not None:
+            stmt = stmt.where(Pref.book_id == book_id)
+        result = cast("CursorResult[Any]", await self.session.execute(stmt))
+        await self.session.flush()
+        return int(result.rowcount or 0)

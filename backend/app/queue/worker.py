@@ -35,11 +35,13 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.db.models.enums import RenderPriority, ShotStatus
 from app.memory.budget_service import Reservation
+from app.memory.conflict_log import record_conflict_history
 from app.queue.redis_queue import (
     LANE_ORDER,
     QueuedJob,
     RedisRenderQueue,
     book_channel,
+    conflict_object_key,
     session_channel,
 )
 from app.render.pipeline import RenderResult, UnknownShotError
@@ -149,6 +151,15 @@ class RenderWorker:
         await self._release_earmark(job, reason="handoff")
 
         runner = self._run_shot or self._default_run_shot
+        # §5.4: surface the Cinematographer composing this shot ahead of the
+        # reader, so the feed shows the crew planning — not just the clip arriving.
+        if job.shot_id:
+            await self._publish_agent_activity(
+                job,
+                agent="cinematographer",
+                message=f"Composing shot {job.shot_id}",
+                shot_id=job.shot_id,
+            )
         try:
             result = await self._run_with_lease_heartbeat(job, runner)
         except _PERMANENT as exc:
@@ -274,8 +285,15 @@ class RenderWorker:
                 settings=self._settings,
             )
             assert job.shot_id is not None
+            # A render tied to a live reading session has a director present, so a
+            # canon violation surfaces for the reader to arbitrate (§7.2) rather
+            # than silently auto-honouring; background/speculative renders (no
+            # session) keep the safe auto-resolve default.
             return await pipeline.render_shot(
-                job.book_id, job.shot_id, session_id=job.session_id
+                job.book_id,
+                job.shot_id,
+                session_id=job.session_id,
+                director_present=job.session_id is not None,
             )
 
     # -- events -------------------------------------------------------------- #
@@ -289,6 +307,21 @@ class RenderWorker:
         )
         if result.status is ShotStatus.CONFLICT and result.conflict is not None:
             conflict = result.conflict.model_dump(mode="json")
+            # Persist the structured conflict so the conflict_choice handler can
+            # apply the Director's pick (regenerate the shot / evolve canon, §7.2),
+            # and log it to the session's history so a refresh can reload it.
+            if job.session_id:
+                await self._redis.set_json(
+                    conflict_object_key(job.session_id, result.conflict.conflict_id),
+                    conflict,
+                    ttl_s=86_400,
+                )
+                await record_conflict_history(
+                    self._redis,
+                    job.session_id,
+                    conflict=conflict,
+                    conflict_id=result.conflict.conflict_id,
+                )
             await self._redis.publish(
                 channel,
                 {
@@ -297,6 +330,8 @@ class RenderWorker:
                     "options": conflict.get("options", []),
                     "claim": result.conflict.claim,
                     "canon_fact": result.conflict.canon_fact,
+                    "current_beat": result.conflict.current_beat,
+                    "raised_by": result.conflict.raised_by,
                     "shot_id": result.shot_id,
                 },
             )
@@ -318,6 +353,21 @@ class RenderWorker:
             )
             return
 
+        # An auto-resolved conflict (honour/evolve, never surfaced): show the
+        # Showrunner's decision record in the feed for §7.2 transparency.
+        if result.decision is not None:
+            await self._redis.publish(
+                channel,
+                {
+                    "event": "agent_activity",
+                    "agent": "showrunner",
+                    "message": result.decision.get("reasoning")
+                    or f"Resolved conflict: {result.decision.get('chosen_option')}",
+                    "conflict": result.decision,
+                    "shot_id": result.shot_id,
+                },
+            )
+
         if result.clip_url or result.clip_key:
             await self._publish_clip_ready(job, result)
 
@@ -338,6 +388,63 @@ class RenderWorker:
             "video_seconds": result.video_seconds,
         }
         await self._redis.publish(channel, payload)
+        # §5.4: the feed shows the Generator producing the shot + the Critic's QA,
+        # so a judge watches the crew render + score each clip, not just its arrival.
+        # §12.4 ladder is visible here: a real Wan clip vs a cache reuse vs a
+        # degraded bridge (Ken-Burns / audio-text) all read distinctly in the feed.
+        rung = result.rung or ""
+        if rung == "full_video":
+            gen_msg = f"Rendered shot {result.shot_id}"
+        elif rung == "cache_hit":
+            gen_msg = f"Reused cached shot {result.shot_id}"
+        else:
+            gen_msg = f"Bridged shot {result.shot_id} — {rung} (ladder)"
+        await self._publish_agent_activity(
+            job,
+            agent="generator",
+            message=gen_msg,
+            shot_id=result.shot_id,
+        )
+        qa = result.qa or {}
+        if qa:
+            ccs = qa.get("ccs")
+            passed = str(qa.get("verdict", "")).lower() == "pass"
+            detail = f" — CCS {float(ccs):.2f}" if isinstance(ccs, (int, float)) else ""
+            await self._publish_agent_activity(
+                job,
+                agent="critic",
+                aspect="qa",
+                message=f"Shot {result.shot_id} {'passed' if passed else 'flagged in'} QA{detail}",
+                shot_id=result.shot_id,
+                qa=qa,
+            )
+
+    async def _publish_agent_activity(
+        self,
+        job: QueuedJob,
+        *,
+        agent: str,
+        message: str,
+        aspect: str | None = None,
+        shot_id: str | None = None,
+        qa: dict[str, Any] | None = None,
+    ) -> None:
+        """Publish one §5.4 crew activity to the reader's session feed (best-effort).
+
+        Scoped to live sessions: background/speculative renders (no session) have
+        no one watching, so we skip them rather than spam the book channel.
+        """
+        if not job.session_id:
+            return
+        payload: dict[str, Any] = {"event": "agent_activity", "agent": agent, "message": message}
+        if aspect is not None:
+            payload["aspect"] = aspect
+        if shot_id is not None:
+            payload["shot_id"] = shot_id
+        if qa is not None:
+            payload["qa"] = qa
+        with contextlib.suppress(Exception):
+            await self._redis.publish(session_channel(job.session_id), payload)
 
     # -- scene stitch + ship (§9.6) ------------------------------------------ #
 

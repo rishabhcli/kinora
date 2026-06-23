@@ -76,6 +76,34 @@ def classify_shot(
     return eta, classify(eta, commit_horizon_s=commit_horizon_s, spec_horizon_s=spec_horizon_s)
 
 
+def viewer_zone(
+    next_eta: float | None,
+    *,
+    stable: bool,
+    budget_ok: bool,
+    commit_horizon_s: float,
+    spec_horizon_s: float,
+) -> Zone:
+    """The representation the viewer is seeing for the nearest upcoming shot (§5.3).
+
+    This mirrors the §4.6 promotion decision rather than the byte-level render
+    state, so it is meaningful even when the live-video gate is off: the nearest
+    shot reads as **committed** (full film) only when it is inside the commit
+    horizon *and* the trajectory is stable *and* the budget can still spend
+    video-seconds. A rapid skim or a low budget suspends promotion, so even a
+    near shot rides the keyframe ladder (**speculative** — a preview still);
+    content beyond the speculative horizon is **cold** (plan/canon only). This is
+    what powers the quiet zone badge that surfaces the generation machinery.
+    """
+    if next_eta is None:
+        return Zone.COLD
+    zone = classify(next_eta, commit_horizon_s=commit_horizon_s, spec_horizon_s=spec_horizon_s)
+    if zone is Zone.COMMITTED and not (stable and budget_ok):
+        # Skim / budget pressure: ride the keyframe ladder instead of full video.
+        return Zone.SPECULATIVE
+    return zone
+
+
 def trajectory_is_stable(
     session: _StabilityState, *, clamp_high: float = VELOCITY_CLAMP_HIGH
 ) -> bool:
@@ -101,4 +129,5 @@ __all__ = [
     "classify_shot",
     "eta_seconds",
     "trajectory_is_stable",
+    "viewer_zone",
 ]

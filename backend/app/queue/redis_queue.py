@@ -88,6 +88,23 @@ def book_progress_key(book_id: str) -> str:
     return f"kinora:book:progress:{book_id}"
 
 
+def conflict_choice_key(session_id: str, conflict_id: str) -> str:
+    """Redis key recording the Director's resolution of a surfaced conflict (§7.2)."""
+    return f"kinora:conflict:{session_id}:{conflict_id}"
+
+
+def conflict_object_key(session_id: str, conflict_id: str) -> str:
+    """Redis key holding a surfaced conflict object so the choice handler can act
+    on it (apply the §7.2 resolution: regenerate the shot / evolve canon)."""
+    return f"kinora:conflict_obj:{session_id}:{conflict_id}"
+
+
+def conflict_history_key(session_id: str) -> str:
+    """Redis key holding the session's §7.2 conflict log (conflict_id -> record)
+    so a refreshed client can reload surfaced/resolved disputes."""
+    return f"kinora:conflict_hist:{session_id}"
+
+
 # --------------------------------------------------------------------------- #
 # Lua scripts (the only operations that must be atomic)
 # --------------------------------------------------------------------------- #

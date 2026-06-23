@@ -14,11 +14,19 @@ from dataclasses import dataclass
 
 from app.core.config import Settings, get_settings
 from app.memory.interfaces import CanonEntitySlice, CanonSlice
+from app.memory.prefs_service import PreferencePriors
+from app.memory.prefs_signals import (
+    camera_overrides,
+    infer_signals,
+    preferences_payload,
+    prompt_hints,
+)
 from app.providers import Providers
 
 from .base import BaseAgent
 from .contracts import (
     Beat,
+    Camera,
     CinematographerFill,
     DirectorNote,
     RenderMode,
@@ -126,8 +134,16 @@ class Cinematographer(BaseAgent):
         *,
         shot_id: str | None = None,
         target_duration_s: float = 5.0,
+        priors: PreferencePriors | None = None,
     ) -> ShotSpec:
-        """Design a shot for ``beat``: pick the render mode, then the creative fill."""
+        """Design a shot for ``beat``: pick the render mode, then the creative fill.
+
+        ``priors`` are the reader's accumulated directing preferences (§8.6). They
+        are handed to the model as a default style *and* applied deterministically
+        after the fill, so a learned "slower / wider" taste shifts the shot even
+        when nothing in this beat asked for it — but only on axes the current
+        director notes do not already speak to (an explicit ask always wins).
+        """
         notes = director_notes or []
         inputs = self.derive_inputs(beat, canon_slice, notes)
         mode = decide_render_mode(inputs)
@@ -140,22 +156,44 @@ class Cinematographer(BaseAgent):
             "locked_reference_ids": candidates,
             "has_previous_endpoint": canon_slice.previous_endpoint is not None,
             "director_notes": [n.model_dump(mode="json") for n in notes],
+            "preferences": preferences_payload(priors) or None,
         }
         fill = await self.run_json(payload, CinematographerFill, temperature=0.4)
+        camera, prompt = self._apply_priors(fill.camera, fill.prompt, priors, notes)
 
         return ShotSpec(
             shot_id=shot_id or f"{beat.beat_id or 'beat'}_shot_00",
             beat_id=beat.beat_id or None,
             scene_id=beat.scene_id,
             render_mode=mode,
-            prompt=fill.prompt,
+            prompt=prompt,
             negative_prompt=fill.negative_prompt,
             reference_image_ids=self._select_refs(mode, fill.reference_image_ids, candidates),
-            camera=fill.camera,
+            camera=camera,
             seed=fill.seed if fill.seed is not None else _stable_seed(beat.beat_id or "beat"),
             target_duration_s=target_duration_s,
             end_frame_ref=None,
         )
+
+    @staticmethod
+    def _apply_priors(
+        camera: Camera,
+        prompt: str,
+        priors: PreferencePriors | None,
+        notes: list[DirectorNote],
+    ) -> tuple[Camera, str]:
+        """Fold learned priors into the camera/prompt, skipping axes the notes set."""
+        if priors is None or not priors.priors:
+            return camera, prompt
+        # Axes this call's notes already address are left to the explicit ask.
+        skip = frozenset(kind for kind, _ in infer_signals(" ".join(n.note for n in notes)))
+        overrides = camera_overrides(priors, skip=skip)
+        if overrides:
+            camera = camera.model_copy(update=overrides)
+        for hint in prompt_hints(priors, skip=skip):
+            if hint.lower() not in prompt.lower():
+                prompt = f"{prompt}; {hint}" if prompt else hint
+        return camera, prompt
 
     # -- deriving the tree's booleans from real signals ---------------------- #
 
@@ -189,9 +227,7 @@ class Cinematographer(BaseAgent):
         )
 
     @staticmethod
-    def _select_refs(
-        mode: RenderMode, selected: list[str], candidates: list[str]
-    ) -> list[str]:
+    def _select_refs(mode: RenderMode, selected: list[str], candidates: list[str]) -> list[str]:
         if mode is RenderMode.TEXT_TO_VIDEO:
             return []
         verbatim = [ref for ref in selected if ref in candidates]

@@ -469,6 +469,7 @@ class FakeDesigner:
     def __init__(self) -> None:
         self.calls = 0
         self.last_notes: list[Any] | None = None
+        self.last_priors: Any = None
 
     async def design_shot(
         self,
@@ -478,9 +479,11 @@ class FakeDesigner:
         *,
         shot_id: str | None = None,
         target_duration_s: float = 5.0,
+        priors: Any = None,
     ) -> AgentShotSpec:
         self.calls += 1
         self.last_notes = director_notes
+        self.last_priors = priors
         return AgentShotSpec(
             shot_id=shot_id or SHOT_ID,
             beat_id=beat.beat_id or None,

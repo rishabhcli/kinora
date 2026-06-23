@@ -368,6 +368,11 @@ async def test_timeline_conflict_honor_canon_regenerates_then_accepts() -> None:
     assert bundle.generator.calls == 2
     assert result.attempts == 2
     assert ShotStatus.CONFLICT in bundle.shots.statuses
+    # The Showrunner's autonomous decision rides the result so the feed can show
+    # it even though the reader was never asked (§7.2 transparency).
+    assert result.decision is not None
+    assert result.decision["chosen_option"] == "honor_canon"
+    assert result.decision["evolved_canon"] is False
 
 
 async def test_timeline_conflict_surface_to_user_returns_conflict() -> None:
@@ -386,6 +391,8 @@ async def test_timeline_conflict_surface_to_user_returns_conflict() -> None:
     # Surfaced conflicts are not accepted/logged as footage.
     assert bundle.episodic.logged == []
     assert bundle.generator.calls == 1
+    # A surfaced conflict carries the conflict object, not an auto-decision.
+    assert result.decision is None
 
 
 async def test_timeline_conflict_evolve_canon_writes_state_then_regenerates() -> None:
@@ -401,6 +408,9 @@ async def test_timeline_conflict_evolve_canon_writes_state_then_regenerates() ->
     assert bundle.evolver is not None
     assert len(bundle.evolver.asserts) == 1  # canon evolved via a real assert_state
     assert bundle.designer.calls == 2
+    assert result.decision is not None
+    assert result.decision["chosen_option"] == "evolve_canon"
+    assert result.decision["evolved_canon"] is True
 
 
 # --------------------------------------------------------------------------- #

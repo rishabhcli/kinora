@@ -12,6 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.agents.contracts import ConflictOption
+
 # --------------------------------------------------------------------------- #
 # Auth
 # --------------------------------------------------------------------------- #
@@ -100,9 +102,15 @@ class PageResponse(BaseModel):
 
 
 class CanonReferenceImage(BaseModel):
-    """A locked reference image projected for the Director's canon editor."""
+    """A locked reference image projected for the Director's canon editor.
+
+    ``oss_url`` is an ephemeral presigned GET URL (for display); ``oss_key`` is the
+    durable object-store key. The editor echoes ``oss_key`` back inside a
+    ``canon_edit`` ``changes.appearance`` so a locked-reference swap round-trips
+    losslessly — the presigned URL can't be re-stored, the key can (§5.4/§8.1)."""
 
     oss_url: str
+    oss_key: str | None = None
     pose: str | None = None
     locked: bool | None = None
 
@@ -135,12 +143,33 @@ class CanonEntityResponse(BaseModel):
     first_appearance: dict[str, Any] | None = None
 
 
+class CanonStateResponse(BaseModel):
+    """A versioned continuity fact projected for the canon editor (§8.5).
+
+    A ``(subject, predicate, object)`` triple true only over a beat interval;
+    ``valid_to_beat is None`` means still active, a value means it was *retired*
+    (the "forgetting" mechanism) — the editor shows both so the timeline of what
+    the story currently believes (and used to) is inspectable."""
+
+    id: str
+    subject_entity_key: str
+    predicate: str
+    object_value: str
+    valid_from_beat: int
+    valid_to_beat: int | None = None
+    version: int
+    active: bool
+    source_span: dict[str, Any] | None = None
+
+
 class CanonResponse(BaseModel):
     """The canon graph for a book: the entity list the Director editor renders,
-    plus the optional human-inspectable markdown vault export (§8.1)."""
+    the versioned continuity facts (§8.5), plus the optional human-inspectable
+    markdown vault export (§8.1)."""
 
     book_id: str
     entities: list[CanonEntityResponse] = Field(default_factory=list)
+    states: list[CanonStateResponse] = Field(default_factory=list)
     markdown: str | None = None
 
 
@@ -234,6 +263,51 @@ class SeekResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Directing-style preferences (§8.6 — "Your directing style")
+# --------------------------------------------------------------------------- #
+
+
+class DirectingPriorView(BaseModel):
+    """One learned directing prior, projected as plain language for the panel.
+
+    ``bias`` is the signed strength (negative = slower/cooler/closer, positive =
+    faster/warmer/wider); ``applied`` is whether it is strong enough to default a
+    future shot; ``applied_value`` is the concrete default it sets (``slow`` /
+    ``wide`` / …) when applied.
+    """
+
+    kind: str
+    bias: float
+    weight: float
+    label: str
+    detail: str
+    applied: bool
+    applied_value: str | None = None
+    #: The most recent Director note that taught this prior (provenance, §8.6).
+    last_note: str | None = None
+
+
+class DirectingStyleResponse(BaseModel):
+    """The reader's accumulated directing style for a scope (§8.6).
+
+    ``scope`` is ``"book"`` (this title) or ``"user"`` (all books). Empty
+    ``priors`` means nothing has been learned yet — the panel shows its zero-state.
+    """
+
+    scope: str
+    book_id: str | None = None
+    priors: list[DirectingPriorView] = Field(default_factory=list)
+
+
+class ResetPrefsResponse(BaseModel):
+    """Acknowledgement that learned priors were cleared (§8.6)."""
+
+    scope: str
+    book_id: str | None = None
+    cleared: int = 0
+
+
+# --------------------------------------------------------------------------- #
 # Director tools (§5.4)
 # --------------------------------------------------------------------------- #
 
@@ -249,13 +323,19 @@ class CommentRequest(BaseModel):
 
 
 class CommentResponse(BaseModel):
-    """How a comment was routed and the regen it triggered (§5.4)."""
+    """How a comment was routed and the regen it triggered (§5.4).
+
+    ``learned`` is the directing priors this note taught (§8.6) — usually empty,
+    but non-empty when the note nudged a pacing/palette/framing default, so the
+    client can confirm "Noted — slower shots will be the default" at teach time.
+    """
 
     shot_id: str
     agent: str
     aspect: str
     message: str
     job_id: str | None = None
+    learned: list[DirectingPriorView] = Field(default_factory=list)
 
 
 class CanonEditRequest(BaseModel):
@@ -286,15 +366,35 @@ class ConflictChoiceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     conflict_id: str
-    option: str
+    #: One of the fixed §7.2 policy options; an unknown value is rejected (422).
+    option: ConflictOption
 
 
 class ConflictChoiceResponse(BaseModel):
-    """Acknowledgement that a conflict choice was recorded (§7.2)."""
+    """Acknowledgement of a conflict resolution (§7.2)."""
 
     conflict_id: str
-    option: str
+    option: ConflictOption
+    #: ``applied`` (regen/evolve spawned) · ``deferred`` (surface_to_user) ·
+    #: ``already_resolved`` (idempotent re-submit) · ``recorded`` (no live object).
     status: str = "recorded"
+    shot_id: str | None = None
+    reasoning: str | None = None
+
+
+class ConflictRecordResponse(BaseModel):
+    """A surfaced conflict + its resolution — the §7.2 history a refresh reloads."""
+
+    conflict_id: str
+    shot_id: str | None = None
+    claim: str | None = None
+    canon_fact: str | None = None
+    raised_by: str | None = None
+    current_beat: str | None = None
+    options: list[dict[str, Any]] = Field(default_factory=list)
+    resolved: bool = False
+    chosen_option: str | None = None
+    reasoning: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -324,11 +424,15 @@ __all__ = [
     "CanonEntityResponse",
     "CanonReferenceImage",
     "CanonResponse",
+    "CanonStateResponse",
     "CommentRequest",
     "CommentResponse",
     "ConflictChoiceRequest",
     "ConflictChoiceResponse",
+    "ConflictRecordResponse",
     "CreateSessionRequest",
+    "DirectingPriorView",
+    "DirectingStyleResponse",
     "ErrorBody",
     "ErrorResponse",
     "IntentRequest",
@@ -336,6 +440,7 @@ __all__ = [
     "LoginRequest",
     "PageResponse",
     "RegisterRequest",
+    "ResetPrefsResponse",
     "SeekRequest",
     "SeekResponse",
     "SessionResponse",

@@ -205,6 +205,81 @@
     box-shadow: 0 0 0 2px var(--page-accent);
   }
 
+  /* ---- Virtualised PDF page + word overlay (§5.2 / §9.4) --------------- */
+
+  /* One rasterised page (PyMuPDF PNG) presented as a real sheet — a faint
+     paper frame + drop shadow over the themed reading ground. */
+  .pdf-page {
+    background: linear-gradient(180deg, var(--page-bg), var(--page-bg-edge));
+    box-shadow:
+      0 1px 0 var(--page-rule) inset,
+      0 30px 70px -38px var(--page-shadow);
+    border: 1px solid var(--page-rule);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  /* A transparent, selectable text layer over the raster (PDF.js-style): each
+     word sits in its box so the page is click-to-seek, drag-to-select/copy, and
+     find-friendly — the printed glyphs show through, this carries the text. The
+     layer itself is inert so gaps never block the image; only the words catch. */
+  .word-layer {
+    pointer-events: none;
+  }
+  .word-token {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    color: transparent;
+    line-height: 1;
+    white-space: pre;
+    overflow: hidden;
+    border-radius: 2px;
+    user-select: text;
+  }
+  /* Selecting the (transparent) text paints the word region — a real highlight. */
+  .word-token::selection {
+    background: color-mix(in srgb, var(--page-accent) 32%, transparent);
+  }
+  .word-token:hover {
+    background-color: color-mix(in srgb, var(--page-accent) 14%, transparent);
+  }
+  /* The spoken word lights up in place — a single moving highlighter wash that
+     tints the printed ink beneath it (karaoke on the raster, §5.3). It rides
+     above the hotspots but never catches pointer events. */
+  .karaoke-box {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 3px;
+    background-color: var(--page-highlight);
+    mix-blend-mode: multiply;
+    transition:
+      left 120ms ease,
+      top 120ms ease,
+      width 120ms ease,
+      height 120ms ease;
+  }
+
+  /* Page-state affordances: a quiet retry pill + a slow spinner for the
+     still-preparing rung, so a page never sits on an endless shimmer. */
+  .page-retry {
+    border-radius: 9999px;
+    border: 1px solid var(--page-rule);
+    padding: 0.25rem 0.8rem;
+    font-size: 12px;
+    color: var(--page-accent);
+    transition: background-color 140ms ease;
+  }
+  .page-retry:enabled:hover {
+    background-color: color-mix(in srgb, var(--page-accent) 12%, transparent);
+  }
+  .page-retry:disabled {
+    opacity: 0.5;
+  }
+  .kinora-spin {
+    animation: kinora-rotate 0.9s linear infinite;
+    color: var(--page-accent);
+  }
+
   /* ---- Wooden bookshelf (premium) -------------------------------------- */
 
   /* A thick oak rail with a rounded front lip, a lit top edge and a dark
@@ -363,6 +438,37 @@
     font-size: 3.2em;
     color: var(--page-accent);
   }
+
+  /* The §5.3 buffer hairline — the faint generation indicator along the video
+     stage's top edge: it eases as it fills toward H and breathes during a refill
+     burst, resting quietly (no animation) between the watermarks. */
+  .buffer-hairline-fill {
+    transition:
+      width 600ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 400ms ease;
+  }
+  .buffer-hairline-fill[data-bursting="true"] {
+    animation: kinora-buffer-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes kinora-buffer-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buffer-hairline-fill {
+    transition: none;
+  }
+  .buffer-hairline-fill[data-bursting="true"] {
+    animation: none;
+  }
 }
 
 @keyframes kinora-shimmer {
@@ -386,20 +492,85 @@
   }
 }
 
+/* The agent-activity feed (§5.4) — a new entry fades/rises in once on mount;
+   the stream never auto-scrolls or reflows, and modals fade their scrim. Both
+   are stilled under reduce-motion (self-contained guard below). */
+@keyframes kinora-feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes kinora-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.feed-item {
+  animation: kinora-feed-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-item {
+    animation: none;
+  }
+}
+
+/* The client-side Ken-Burns pan over a degraded still (§4.4, §12.4) — a slow
+   zoom/drift in pure CSS at zero generation cost. The move (scale + drift +
+   duration) is supplied per-element via custom properties from kenBurnsPreset(),
+   so a re-read replays the identical, calm motion. `alternate` ping-pongs it so a
+   long dwell never snaps back. Stilled (held static) under reduce-motion. */
+@keyframes ken-burns {
+  from {
+    transform: scale(var(--kb-from-scale, 1.04))
+      translate(var(--kb-from-x, 0%), var(--kb-from-y, 0%));
+  }
+  to {
+    transform: scale(var(--kb-to-scale, 1.12)) translate(var(--kb-to-x, 0%), var(--kb-to-y, 0%));
+  }
+}
+.ken-burns {
+  transform-origin: center;
+  will-change: transform;
+  animation: ken-burns var(--kb-dur, 18s) ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ken-burns {
+    animation: none;
+    transform: scale(var(--kb-from-scale, 1.04));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toolbar-btn,
   .toolbar-btn:active,
   .reading-leaf .word,
+  .word-token,
+  .karaoke-box,
   .shelf-contact,
   .add-slot {
     transition: none;
   }
   .shimmer::after,
-  .status-pulse[data-live="true"]::after {
+  .status-pulse[data-live="true"]::after,
+  .kinora-spin {
     animation: none;
   }
   .shimmer::after {
     opacity: 0;
+  }
+}
+
+@keyframes kinora-rotate {
+  to {
+    transform: rotate(360deg);
   }
 }
 

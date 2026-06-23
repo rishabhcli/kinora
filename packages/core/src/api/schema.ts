@@ -147,14 +147,15 @@ export interface paths {
         put?: never;
         /**
          * Upload Book
-         * @description Validate + store a PDF, create the book, and trigger Phase A ingest.
+         * @description Validate + store a PDF/EPUB, create the book, and trigger Phase A ingest.
          *
          *     Returns the freshly-created book (status ``importing``) directly — the shelf
          *     prepends it and polls until it is ``ready``.
          *
          *     Defends the ingest pipeline: the content-type is checked, the per-user book
          *     quota is enforced, the body is read **streaming** (aborting the moment it
-         *     crosses ``MAX_PDF_BYTES`` rather than buffering an oversized payload), and the
+         *     crosses ``MAX_PDF_BYTES`` rather than buffering an oversized payload), the
+         *     format is detected by content magic, an EPUB is normalised to PDF, and the
          *     page count is capped (``MAX_INGEST_PAGES``) before any token-spending ingest
          *     is triggered.
          */
@@ -377,10 +378,64 @@ export interface paths {
         put?: never;
         /**
          * Conflict Choice
-         * @description Record the Director's resolution of a surfaced conflict and announce it (§7.2).
+         * @description Apply the Director's resolution of a surfaced conflict (§7.2).
+         *
+         *     Records the pick, streams the Showrunner's arbitration reasoning into the feed,
+         *     and **acts on it**: ``honor_canon`` regenerates the shot honouring the canon,
+         *     ``evolve_canon`` writes the new state then regenerates, ``surface_to_user``
+         *     leaves it surfaced. The affected shot's fresh clip closes the loop (a
+         *     ``regen_done`` event), so the §16 demo resolves a conflict live.
          */
         post: operations["conflict_choice_api_sessions__session_id__conflict_choice_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Directing Style
+         * @description The reader's accumulated directing style across all their books (§8.6).
+         */
+        get: operations["my_directing_style_api_me_prefs_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Reset My Directing Style
+         * @description Clear the reader's learned directing style everywhere (global reset, §8.6).
+         */
+        delete: operations["reset_my_directing_style_api_me_prefs_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/books/{book_id}/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Book Directing Style
+         * @description The directing style learned for one book — what its shots default to (§8.6).
+         */
+        get: operations["book_directing_style_api_books__book_id__prefs_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Reset Book Directing Style
+         * @description Clear the directing style learned for one book (§8.6).
+         */
+        delete: operations["reset_book_directing_style_api_books__book_id__prefs_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -487,7 +542,7 @@ export interface components {
         Body_upload_book_api_books_post: {
             /**
              * File
-             * @description The source PDF
+             * @description The source PDF or EPUB
              */
             file: string;
             /** Title */
@@ -624,10 +679,17 @@ export interface components {
         /**
          * CanonReferenceImage
          * @description A locked reference image projected for the Director's canon editor.
+         *
+         *     ``oss_url`` is an ephemeral presigned GET URL (for display); ``oss_key`` is the
+         *     durable object-store key. The editor echoes ``oss_key`` back inside a
+         *     ``canon_edit`` ``changes.appearance`` so a locked-reference swap round-trips
+         *     losslessly — the presigned URL can't be re-stored, the key can (§5.4/§8.1).
          */
         CanonReferenceImage: {
             /** Oss Url */
             oss_url: string;
+            /** Oss Key */
+            oss_key?: string | null;
             /** Pose */
             pose?: string | null;
             /** Locked */
@@ -636,15 +698,49 @@ export interface components {
         /**
          * CanonResponse
          * @description The canon graph for a book: the entity list the Director editor renders,
-         *     plus the optional human-inspectable markdown vault export (§8.1).
+         *     the versioned continuity facts (§8.5), plus the optional human-inspectable
+         *     markdown vault export (§8.1).
          */
         CanonResponse: {
             /** Book Id */
             book_id: string;
             /** Entities */
             entities?: components["schemas"]["CanonEntityResponse"][];
+            /** States */
+            states?: components["schemas"]["CanonStateResponse"][];
             /** Markdown */
             markdown?: string | null;
+        };
+        /**
+         * CanonStateResponse
+         * @description A versioned continuity fact projected for the canon editor (§8.5).
+         *
+         *     A ``(subject, predicate, object)`` triple true only over a beat interval;
+         *     ``valid_to_beat is None`` means still active, a value means it was *retired*
+         *     (the "forgetting" mechanism) — the editor shows both so the timeline of what
+         *     the story currently believes (and used to) is inspectable.
+         */
+        CanonStateResponse: {
+            /** Id */
+            id: string;
+            /** Subject Entity Key */
+            subject_entity_key: string;
+            /** Predicate */
+            predicate: string;
+            /** Object Value */
+            object_value: string;
+            /** Valid From Beat */
+            valid_from_beat: number;
+            /** Valid To Beat */
+            valid_to_beat?: number | null;
+            /** Version */
+            version: number;
+            /** Active */
+            active: boolean;
+            /** Source Span */
+            source_span?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * CommentRequest
@@ -661,6 +757,10 @@ export interface components {
         /**
          * CommentResponse
          * @description How a comment was routed and the regen it triggered (§5.4).
+         *
+         *     ``learned`` is the directing priors this note taught (§8.6) — usually empty,
+         *     but non-empty when the note nudged a pacing/palette/framing default, so the
+         *     client can confirm "Noted — slower shots will be the default" at teach time.
          */
         CommentResponse: {
             /** Shot Id */
@@ -673,6 +773,8 @@ export interface components {
             message: string;
             /** Job Id */
             job_id?: string | null;
+            /** Learned */
+            learned?: components["schemas"]["DirectingPriorView"][];
         };
         /**
          * ConflictChoiceRequest
@@ -681,24 +783,32 @@ export interface components {
         ConflictChoiceRequest: {
             /** Conflict Id */
             conflict_id: string;
-            /** Option */
-            option: string;
+            option: components["schemas"]["ConflictOption"];
         };
         /**
          * ConflictChoiceResponse
-         * @description Acknowledgement that a conflict choice was recorded (§7.2).
+         * @description Acknowledgement of a conflict resolution (§7.2).
          */
         ConflictChoiceResponse: {
             /** Conflict Id */
             conflict_id: string;
-            /** Option */
-            option: string;
+            option: components["schemas"]["ConflictOption"];
             /**
              * Status
              * @default recorded
              */
             status: string;
+            /** Shot Id */
+            shot_id?: string | null;
+            /** Reasoning */
+            reasoning?: string | null;
         };
+        /**
+         * ConflictOption
+         * @description The fixed set of resolutions the Showrunner policy arbitrates between.
+         * @enum {string}
+         */
+        ConflictOption: "honor_canon" | "surface_to_user" | "evolve_canon";
         /**
          * CreateSessionRequest
          * @description Open a reading session against a book.
@@ -716,6 +826,46 @@ export interface components {
              * @default viewer
              */
             mode: string;
+        };
+        /**
+         * DirectingPriorView
+         * @description One learned directing prior, projected as plain language for the panel.
+         *
+         *     ``bias`` is the signed strength (negative = slower/cooler/closer, positive =
+         *     faster/warmer/wider); ``applied`` is whether it is strong enough to default a
+         *     future shot; ``applied_value`` is the concrete default it sets (``slow`` /
+         *     ``wide`` / …) when applied.
+         */
+        DirectingPriorView: {
+            /** Kind */
+            kind: string;
+            /** Bias */
+            bias: number;
+            /** Weight */
+            weight: number;
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /** Applied */
+            applied: boolean;
+            /** Applied Value */
+            applied_value?: string | null;
+        };
+        /**
+         * DirectingStyleResponse
+         * @description The reader's accumulated directing style for a scope (§8.6).
+         *
+         *     ``scope`` is ``"book"`` (this title) or ``"user"`` (all books). Empty
+         *     ``priors`` means nothing has been learned yet — the panel shows its zero-state.
+         */
+        DirectingStyleResponse: {
+            /** Scope */
+            scope: string;
+            /** Book Id */
+            book_id?: string | null;
+            /** Priors */
+            priors?: components["schemas"]["DirectingPriorView"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -813,6 +963,21 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /**
+         * ResetPrefsResponse
+         * @description Acknowledgement that learned priors were cleared (§8.6).
+         */
+        ResetPrefsResponse: {
+            /** Scope */
+            scope: string;
+            /** Book Id */
+            book_id?: string | null;
+            /**
+             * Cleared
+             * @default 0
+             */
+            cleared: number;
         };
         /**
          * SeekRequest
@@ -1526,6 +1691,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictChoiceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_directing_style_api_me_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectingStyleResponse"];
+                };
+            };
+        };
+    };
+    reset_my_directing_style_api_me_prefs_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetPrefsResponse"];
+                };
+            };
+        };
+    };
+    book_directing_style_api_books__book_id__prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectingStyleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_book_directing_style_api_books__book_id__prefs_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetPrefsResponse"];
                 };
             };
             /** @description Validation Error */

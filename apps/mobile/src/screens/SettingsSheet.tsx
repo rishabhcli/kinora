@@ -1,4 +1,8 @@
+import { type DirectingPriorView, queryKeys } from "@kinora/core";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -12,7 +16,9 @@ import {
 import { GhostButton, PrimaryButton, Surface } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
 import { usePreferences } from "../hooks/usePreferences";
+import { api } from "../lib/api";
 import { preferencesStore } from "../lib/preferences";
+import { queryClient } from "../lib/queryClient";
 import {
   alpha,
   BOTTOM_INSET,
@@ -58,6 +64,101 @@ function ToggleRow({
         ios_backgroundColor="rgba(255,255,255,0.12)"
       />
     </Pressable>
+  );
+}
+
+/** One learned directing prior: its plain-language label + applied/leaning chip. */
+function StyleRow({ prior }: { prior: DirectingPriorView }) {
+  return (
+    <View style={styles.styleRow}>
+      <View style={styles.rowText}>
+        <Text style={[styles.styleLabel, !prior.applied && styles.styleLabelMuted]}>
+          {prior.label}
+        </Text>
+        <Text style={styles.styleDetail}>{prior.detail}</Text>
+      </View>
+      <View style={[styles.chip, prior.applied ? styles.chipApplied : styles.chipLeaning]}>
+        <Text style={[styles.chipText, prior.applied && styles.chipTextApplied]}>
+          {prior.applied ? (prior.applied_value ?? "Applied") : "Leaning"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * "Your directing style" (§8.6) — the priors learned from this reader's director
+ * notes, shown in plain language with an applied/leaning chip, plus a reset. The
+ * query runs only while the sheet is open. Global scope (all books), matching
+ * where this sheet lives.
+ */
+function DirectingStyleSection({ visible }: { visible: boolean }) {
+  const styleQuery = useQuery({
+    queryKey: queryKeys.directingStyle(),
+    enabled: visible,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/me/prefs");
+      if (error || !data) throw new Error("failed to load directing style");
+      return data;
+    },
+  });
+
+  const reset = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.DELETE("/api/me/prefs");
+      if (error) throw new Error("failed to reset directing style");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["prefs"] });
+    },
+  });
+
+  const priors = styleQuery.data?.priors ?? [];
+
+  const confirmReset = () =>
+    Alert.alert(
+      "Reset directing style?",
+      "This clears everything Kinora has learned about how you like your films directed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Reset", style: "destructive", onPress: () => reset.mutate() },
+      ],
+    );
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>Your directing style</Text>
+      <View style={styles.styleCard}>
+        {styleQuery.isLoading ? (
+          <View style={styles.styleStatus}>
+            <ActivityIndicator color={palette.emberGlow} />
+          </View>
+        ) : styleQuery.isError ? (
+          <Text style={styles.styleStatusText}>Couldn’t load your directing style.</Text>
+        ) : priors.length === 0 ? (
+          <View style={styles.styleEmpty}>
+            <Text style={styles.styleEmptyTitle}>No directing style learned yet.</Text>
+            <Text style={styles.styleEmptyBody}>
+              Leave notes in the director bar — “slower”, “warmer”, “pull back
+              wider” — and your taste becomes the default over time.
+            </Text>
+          </View>
+        ) : (
+          priors.map((prior, index) => (
+            <View key={prior.kind}>
+              {index > 0 && <View style={styles.divider} />}
+              <StyleRow prior={prior} />
+            </View>
+          ))
+        )}
+      </View>
+      {priors.length > 0 && (
+        <GhostButton
+          label={reset.isPending ? "Resetting…" : "Reset directing style"}
+          onPress={confirmReset}
+        />
+      )}
+    </View>
   );
 }
 
@@ -138,6 +239,8 @@ export function SettingsSheet({
                 />
               </View>
             </View>
+
+            <DirectingStyleSection visible={visible} />
 
             <View style={styles.actions}>
               <PrimaryButton label="Sign out" onPress={onSignOut} />
@@ -247,4 +350,55 @@ const styles = StyleSheet.create({
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: alpha.white12 },
   actions: { gap: space.sm, marginTop: space.sm },
+  styleCard: {
+    borderRadius: radius.lg,
+    backgroundColor: alpha.glassFillSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: alpha.white12,
+    paddingHorizontal: space.lg,
+    marginBottom: space.sm,
+  },
+  styleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: space.md,
+    paddingVertical: space.md,
+  },
+  styleLabel: {
+    color: palette.parchment,
+    fontSize: type.body.fontSize,
+    lineHeight: type.label.lineHeight,
+    fontWeight: "600",
+  },
+  styleLabelMuted: { color: alpha.white55, fontWeight: "500" },
+  styleDetail: {
+    color: alpha.white40,
+    fontSize: type.caption.fontSize,
+    marginTop: 2,
+    textTransform: "capitalize",
+  },
+  chip: {
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  chipApplied: { backgroundColor: alpha.emberSoft },
+  chipLeaning: { backgroundColor: alpha.white12 },
+  chipText: {
+    fontSize: type.micro.fontSize,
+    letterSpacing: 0.4,
+    textTransform: "capitalize",
+    color: alpha.white55,
+    fontWeight: "600",
+  },
+  chipTextApplied: { color: palette.emberGlow },
+  styleStatus: { paddingVertical: space.lg, alignItems: "center" },
+  styleStatusText: { color: alpha.white55, fontSize: type.caption.fontSize, paddingVertical: space.lg },
+  styleEmpty: { paddingVertical: space.md, gap: 4 },
+  styleEmptyTitle: { color: alpha.white95, fontSize: type.body.fontSize, fontWeight: "600" },
+  styleEmptyBody: {
+    color: alpha.white55,
+    fontSize: type.caption.fontSize,
+    lineHeight: type.label.lineHeight,
+  },
 });

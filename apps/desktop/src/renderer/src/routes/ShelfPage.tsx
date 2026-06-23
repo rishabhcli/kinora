@@ -4,6 +4,8 @@ import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } fro
 import { useNavigate } from "react-router-dom";
 
 import { BookCover } from "../components/BookCover";
+import { DirectingStylePanel } from "../components/DirectingStylePanel";
+import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
@@ -75,6 +77,10 @@ export default function ShelfPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [query, setQuery] = useState("");
+  const [showStyle, setShowStyle] = useState(false);
+  // The book whose §13 metrics are open from the shelf (report-only — no live
+  // session here, so the buffer sawtooth shows its "start reading" placeholder).
+  const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
 
   const { data: books, isLoading } = useQuery({
     queryKey: queryKeys.books(),
@@ -199,6 +205,25 @@ export default function ShelfPage() {
             className="hidden"
             onChange={onFile}
           />
+          <div className="relative">
+            <button
+              onClick={() => setShowStyle((open) => !open)}
+              title="Your directing style"
+              aria-label="Your directing style"
+              aria-expanded={showStyle}
+              className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md transition active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+                showStyle
+                  ? "bg-white/25 text-white"
+                  : "bg-white/[0.14] text-white/80 hover:bg-white/25 hover:text-white"
+              }`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 8h18M7 8 5 4M12 8l-2-4M17 8l-2-4" />
+                <rect x="3" y="8" width="18" height="12" rx="2" />
+              </svg>
+            </button>
+            {showStyle && <DirectingStylePanel onClose={() => setShowStyle(false)} />}
+          </div>
           <button
             onClick={signOut}
             title="Sign out"
@@ -295,7 +320,12 @@ export default function ShelfPage() {
                   style={{ minHeight: 232 }}
                 >
                   {row.map((book) => (
-                    <BookCover key={book.id} book={book} onOpen={() => openBook(book.id)} />
+                    <BookCover
+                      key={book.id}
+                      book={book}
+                      onOpen={() => openBook(book.id)}
+                      onMetrics={() => setMetricsBookId(book.id)}
+                    />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (
                     <AddSlot onClick={() => fileRef.current?.click()} />
@@ -306,6 +336,15 @@ export default function ShelfPage() {
             ))}
         </div>
       </div>
+
+      {metricsBookId && (
+        <MetricsPanel
+          bookId={metricsBookId}
+          sessionId={null}
+          bookTitle={books?.find((b) => b.id === metricsBookId)?.title ?? null}
+          onClose={() => setMetricsBookId(null)}
+        />
+      )}
     </div>
   );
 }

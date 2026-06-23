@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.db.models.enums import ShotStatus
@@ -27,6 +27,22 @@ class ShotRepo(BaseRepository):
         self.session.add(shot)
         await self.session.flush()
         return shot
+
+    async def delete_for_book(self, book_id: str) -> int:
+        """Delete a book's shots (cascading its source-span rows); rows removed.
+
+        Pairs with :meth:`SceneRepo.delete_for_book` to make the §9.1 shot-plan
+        step re-runnable: a re-ingest clears the book's prior shots before
+        re-inserting, so the same book-scoped ids do not violate ``pk_shots``.
+        ``source_span_index.shot_id`` is ``ON DELETE CASCADE``, so the index rows
+        drop with the shots.
+        """
+        result = cast(
+            "CursorResult[Any]",
+            await self.session.execute(delete(Shot).where(Shot.book_id == book_id)),
+        )
+        await self.session.flush()
+        return int(result.rowcount or 0)
 
     async def get(self, shot_id: str) -> Shot | None:
         """Fetch a shot by id."""

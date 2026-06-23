@@ -64,6 +64,17 @@ class ContinuityStateRepo(BaseRepository):
         )
         await self.session.flush()
 
+    async def list_for_book(self, book_id: str) -> list[ContinuityState]:
+        """Every fact for a book — active **and** retired — for the canon editor's
+        inspectable continuity view (§8.5). Ordered by interval start, then version
+        so the timeline reads chronologically."""
+        stmt = (
+            select(ContinuityState)
+            .where(ContinuityState.book_id == book_id)
+            .order_by(ContinuityState.valid_from_beat, ContinuityState.version)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
     async def active_states_at_beat(
         self, book_id: str, beat: int, *, subject_entity_key: str | None = None
     ) -> list[ContinuityState]:

@@ -78,7 +78,12 @@ class SceneGroup:
 
 
 def group_scenes(page_numbers: Sequence[int], *, pages_per_scene: int = 1) -> list[SceneGroup]:
-    """Group ordered page numbers into scenes of up to ``pages_per_scene`` pages."""
+    """Group ordered page numbers into scenes of up to ``pages_per_scene`` pages.
+
+    ``scene_id`` here is the *local* (per-book) label (``scene_001``…). Persistence
+    book-scopes it via :func:`scope_id` so the global ``scenes`` PK never collides
+    across two books (every book's plan reuses the same local labels).
+    """
     ordered = sorted(set(page_numbers))
     groups: list[SceneGroup] = []
     step = max(1, pages_per_scene)
@@ -94,6 +99,22 @@ def group_scenes(page_numbers: Sequence[int], *, pages_per_scene: int = 1) -> li
             )
         )
     return groups
+
+
+def scope_id(book_id: str, local_id: str) -> str:
+    """Book-scope a local plan id so it is unique across books (§4.2 backbone).
+
+    Scene/beat/shot ids are sequence-derived local labels (``scene_001``,
+    ``beat_0000``, ``beat_0000_shot_00``) reused identically by *every* book, while
+    their table PKs (``pk_scenes``/``pk_beats``/``pk_shots``) are on ``id`` alone —
+    so two books collide on the first scene. Prefixing the book id (pure-hex, so
+    the ``_`` delimiter is unambiguous) makes the stored id per-book unique without
+    changing how any consumer treats it (the id is an opaque string everywhere; no
+    code parses its shape). Idempotent: an already-scoped id is returned unchanged,
+    so re-running the plan for the same book reproduces identical ids.
+    """
+    prefix = f"{book_id}_"
+    return local_id if local_id.startswith(prefix) else f"{prefix}{local_id}"
 
 
 # --------------------------------------------------------------------------- #
@@ -316,12 +337,26 @@ async def plan_and_persist(
     pages_per_scene: int = 1,
     max_tokens: int | None = 1500,
 ) -> ShotPlanResult:
-    """Plan + persist scenes/beats/shots and the reconciled source-span index."""
+    """Plan + persist scenes/beats/shots and the reconciled source-span index.
+
+    Re-runnable: any prior plan for ``book_id`` is cleared first (within this
+    unit of work), so resuming an ingest that previously failed *after* this step
+    — e.g. a book that 429'd during identity-lock — re-inserts cleanly instead of
+    colliding on ``pk_scenes``/``pk_shots`` (§9.1: "a partial import is resumable").
+    """
     repos = _Repos(scenes=scenes, beats=beats, shots=shots, spans=spans)
+
+    # Clear-then-insert: drop shots (cascading source_span_index) and scenes
+    # (cascading beats) for this book before re-planning. Idempotent + atomic.
+    await repos.shots.delete_for_book(book_id)
+    await repos.scenes.delete_for_book(book_id)
 
     page_numbers = [p.page_number for p in extract.pages if p.num_words > 0]
     groups = group_scenes(page_numbers, pages_per_scene=pages_per_scene)
-    page_to_scene = {pn: g.scene_id for g in groups for pn in g.pages}
+    # Book-scope every plan id (§4.2): the stored scene/beat/shot ids carry the
+    # book id so the global PKs never collide across books, and a re-ingest is
+    # idempotent (the same book reproduces identical scoped ids).
+    page_to_scene = {pn: scope_id(book_id, g.scene_id) for g in groups for pn in g.pages}
 
     for group in groups:
         await repos.scenes.create(
@@ -330,10 +365,14 @@ async def plan_and_persist(
             page_start=group.page_start,
             page_end=group.page_end,
             style_entity_key=canon.style_key,
-            scene_id=group.scene_id,
+            scene_id=scope_id(book_id, group.scene_id),
         )
 
     # --- Adapter: page text -> beats (book-global beat_index across pages) ---- #
+    # ``analyze_page`` mints local beat ids (``beat_0000``…); we book-scope each
+    # beat's id + its scene_id immediately, so the downstream reconcile keys,
+    # ``plan_shots`` (which derives shot_id from beat_id and copies scene_id), and
+    # the persisted rows are all consistently scoped from one place.
     all_beats: list[Beat] = []
     beat_index = 0
     for page in extract.pages:
@@ -347,7 +386,10 @@ async def plan_and_persist(
             beat_index_start=beat_index,
             max_tokens=max_tokens,
         )
-        all_beats.extend(page_beats)
+        for beat in page_beats:
+            all_beats.append(
+                beat.model_copy(update={"beat_id": scope_id(book_id, beat.beat_id)})
+            )
         beat_index += len(page_beats)
 
     # --- Reconcile beats to REAL global word ranges -------------------------- #
@@ -420,7 +462,7 @@ async def plan_and_persist(
 
     result = ShotPlanResult(
         book_id=book_id,
-        scene_ids=[g.scene_id for g in groups],
+        scene_ids=[scope_id(book_id, g.scene_id) for g in groups],
         num_beats=len(reconciled),
         num_shots=len(shot_items),
         num_spans=num_spans,
@@ -452,4 +494,5 @@ __all__ = [
     "plan_and_persist",
     "reconcile_beat_word_ranges",
     "resolve_beat_entities",
+    "scope_id",
 ]

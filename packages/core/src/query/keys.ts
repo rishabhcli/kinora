@@ -11,6 +11,13 @@ export const queryKeys = {
   shots: (bookId: string) => ["book", bookId, "shots"] as const,
   page: (bookId: string, page: number) => ["book", bookId, "page", page] as const,
   session: (sessionId: string) => ["session", sessionId] as const,
+  /** The reader's learned directing style: global (no book) or per-book (§8.6). */
+  directingStyle: (bookId?: string) =>
+    bookId ? (["prefs", "book", bookId] as const) : (["prefs", "user"] as const),
+  /** The cached §13 crew-vs-baseline eval report for a book. */
+  evalReport: (bookId: string) => ["book", bookId, "eval-report"] as const,
+  /** The live-recomputed §4.10 committed-buffer sawtooth for a session. */
+  bufferTrace: (sessionId: string) => ["session", sessionId, "buffer-trace"] as const,
 };
 
 export const defaultQueryOptions = {

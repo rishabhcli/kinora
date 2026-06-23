@@ -18,8 +18,17 @@ export type * from "./api/types";
 export type { paths, components, operations } from "./api/schema";
 
 export * from "./events";
+export * from "./eval/report";
+export * from "./feed";
+export * from "./canon";
+export * from "./director";
 export * from "./sync/velocity";
 export * from "./sync/timeline";
+export * from "./sync/pageFocus";
+export * from "./sync/kenburns";
+export * from "./sync/buffer";
+export * from "./sync/lruMap";
+export * from "./sync/ladderTelemetry";
 export * from "./sync/SyncEngine";
 export * from "./realtime/socket";
 export * from "./stores/authStore";

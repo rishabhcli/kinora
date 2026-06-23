@@ -32,6 +32,7 @@ from app.api.schemas import (
     CanonEntityResponse,
     CanonReferenceImage,
     CanonResponse,
+    CanonStateResponse,
     PageResponse,
     ShotResponse,
 )
@@ -39,11 +40,13 @@ from app.composition import Container
 from app.core.logging import get_logger
 from app.db.base import new_id
 from app.db.models.book import Book
+from app.db.models.continuity import ContinuityState
 from app.db.models.entity import Entity
 from app.db.models.enums import BookStatus
 from app.db.models.shot import Shot
 from app.db.models.user import User
 from app.db.repositories.book import BookRepo, PageRepo
+from app.db.repositories.continuity import ContinuityStateRepo
 from app.db.repositories.entity import EntityRepo
 from app.ingest.epub_extract import (
     EPUB_CONTENT_TYPE,
@@ -406,10 +409,28 @@ async def get_canon(book_id: str, container: ContainerDep, user: CurrentUser) ->
         # Current (latest-version) entities — what the canon editor lists/edits.
         entities = await EntityRepo(session).list_active_at_beat(book_id, _LATEST_BEAT)
         items = [_canon_entity_response(container, e) for e in entities]
+        # Continuity facts (§8.5) — active + retired, so "forgetting" is inspectable.
+        states = await ContinuityStateRepo(session).list_for_book(book_id)
+        state_items = [_canon_state_response(s) for s in states]
         # The markdown vault (§8.1) — joined into one document for inspection.
         export = await CanonVault(session, blob_store=container.object_store).export(book_id)
     markdown = "\n\n".join(export.files.values()) or None
-    return CanonResponse(book_id=book_id, entities=items, markdown=markdown)
+    return CanonResponse(book_id=book_id, entities=items, states=state_items, markdown=markdown)
+
+
+def _canon_state_response(state: ContinuityState) -> CanonStateResponse:
+    """Project a continuity-state row for the canon editor (§8.5)."""
+    return CanonStateResponse(
+        id=state.id,
+        subject_entity_key=state.subject_entity_key,
+        predicate=state.predicate,
+        object_value=state.object_value,
+        valid_from_beat=state.valid_from_beat,
+        valid_to_beat=state.valid_to_beat,
+        version=state.version,
+        active=state.valid_to_beat is None,
+        source_span=state.source_span,
+    )
 
 
 def _canon_entity_response(container: Container, entity: Entity) -> CanonEntityResponse:
@@ -452,6 +473,7 @@ def _canon_reference_images(
                 images.append(
                     CanonReferenceImage(
                         oss_url=container.object_store.presigned_get_url(key),
+                        oss_key=key,
                         pose=item.get("pose"),
                         locked=bool(item.get("locked", False)),
                     )
@@ -463,7 +485,9 @@ def _canon_reference_images(
             if isinstance(key, str):
                 images.append(
                     CanonReferenceImage(
-                        oss_url=container.object_store.presigned_get_url(key), locked=locked
+                        oss_url=container.object_store.presigned_get_url(key),
+                        oss_key=key,
+                        locked=locked,
                     )
                 )
     return images

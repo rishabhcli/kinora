@@ -90,8 +90,16 @@ export class SessionSocket {
     this.send({ type: "seek", word });
   }
 
-  sendComment(note: string, shotId?: string | null): void {
-    this.send({ type: "comment", note, shot_id: shotId ?? null });
+  /**
+   * Send a Director region-comment over the wire (§5.6 `comment{shot_id,
+   * region_png, note}`). `regionPng` is the base64 PNG of the boxed region
+   * (no data-URL prefix); omitted when the reader commented without a selection.
+   * Note: the *regen-triggering* path is the REST `POST /sessions/{id}/comment`
+   * (it re-rolls the seed + enqueues); this WS message is the lightweight
+   * classify-and-announce counterpart.
+   */
+  sendComment(note: string, shotId?: string | null, regionPng?: string | null): void {
+    this.send({ type: "comment", note, shot_id: shotId ?? null, region_png: regionPng ?? null });
   }
 
   close(): void {

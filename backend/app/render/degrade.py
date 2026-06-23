@@ -44,6 +44,63 @@ DEFAULT_FPS: int = 30
 DEFAULT_ZOOM_MAX: float = 1.18
 _FFMPEG_TIMEOUT_S = 180.0
 
+#: How the learned camera (the §8.6 pacing / composition prior) drives the
+#: Ken-Burns push: shot size sets the zoom magnitude, pacing scales it — a
+#: "slower" prior becomes a gentler drift, a "wider" prior a near-static frame.
+#: This is what makes a learned "slower / wider" taste *visible* even on the
+#: off-gate degradation lane (where no live Wan motion exists).
+_SHOT_SIZE_ZOOM: dict[str, float] = {"wide": 1.05, "medium": 1.14, "close": 1.26}
+_SPEED_ZOOM_MULT: dict[str, float] = {"slow": 0.5, "medium": 1.0, "fast": 1.6}
+#: Keep the push within a tasteful, jitter-free band.
+ZOOM_FLOOR, ZOOM_CEIL = 1.02, 1.34
+
+
+def zoom_for_camera(camera: object | None) -> float:
+    """Map a shot's camera (speed + shot_size) onto a Ken-Burns ``zoom_max``.
+
+    Duck-typed on ``.speed`` / ``.shot_size`` (the agents' ``Camera``) so this
+    module stays free of the agents layer. ``None`` / unknown values fall back to
+    the neutral default, so a shot with no learned prior looks exactly as before.
+    """
+    speed = str(getattr(camera, "speed", "medium") or "medium").lower()
+    shot_size = str(getattr(camera, "shot_size", "medium") or "medium").lower()
+    base = _SHOT_SIZE_ZOOM.get(shot_size, _SHOT_SIZE_ZOOM["medium"])
+    mult = _SPEED_ZOOM_MULT.get(speed, 1.0)
+    zoom = 1.0 + (base - 1.0) * mult
+    return round(max(ZOOM_FLOOR, min(ZOOM_CEIL, zoom)), 4)
+
+
+#: Pacing also stretches/compresses dwell time: a "slower" prior lets the shot
+#: linger, a "faster" one tightens it (clamped so narration still fits, §8.6).
+_SPEED_DURATION_MULT: dict[str, float] = {"slow": 1.35, "medium": 1.0, "fast": 0.8}
+
+
+def duration_for_pacing(base_s: float, camera: object | None, *, floor_s: float = 1.0) -> float:
+    """Scale a shot's dwell time by the learned pacing (slower lingers longer)."""
+    speed = str(getattr(camera, "speed", "medium") or "medium").lower()
+    return round(max(floor_s, base_s * _SPEED_DURATION_MULT.get(speed, 1.0)), 3)
+
+
+#: ffmpeg grade fragments for the learned palette/lighting (§8.6) — applied over
+#: the Ken-Burns still so the look is *seen* on the off-gate lane, not just
+#: prompted. Warm/cool shift the colour balance; bright/dark the exposure+mood.
+_GRADE_FILTERS: dict[str, str] = {
+    "palette:warm": "colorbalance=rs=0.10:bs=-0.10:rm=0.06:bm=-0.08:rh=0.04:bh=-0.06",
+    "palette:cool": "colorbalance=rs=-0.10:bs=0.10:rm=-0.06:bm=0.08:rh=-0.04:bh=0.06",
+    "lighting:bright": "eq=brightness=0.06:saturation=1.06",
+    "lighting:dark": "eq=brightness=-0.08:contrast=1.08:saturation=0.95",
+}
+
+
+def grade_filter(*, palette: str | None = None, lighting: str | None = None) -> str | None:
+    """A comma-joined ffmpeg grade for the applied palette/lighting, or ``None``."""
+    parts = [
+        _GRADE_FILTERS[key]
+        for key in (f"palette:{palette}", f"lighting:{lighting}")
+        if key in _GRADE_FILTERS
+    ]
+    return ",".join(parts) or None
+
 
 class DegradeRung(StrEnum):
     """The §12.4 rungs below full Wan video (each cheaper than the last)."""
@@ -327,12 +384,15 @@ def ken_burns_over_image(
     size: tuple[int, int] = DEFAULT_SIZE,
     fps: int = DEFAULT_FPS,
     zoom_max: float = DEFAULT_ZOOM_MAX,
+    grade: str | None = None,
 ) -> bytes:
     """Render a real Ken-Burns mp4 over ``image_bytes`` (the §4.4/§12.4 rung).
 
     A slow zoom/pan over the still at ``size``/``fps`` for ``duration_s`` seconds,
-    muxing ``audio_bytes`` (the narration WAV) when provided. Returns mp4 bytes;
-    verify with :func:`probe` / :func:`verify_playable`.
+    muxing ``audio_bytes`` (the narration WAV) when provided. An optional ``grade``
+    (a comma-joined ffmpeg filter from :func:`grade_filter`) is appended so the
+    learned palette/lighting is baked into the clip. Returns mp4 bytes; verify with
+    :func:`probe` / :func:`verify_playable`.
 
     Raises:
         FfmpegError: when no ffmpeg binary is available or the render fails.
@@ -346,6 +406,8 @@ def ken_burns_over_image(
     ffmpeg = get_ffmpeg_exe()
     frames = _frames_for(duration_s, fps)
     vf = _ken_burns_filter(size, frames, fps, zoom_max)
+    if grade:
+        vf = f"{vf},{grade}"
 
     with tempfile.TemporaryDirectory(prefix="kinora_kb_") as tmp:
         tmp_dir = Path(tmp)
@@ -514,8 +576,10 @@ __all__ = [
     "FfmpegError",
     "ProbeInfo",
     "audio_text_card",
+    "duration_for_pacing",
     "extract_frames",
     "ffmpeg_available",
+    "grade_filter",
     "get_ffmpeg_exe",
     "get_ffprobe_exe",
     "inspect",
@@ -523,4 +587,5 @@ __all__ = [
     "probe",
     "run_ffmpeg",
     "verify_playable",
+    "zoom_for_camera",
 ]

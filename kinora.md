@@ -332,6 +332,7 @@ The backend pushes generation events to the client over **Server-Sent Events** (
 |---|---|---|
 | `keyframe_ready` | `{beat_id, oss_url}` | cache still for Ken-Burns bridge |
 | `clip_ready` | `{shot_id, oss_url, sync_segment}` | preload + hot-swap video source |
+| `buffer_state` | `{committed_seconds_ahead, low, high, commit_horizon, bursting, idle, zone}` | fill the buffer hairline toward `H` + set the zone badge (§5.3) |
 | `scene_stitched` | `{scene_id, oss_url, sync_map}` | replace per-shot playback with stitched scene |
 | `regen_done` | `{shot_id, oss_url, qa}` | swap a single shot after a Director edit |
 | `budget_low` | `{remaining_s}` | drop to keyframe ladder, show quiet notice |
@@ -628,6 +629,8 @@ Never the whole book, never stale versions. A 300-page book never re-enters the 
 ### 8.6 Preference learning — persistent across sessions
 
 Every Director edit writes a preference signal via `prefs.upsert`: a "slower" note nudges a pacing prior; repeated palette edits shift the default Style node; a re-framed shot adjusts a composition default. These accumulate per reader (and optionally per book), and the Cinematographer reads `prefs.get` into its prompt prior on the *next* session. Over time the system directs in the reader's taste without being asked — the persistent personalization Track 1 calls for, earned by the same write-back that powers self-correction.
+
+**How it's wired (implementation).** A free-text note is mapped to `(axis, direction)` signals (`app/memory/prefs_signals.py`): each signal nudges a signed `bias` per axis (±0.3, clamped ±1.5), so opposing notes cancel and repeated notes reinforce. `POST /sessions/{id}/comment` and `POST /books/{id}/canon_edit` both invoke this nudge path; the comment response echoes what it taught for teach-time confirmation. A prior becomes an applied *default* once `|bias| ≥ 0.5` — the Cinematographer folds book-scoped priors into the shot's `camera`/prompt, but only on axes the current note doesn't already address (an explicit ask wins). The learned camera also drives the off-gate Ken-Burns push (`zoom_for_camera`), so a "slower / wider" taste is visible even with `KINORA_LIVE_VIDEO` off. The accumulated priors are read back as plain language ("You prefer slower, lingering shots", "Warmer palette bias +0.3") via `GET /me/prefs` and `GET /books/{id}/prefs`, shown in a **"Your directing style"** Settings panel on both shells, and cleared per-book or globally via the matching `DELETE`.
 
 ### 8.7 Caching & dedup — why a re-read costs nothing
 

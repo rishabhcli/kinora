@@ -34,7 +34,7 @@ from app.observability import metrics
 from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult
 from app.scheduler.events import SessionEventPublisher
 from app.scheduler.model import BufferedShot, SchedulerSession, SchedulerStore
-from app.scheduler.zones import eta_seconds, trajectory_is_stable
+from app.scheduler.zones import Zone, eta_seconds, trajectory_is_stable, viewer_zone
 
 logger = get_logger("app.scheduler.service")
 
@@ -218,6 +218,7 @@ class SchedulerService:
                 metrics.inc_idle_period()
             metrics.set_buffer_occupancy(session.session_id, session.committed_seconds_ahead)
             await self._save(session)
+            await self._publish_buffer_state(session, idle=True)
             logger.info("scheduler.idle", session_id=session.session_id, cancelled=cancelled)
             return SchedulerTick(
                 idle=True,
@@ -247,6 +248,7 @@ class SchedulerService:
 
         await self._save(session)
         metrics.set_buffer_occupancy(session.session_id, session.committed_seconds_ahead)
+        await self._publish_buffer_state(session, idle=False, promoted=len(promoted))
         tick = SchedulerTick(
             idle=False,
             promoted=promoted,
@@ -286,6 +288,63 @@ class SchedulerService:
             "scheduler.budget_low",
             session_id=session.session_id,
             remaining_s=remaining,
+        )
+
+    # -- buffer surfacing (the §5.3 indicator) ------------------------------- #
+
+    async def _zone_and_eta(self, session: SchedulerSession) -> tuple[Zone, float | None]:
+        """Classify the nearest upcoming shot + its ETA for the §5.3 surfacing."""
+        shot = await self._shots.next_uncommitted_shot(session.book_id, session.focus_word)
+        next_eta = (
+            eta_seconds(_shot_start(shot), session.focus_word, session.velocity_wps)
+            if shot is not None
+            else None
+        )
+        budget_ok = self._budget.can_render_live() and not await self._budget.is_low()
+        zone = viewer_zone(
+            next_eta,
+            stable=trajectory_is_stable(session),
+            budget_ok=budget_ok,
+            commit_horizon_s=self._commit_horizon,
+            spec_horizon_s=self._spec_horizon,
+        )
+        return zone, next_eta
+
+    async def _publish_buffer_state(
+        self, session: SchedulerSession, *, idle: bool, promoted: int = 0
+    ) -> None:
+        """Surface live buffer occupancy + zone to the client (§5.3/§5.6).
+
+        A small event carrying everything the buffer hairline + zone badge + debug
+        readout need: the committed-seconds-ahead the hairline fills toward ``H``,
+        the watermarks/horizon it is measured against, the burst/idle flags, the
+        velocity-adaptive zone + the ETA it was derived from, the in-flight render
+        counts, and how many shots this tick promoted (a *real* burst). Fired once
+        per control tick; a ``None`` publisher (the tests' default) makes it a
+        no-op.
+        """
+        if self._events is None:
+            return
+        zone, next_eta = await self._zone_and_eta(session)
+        inflight = session.inflight
+        await self._events.publish(
+            session.session_id,
+            {
+                "event": "buffer_state",
+                "committed_seconds_ahead": round(session.committed_seconds_ahead, 3),
+                "low": self._low,
+                "high": self._high,
+                "commit_horizon": self._commit_horizon,
+                "bursting": session.bursting,
+                "idle": idle,
+                "zone": zone.value,
+                "eta_next_s": round(next_eta, 3) if next_eta is not None else None,
+                "velocity_wps": round(session.velocity_wps, 3),
+                "inflight_committed": len(inflight["committed"]),
+                "inflight_speculative": len(inflight["speculative"]),
+                "promoted": promoted,
+                "budget_remaining_s": session.budget_remaining_s,
+            },
         )
 
     # -- watermark fill ------------------------------------------------------ #

@@ -236,7 +236,7 @@
           "books"
         ],
         "summary": "Upload Book",
-        "description": "Validate + store a PDF, create the book, and trigger Phase A ingest.\n\nReturns the freshly-created book (status ``importing``) directly \u2014 the shelf\nprepends it and polls until it is ``ready``.\n\nDefends the ingest pipeline: the content-type is checked, the per-user book\nquota is enforced, the body is read **streaming** (aborting the moment it\ncrosses ``MAX_PDF_BYTES`` rather than buffering an oversized payload), and the\npage count is capped (``MAX_INGEST_PAGES``) before any token-spending ingest\nis triggered.",
+        "description": "Validate + store a PDF/EPUB, create the book, and trigger Phase A ingest.\n\nReturns the freshly-created book (status ``importing``) directly \u2014 the shelf\nprepends it and polls until it is ``ready``.\n\nDefends the ingest pipeline: the content-type is checked, the per-user book\nquota is enforced, the body is read **streaming** (aborting the moment it\ncrosses ``MAX_PDF_BYTES`` rather than buffering an oversized payload), the\nformat is detected by content magic, an EPUB is normalised to PDF, and the\npage count is capped (``MAX_INGEST_PAGES``) before any token-spending ingest\nis triggered.",
         "operationId": "upload_book_api_books_post",
         "requestBody": {
           "content": {
@@ -815,7 +815,7 @@
           "director"
         ],
         "summary": "Conflict Choice",
-        "description": "Record the Director's resolution of a surfaced conflict and announce it (\u00a77.2).",
+        "description": "Apply the Director's resolution of a surfaced conflict (\u00a77.2).\n\nRecords the pick, streams the Showrunner's arbitration reasoning into the feed,\nand **acts on it**: ``honor_canon`` regenerates the shot honouring the canon,\n``evolve_canon`` writes the new state then regenerates, ``surface_to_user``\nleaves it surfaced. The affected shot's fresh clip closes the loop (a\n``regen_done`` event), so the \u00a716 demo resolves a conflict live.",
         "operationId": "conflict_choice_api_sessions__session_id__conflict_choice_post",
         "security": [
           {
@@ -850,6 +850,152 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictChoiceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/prefs": {
+      "get": {
+        "tags": [
+          "prefs"
+        ],
+        "summary": "My Directing Style",
+        "description": "The reader's accumulated directing style across all their books (\u00a78.6).",
+        "operationId": "my_directing_style_api_me_prefs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectingStyleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "prefs"
+        ],
+        "summary": "Reset My Directing Style",
+        "description": "Clear the reader's learned directing style everywhere (global reset, \u00a78.6).",
+        "operationId": "reset_my_directing_style_api_me_prefs_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPrefsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/prefs": {
+      "get": {
+        "tags": [
+          "prefs"
+        ],
+        "summary": "Book Directing Style",
+        "description": "The directing style learned for one book \u2014 what its shots default to (\u00a78.6).",
+        "operationId": "book_directing_style_api_books__book_id__prefs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Book Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectingStyleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "prefs"
+        ],
+        "summary": "Reset Book Directing Style",
+        "description": "Clear the directing style learned for one book (\u00a78.6).",
+        "operationId": "reset_book_directing_style_api_books__book_id__prefs_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Book Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPrefsResponse"
                 }
               }
             }
@@ -1119,7 +1265,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "The source PDF"
+            "description": "The source PDF or EPUB"
           },
           "title": {
             "anyOf": [
@@ -1489,6 +1635,17 @@
             "type": "string",
             "title": "Oss Url"
           },
+          "oss_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oss Key"
+          },
           "pose": {
             "anyOf": [
               {
@@ -1517,7 +1674,7 @@
           "oss_url"
         ],
         "title": "CanonReferenceImage",
-        "description": "A locked reference image projected for the Director's canon editor."
+        "description": "A locked reference image projected for the Director's canon editor.\n\n``oss_url`` is an ephemeral presigned GET URL (for display); ``oss_key`` is the\ndurable object-store key. The editor echoes ``oss_key`` back inside a\n``canon_edit`` ``changes.appearance`` so a locked-reference swap round-trips\nlosslessly \u2014 the presigned URL can't be re-stored, the key can (\u00a75.4/\u00a78.1)."
       },
       "CanonResponse": {
         "properties": {
@@ -1531,6 +1688,13 @@
             },
             "type": "array",
             "title": "Entities"
+          },
+          "states": {
+            "items": {
+              "$ref": "#/components/schemas/CanonStateResponse"
+            },
+            "type": "array",
+            "title": "States"
           },
           "markdown": {
             "anyOf": [
@@ -1549,7 +1713,74 @@
           "book_id"
         ],
         "title": "CanonResponse",
-        "description": "The canon graph for a book: the entity list the Director editor renders,\nplus the optional human-inspectable markdown vault export (\u00a78.1)."
+        "description": "The canon graph for a book: the entity list the Director editor renders,\nthe versioned continuity facts (\u00a78.5), plus the optional human-inspectable\nmarkdown vault export (\u00a78.1)."
+      },
+      "CanonStateResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "subject_entity_key": {
+            "type": "string",
+            "title": "Subject Entity Key"
+          },
+          "predicate": {
+            "type": "string",
+            "title": "Predicate"
+          },
+          "object_value": {
+            "type": "string",
+            "title": "Object Value"
+          },
+          "valid_from_beat": {
+            "type": "integer",
+            "title": "Valid From Beat"
+          },
+          "valid_to_beat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To Beat"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "source_span": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Span"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject_entity_key",
+          "predicate",
+          "object_value",
+          "valid_from_beat",
+          "version",
+          "active"
+        ],
+        "title": "CanonStateResponse",
+        "description": "A versioned continuity fact projected for the canon editor (\u00a78.5).\n\nA ``(subject, predicate, object)`` triple true only over a beat interval;\n``valid_to_beat is None`` means still active, a value means it was *retired*\n(the \"forgetting\" mechanism) \u2014 the editor shows both so the timeline of what\nthe story currently believes (and used to) is inspectable."
       },
       "CommentRequest": {
         "properties": {
@@ -1612,6 +1843,13 @@
               }
             ],
             "title": "Job Id"
+          },
+          "learned": {
+            "items": {
+              "$ref": "#/components/schemas/DirectingPriorView"
+            },
+            "type": "array",
+            "title": "Learned"
           }
         },
         "type": "object",
@@ -1622,7 +1860,7 @@
           "message"
         ],
         "title": "CommentResponse",
-        "description": "How a comment was routed and the regen it triggered (\u00a75.4)."
+        "description": "How a comment was routed and the regen it triggered (\u00a75.4).\n\n``learned`` is the directing priors this note taught (\u00a78.6) \u2014 usually empty,\nbut non-empty when the note nudged a pacing/palette/framing default, so the\nclient can confirm \"Noted \u2014 slower shots will be the default\" at teach time."
       },
       "ConflictChoiceRequest": {
         "properties": {
@@ -1631,8 +1869,7 @@
             "title": "Conflict Id"
           },
           "option": {
-            "type": "string",
-            "title": "Option"
+            "$ref": "#/components/schemas/ConflictOption"
           }
         },
         "additionalProperties": false,
@@ -1651,13 +1888,34 @@
             "title": "Conflict Id"
           },
           "option": {
-            "type": "string",
-            "title": "Option"
+            "$ref": "#/components/schemas/ConflictOption"
           },
           "status": {
             "type": "string",
             "title": "Status",
             "default": "recorded"
+          },
+          "shot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Id"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
           }
         },
         "type": "object",
@@ -1666,7 +1924,17 @@
           "option"
         ],
         "title": "ConflictChoiceResponse",
-        "description": "Acknowledgement that a conflict choice was recorded (\u00a77.2)."
+        "description": "Acknowledgement of a conflict resolution (\u00a77.2)."
+      },
+      "ConflictOption": {
+        "type": "string",
+        "enum": [
+          "honor_canon",
+          "surface_to_user",
+          "evolve_canon"
+        ],
+        "title": "ConflictOption",
+        "description": "The fixed set of resolutions the Showrunner policy arbitrates between."
       },
       "CreateSessionRequest": {
         "properties": {
@@ -1693,6 +1961,88 @@
         ],
         "title": "CreateSessionRequest",
         "description": "Open a reading session against a book."
+      },
+      "DirectingPriorView": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "bias": {
+            "type": "number",
+            "title": "Bias"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "applied_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "bias",
+          "weight",
+          "label",
+          "detail",
+          "applied"
+        ],
+        "title": "DirectingPriorView",
+        "description": "One learned directing prior, projected as plain language for the panel.\n\n``bias`` is the signed strength (negative = slower/cooler/closer, positive =\nfaster/warmer/wider); ``applied`` is whether it is strong enough to default a\nfuture shot; ``applied_value`` is the concrete default it sets (``slow`` /\n``wide`` / \u2026) when applied."
+      },
+      "DirectingStyleResponse": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "book_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Id"
+          },
+          "priors": {
+            "items": {
+              "$ref": "#/components/schemas/DirectingPriorView"
+            },
+            "type": "array",
+            "title": "Priors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope"
+        ],
+        "title": "DirectingStyleResponse",
+        "description": "The reader's accumulated directing style for a scope (\u00a78.6).\n\n``scope`` is ``\"book\"`` (this title) or ``\"user\"`` (all books). Empty\n``priors`` means nothing has been learned yet \u2014 the panel shows its zero-state."
       },
       "HTTPValidationError": {
         "properties": {
@@ -1893,6 +2243,36 @@
         ],
         "title": "RegisterRequest",
         "description": "Create an account."
+      },
+      "ResetPrefsResponse": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "book_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Id"
+          },
+          "cleared": {
+            "type": "integer",
+            "title": "Cleared",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope"
+        ],
+        "title": "ResetPrefsResponse",
+        "description": "Acknowledgement that learned priors were cleared (\u00a78.6)."
       },
       "SeekRequest": {
         "properties": {

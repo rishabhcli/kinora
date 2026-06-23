@@ -25,7 +25,15 @@ function stageLabel(book: BookResponse): string {
  *  animation on select before it opens in its own window. A book still importing
  *  (or whose import failed) reads as a deliberate, dimmed state with a status
  *  chip rather than a broken cover. */
-export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => void }) {
+export function BookCover({
+  book,
+  onOpen,
+  onMetrics,
+}: {
+  book: BookResponse;
+  onOpen: () => void;
+  onMetrics?: () => void;
+}) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
   const failed = book.status === "failed";
@@ -53,15 +61,9 @@ export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => 
   }
 
   return (
-    <button
-      onClick={select}
-      title={book.title}
-      aria-label={`Open ${book.title}`}
-      className="group relative flex shrink-0 flex-col items-center outline-none"
-      style={{ width: 138 }}
-    >
+    <div className="group relative flex shrink-0 flex-col items-center" style={{ width: 138 }}>
       <div
-        className={`relative aspect-[2/3] w-[138px] origin-bottom rounded-[3px_7px_7px_3px] transition-[transform,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:-translate-y-2.5 group-focus-visible:-translate-y-2.5 group-focus-visible:ring-2 group-focus-visible:ring-ember-glow/80 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-walnut-deep ${
+        className={`relative aspect-[2/3] w-[138px] origin-bottom rounded-[3px_7px_7px_3px] transition-[transform,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:-translate-y-2.5 group-focus-within:-translate-y-2.5 ${
           popping ? "-translate-y-8 scale-[1.08]" : ""
         }`}
         style={{
@@ -114,16 +116,42 @@ export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => 
             </>
           )}
         </div>
+
+        {/* Full-cover open button + a hover metrics affordance — siblings (no
+            nested <button>); both lift with the cover via the group. */}
+        <button
+          type="button"
+          onClick={select}
+          title={book.title}
+          aria-label={`Open ${book.title}`}
+          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+        />
+        {ready && onMetrics && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onMetrics();
+            }}
+            title="Metrics"
+            aria-label={`Metrics for ${book.title}`}
+            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-walnut-deep/70 text-white/85 opacity-0 backdrop-blur-md transition hover:bg-walnut-deep hover:text-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow group-hover:opacity-100 motion-reduce:transition-none"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 21V10M12 21V4M19 21v-7" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Contact shadow on the plank: tightens + darkens as the book lifts. */}
-      <div className="shelf-contact mt-1 w-[86%] opacity-90 group-hover:w-[78%] group-hover:opacity-60 group-focus-visible:w-[78%] group-focus-visible:opacity-60" />
+      <div className="shelf-contact mt-1 w-[86%] opacity-90 group-hover:w-[78%] group-hover:opacity-60 group-focus-within:w-[78%] group-focus-within:opacity-60" />
 
       {/* Title sits just below the shelf board; absolute so the cover seats on
           the rail rather than the label. Fades in only on hover/focus. */}
-      <p className="pointer-events-none absolute top-[calc(100%+12px)] left-1/2 max-w-[148px] -translate-x-1/2 truncate text-center font-sans text-[11px] text-white/0 transition-colors duration-200 group-hover:text-white/85 group-focus-visible:text-white/85">
+      <p className="pointer-events-none absolute top-[calc(100%+12px)] left-1/2 max-w-[148px] -translate-x-1/2 truncate text-center font-sans text-[11px] text-white/0 transition-colors duration-200 group-hover:text-white/85 group-focus-within:text-white/85">
         {book.title}
       </p>
-    </button>
+    </div>
   );
 }

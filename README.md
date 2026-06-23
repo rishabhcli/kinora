@@ -69,7 +69,7 @@ A versioned **canon graph** (characters, voices, locations, props, style, timeli
 
 - **Recall under a limited context window** — `canon.query(beat)` returns *only* what a beat needs (characters present + active location + style tokens + the previous shot's endpoint frame), never the whole book. Token cost stays flat as books get longer.
 - **Timely forgetting** — facts are scoped to the beat interval where they were true; retired states drop out of forward retrieval but survive for backward (time-travel) reads.
-- **Increasingly accurate across sessions** — every Director edit writes a preference signal, so the system learns this reader's taste (pacing, palette, framing) and applies it by default next time.
+- **Increasingly accurate across sessions** — every Director edit writes a preference signal, so the system learns this reader's taste (pacing, palette, framing) and applies it by default next time. The accumulated style is browsable and resettable (per-book or globally) in the **"Your directing style"** Settings panel on both apps (`GET`/`DELETE /me/prefs`, `/books/{id}/prefs`).
 - **Free re-reads** — each shot has a content hash; a cache hit serves the clip from OSS for zero video-seconds, which also makes Director edits surgical (only the dependent shots regenerate).
 
 ## Architecture

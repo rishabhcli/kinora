@@ -58,6 +58,7 @@ from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
     from app.mcp.tools import MemoryTools
+    from app.memory.prefs_service import PreferencePrior, PreferencePriors
     from app.providers import Providers
     from app.scheduler.keyframe import KeyframeService
 
@@ -313,11 +314,67 @@ class Container:
         )
         return self.comment_classifier
 
-    async def classify_comment(
-        self, note: str, *, shot_context: str | None = None
-    ) -> CommentRoute:
+    async def classify_comment(self, note: str, *, shot_context: str | None = None) -> CommentRoute:
         """Route a Director note to an agent (cheap chat() classifier, §5.4)."""
         return await self._classifier().classify(note, shot_context=shot_context)
+
+    # -- preference learning (§8.6: every Director edit teaches a prior) ------ #
+
+    async def record_note_prefs(
+        self, note: str, *, user_id: str | None, book_id: str | None
+    ) -> list[PreferencePrior]:
+        """Learn directing priors from a Director region-comment (§8.6).
+
+        Best-effort: a preference write must never break the comment's regen, so a
+        failure is logged and swallowed.
+        """
+        from app.db.repositories.pref import PrefsRepo
+        from app.memory.prefs_service import PrefsService
+
+        try:
+            async with self.session_factory() as db:
+                priors = await PrefsService(prefs=PrefsRepo(db)).record_note(
+                    note, user_id=user_id, book_id=book_id
+                )
+            return priors
+        except Exception as exc:  # noqa: BLE001 - learning is best-effort
+            logger.warning("prefs.record_note_failed", error=str(exc))
+            return []
+
+    async def record_edit_prefs(
+        self, changes: dict[str, object], *, user_id: str | None, book_id: str | None
+    ) -> list[PreferencePrior]:
+        """Learn directing priors from a canon edit's changes (§8.6, best-effort)."""
+        from app.db.repositories.pref import PrefsRepo
+        from app.memory.prefs_service import PrefsService
+
+        try:
+            async with self.session_factory() as db:
+                priors = await PrefsService(prefs=PrefsRepo(db)).record_changes(
+                    changes, user_id=user_id, book_id=book_id
+                )
+            return priors
+        except Exception as exc:  # noqa: BLE001 - learning is best-effort
+            logger.warning("prefs.record_edit_failed", error=str(exc))
+            return []
+
+    async def get_prefs(
+        self, *, user_id: str | None = None, book_id: str | None = None
+    ) -> PreferencePriors:
+        """Read aggregated directing priors for a scope (§8.6) — for the Settings panel."""
+        from app.db.repositories.pref import PrefsRepo
+        from app.memory.prefs_service import PrefsService
+
+        async with self.session_factory() as db:
+            return await PrefsService(prefs=PrefsRepo(db)).get(user_id=user_id, book_id=book_id)
+
+    async def reset_prefs(self, *, user_id: str | None = None, book_id: str | None = None) -> int:
+        """Clear learned directing priors for a scope; return how many were removed."""
+        from app.db.repositories.pref import PrefsRepo
+        from app.memory.prefs_service import PrefsService
+
+        async with self.session_factory() as db:
+            return await PrefsService(prefs=PrefsRepo(db)).reset(user_id=user_id, book_id=book_id)
 
     async def run_regen(
         self, book_id: str, shot_id: str, session_id: str | None = None

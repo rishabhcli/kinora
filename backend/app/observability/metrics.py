@@ -131,6 +131,14 @@ conflicts_total: Counter = Counter(
     registry=registry,
 )
 
+conflicts_resolved_total: Counter = Counter(
+    "kinora_conflicts_resolved_total",
+    "Continuity conflicts resolved, labelled by the chosen §7.2 policy option "
+    "(honor_canon / evolve_canon / surface_to_user).",
+    labelnames=("option",),
+    registry=registry,
+)
+
 # --------------------------------------------------------------------------- #
 # Per-session scheduler telemetry (§12.5)
 # --------------------------------------------------------------------------- #
@@ -304,6 +312,11 @@ def inc_shot_degraded() -> None:
 def inc_conflict() -> None:
     """Count one continuity conflict surfaced to the director."""
     conflicts_total.inc()
+
+
+def inc_conflict_resolved(option: str) -> None:
+    """Count one §7.2 conflict resolution, by the chosen policy option."""
+    conflicts_resolved_total.labels(option=option).inc()
 
 
 # --------------------------------------------------------------------------- #

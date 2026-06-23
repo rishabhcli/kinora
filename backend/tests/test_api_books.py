@@ -209,6 +209,12 @@ async def test_get_canon_vault(
             entity_type=EntityType.CHARACTER,
             name="Brave Hero",
             valid_from_beat=1,
+            appearance={
+                "description": "windswept cloak, iron circlet",
+                "reference_images": [
+                    {"key": "refs/char_hero/front.png", "pose": "front", "locked": True},
+                ],
+            },
         )
 
     resp = await api_client.get(f"/api/books/{book_id}/canon", headers=auth_headers)
@@ -221,6 +227,13 @@ async def test_get_canon_vault(
     assert hero["name"] == "Brave Hero"
     assert hero["type"] == "character"
     assert hero["version"] == 1
+    # Reference images carry BOTH a presigned display URL and the durable key, so
+    # the canon editor can echo the key back in a canon_edit (lossless lock swap).
+    ref = hero["appearance"]["reference_images"][0]
+    assert ref["oss_key"] == "refs/char_hero/front.png"
+    assert ref["oss_url"].startswith("http")
+    assert ref["pose"] == "front"
+    assert ref["locked"] is True
     assert "char_hero" in body["markdown"]
     assert "Brave Hero" in body["markdown"]
 

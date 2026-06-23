@@ -15,6 +15,10 @@ interface ReadingToolbarProps {
   onBack: () => void;
   onShare: () => void;
   shareConfirmed: boolean;
+  onOpenMetrics: () => void;
+  metricsOpen: boolean;
+  onOpenCanon: () => void;
+  canonOpen: boolean;
 }
 
 function IconButton({
@@ -63,6 +67,10 @@ export function ReadingToolbar({
   onBack,
   onShare,
   shareConfirmed,
+  onOpenMetrics,
+  metricsOpen,
+  onOpenCanon,
+  canonOpen,
 }: ReadingToolbarProps) {
   const [themeOpen, setThemeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -112,6 +120,21 @@ export function ReadingToolbar({
           </IconButton>
           {themeOpen && <ThemePopover {...reading} onClose={() => setThemeOpen(false)} />}
         </div>
+
+        {/* Metrics — opens the §13 proof panel (crew vs baseline + buffer sawtooth) */}
+        <IconButton label="Metrics" on={metricsOpen} onClick={onOpenMetrics}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 21V10M12 21V4M19 21v-7" />
+          </svg>
+        </IconButton>
+
+        {/* Canon — opens the §5.4 editable memory graph (surgical re-render) */}
+        <IconButton label="Canon editor" on={canonOpen} onClick={onOpenCanon}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3 2 8l10 5 10-5-10-5Z" />
+            <path d="m2 12 10 5 10-5" opacity="0.55" />
+          </svg>
+        </IconButton>
 
         {/* Search — expands inline */}
         <div

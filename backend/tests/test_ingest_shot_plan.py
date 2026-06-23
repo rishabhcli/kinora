@@ -26,6 +26,7 @@ from app.ingest.shot_plan import (
     group_scenes,
     plan_and_persist,
     reconcile_beat_word_ranges,
+    scope_id,
 )
 from app.providers import Providers
 from tests.test_ingest_support import (
@@ -200,14 +201,17 @@ async def test_shot_plan_persists_and_index_resolves(
     assert len(await SceneRepo(session).list_by_book(book.id)) == 2
 
     # The Adapter's bogus (0,0) spans were overridden with REAL global ranges.
+    # Persisted ids are book-scoped (§4.2) — the plan keys by the scoped id.
     p2_start = extract.pages[1].word_index_start
-    assert plan.beat_ranges["beat_0000"][0] == 0  # first beat of page 1 starts at 0
-    assert plan.beat_ranges["beat_0002"][0] == p2_start  # first beat of page 2
+    beat0 = scope_id(book.id, "beat_0000")
+    beat2 = scope_id(book.id, "beat_0002")
+    assert plan.beat_ranges[beat0][0] == 0  # first beat of page 1 starts at 0
+    assert plan.beat_ranges[beat2][0] == p2_start  # first beat of page 2
 
     # Beat entity resolution mapped canon names → entity_keys.
-    b0 = await BeatRepo(session).get("beat_0000")
+    b0 = await BeatRepo(session).get(beat0)
     assert b0 is not None and "char_knight" in b0.entities
-    b2 = await BeatRepo(session).get("beat_0002")
+    b2 = await BeatRepo(session).get(beat2)
     assert b2 is not None and "char_princess" in b2.entities
 
     # THE KEY CHECK: every extracted word resolves to the shot whose reconciled

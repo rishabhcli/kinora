@@ -25,6 +25,12 @@ export const syncSegmentSchema = z.object({
   page: z.number().int(),
   page_turn_at_s: z.number(),
   words: z.array(syncWordSchema).default([]),
+  /**
+   * Separate narration track (CosyVoice .wav), when the backend exposes it apart
+   * from the muxed clip — the bottom rung of the §12.4 ladder (audio + karaoke
+   * text) can play this with no video. Forward-compatible: absent today.
+   */
+  audio_url: z.string().nullable().optional(),
 });
 export type SyncSegment = z.infer<typeof syncSegmentSchema>;
 
@@ -72,20 +78,90 @@ export const budgetLowEvent = z.object({
   remaining_s: z.number(),
 });
 
+/** The viewer-facing representation of the nearest upcoming shot (§4.4/§5.3). */
+export const bufferZoneSchema = z.enum(["committed", "speculative", "cold"]);
+export type BufferZone = z.infer<typeof bufferZoneSchema>;
+
+/**
+ * Live buffer surfacing (§5.3): the committed video-seconds the hairline fills
+ * toward `high`, the watermarks it is measured against, the burst/idle hysteresis
+ * flags, and the zone badge. Emitted once per Scheduler control tick (§4.9).
+ */
+export const bufferStateEvent = z.object({
+  event: z.literal("buffer_state"),
+  committed_seconds_ahead: z.number(),
+  low: z.number(),
+  high: z.number(),
+  commit_horizon: z.number(),
+  bursting: z.boolean().default(false),
+  idle: z.boolean().default(false),
+  zone: bufferZoneSchema.default("cold"),
+  /** Reading-seconds to the nearest upcoming shot (the value `zone` was derived from). */
+  eta_next_s: z.number().nullable().optional(),
+  /** The clamped reading velocity the scheduler is planning against (wps). */
+  velocity_wps: z.number().optional(),
+  /** In-flight render counts: committed full-video shots / speculative keyframes. */
+  inflight_committed: z.number().int().optional(),
+  inflight_speculative: z.number().int().optional(),
+  /** Shots promoted to full video on this tick — a real generation burst. */
+  promoted: z.number().int().default(0),
+  budget_remaining_s: z.number().nullable().optional(),
+});
+export type BufferStateEvent = z.infer<typeof bufferStateEvent>;
+
+// --- Conflict negotiation (§7.2): structured Showrunner ↔ Continuity dispute - #
+
+/** The fixed policy resolutions the Showrunner arbitrates between (§7.2). */
+export const conflictOptionIdSchema = z.enum(["honor_canon", "surface_to_user", "evolve_canon"]);
+export type ConflictOptionId = z.infer<typeof conflictOptionIdSchema>;
+
+/** One option on a surfaced conflict, with its budget cost / precondition. */
+export const conflictOptionSchema = z.object({
+  /** Tolerant of an unknown id so a future policy option still renders. */
+  id: z.union([conflictOptionIdSchema, z.string()]),
+  action: z.string(),
+  cost_video_s: z.number().nullable().optional(),
+  requires: z.string().nullable().optional(),
+});
+export type ConflictOption = z.infer<typeof conflictOptionSchema>;
+
+/** The Showrunner's decision record / a director choice ack on agent_activity. */
+export const conflictDecisionSchema = z
+  .object({
+    conflict_id: z.string().optional(),
+    /** Set by the director's pick (POST conflict_choice). */
+    option: z.union([conflictOptionIdSchema, z.string()]).nullable().optional(),
+    /** Set by the Showrunner's auto-arbitration (DecisionRecord). */
+    chosen_option: z.union([conflictOptionIdSchema, z.string()]).nullable().optional(),
+    reasoning: z.string().nullable().optional(),
+    claim: z.string().nullable().optional(),
+    canon_fact: z.string().nullable().optional(),
+    evolved_canon: z.boolean().optional(),
+  })
+  .passthrough();
+export type ConflictDecision = z.infer<typeof conflictDecisionSchema>;
+
 export const agentActivityEvent = z.object({
   event: z.literal("agent_activity"),
   agent: z.string(),
   aspect: z.string().nullable().optional(),
   message: z.string(),
   shot_id: z.string().nullable().optional(),
+  job_id: z.string().nullable().optional(),
+  /** Present when the activity records a §7.2 conflict decision (auto or director). */
+  conflict: conflictDecisionSchema.nullable().optional(),
+  /** Structured Critic QA (ccs/verdict) when the activity reports a QA result (§9.5). */
+  qa: z.record(z.unknown()).nullable().optional(),
 });
 
 export const conflictChoiceEvent = z.object({
   event: z.literal("conflict_choice"),
   conflict_id: z.string(),
-  options: z.array(z.unknown()).default([]),
-  claim: z.unknown().optional(),
-  canon_fact: z.unknown().optional(),
+  options: z.array(conflictOptionSchema).default([]),
+  claim: z.string().nullable().optional(),
+  canon_fact: z.string().nullable().optional(),
+  current_beat: z.string().nullable().optional(),
+  raised_by: z.string().nullable().optional(),
   shot_id: z.string().nullable().optional(),
 });
 
@@ -99,6 +175,7 @@ export const kinoraEventSchema = z.discriminatedUnion("event", [
   keyframeReadyEvent,
   regenDoneEvent,
   budgetLowEvent,
+  bufferStateEvent,
   agentActivityEvent,
   conflictChoiceEvent,
   ingestProgressEvent,

@@ -24,6 +24,7 @@ export type CanonResponse = Schemas["CanonResponse"];
 export type CanonEntityResponse = Schemas["CanonEntityResponse"];
 export type CanonAppearance = Schemas["CanonAppearance"];
 export type CanonReferenceImage = Schemas["CanonReferenceImage"];
+export type CanonStateResponse = Schemas["CanonStateResponse"];
 export type CanonEditRequest = Schemas["CanonEditRequest"];
 export type CanonEditResponse = Schemas["CanonEditResponse"];
 
@@ -40,6 +41,11 @@ export type CommentRequest = Schemas["CommentRequest"];
 export type CommentResponse = Schemas["CommentResponse"];
 export type ConflictChoiceRequest = Schemas["ConflictChoiceRequest"];
 export type ConflictChoiceResponse = Schemas["ConflictChoiceResponse"];
+
+// --- Directing-style preferences (§8.6) ---
+export type DirectingStyleResponse = Schemas["DirectingStyleResponse"];
+export type DirectingPriorView = Schemas["DirectingPriorView"];
+export type ResetPrefsResponse = Schemas["ResetPrefsResponse"];
 
 // --- Eval ---
 export type BufferTracePoint = Schemas["BufferTracePoint"];
