@@ -71,6 +71,9 @@ mcp:
 
 demo-pdf:
 	backend/.venv/bin/python assets/books/build_demo_pdf.py
+	backend/.venv/bin/python assets/books/build_red_riding_hood.py
+
+demo-pdfs: demo-pdf
 
 seed-demo:
 	cd backend && .venv/bin/python scripts/seed_demo.py $(SEED_ARGS)
