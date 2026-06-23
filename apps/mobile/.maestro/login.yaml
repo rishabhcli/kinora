@@ -1,0 +1,9 @@
+# Maestro smoke flow — launch the app and assert the login screen renders.
+# Run on a device/emulator with a dev build installed:
+#   eas build --profile development        # or: npx expo run:android
+#   maestro test apps/mobile/.maestro/login.yaml
+appId: app.kinora.mobile
+---
+- launchApp
+- assertVisible: "Kinora"
+- assertVisible: "watch the book"

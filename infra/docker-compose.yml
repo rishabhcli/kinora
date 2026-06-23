@@ -211,20 +211,6 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ..
-      dockerfile: infra/docker/frontend.Dockerfile
-    image: kinora-frontend:local
-    ports:
-      - "5173:5173"
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - kinora
-    restart: unless-stopped
-
   prometheus:
     image: prom/prometheus:latest
     command:
