@@ -17,7 +17,19 @@ struct KinoraGlassApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1320, height: 880)
+        .commands {
+            CommandGroup(after: .sidebar) {
+                Button("Reload") {
+                    NotificationCenter.default.post(name: .kinoraReload, object: nil)
+                }
+                .keyboardShortcut("r", modifiers: .command)
+            }
+        }
     }
+}
+
+extension Notification.Name {
+    static let kinoraReload = Notification.Name("kinora.reload")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -151,6 +163,9 @@ struct WebView: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.load(URLRequest(url: Kinora.url(path)))
+        NotificationCenter.default.addObserver(
+            forName: .kinoraReload, object: nil, queue: .main
+        ) { [weak webView] _ in webView?.reload() }
         return webView
     }
 
