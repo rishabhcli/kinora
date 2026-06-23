@@ -22,3 +22,5 @@ export * from "./sync/velocity";
 export * from "./sync/timeline";
 export * from "./sync/SyncEngine";
 export * from "./realtime/socket";
+export * from "./stores/authStore";
+export * from "./query/keys";
