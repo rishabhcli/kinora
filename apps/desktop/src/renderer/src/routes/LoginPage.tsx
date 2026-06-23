@@ -1,20 +1,22 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { BookWall } from "../components/BookWall";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 
-/** Log in, persist the token, then load the user — returns an error message or null. */
+/** The simple demo reader (owns the seeded library) — one tap to explore. */
+const DEMO = { email: "e2e@kinora.test", password: "e2e-password-123" } as const;
+
 async function loginAndLoadUser(email: string, password: string): Promise<string | null> {
   const { data, error } = await api.POST("/api/auth/login", { body: { email, password } });
-  if (error || !data) return "Invalid email or password.";
-  // Put the token in the store *before* /me so the API client authenticates it.
+  if (error || !data) return "That email and password didn't match.";
   authStore.getState().setToken(data.access_token);
   persistToken(data.access_token);
   const me = await api.GET("/api/auth/me");
   if (me.error || !me.data) {
     persistToken(null);
-    return "Signed in, but could not load your account.";
+    return "Signed in, but couldn't load your account.";
   }
   authStore.getState().setSession(data.access_token, me.data);
   return null;
@@ -23,26 +25,27 @@ async function loginAndLoadUser(email: string, password: string): Promise<string
 export default function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState<string>(DEMO.email);
+  const [password, setPassword] = useState<string>(DEMO.password);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function run(currentEmail: string, currentPassword: string) {
     setBusy(true);
     setError(null);
     authStore.getState().setAuthenticating();
-
     let message: string | null;
     if (mode === "register") {
-      const reg = await api.POST("/api/auth/register", { body: { email, password } });
+      const reg = await api.POST("/api/auth/register", {
+        body: { email: currentEmail, password: currentPassword },
+      });
       message =
-        reg.error || !reg.data ? "Could not create that account." : await loginAndLoadUser(email, password);
+        reg.error || !reg.data
+          ? "Couldn't create that account."
+          : await loginAndLoadUser(currentEmail, currentPassword);
     } else {
-      message = await loginAndLoadUser(email, password);
+      message = await loginAndLoadUser(currentEmail, currentPassword);
     }
-
     if (message) {
       setError(message);
       authStore.getState().setAnonymous();
@@ -52,45 +55,76 @@ export default function LoginPage() {
     }
   }
 
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    void run(email, password);
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-neutral-100">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Kinora</h1>
-          <p className="mt-1 text-sm text-neutral-400">watch the book</p>
-        </div>
-        <input
-          type="email"
-          required
-          placeholder="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm outline-none focus:border-neutral-600"
-        />
-        <input
-          type="password"
-          required
-          placeholder="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm outline-none focus:border-neutral-600"
-        />
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-md bg-indigo-500 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
-        >
-          {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode(mode === "login" ? "register" : "login")}
-          className="w-full text-center text-xs text-neutral-400 hover:text-neutral-200"
-        >
-          {mode === "login" ? "Need an account? Register" : "Have an account? Sign in"}
-        </button>
-      </form>
+    <div className="relative h-screen w-screen overflow-hidden bg-walnut font-sans text-white">
+      <div className="drag absolute inset-x-0 top-0 z-30 h-12" />
+      <BookWall />
+
+      <main className="relative z-20 flex h-full items-center justify-center px-6">
+        <section className="glass no-drag w-full max-w-[400px] rounded-glass p-8">
+          <header className="mb-7 text-center">
+            <h1 className="font-display text-[44px] font-semibold leading-none tracking-tight">
+              Kinora
+            </h1>
+            <p className="mt-2 text-sm text-white/65">Watch the book.</p>
+          </header>
+
+          <form onSubmit={onSubmit} className="space-y-3">
+            <input
+              type="email"
+              required
+              autoFocus
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="glass-input w-full rounded-xl px-4 py-3 text-sm"
+            />
+            <input
+              type="password"
+              required
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="glass-input w-full rounded-xl px-4 py-3 text-sm"
+            />
+            {error && <p className="px-1 text-sm text-red-300">{error}</p>}
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-2xl bg-gradient-to-b from-ember-glow to-ember-deep py-3 text-[15px] font-semibold text-walnut-deep shadow-[0_12px_34px_-8px_rgba(224,134,58,0.65)] transition hover:brightness-[1.06] active:scale-[0.99] disabled:opacity-60"
+            >
+              {busy ? "One moment…" : mode === "login" ? "Sign in" : "Create account"}
+            </button>
+          </form>
+
+          <div className="mt-5 flex items-center justify-between text-xs text-white/55">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail(DEMO.email);
+                setPassword(DEMO.password);
+                setMode("login");
+                void run(DEMO.email, DEMO.password);
+              }}
+              className="rounded-lg px-2 py-1 text-white/75 transition hover:text-white"
+            >
+              Explore the demo library →
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode(mode === "login" ? "register" : "login")}
+              className="rounded-lg px-2 py-1 transition hover:text-white"
+            >
+              {mode === "login" ? "Create account" : "Sign in"}
+            </button>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

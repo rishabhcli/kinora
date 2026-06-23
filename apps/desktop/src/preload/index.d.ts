@@ -6,6 +6,7 @@ declare global {
         getToken: () => Promise<string | null>;
         setToken: (token: string | null) => Promise<void>;
       };
+      openBook: (bookId: string) => Promise<void>;
     };
   }
 }

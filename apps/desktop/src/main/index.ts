@@ -2,12 +2,12 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+import liquidGlass from "electron-liquid-glass";
 
 function tokenFile(): string {
   return join(app.getPath("userData"), "session.bin");
 }
 
-/** Encrypted token storage backed by the OS keychain via Electron safeStorage. */
 function registerSecureStorage(): void {
   ipcMain.handle("secure:getToken", (): string | null => {
     try {
@@ -29,37 +29,78 @@ function registerSecureStorage(): void {
         writeFileSync(file, safeStorage.encryptString(token));
       }
     } catch {
-      // Persistence is best-effort; a failure just means the user re-logs in.
+      // best-effort
+    }
+  });
+}
+
+function preloadPath(): string {
+  return join(__dirname, "../preload/index.js");
+}
+
+function loadRoute(window: BrowserWindow, route: string): void {
+  const devUrl = process.env["ELECTRON_RENDERER_URL"];
+  if (devUrl) {
+    void window.loadURL(`${devUrl}/#${route}`);
+  } else {
+    void window.loadFile(join(__dirname, "../renderer/index.html"), { hash: route });
+  }
+}
+
+/** Apply real macOS Liquid Glass (NSGlassEffectView) behind the web content.
+ *  Requires a transparent window (no vibrancy) and must run after load. */
+function applyLiquidGlass(window: BrowserWindow): void {
+  window.webContents.once("did-finish-load", () => {
+    try {
+      const supported = liquidGlass.isGlassSupported();
+      const viewId = liquidGlass.addView(window.getNativeWindowHandle(), { cornerRadius: 18 });
+      console.log(`[kinora] liquid-glass attached: supported=${supported} viewId=${viewId}`);
+    } catch (error) {
+      console.error("[kinora] liquid-glass error:", error);
     }
   });
 }
 
 function createWindow(): void {
   const window = new BrowserWindow({
-    width: 1280,
-    height: 860,
+    width: 1320,
+    height: 880,
+    minWidth: 940,
+    minHeight: 640,
     show: false,
-    autoHideMenuBar: true,
-    backgroundColor: "#0a0a0a",
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.js"),
-      contextIsolation: true,
-      sandbox: false,
-    },
+    titleBarStyle: "hidden",
+    trafficLightPosition: { x: 18, y: 24 },
+    transparent: true,
+    webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: false },
   });
-
   window.on("ready-to-show", () => window.show());
+  applyLiquidGlass(window);
+  loadRoute(window, "/");
+}
 
-  const devUrl = process.env["ELECTRON_RENDERER_URL"];
-  if (devUrl) {
-    void window.loadURL(devUrl);
-  } else {
-    void window.loadFile(join(__dirname, "../renderer/index.html"));
-  }
+/** A book opens in its own dedicated reading window (Apple Books style). */
+function createBookWindow(bookId: string): void {
+  const window = new BrowserWindow({
+    width: 1120,
+    height: 840,
+    minWidth: 720,
+    minHeight: 560,
+    show: false,
+    titleBarStyle: "hidden",
+    trafficLightPosition: { x: 18, y: 22 },
+    transparent: true,
+    webPreferences: { preload: preloadPath(), contextIsolation: true, sandbox: false },
+  });
+  window.on("ready-to-show", () => window.show());
+  applyLiquidGlass(window);
+  loadRoute(window, `/book/${bookId}`);
 }
 
 void app.whenReady().then(() => {
   registerSecureStorage();
+  ipcMain.handle("book:open", (_event, bookId: unknown) => {
+    if (typeof bookId === "string" && bookId.length > 0) createBookWindow(bookId);
+  });
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

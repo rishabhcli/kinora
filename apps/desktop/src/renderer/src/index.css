@@ -1,3 +1,288 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+@layer components {
+  /* Liquid Glass — a translucent, refractive floating surface. The inset top
+     highlight reads as the specular edge; the saturate() keeps content beneath
+     vivid through the blur. */
+  .glass {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+    backdrop-filter: blur(44px) saturate(200%) brightness(1.12);
+    -webkit-backdrop-filter: blur(44px) saturate(200%) brightness(1.12);
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    box-shadow:
+      0 34px 90px -28px rgba(0, 0, 0, 0.7),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.65),
+      inset 0 -26px 54px -30px rgba(0, 0, 0, 0.28);
+  }
+  .glass-strong {
+    background: rgba(28, 21, 15, 0.55);
+    backdrop-filter: blur(40px) saturate(160%);
+    -webkit-backdrop-filter: blur(40px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 16px 60px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+  .glass-input {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+  .glass-input::placeholder {
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .glass-input:focus {
+    outline: none;
+    border-color: rgba(244, 168, 93, 0.7);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Procedural oak — warm gradient + plank seams + a faint grain via SVG noise. */
+  .wood {
+    background-color: #6b4a2b;
+    background-image:
+      linear-gradient(180deg, rgba(255, 224, 178, 0.12), rgba(0, 0, 0, 0.28)),
+      repeating-linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.05) 0 1px,
+        transparent 1px 6px
+      ),
+      linear-gradient(90deg, #5a3c22, #7a512f 28%, #9c6d40 50%, #6e4a2a 74%, #5a3c22),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+
+  /* Draggable titlebar regions for the frameless window. */
+  .drag {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  /* ---- Apple Books reading room ---------------------------------------- */
+
+  /* A refined glass icon button for the reading toolbar — a soft circular
+     pill that brightens on hover and shows a clear keyboard focus ring. */
+  .toolbar-btn {
+    position: relative;
+    display: inline-flex;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-radius: 9999px;
+    padding: 0 0.55rem;
+    color: rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition:
+      background 180ms ease,
+      color 180ms ease,
+      transform 180ms ease,
+      box-shadow 180ms ease;
+  }
+  .toolbar-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+  .toolbar-btn:active {
+    transform: scale(0.94);
+  }
+  .toolbar-btn:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(22, 14, 8, 0.9),
+      0 0 0 4px rgba(244, 168, 93, 0.85);
+  }
+  /* Pressed/active state (e.g. AA while the popover is open, an active bookmark). */
+  .toolbar-btn[data-on="true"] {
+    background: rgba(244, 168, 93, 0.92);
+    color: #160e08;
+    border-color: rgba(244, 168, 93, 0.6);
+    box-shadow: 0 6px 18px -6px rgba(224, 134, 58, 0.7);
+  }
+
+  /* macOS popover surface: a rounded, frosted card with a layered shadow.
+     The little pointer arrow is .popover-arrow, positioned by the caller. */
+  .popover {
+    background: linear-gradient(180deg, rgba(40, 31, 23, 0.92), rgba(28, 21, 15, 0.94));
+    backdrop-filter: blur(42px) saturate(170%);
+    -webkit-backdrop-filter: blur(42px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 20px;
+    box-shadow:
+      0 30px 70px -22px rgba(0, 0, 0, 0.78),
+      0 2px 0 rgba(255, 255, 255, 0.06) inset,
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+  .popover-arrow {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    transform: rotate(45deg);
+    background: rgba(40, 31, 23, 0.94);
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    border-top-left-radius: 4px;
+  }
+
+  /* The reading paper "leaf" — a single page surface driven by the active
+     theme's CSS custom properties (set on the [data-reading-theme] scope). */
+  .reading-scope {
+    background: radial-gradient(
+      130% 90% at 50% -10%,
+      color-mix(in srgb, var(--page-accent) 7%, transparent),
+      transparent 60%
+    );
+  }
+  .reading-leaf {
+    position: relative;
+    background: linear-gradient(180deg, var(--page-bg), var(--page-bg-edge));
+    color: var(--page-ink);
+    box-shadow:
+      0 1px 0 var(--page-rule) inset,
+      0 40px 90px -40px var(--page-shadow);
+    border: 1px solid var(--page-rule);
+  }
+  /* A faint stack of page edges to the right, so the leaf reads as one sheet
+     atop a book block (the "paginated feel"). */
+  .reading-leaf::before,
+  .reading-leaf::after {
+    content: "";
+    position: absolute;
+    top: 1.4%;
+    bottom: 1.4%;
+    right: -5px;
+    width: 5px;
+    border-radius: 0 4px 4px 0;
+    background: var(--page-bg-edge);
+    box-shadow: 0 22px 40px -28px var(--page-shadow);
+  }
+  .reading-leaf::after {
+    right: -9px;
+    top: 2.6%;
+    bottom: 2.6%;
+    opacity: 0.6;
+  }
+  .reading-leaf a.word,
+  .reading-leaf .word {
+    cursor: pointer;
+    border-radius: 4px;
+    transition:
+      background-color 140ms ease,
+      color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  .reading-leaf .word:hover {
+    background-color: color-mix(in srgb, var(--page-ink) 8%, transparent);
+  }
+  .reading-leaf .word[data-active="true"] {
+    background-color: var(--page-highlight);
+    box-shadow: 0 0 0 2px var(--page-highlight);
+    color: var(--page-ink);
+  }
+  .reading-leaf .word:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--page-accent);
+  }
+
+  /* ---- Wooden bookshelf (premium) -------------------------------------- */
+
+  /* A thick oak rail with a rounded front lip, a lit top edge and a dark
+     underside — covers visibly stand on it. */
+  .wood-rail {
+    position: relative;
+    height: 26px;
+    border-radius: 4px 4px 7px 7px;
+    background-color: #6b4a2b;
+    background-image:
+      linear-gradient(180deg, rgba(255, 228, 184, 0.22), rgba(255, 228, 184, 0.04) 5px, transparent 11px),
+      linear-gradient(180deg, transparent 58%, rgba(0, 0, 0, 0.36) 100%),
+      linear-gradient(90deg, #573a21, #7e5532 26%, #9c6f44 50%, #71492a 74%, #543921),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85 0.04' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    box-shadow:
+      0 1px 0 rgba(255, 228, 184, 0.28) inset,
+      0 30px 44px -14px rgba(0, 0, 0, 0.72),
+      0 6px 0 -1px rgba(0, 0, 0, 0.4);
+  }
+  /* The shadowed front face under the lip (gives the plank thickness). */
+  .wood-rail::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -7px 0;
+    height: 9px;
+    border-radius: 0 0 7px 7px;
+    background: linear-gradient(180deg, #4a3120, #2e1d10);
+    box-shadow: 0 16px 24px -10px rgba(0, 0, 0, 0.7);
+  }
+  /* The contact shadow a cover casts onto the plank it stands on. */
+  .shelf-contact {
+    height: 9px;
+    margin: 0 6%;
+    border-radius: 50%;
+    background: radial-gradient(50% 100% at 50% 0%, rgba(0, 0, 0, 0.55), transparent 72%);
+    filter: blur(1.5px);
+    transition:
+      transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 320ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-btn,
+  .toolbar-btn:active,
+  .reading-leaf .word,
+  .shelf-contact {
+    transition: none;
+  }
+}
+
+/* Ambient book-wall scroll — columns loop seamlessly (content is doubled). */
+@keyframes scroll-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+@keyframes scroll-down {
+  from {
+    transform: translateY(-50%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.col-up {
+  animation: scroll-up var(--dur, 60s) linear infinite;
+}
+.col-down {
+  animation: scroll-down var(--dur, 60s) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .col-up,
+  .col-down {
+    animation: none;
+  }
+}
