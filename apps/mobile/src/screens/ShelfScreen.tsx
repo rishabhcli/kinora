@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, applyIngestProgress, formatIngestPercent, ingestStageLabel, queryKeys, subscribeLibraryIngest, type EventSourceLike } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -21,6 +21,7 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
+import { API_BASE_URL } from "../lib/config";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
 import { SettingsSheet } from "./SettingsSheet";
 
@@ -102,6 +103,26 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
     };
   }, [books, queryClient]);
 
+  // Live ingest progress from the shelf SSE channel (§5.1).
+  useEffect(() => {
+    const token = authStore.getState().token;
+    if (!token) return;
+    return subscribeLibraryIngest({
+      baseUrl: API_BASE_URL,
+      getToken: () => authStore.getState().token,
+      createEventSource: (url) => new EventSource(url) as unknown as EventSourceLike,
+      onProgress: (update) => {
+        queryClient.setQueryData<BookResponse[]>(queryKeys.books(), (prev) => {
+          if (!prev) return prev;
+          return applyIngestProgress(prev, update);
+        });
+        if (update.stage === "ready" || update.stage === "failed") {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+        }
+      },
+    });
+  }, [queryClient, email]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (books ?? []).filter(
@@ -169,7 +190,10 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     key={book.id}
                     book={book}
                     width={cardWidth}
-                    onPress={() => onOpen(book.id)}
+                    onPress={() => {
+                      if (book.status !== "ready") return;
+                      onOpen(book.id);
+                    }}
                   />
                 ))}
               </View>

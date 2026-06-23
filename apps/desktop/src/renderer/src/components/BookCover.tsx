@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, formatIngestPercent, ingestStageLabel, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -14,10 +14,7 @@ function colorFor(id: string): string {
 /** A short, human label for a book that isn't ready yet — the import stage in
  *  sentence case, or a clean fallback. */
 function stageLabel(book: BookResponse): string {
-  if (book.status === "failed") return "Import failed";
-  const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
+  return ingestStageLabel(book);
 }
 
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
@@ -51,8 +48,10 @@ export function BookCover({
     },
   });
   const cover = data?.image_url ?? null;
+  const progressLabel = working ? formatIngestPercent(book.progress) : null;
 
   function select() {
+    if (!ready) return;
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -107,10 +106,18 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-2 pb-2.5">
+                {progressLabel && (
+                  <div className="h-1 w-[72%] overflow-hidden rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-ember-glow transition-[width] duration-500 ease-out"
+                      style={{ width: `${Math.round((book.progress ?? 0) * 100)}%` }}
+                    />
+                  </div>
+                )}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {progressLabel ? `${stageLabel(book)} · ${progressLabel}` : stageLabel(book)}
                 </span>
               </div>
             </>
@@ -122,9 +129,12 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          title={ready ? book.title : stageLabel(book)}
+          aria-label={ready ? `Open ${book.title}` : `${book.title} — ${stageLabel(book)}`}
+          aria-disabled={!ready}
+          className={`absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep ${
+            ready ? "" : "cursor-default"
+          }`}
         />
         {ready && onMetrics && (
           <button

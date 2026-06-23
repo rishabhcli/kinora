@@ -23,7 +23,9 @@ help:
 	@echo "  worker       run the render worker locally (python -m app.queue.worker)"
 	@echo "  mcp          run the MCP canon-memory server (MCP_ARGS=--http by default)"
 	@echo "  demo-pdf     (re)build the bundled public-domain demo book PDF"
+	@echo "  demo-pdfs    build both bundled public-domain demo book PDFs"
 	@echo "  seed-demo    load the demo book via the real flow (SEED_ARGS=... e.g. '--via direct')"
+	@echo "  seed-library load both demo books via the real flow"
 	@echo "  lint         ruff check + mypy"
 	@echo "  fmt          black + ruff --fix"
 	@echo "  test         pytest"
@@ -72,8 +74,16 @@ mcp:
 demo-pdf:
 	backend/.venv/bin/python assets/books/build_demo_pdf.py
 
+demo-pdf-lrrh:
+	backend/.venv/bin/python assets/books/build_little_red_riding_hood.py
+
+demo-pdfs: demo-pdf demo-pdf-lrrh
+
 seed-demo:
 	cd backend && .venv/bin/python scripts/seed_demo.py $(SEED_ARGS)
+
+seed-library:
+	cd backend && .venv/bin/python scripts/seed_library.py $(SEED_ARGS)
 
 # -- Quality gates ----------------------------------------------------------- #
 

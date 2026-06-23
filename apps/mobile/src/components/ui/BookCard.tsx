@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, formatIngestPercent, ingestStageLabel, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
@@ -54,6 +54,9 @@ export function BookCard({
     },
   });
   const cover = data?.image_url ?? null;
+  const working = !ready && book.status !== "failed";
+  const progressLabel = working ? formatIngestPercent(book.progress) : null;
+  const statusLabel = ready ? null : ingestStageLabel(book);
 
   function animate(to: number) {
     if (reduced) return;
@@ -62,13 +65,23 @@ export function BookCard({
 
   const translateY = lift.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
 
+  function handlePress() {
+    if (!ready) return;
+    onPress();
+  }
+
   return (
     <Pressable
-      onPress={onPress}
-      onPressIn={() => animate(1)}
-      onPressOut={() => animate(0)}
+      onPress={handlePress}
+      onPressIn={() => ready && animate(1)}
+      onPressOut={() => ready && animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
+      accessibilityLabel={
+        ready
+          ? `Open ${book.title}${book.author ? `, by ${book.author}` : ""}`
+          : `${book.title} — ${statusLabel ?? book.status}`
+      }
+      accessibilityState={{ disabled: !ready }}
       style={{ width }}
     >
       <Animated.View
@@ -99,8 +112,13 @@ export function BookCard({
 
         {!ready ? (
           <View style={styles.statusBar}>
+            {progressLabel ? (
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round((book.progress ?? 0) * 100)}%` }]} />
+              </View>
+            ) : null}
             <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+              {progressLabel ? `${statusLabel} · ${progressLabel}` : (statusLabel ?? book.status).toUpperCase()}
             </Text>
           </View>
         ) : null}
@@ -157,10 +175,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  progressTrack: {
+    width: "72%",
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
   },
   statusText: {
     color: palette.emberGlow,
