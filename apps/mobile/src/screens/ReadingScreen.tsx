@@ -439,6 +439,7 @@ function Header({
   unread,
   onOpenFeed,
   onOpenCanon,
+  onOpenMetrics,
 }: {
   onBack: () => void;
   velocity: number;
@@ -448,6 +449,7 @@ function Header({
   unread: number;
   onOpenFeed: () => void;
   onOpenCanon: () => void;
+  onOpenMetrics?: () => void;
 }) {
   const dotColor =
     socketStatus === "open" ? "#86efac" : socketStatus === "connecting" ? "#fcd34d" : alpha.white40;
@@ -482,6 +484,17 @@ function Header({
             </View>
           ) : null}
         </Pressable>
+        {onOpenMetrics ? (
+          <Pressable
+            onPress={onOpenMetrics}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Metrics"
+            style={styles.crewBtn}
+          >
+            <Text style={styles.crewLabel}>Metrics</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.meta}>
           <Text style={styles.metaPrimary}>Page {page > 0 ? page : "—"}</Text>
           <Text style={styles.metaSecondary}>
