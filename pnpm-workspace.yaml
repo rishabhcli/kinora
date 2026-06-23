@@ -4,5 +4,5 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  electron: false
+  electron: true
   esbuild: true
