@@ -15,7 +15,9 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+type UploadNotice = { tone: "success" | "error"; message: string };
+
+async function uploadBook(file: File): Promise<{ ok: true } | { ok: false; message: string }> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +26,20 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let message = "Upload failed — check the file is a PDF or EPUB under the size limit.";
+  try {
+    const body = (await response.json()) as { detail?: string | { msg?: string }[] };
+    if (typeof body.detail === "string") message = body.detail;
+    else if (Array.isArray(body.detail) && body.detail[0]?.msg) message = body.detail[0].msg;
+  } catch {
+    /* non-JSON error body */
+  }
+  return { ok: false, message };
+}
+
+function hasImportingBooks(books: BookResponse[] | undefined): boolean {
+  return (books ?? []).some((book) => book.status === "importing");
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -76,6 +91,7 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<UploadNotice | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
@@ -89,7 +105,14 @@ export default function ShelfPage() {
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    refetchInterval: (query) => (hasImportingBooks(query.state.data) ? 3000 : false),
   });
+
+  useEffect(() => {
+    if (!uploadNotice) return;
+    const timer = window.setTimeout(() => setUploadNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [uploadNotice]);
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -150,9 +173,15 @@ export default function ShelfPage() {
     event.target.value = "";
     if (!file) return;
     setUploading(true);
-    const ok = await uploadBook(file);
+    setUploadNotice(null);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) {
+      setUploadNotice({ tone: "success", message: `“${file.name}” uploaded — preparing your film…` });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    } else {
+      setUploadNotice({ tone: "error", message: result.message });
+    }
   }
 
   function signOut() {
@@ -237,6 +266,19 @@ export default function ShelfPage() {
           </button>
         </div>
       </header>
+
+      {uploadNotice && (
+        <div
+          role="status"
+          className={`no-drag relative z-40 mx-5 mt-3 rounded-xl border px-4 py-3 text-sm shadow-lg backdrop-blur-md ${
+            uploadNotice.tone === "success"
+              ? "border-emerald-400/30 bg-emerald-950/80 text-emerald-100"
+              : "border-rose-400/30 bg-rose-950/80 text-rose-100"
+          }`}
+        >
+          {uploadNotice.message}
+        </div>
+      )}
 
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">

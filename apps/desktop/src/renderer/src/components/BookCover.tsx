@@ -53,6 +53,7 @@ export function BookCover({
   const cover = data?.image_url ?? null;
 
   function select() {
+    if (!ready) return;
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -61,7 +62,7 @@ export function BookCover({
   }
 
   return (
-    <div className="group relative flex shrink-0 flex-col items-center" style={{ width: 138 }}>
+    <div className={`group relative flex shrink-0 flex-col items-center ${ready ? "" : "cursor-not-allowed"}`} style={{ width: 138 }}>
       <div
         className={`relative aspect-[2/3] w-[138px] origin-bottom rounded-[3px_7px_7px_3px] transition-[transform,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:-translate-y-2.5 group-focus-within:-translate-y-2.5 ${
           popping ? "-translate-y-8 scale-[1.08]" : ""
@@ -122,9 +123,10 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          disabled={!ready}
+          title={ready ? book.title : stageLabel(book)}
+          aria-label={ready ? `Open ${book.title}` : `${book.title} — ${stageLabel(book)}`}
+          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep disabled:cursor-default"
         />
         {ready && onMetrics && (
           <button
