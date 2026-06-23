@@ -52,10 +52,19 @@ export default function ShelfPage() {
         {books && books.length > 0 && (
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {books.map((book) => (
-              <li key={book.id} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-                <p className="truncate text-sm font-medium">{book.title}</p>
-                {book.author && <p className="truncate text-xs text-neutral-500">{book.author}</p>}
-                <p className="mt-2 text-xs uppercase tracking-wide text-neutral-500">{book.status}</p>
+              <li key={book.id}>
+                <button
+                  onClick={() => navigate(`/book/${book.id}`)}
+                  className="w-full rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-left transition-colors hover:border-neutral-600"
+                >
+                  <p className="truncate text-sm font-medium">{book.title}</p>
+                  {book.author && (
+                    <p className="truncate text-xs text-neutral-500">{book.author}</p>
+                  )}
+                  <p className="mt-2 text-xs uppercase tracking-wide text-neutral-500">
+                    {book.status}
+                  </p>
+                </button>
               </li>
             ))}
           </ul>

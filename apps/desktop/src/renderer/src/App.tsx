@@ -8,6 +8,7 @@ import { authStore, loadPersistedToken, persistToken } from "./lib/auth";
 import { queryClient } from "./lib/queryClient";
 import LoginPage from "./routes/LoginPage";
 import ShelfPage from "./routes/ShelfPage";
+import WorkspacePage from "./routes/WorkspacePage";
 
 /** On launch, restore a persisted session by validating the token against /me. */
 function useBootstrap(): void {
@@ -60,6 +61,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <ShelfPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/book/:id"
+            element={
+              <RequireAuth>
+                <WorkspacePage />
               </RequireAuth>
             }
           />
