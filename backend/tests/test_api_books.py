@@ -357,3 +357,22 @@ async def test_upload_enforces_max_books_per_user(
     second = await api_client.post("/api/books", headers=auth_headers, files=_files(tiny_pdf()))
     assert second.status_code == 429
     assert second.json()["error"]["type"] == "book_quota_exceeded"
+
+
+async def test_delete_book_removes_from_shelf(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    up = await api_client.post(
+        "/api/books", headers=auth_headers, files=_files(tiny_pdf()), data={"title": "Gone"}
+    )
+    assert up.status_code == 201
+    book_id = up.json()["id"]
+
+    deleted = await api_client.delete(f"/api/books/{book_id}", headers=auth_headers)
+    assert deleted.status_code == 204
+
+    shelf = await api_client.get("/api/books", headers=auth_headers)
+    assert all(b["id"] != book_id for b in shelf.json())
+
+    missing = await api_client.get(f"/api/books/{book_id}", headers=auth_headers)
+    assert missing.status_code == 404

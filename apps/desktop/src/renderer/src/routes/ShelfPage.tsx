@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, queryKeys, uploadErrorMessage } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { useLibraryEvents } from "../hooks/useLibraryEvents";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
@@ -15,7 +16,9 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+type UploadResult = { ok: true } | { ok: false; message: string };
+
+async function uploadBook(file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +27,14 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    /* non-JSON error */
+  }
+  return { ok: false, message: uploadErrorMessage(body, `Upload failed (${response.status})`) };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -71,11 +81,14 @@ function AddSlot({ onClick }: { onClick: () => void }) {
 
 export default function ShelfPage() {
   const email = useAuth((state) => state.user?.email);
+  const token = useAuth((state) => state.token);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [gateToast, setGateToast] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
@@ -90,6 +103,25 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  useLibraryEvents(Boolean(token));
+
+  // Poll fallback while any book is still importing — catches the final ready flip
+  // if the SSE socket drops right as ingest completes.
+  const hasImporting = (books ?? []).some((b) => b.status === "importing");
+  useEffect(() => {
+    if (!hasImporting) return;
+    const timer = window.setInterval(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [hasImporting, queryClient]);
+
+  useEffect(() => {
+    if (!gateToast) return;
+    const timer = window.setTimeout(() => setGateToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [gateToast]);
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -145,14 +177,33 @@ export default function ShelfPage() {
     else navigate(`/book/${id}`);
   }
 
+  async function removeBook(bookId: string) {
+    const token = authStore.getState().token;
+    const response = await fetch(`${API_BASE_URL}/api/books/${bookId}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.ok) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+      setGateToast(null);
+    } else {
+      setUploadError("Couldn't remove that book. Try again.");
+    }
+  }
+
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    } else {
+      setUploadError(result.message);
+    }
   }
 
   function signOut() {
@@ -237,6 +288,23 @@ export default function ShelfPage() {
           </button>
         </div>
       </header>
+
+      {(uploadError || gateToast) && (
+        <div className="no-drag relative z-40 mx-5 mt-3 flex items-start gap-3 rounded-glass border border-white/15 bg-walnut-deep/80 px-4 py-3 text-sm text-white shadow-lg backdrop-blur-md">
+          <p className="flex-1">{uploadError ?? gateToast}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setUploadError(null);
+              setGateToast(null);
+            }}
+            aria-label="Dismiss"
+            className="shrink-0 text-white/55 transition hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">
@@ -325,6 +393,8 @@ export default function ShelfPage() {
                       book={book}
                       onOpen={() => openBook(book.id)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onBlocked={setGateToast}
+                      onRemove={book.status === "failed" ? () => void removeBook(book.id) : undefined}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (

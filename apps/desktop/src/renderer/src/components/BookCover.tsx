@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, formatIngestStage, importGateMessage, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -15,9 +15,12 @@ function colorFor(id: string): string {
  *  sentence case, or a clean fallback. */
 function stageLabel(book: BookResponse): string {
   if (book.status === "failed") return "Import failed";
-  const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
+  return formatIngestStage(book.stage);
+}
+
+function progressPercent(book: BookResponse): number | null {
+  if (typeof book.progress !== "number" || !Number.isFinite(book.progress)) return null;
+  return Math.max(0, Math.min(100, Math.round(book.progress * 100)));
 }
 
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
@@ -29,15 +32,22 @@ export function BookCover({
   book,
   onOpen,
   onMetrics,
+  onBlocked,
+  onRemove,
 }: {
   book: BookResponse;
   onOpen: () => void;
   onMetrics?: () => void;
+  /** Called when the reader taps a book that is not ready yet. */
+  onBlocked?: (message: string) => void;
+  /** Remove a failed import from the shelf. */
+  onRemove?: () => void;
 }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
   const failed = book.status === "failed";
   const working = !ready && !failed;
+  const pct = progressPercent(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -53,6 +63,11 @@ export function BookCover({
   const cover = data?.image_url ?? null;
 
   function select() {
+    if (!ready) {
+      const message = importGateMessage(book);
+      if (message) onBlocked?.(message);
+      return;
+    }
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -107,11 +122,38 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 px-2 pb-2.5">
+                {working && pct != null && (
+                  <div
+                    className="h-1 w-[88%] overflow-hidden rounded-full bg-black/35"
+                    role="progressbar"
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Import progress for ${book.title}`}
+                  >
+                    <div
+                      className="h-full rounded-full bg-ember-glow transition-[width] duration-500 ease-out"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                )}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {working && pct != null ? `${stageLabel(book)} · ${pct}%` : stageLabel(book)}
                 </span>
+                {failed && onRemove && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemove();
+                    }}
+                    className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/90 transition hover:bg-white/25"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -122,9 +164,12 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          title={ready ? book.title : importGateMessage(book) ?? book.title}
+          aria-label={ready ? `Open ${book.title}` : `Preparing ${book.title}`}
+          aria-disabled={!ready}
+          className={`absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep ${
+            ready ? "" : "cursor-default"
+          }`}
         />
         {ready && onMetrics && (
           <button
