@@ -15,10 +15,21 @@ __pycache__/
 coverage/
 htmlcov/
 
-# --- Node / frontend ---
+# --- Node / monorepo ---
 node_modules/
-frontend/dist/
 dist/
+out/
+.turbo/
+*.tsbuildinfo
+
+# legacy web frontend (to be retired)
+frontend/dist/
+
+# Electron build output
+apps/desktop/release/
+
+# Expo / React Native
+.expo/
 
 # --- Object storage / local artifacts ---
 # Root-level runtime artifacts only; anchored so it does NOT match the real
