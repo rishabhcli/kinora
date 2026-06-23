@@ -72,6 +72,30 @@ function shotDuration(shot: Shot): number {
   return shot.duration_s ?? shot.est_duration_s ?? DEFAULT_SHOT_DURATION_S;
 }
 
+function fallbackSegmentForShot(shot: Shot): SyncSegment | null {
+  if (!shot.source_span) return null;
+  const [start, end] = shot.source_span.word_range;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  const duration = shotDuration(shot);
+  const first = Math.max(0, Math.floor(start));
+  const last = Math.max(first, Math.floor(end));
+  const count = Math.max(1, last - first + 1);
+  const step = duration / count;
+  return {
+    shot_id: shot.shot_id,
+    video_start_s: 0,
+    video_end_s: duration,
+    page: shot.source_span.page,
+    page_turn_at_s: Math.max(0, duration - 0.2),
+    words: Array.from({ length: count }, (_, i) => ({
+      word_index: first + i,
+      text: "",
+      t_start: i * step,
+      t_end: Math.min(duration, (i + 1) * step),
+    })),
+  };
+}
+
 export class SyncEngine {
   private readonly sessionId: string;
   private readonly pushIntentFn: (intent: IntentUpdate) => void;
@@ -170,9 +194,17 @@ export class SyncEngine {
     this.shots.forEach((shot, i) => {
       this.shotIndexById.set(shot.shot_id, i);
       this.beatByShot.set(shot.shot_id, shot.beat_id);
-      if (shot.clip_url) this.clips.set(shot.shot_id, shot.clip_url);
+      if (shot.clip_url) {
+        this.clips.set(shot.shot_id, shot.clip_url);
+        if (!this.segments.has(shot.shot_id)) {
+          const fallback = fallbackSegmentForShot(shot);
+          if (fallback) this.segments.set(shot.shot_id, fallback);
+        }
+      }
       if (shot.keyframe_url) this.keyframesByShot.set(shot.shot_id, shot.keyframe_url);
     });
+    this.selectInitialCachedClip();
+    this.preloadNext();
     this.recomputeBuffer();
     this.emit();
   }
@@ -501,6 +533,24 @@ export class SyncEngine {
     const next = this.shots[idx + 1];
     const url = next ? this.clips.get(next.shot_id) : undefined;
     this.snapshot = { ...this.snapshot, preloadSrc: url ?? null };
+  }
+
+  private selectInitialCachedClip(): void {
+    if (this.currentShotId || this.snapshot.videoSrc) return;
+    const firstReady = this.shots.find((shot) => this.clips.has(shot.shot_id));
+    if (!firstReady) return;
+    this.currentShotId = firstReady.shot_id;
+    this.focusWord = firstReady.source_span?.word_range?.[0] ?? this.focusWord;
+    this.currentLocalTimeS = 0;
+    this.snapshot = {
+      ...this.snapshot,
+      currentPage: firstReady.source_span?.page ?? this.snapshot.currentPage,
+      activeWordIndex: this.focusWord,
+      bridging: false,
+      bridgeKeyframeUrl: null,
+    };
+    this.setVideoSrc(this.clips.get(firstReady.shot_id) ?? null);
+    this.requestSeek(0);
   }
 
   private recomputeBuffer(): void {

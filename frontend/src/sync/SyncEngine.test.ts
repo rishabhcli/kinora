@@ -101,6 +101,18 @@ describe("SyncEngine — debounced intent (200ms settle)", () => {
 });
 
 describe("SyncEngine — seek bridge + clip hot-swap", () => {
+  it("starts on the first cached clip from the initial shot list", () => {
+    const { engine } = makeEngine();
+    engine.setShots([{ ...shots[0], status: "accepted", clip_url: "clip1.mp4" }, shots[1]]);
+
+    const snap = engine.getSnapshot();
+    expect(snap.currentShotId).toBe("s1");
+    expect(snap.videoSrc).toBe("clip1.mp4");
+    expect(snap.currentPage).toBe(1);
+    expect(snap.bridging).toBe(false);
+    expect(snap.committedSecondsAhead).toBeCloseTo(5);
+  });
+
   it("bridges a seek with the keyframe under Ken-Burns, then swaps in the real clip", () => {
     const { engine, postSeek } = makeEngine();
     engine.setShots(shots);
