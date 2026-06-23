@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 
 import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
-import liquidGlass from "electron-liquid-glass";
+
+const require = createRequire(import.meta.url);
 
 function tokenFile(): string {
   return join(app.getPath("userData"), "session.bin");
@@ -52,11 +54,16 @@ function loadRoute(window: BrowserWindow, route: string): void {
 function applyLiquidGlass(window: BrowserWindow): void {
   window.webContents.once("did-finish-load", () => {
     try {
+      const liquidGlass = require("electron-liquid-glass") as {
+        isGlassSupported: () => boolean;
+        addView: (handle: Buffer, opts: { cornerRadius: number }) => number;
+      };
       const supported = liquidGlass.isGlassSupported();
       const viewId = liquidGlass.addView(window.getNativeWindowHandle(), { cornerRadius: 18 });
       console.log(`[kinora] liquid-glass attached: supported=${supported} viewId=${viewId}`);
-    } catch (error) {
-      console.error("[kinora] liquid-glass error:", error);
+    } catch {
+      // Native module is macOS-only; Linux/Windows builds skip gracefully.
+      console.log("[kinora] liquid-glass: unavailable on this platform");
     }
   });
 }

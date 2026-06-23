@@ -5,9 +5,11 @@ import { useNavigate } from "react-router-dom";
 
 import { BookCover } from "../components/BookCover";
 import { DirectingStylePanel } from "../components/DirectingStylePanel";
+import { ImportGateDialog } from "../components/ImportGateDialog";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { useShelfIngestSync, shelfHasImporting } from "../hooks/useShelfIngestSync";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
@@ -81,6 +83,7 @@ export default function ShelfPage() {
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
+  const [gateBook, setGateBook] = useState<BookResponse | null>(null);
 
   const { data: books, isLoading } = useQuery({
     queryKey: queryKeys.books(),
@@ -90,6 +93,8 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  useShelfIngestSync(shelfHasImporting(books));
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -140,6 +145,11 @@ export default function ShelfPage() {
   const sparse = filtered.length > 0 && filtered.length <= 2 && !q;
 
   function openBook(id: string) {
+    const book = books?.find((b) => b.id === id);
+    if (book && book.status !== "ready") {
+      setGateBook(book);
+      return;
+    }
     const bridge = (globalThis as { kinora?: { openBook?: (bookId: string) => Promise<void> } }).kinora;
     if (bridge?.openBook) void bridge.openBook(id);
     else navigate(`/book/${id}`);
@@ -345,6 +355,8 @@ export default function ShelfPage() {
           onClose={() => setMetricsBookId(null)}
         />
       )}
+
+      {gateBook && <ImportGateDialog book={gateBook} onClose={() => setGateBook(null)} />}
     </div>
   );
 }

@@ -23,6 +23,19 @@ function spineColor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
+function formatImportStatus(book: BookResponse): string {
+  if (book.status === "failed") return "IMPORT FAILED";
+  const stage = book.stage?.trim();
+  const label = stage
+    ? stage.replace(/[_-]+/g, " ").toUpperCase()
+    : book.status.toUpperCase();
+  const pct =
+    book.progress != null && book.status === "importing"
+      ? Math.round(Math.min(1, Math.max(0, book.progress)) * 100)
+      : null;
+  return pct != null ? `${label} · ${pct}%` : label;
+}
+
 /**
  * A book standing on the shelf — its page-1 image as the cover when the book is
  * `ready`, otherwise a titled spine card in a warm hue. The bound spine edge, a
@@ -100,7 +113,7 @@ export function BookCard({
         {!ready ? (
           <View style={styles.statusBar}>
             <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+              {formatImportStatus(book)}
             </Text>
           </View>
         ) : null}
