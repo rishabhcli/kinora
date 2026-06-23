@@ -86,6 +86,10 @@ export class LibraryEventsClient {
     this.closedByUser = false;
     this.opts.onStatus?.("connecting");
     const token = await this.opts.getToken();
+    if (!token) {
+      this.opts.onStatus?.("closed");
+      return;
+    }
     const source = this.opts.createEventSource(sseUrl(this.opts.baseUrl, token));
     this.source = source;
 

@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { authStore } from "../lib/auth";
+import { useAuth } from "./useAuth";
 import { API_BASE_URL } from "../lib/config";
 
 const IMPORT_POLL_MS = 4_000;
@@ -17,8 +17,11 @@ const IMPORT_POLL_MS = 4_000;
 /** Live ingest progress for the mobile shelf (polling + SSE when available). */
 export function useLibraryEvents(books: BookResponse[] | undefined): void {
   const queryClient = useQueryClient();
+  const token = useAuth((state) => state.token);
 
   useEffect(() => {
+    if (!token) return;
+
     const applyProgress = (payload: Parameters<typeof patchBooksWithIngestProgress>[1]) => {
       queryClient.setQueryData<BookResponse[]>(queryKeys.books(), (old) => {
         if (!old) return old;
@@ -31,7 +34,7 @@ export function useLibraryEvents(books: BookResponse[] | undefined): void {
 
     const client = new LibraryEventsClient({
       baseUrl: API_BASE_URL,
-      getToken: async () => authStore.getState().token,
+      getToken: async () => token,
       createEventSource:
         typeof EventSource !== "undefined"
           ? (url) => new EventSource(url) as unknown as EventSourceLike
@@ -40,7 +43,7 @@ export function useLibraryEvents(books: BookResponse[] | undefined): void {
     });
     void client.connect();
     return () => client.close();
-  }, [queryClient]);
+  }, [queryClient, token]);
 
   useEffect(() => {
     if (!shelfHasPendingImports(books)) return;
