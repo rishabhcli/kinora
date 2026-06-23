@@ -4,9 +4,9 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "
 
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
-import { authStore } from "../lib/auth";
+import { authStore, persistToken } from "../lib/auth";
 
-export function ShelfScreen() {
+export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const email = useAuth((state) => state.user?.email);
 
   const { data: books, isLoading } = useQuery({
@@ -18,11 +18,16 @@ export function ShelfScreen() {
     },
   });
 
+  function signOut() {
+    persistToken(null);
+    authStore.getState().setAnonymous();
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Library</Text>
-        <Pressable onPress={() => authStore.getState().setAnonymous()}>
+        <Pressable onPress={signOut}>
           <Text style={styles.signOut}>{email ? "Sign out" : "Sign out"}</Text>
         </Pressable>
       </View>
@@ -34,7 +39,7 @@ export function ShelfScreen() {
           keyExtractor={(book) => book.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <Pressable style={styles.card} onPress={() => onOpen(item.id)}>
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {item.title}
               </Text>
@@ -44,9 +49,11 @@ export function ShelfScreen() {
                 </Text>
               ) : null}
               <Text style={styles.cardStatus}>{item.status}</Text>
-            </View>
+            </Pressable>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No books yet. Upload a PDF on desktop.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No books yet. Upload a PDF on desktop.</Text>
+          }
         />
       )}
     </View>
