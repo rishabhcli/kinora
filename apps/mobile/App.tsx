@@ -7,16 +7,34 @@ import { AmbientBackdrop, Wordmark } from "./src/components/ui";
 import { useAuth } from "./src/hooks/useAuth";
 import { api } from "./src/lib/api";
 import { authStore, loadPersistedToken, persistToken } from "./src/lib/auth";
+import { loadHasOnboarded, persistHasOnboarded } from "./src/lib/onboarding";
 import { queryClient } from "./src/lib/queryClient";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { ReadingScreen } from "./src/screens/ReadingScreen";
 import { ShelfScreen } from "./src/screens/ShelfScreen";
 import { palette } from "./src/theme/tokens";
 
-/** Restore a persisted session from secure storage and validate it via /me. */
-function useBootstrap(): void {
+/** Whether the first-run intro has been seen: unknown while we read storage. */
+type OnboardingState = "unknown" | "needed" | "done";
+
+/**
+ * Restore a persisted session from secure storage and validate it via /me, and
+ * in parallel read the first-run "has onboarded" flag. Both feed the boot gate
+ * in <Root/>; the intro is independent of auth, so it loads alongside the token.
+ */
+function useBootstrap(): OnboardingState {
+  const [onboarding, setOnboarding] = useState<OnboardingState>("unknown");
+
   useEffect(() => {
     let cancelled = false;
+    void (async () => {
+      const seen = await loadHasOnboarded();
+      if (!cancelled) setOnboarding(seen ? "done" : "needed");
+    })().catch(() => {
+      if (!cancelled) setOnboarding("needed");
+    });
+
     void (async () => {
       const token = await loadPersistedToken();
       if (cancelled) return;
@@ -38,17 +56,28 @@ function useBootstrap(): void {
       persistToken(null);
       authStore.getState().setAnonymous();
     });
+
     return () => {
       cancelled = true;
     };
   }, []);
+
+  return onboarding;
 }
 
-function Root() {
+function Root({
+  onboarding,
+  onOnboarded,
+}: {
+  onboarding: OnboardingState;
+  onOnboarded: () => void;
+}) {
   const status = useAuth((state) => state.status);
   const [bookId, setBookId] = useState<string | null>(null);
 
-  if (status === "unknown" || status === "authenticating") {
+  // Hold the splash until both the session and the onboarding flag are resolved,
+  // so a returning user never sees the intro flash before the library.
+  if (status === "unknown" || status === "authenticating" || onboarding === "unknown") {
     return (
       <AmbientBackdrop>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -58,16 +87,27 @@ function Root() {
       </AmbientBackdrop>
     );
   }
+  if (onboarding === "needed") return <OnboardingScreen onDone={onOnboarded} />;
   if (status !== "authenticated") return <LoginScreen />;
   if (bookId) return <ReadingScreen bookId={bookId} onBack={() => setBookId(null)} />;
   return <ShelfScreen onOpen={setBookId} />;
 }
 
 export default function App() {
-  useBootstrap();
+  const bootOnboarding = useBootstrap();
+  // Once the user finishes the intro we both persist the flag and optimistically
+  // advance the gate, so the transition to login/library is immediate.
+  const [onboarded, setOnboarded] = useState(false);
+  const onboarding: OnboardingState = onboarded ? "done" : bootOnboarding;
+
+  function completeOnboarding() {
+    setOnboarded(true);
+    void persistHasOnboarded();
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Root />
+      <Root onboarding={onboarding} onOnboarded={completeOnboarding} />
       <StatusBar style="light" />
     </QueryClientProvider>
   );

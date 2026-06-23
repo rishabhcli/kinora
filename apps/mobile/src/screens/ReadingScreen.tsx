@@ -16,7 +16,7 @@ import { ReflowReader } from "../components/ReflowReader";
 import { SegmentedControl } from "../components/ui";
 import { useSyncEngine } from "../hooks/useSyncEngine";
 import { api } from "../lib/api";
-import { alpha, palette, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
+import { alpha, BOTTOM_INSET, palette, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
 
 type ReadingView = "read" | "watch";
 
@@ -251,5 +251,5 @@ const styles = StyleSheet.create({
   splitReader: { flex: 1 },
   splitFilm: { width: "45%", maxWidth: 560, backgroundColor: "#000" },
 
-  segmentBar: { paddingHorizontal: space.xl, paddingTop: space.sm, paddingBottom: space.xl },
+  segmentBar: { paddingHorizontal: space.xl, paddingTop: space.sm, paddingBottom: BOTTOM_INSET + space.sm },
 });

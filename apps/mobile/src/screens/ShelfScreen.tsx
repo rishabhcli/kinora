@@ -20,7 +20,7 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
-import { alpha, fonts, palette, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
+import { alpha, BOTTOM_INSET, fonts, palette, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
 
 const GRID_GAP = 18;
 const SCREEN_PADDING = 20;
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   email: { color: alpha.white40, fontSize: type.caption.fontSize, marginLeft: 4 },
-  scroll: { paddingHorizontal: SCREEN_PADDING, paddingBottom: space.huge },
+  scroll: { paddingHorizontal: SCREEN_PADDING, paddingBottom: BOTTOM_INSET + space.huge },
   loading: { alignItems: "center", paddingTop: space.huge, gap: space.md },
   loadingText: { color: alpha.white55, fontSize: type.label.fontSize },
   shelf: { marginBottom: space.xxxl },

@@ -11,7 +11,7 @@ import {
 import { GhostButton, GlassField, PrimaryButton, Surface, Wordmark } from "../components/ui";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
-import { alpha, space, TOP_INSET, type } from "../theme/tokens";
+import { alpha, BOTTOM_INSET, space, TOP_INSET, type } from "../theme/tokens";
 
 /** The seeded demo reader (owns the bundled library) — one tap to explore. */
 const DEMO = { email: "e2e@kinora.test", password: "e2e-password-123" } as const;
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: space.xxl,
     paddingTop: TOP_INSET + space.xxl,
-    paddingBottom: space.huge,
+    paddingBottom: BOTTOM_INSET + space.huge,
   },
   hero: { alignItems: "center", marginBottom: space.xxxl },
   card: { width: "100%", maxWidth: 440, alignSelf: "center", padding: space.xxl },
