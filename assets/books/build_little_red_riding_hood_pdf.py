@@ -114,12 +114,16 @@ def _draw_wolf(page: fitz.Page, cx: float, cy: float, scale: float = 1.0) -> Non
     page.draw_oval(head, color=WOLF_DK, fill=WOLF, width=1.5)
     page.draw_circle(fitz.Point(cx + 78 * scale, cy - 18 * scale), 5 * scale, color=None, fill=INK)
     page.draw_circle(fitz.Point(cx + 98 * scale, cy - 18 * scale), 5 * scale, color=None, fill=INK)
-    page.draw_triangle(
-        fitz.Point(cx + 118 * scale, cy - 8 * scale),
-        fitz.Point(cx + 128 * scale, cy + 2 * scale),
-        fitz.Point(cx + 108 * scale, cy + 2 * scale),
+    page.draw_polyline(
+        [
+            fitz.Point(cx + 118 * scale, cy - 8 * scale),
+            fitz.Point(cx + 128 * scale, cy + 2 * scale),
+            fitz.Point(cx + 108 * scale, cy + 2 * scale),
+        ],
         color=WOLF_DK,
         fill=WOLF_DK,
+        width=1.2,
+        closePath=True,
     )
 
 
