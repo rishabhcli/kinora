@@ -10,9 +10,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:api": "openapi-typescript ./openapi.json -o ./src/api/schema.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.5",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
+    "openapi-typescript": "^7.5.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }
