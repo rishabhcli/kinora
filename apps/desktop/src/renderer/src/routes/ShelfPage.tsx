@@ -177,6 +177,20 @@ export default function ShelfPage() {
     else navigate(`/book/${id}`);
   }
 
+  async function removeBook(bookId: string) {
+    const token = authStore.getState().token;
+    const response = await fetch(`${API_BASE_URL}/api/books/${bookId}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.ok) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+      setGateToast(null);
+    } else {
+      setUploadError("Couldn't remove that book. Try again.");
+    }
+  }
+
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -380,6 +394,7 @@ export default function ShelfPage() {
                       onOpen={() => openBook(book.id)}
                       onMetrics={() => setMetricsBookId(book.id)}
                       onBlocked={setGateToast}
+                      onRemove={book.status === "failed" ? () => void removeBook(book.id) : undefined}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (

@@ -33,12 +33,15 @@ export function BookCover({
   onOpen,
   onMetrics,
   onBlocked,
+  onRemove,
 }: {
   book: BookResponse;
   onOpen: () => void;
   onMetrics?: () => void;
   /** Called when the reader taps a book that is not ready yet. */
   onBlocked?: (message: string) => void;
+  /** Remove a failed import from the shelf. */
+  onRemove?: () => void;
 }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
@@ -139,6 +142,18 @@ export function BookCover({
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
                   {working && pct != null ? `${stageLabel(book)} · ${pct}%` : stageLabel(book)}
                 </span>
+                {failed && onRemove && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemove();
+                    }}
+                    className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/90 transition hover:bg-white/25"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             </>
           )}

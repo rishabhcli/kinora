@@ -18,7 +18,7 @@ export function formatIngestStage(stage: string | null | undefined): string {
 export function importGateMessage(book: BookResponse): string | null {
   if (book.status === "ready") return null;
   if (book.status === "failed") {
-    return "This import failed. Remove the book and try uploading again.";
+    return "This import failed. Tap Remove on the cover, then try uploading again.";
   }
   const stage = formatIngestStage(book.stage);
   const pct =
