@@ -5,8 +5,10 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import { api } from "./lib/api";
 import { authStore, loadPersistedToken, persistToken } from "./lib/auth";
+import { hasOnboarded } from "./lib/onboarding";
 import { queryClient } from "./lib/queryClient";
 import LoginPage from "./routes/LoginPage";
+import OnboardingPage from "./routes/OnboardingPage";
 import ShelfPage from "./routes/ShelfPage";
 import WorkspacePage from "./routes/WorkspacePage";
 
@@ -50,7 +52,9 @@ function RequireAuth({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (status !== "authenticated") return <Navigate to="/login" replace />;
+  if (status !== "authenticated") {
+    return <Navigate to={hasOnboarded() ? "/login" : "/onboarding"} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -61,6 +65,7 @@ export default function App() {
       <HashRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route
             path="/"
             element={
