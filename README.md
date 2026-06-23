@@ -10,7 +10,7 @@ The book stays on screen. As the film plays, a narrator reads the text aloud, th
 | **Primary track** | Track 2 — AI Showrunner (also covers Track 1 · MemoryAgent and Track 3 · Agent Society) |
 | **Deadline** | Jul 9, 2026 · 2:00pm PDT |
 | **Deployment** | Alibaba Cloud — ECS / Function Compute · OSS · DashScope / Model Studio |
-| **Status** | **Built and runnable** — full backend + native apps (Electron desktop + Expo mobile), real Qwen/Wan/CosyVoice, real persistence/queue/budget. Bring up the backend with `docker compose` and the apps with `pnpm`; deploy with `infra/terraform`. |
+| **Status** | **Built and runnable** — full backend + native apps (Electron desktop, a native macOS **Liquid Glass** shell, and Expo mobile), real Qwen/Wan/CosyVoice, real persistence/queue/budget. Bring up the backend with `docker compose` and the apps with `pnpm`; deploy with `infra/terraform`. |
 
 > **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → `make app-desktop-dev`. See [Run it locally](#run-it-locally).
 
