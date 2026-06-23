@@ -4,6 +4,7 @@ import {
   queryKeys,
   shelfHasPendingImports,
   type BookResponse,
+  type EventSourceLike,
 } from "@kinora/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -32,7 +33,9 @@ export function useLibraryEvents(books: BookResponse[] | undefined): void {
       baseUrl: API_BASE_URL,
       getToken: async () => authStore.getState().token,
       createEventSource:
-        typeof EventSource !== "undefined" ? (url) => new EventSource(url) : undefined,
+        typeof EventSource !== "undefined"
+          ? (url) => new EventSource(url) as unknown as EventSourceLike
+          : undefined,
       onProgress: applyProgress,
     });
     void client.connect();

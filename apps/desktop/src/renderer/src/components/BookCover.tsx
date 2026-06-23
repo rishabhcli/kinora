@@ -36,10 +36,12 @@ export function BookCover({
   book,
   onOpen,
   onMetrics,
+  onRemove,
 }: {
   book: BookResponse;
   onOpen: () => void;
   onMetrics?: () => void;
+  onRemove?: () => void;
 }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
@@ -162,6 +164,22 @@ export function BookCover({
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 21V10M12 21V4M19 21v-7" />
+            </svg>
+          </button>
+        )}
+        {failed && onRemove && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            title="Remove from shelf"
+            aria-label={`Remove ${book.title} from shelf`}
+            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-red-950/75 text-red-100 opacity-100 backdrop-blur-md transition hover:bg-red-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/80"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
         )}

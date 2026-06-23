@@ -159,6 +159,17 @@ export default function ShelfPage() {
     else navigate(`/book/${id}`);
   }
 
+  async function removeBook(id: string) {
+    const token = authStore.getState().token;
+    const response = await fetch(`${API_BASE_URL}/api/books/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.status === 204) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    }
+  }
+
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -355,6 +366,7 @@ export default function ShelfPage() {
                       book={book}
                       onOpen={() => openBook(book.id)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onRemove={book.status === "failed" ? () => void removeBook(book.id) : undefined}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (

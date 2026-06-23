@@ -46,10 +46,12 @@ export function BookCard({
   book,
   width,
   onPress,
+  onRemove,
 }: {
   book: BookResponse;
   width: number;
   onPress: () => void;
+  onRemove?: () => void;
 }) {
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
@@ -131,6 +133,17 @@ export function BookCard({
               <Text style={styles.statusText} numberOfLines={1}>
                 {working && pct > 0 ? `${stageLabel(book).toUpperCase()} · ${pct}%` : stageLabel(book).toUpperCase()}
               </Text>
+              {failed && onRemove ? (
+                <Pressable
+                  onPress={onRemove}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${book.title} from shelf`}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.removeBtn, pressed && styles.removePressed]}
+                >
+                  <Text style={styles.removeText}>Remove</Text>
+                </Pressable>
+              ) : null}
             </View>
           </>
         ) : null}
@@ -207,6 +220,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  removeBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,180,180,0.45)",
+  },
+  removePressed: { opacity: 0.7 },
+  removeText: {
+    color: "#f0c6c6",
+    fontSize: type.micro.fontSize,
+    fontWeight: "600",
+    letterSpacing: 0.6,
   },
   statusText: {
     color: palette.emberGlow,

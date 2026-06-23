@@ -22,6 +22,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useLibraryEvents } from "../hooks/useLibraryEvents";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
+import { API_BASE_URL } from "../lib/config";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
 import { SettingsSheet } from "./SettingsSheet";
 
@@ -119,6 +120,17 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
     authStore.getState().setAnonymous();
   }
 
+  async function removeBook(id: string) {
+    const token = authStore.getState().token;
+    const response = await fetch(`${API_BASE_URL}/api/books/${id}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.status === 204) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    }
+  }
+
   const empty = !isLoading && filtered.length === 0;
 
   return (
@@ -175,6 +187,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     onPress={() => {
                       if (book.status === "ready") onOpen(book.id);
                     }}
+                    onRemove={book.status === "failed" ? () => void removeBook(book.id) : undefined}
                   />
                 ))}
               </View>
