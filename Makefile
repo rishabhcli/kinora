@@ -1,6 +1,6 @@
 # Kinora developer Makefile
-# Backend lives in backend/ with its venv at backend/.venv; frontend in frontend/.
-# Infra (docker compose + terraform) lives in infra/.
+# Backend lives in backend/ with its venv at backend/.venv. The Electron desktop
+# and Expo mobile apps live in apps/ (pnpm + Turborepo). Infra in infra/.
 
 PYTHON ?= python3
 REV_MSG ?= change
@@ -9,7 +9,7 @@ MCP_ARGS ?= --http
 
 .PHONY: help install up down stack-up stack-down migrate revision \
         worker mcp demo-pdf seed-demo lint fmt test \
-        fe-install fe-dev fe-build fe-test
+        app-install app-typecheck app-test app-desktop-dev app-desktop-build app-mobile-start
 
 help:
 	@echo "Kinora make targets:"
@@ -26,7 +26,8 @@ help:
 	@echo "  lint         ruff check + mypy"
 	@echo "  fmt          black + ruff --fix"
 	@echo "  test         pytest"
-	@echo "  fe-install / fe-dev / fe-build / fe-test  frontend npm tasks"
+	@echo "  app-install / app-typecheck / app-test                   apps monorepo (pnpm)"
+	@echo "  app-desktop-dev / app-desktop-build / app-mobile-start   run the apps"
 
 install:
 	cd backend && $(PYTHON) -m venv .venv && \
@@ -84,16 +85,24 @@ fmt:
 test:
 	cd backend && .venv/bin/pytest -q
 
-# -- Frontend ---------------------------------------------------------------- #
+# -- Apps (Electron desktop + Expo mobile, pnpm + Turborepo) ----------------- #
 
-fe-install:
-	cd frontend && npm install
+app-install:
+	pnpm install
 
-fe-dev:
-	cd frontend && npm run dev
+app-typecheck:
+	pnpm run typecheck
+	pnpm --filter @kinora/desktop run typecheck
+	pnpm --filter @kinora/mobile run typecheck
 
-fe-build:
-	cd frontend && npm run build
+app-test:
+	pnpm --filter @kinora/core run test
 
-fe-test:
-	cd frontend && npm test
+app-desktop-dev:
+	pnpm --filter @kinora/desktop run dev
+
+app-desktop-build:
+	pnpm --filter @kinora/desktop run build
+
+app-mobile-start:
+	pnpm --filter @kinora/mobile run start
