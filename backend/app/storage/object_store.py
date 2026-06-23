@@ -159,7 +159,16 @@ class ObjectStore:
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
     def presigned_get_url(self, key: str, ttl: int = 3600) -> str:
-        """Return a time-limited URL that downloads ``key``."""
+        """Return a browser-readable URL that downloads ``key``.
+
+        When a public base URL is configured (for local MinIO, OSS CDN, or any
+        public read edge), prefer that stable browser-facing URL. Otherwise fall
+        back to a time-limited signed S3 URL generated against the private API
+        endpoint.
+        """
+        public = self.public_url(key)
+        if public is not None:
+            return public
         url: str = self._client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self._bucket, "Key": key},
