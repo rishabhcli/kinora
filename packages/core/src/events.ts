@@ -165,9 +165,12 @@ export const conflictChoiceEvent = z.object({
   shot_id: z.string().nullable().optional(),
 });
 
-export const ingestProgressEvent = z
-  .object({ event: z.literal("ingest_progress"), book_id: z.string() })
-  .passthrough();
+export const ingestProgressEvent = z.object({
+  event: z.literal("ingest_progress"),
+  book_id: z.string(),
+  stage: z.string().optional(),
+  pct: z.number().optional(),
+});
 
 export const kinoraEventSchema = z.discriminatedUnion("event", [
   clipReadyEvent,

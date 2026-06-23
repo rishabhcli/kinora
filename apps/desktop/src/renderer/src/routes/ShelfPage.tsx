@@ -7,6 +7,7 @@ import { BookCover } from "../components/BookCover";
 import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
+import { useLibraryIngestEvents } from "../hooks/useLibraryIngestEvents";
 import { useAuth } from "../hooks/useAuth";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
@@ -81,6 +82,8 @@ export default function ShelfPage() {
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
+
+  useLibraryIngestEvents();
 
   const { data: books, isLoading } = useQuery({
     queryKey: queryKeys.books(),

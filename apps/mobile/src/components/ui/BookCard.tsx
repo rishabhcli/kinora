@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, bookProgressPercent, bookStageLabel, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
@@ -41,6 +41,9 @@ export function BookCard({
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
   const ready = book.status === "ready";
+  const failed = book.status === "failed";
+  const working = !ready && !failed;
+  const progressPct = bookProgressPercent(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -64,12 +67,20 @@ export function BookCard({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={ready ? onPress : undefined}
+      disabled={!ready}
       onPressIn={() => animate(1)}
       onPressOut={() => animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
-      style={{ width }}
+      accessibilityState={{ disabled: !ready }}
+      accessibilityLabel={
+        ready
+          ? `Open ${book.title}${book.author ? `, by ${book.author}` : ""}`
+          : failed
+            ? `${book.title} — import failed`
+            : `${book.title} — preparing (${progressPct ?? 0}%)`
+      }
+      style={{ width, opacity: ready ? 1 : 0.88 }}
     >
       <Animated.View
         style={[styles.cover, { width, height: width * 1.5, transform: [{ translateY }] }]}
@@ -100,8 +111,14 @@ export function BookCard({
         {!ready ? (
           <View style={styles.statusBar}>
             <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+              {bookStageLabel(book).toUpperCase()}
+              {working && progressPct !== null ? ` · ${progressPct}%` : ""}
             </Text>
+            {working && progressPct !== null ? (
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+              </View>
+            ) : null}
           </View>
         ) : null}
       </Animated.View>
@@ -157,10 +174,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  progressTrack: {
+    height: 3,
+    width: "72%",
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
   },
   statusText: {
     color: palette.emberGlow,
