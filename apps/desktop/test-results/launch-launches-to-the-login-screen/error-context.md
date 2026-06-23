@@ -12,7 +12,7 @@
 # Error details
 
 ```
-Error: electron.launch: Electron failed to install correctly, please delete node_modules/electron and try installing again
+TimeoutError: electronApplication.firstWindow: Timeout 30000ms exceeded while waiting for event "window"
 ```
 
 # Test source
@@ -30,10 +30,10 @@ Error: electron.launch: Electron failed to install correctly, please delete node
   10 |  * points it at a seeded backend (KINORA via VITE_KINORA_API_URL).
   11 |  */
   12 | test("launches to the login screen", async () => {
-> 13 |   const app = await electron.launch({ args: [MAIN] });
-     |               ^ Error: electron.launch: Electron failed to install correctly, please delete node_modules/electron and try installing again
+  13 |   const app = await electron.launch({ args: [MAIN] });
   14 |   try {
-  15 |     const window = await app.firstWindow();
+> 15 |     const window = await app.firstWindow();
+     |                              ^ TimeoutError: electronApplication.firstWindow: Timeout 30000ms exceeded while waiting for event "window"
   16 |     await expect(window.getByText("Kinora")).toBeVisible();
   17 |     await expect(window.getByText("watch the book")).toBeVisible();
   18 |   } finally {
