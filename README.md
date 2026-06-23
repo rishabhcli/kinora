@@ -10,9 +10,9 @@ The book stays on screen. As the film plays, a narrator reads the text aloud, th
 | **Primary track** | Track 2 — AI Showrunner (also covers Track 1 · MemoryAgent and Track 3 · Agent Society) |
 | **Deadline** | Jul 9, 2026 · 2:00pm PDT |
 | **Deployment** | Alibaba Cloud — ECS / Function Compute · OSS · DashScope / Model Studio |
-| **Status** | **Built and runnable** — full backend + React frontend, real Qwen/Wan/CosyVoice, real persistence/queue/budget. Bring it up with `docker compose`; deploy with `infra/terraform`. |
+| **Status** | **Built and runnable** — full backend + native apps (Electron desktop + Expo mobile), real Qwen/Wan/CosyVoice, real persistence/queue/budget. Bring up the backend with `docker compose` and the apps with `pnpm`; deploy with `infra/terraform`. |
 
-> **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → open `http://localhost:5173`. See [Run it locally](#run-it-locally).
+> **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → `make app-desktop-dev`. See [Run it locally](#run-it-locally).
 
 ---
 
@@ -130,10 +130,12 @@ The full diagram, the per-shot state machine, and the end-to-end sequence are in
 ## Project layout
 
 ```
-backend/      FastAPI app, six-agent crew, MCP canon-memory server, render pipeline,
-              scheduler + Redis queue, budget service, eval harness, Alembic migrations
-frontend/     React + Vite + TypeScript two-pane workspace (PDF ⟷ video, SyncEngine)
-infra/        docker-compose.yml (the local stack) + terraform/ (Alibaba Cloud IaC)
+backend/        FastAPI app, six-agent crew, MCP canon-memory server, render pipeline,
+                scheduler + Redis queue, budget service, eval harness, Alembic migrations
+packages/core/  shared TypeScript: SyncEngine, OpenAPI-typed API client, event schemas, stores
+apps/desktop/   Electron app (electron-vite + React + Tailwind) — the two-pane reading room
+apps/mobile/    Expo / React Native app (video + reflow read-along)
+infra/          docker-compose.yml (the backend stack) + terraform/ (Alibaba Cloud IaC)
 deploy/       alibaba_render_worker.py — the §12.6 OSS + DashScope proof artifact
 assets/books/ the bundled public-domain demo book + its PyMuPDF build script
 Makefile      install / stack-up / migrate / worker / mcp / seed-demo / test / …
@@ -165,15 +167,17 @@ cp .env.example backend/.env
 #    edit backend/.env: set DASHSCOPE_API_KEY=sk-...   (KINORA_LIVE_VIDEO stays false)
 #    and set TTS_MODEL=qwen3-tts-flash  (preset-voice narration; see Configuration)
 
-# 2. Build + bring up the whole stack (data plane, migrate, api, render-worker, mcp, frontend).
+# 2. Build + bring up the backend stack (data plane, migrate, api, render-worker, mcp).
 make stack-up                 # == cd infra && docker compose up -d --build
 #    migrations run automatically via the one-shot `migrate` service.
 
 # 3. Seed the bundled public-domain demo book through the REAL flow (register → upload → ingest).
 make seed-demo                # == python backend/scripts/seed_demo.py --via api
 
-# 4. Open the workspace.
-open http://localhost:5173    # API: http://localhost:8000/docs · Prometheus: http://localhost:9090
+# 4. Run the desktop app (it connects to the API at http://localhost:8000).
+make app-install              # pnpm install (first run only)
+make app-desktop-dev          # launches the Electron reading room
+#    API docs: http://localhost:8000/docs · Prometheus: http://localhost:9090
 ```
 
 ### Local dev without Docker (venv)
@@ -187,6 +191,23 @@ cd backend && .venv/bin/uvicorn app.main:app --reload     # api (scheduler + ing
 make worker                   # python -m app.queue.worker
 make mcp                      # python -m app.mcp.run --http
 make seed-demo SEED_ARGS="--via direct"   # or run ingest in-process, no server needed
+```
+
+### Run the apps
+
+**Prerequisites:** Node 20+ and `pnpm` (the apps are a pnpm + Turborepo workspace).
+
+```bash
+make app-install              # pnpm install (first run)
+
+# Desktop (Electron) — connects to the API at http://localhost:8000:
+make app-desktop-dev          # == pnpm --filter @kinora/desktop dev
+#   point at another backend with:  VITE_KINORA_API_URL=https://api.example.com
+#   package signed installers (needs certs):  pnpm --filter @kinora/desktop dist
+
+# Mobile (Expo) — first set the API base in apps/mobile/src/lib/config.ts
+# (a phone/simulator can't reach "localhost"), then:
+make app-mobile-start         # == pnpm --filter @kinora/mobile start   (press i / a)
 ```
 
 ## Verify the end-to-end loop
@@ -238,7 +259,7 @@ terraform init && terraform validate && terraform plan && terraform apply
 
 The **MCP port (8765) is intra-VPC only** (never internet-facing); the bearer token is defense-in-depth on top. cloud-init writes these into each node's env **without** shell tracing, so secrets never land in `cloud-init-output.log`. Read back the generated secrets with `terraform output -raw jwt_secret` / `-raw mcp_auth_token`. For real prod, prefer KMS / Secrets Manager / OOS over user_data.
 
-The **frontend image** (`infra/docker/frontend.Dockerfile`) is a reproducible `npm ci` build served by **nginx** (SPA history fallback + an `/api` reverse proxy that covers REST, SSE, and the Director WebSocket) — not `vite preview`. Deploy it behind a CDN/LB or alongside the API and point the proxy at the api service.
+The **apps** ([`apps/desktop`](./apps/desktop), [`apps/mobile`](./apps/mobile)) ship as native binaries rather than a served site: build signed desktop installers with `pnpm --filter @kinora/desktop dist` (electron-builder → `.dmg`/`.exe`/AppImage) and mobile builds via EAS ([`apps/mobile/eas.json`](./apps/mobile/eas.json)). Both reach the deployed API over HTTPS (`VITE_KINORA_API_URL` for desktop; `apps/mobile/src/lib/config.ts` for mobile).
 
 The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py), kinora.md §12.6) is a real render worker that demonstrably uses **OSS** + **DashScope** — it reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than duplicating logic. See [`deploy/README.md`](./deploy/README.md) and [`infra/terraform/README.md`](./infra/terraform/README.md).
 
@@ -246,7 +267,7 @@ The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./depl
 
 | Path | What it is |
 |---|---|
-| [`backend/`](./backend) · [`frontend/`](./frontend) | The built application (Python backend · React frontend). |
+| [`backend/`](./backend) · [`apps/`](./apps) · [`packages/core`](./packages/core) | The built application (FastAPI backend · Electron + Expo apps · shared TS core). |
 | [`infra/`](./infra) · [`deploy/`](./deploy) · [`assets/`](./assets) | Local stack + Alibaba IaC · §12.6 proof artifact · demo book. |
 | [`kinora.md`](./kinora.md) | The full technical design — architecture, agents, pipeline, memory, budget. |
 | [`what-is-kinora.md`](./what-is-kinora.md) | Plain-English explainer. **Start here if you're non-technical.** |

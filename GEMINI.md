@@ -1,6 +1,6 @@
-# CLAUDE.md
+# GEMINI.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to the Gemini CLI when working with code in this repository.
 
 Kinora turns a book/PDF into a **page-synced film that generates itself a few seconds ahead of the reader** — six AI agents share one versioned "canon" so a long adaptation stays visually consistent. The product is **native apps** (Electron desktop + Expo/React Native mobile) over a cloud **FastAPI** backend. There is no web frontend (the legacy Vite app was retired).
 

@@ -2,29 +2,33 @@
 
 ## Project Structure & Module Organization
 
-Kinora is split into a FastAPI backend and a Vite/React frontend. Backend source lives in `backend/app`, with routes in `api/routes`, persistence in `db`, generation agents in `agents`, render logic in `render`, scheduler logic in `scheduler`, and tests in `backend/tests`. Frontend source lives in `frontend/src`, with route pages in `routes`, shared UI in `components`, state in `stores`, API clients in `api`, sync/playback logic in `sync`, and browser tests in `frontend/e2e`. Infrastructure and deployment assets are in `infra`, `deploy`, and `assets/books`.
+Kinora is a pnpm + Turborepo monorepo plus a Python backend. `backend/app` holds the FastAPI service (routes in `api/routes`, persistence in `db`, generation agents in `agents`, render logic in `render`, scheduler in `scheduler`; tests in `backend/tests`). `packages/core` is the shared TypeScript layer (the SyncEngine, the OpenAPI-typed API client, §5.6 event schemas, the auth store, query keys). `apps/desktop` is the Electron app (electron-vite + React + Tailwind); `apps/mobile` is the Expo / React Native app. Infrastructure and deploy assets live in `infra`, `deploy`, and `assets/books`. There is no web `frontend/` — it was retired in favor of the native apps.
 
 ## Build, Test, and Development Commands
 
-- `make install`: create `backend/.venv` and install `backend` with dev dependencies.
-- `make stack-up` / `make stack-down`: build and run or stop the Docker Compose stack in `infra`.
-- `make seed-demo`: load the bundled demo book through the app flow.
-- `make lint`, `make fmt`, `make test`: run Ruff/Mypy, Black/Ruff fixes, and pytest for the backend.
-- `make fe-install`, `make fe-dev`, `make fe-build`, `make fe-test`: install, run, build, and test the frontend.
-- From `frontend`, use `npm run lint`, `npm run e2e`, and `npm run e2e:install` for ESLint and Playwright.
+- `make install` — create `backend/.venv` and install the backend with dev deps.
+- `make stack-up` / `make stack-down` — build/run or stop the backend Docker Compose stack in `infra`.
+- `make seed-demo` — load the bundled demo book through the real flow.
+- `make lint`, `make fmt`, `make test` — Ruff/Mypy, Black/Ruff fixes, and pytest (backend).
+- `make app-install` — `pnpm install` for the monorepo.
+- `make app-typecheck` — typecheck `@kinora/core` + desktop + mobile.
+- `make app-test` — `pnpm --filter @kinora/core test` (Vitest).
+- `make app-desktop-dev` / `make app-desktop-build` — run / build the Electron app.
+- `make app-mobile-start` — `expo start`.
+- `pnpm --filter @kinora/core gen:api` — regenerate the typed API client from the backend OpenAPI.
 
 ## Coding Style & Naming Conventions
 
-Python targets 3.11+ and uses Black plus Ruff with a 100-character line length. Keep typed functions; Mypy disallows untyped defs. Use `snake_case` for Python modules, functions, and tests, and keep first-party imports under `app`. Frontend TypeScript is ESM/React: components use `PascalCase`, hooks use `useSomething`, stores end with `Store`, and tests sit beside source as `*.test.ts` or `*.test.tsx`.
+Python targets 3.11+ and uses Black + Ruff at a 100-character line length, fully typed (Mypy disallows untyped defs); `snake_case` modules/functions, first-party imports under `app`. TypeScript is strict ESM React: components `PascalCase`, hooks `useSomething`, stores end with `Store`, tests sit beside source as `*.test.ts(x)`.
 
 ## Testing Guidelines
 
-Backend tests use pytest and follow `backend/tests/test_*.py`; infra-bound tests should skip cleanly when Postgres, Redis, or S3 are unavailable. Frontend unit tests use Vitest and Testing Library. End-to-end coverage uses Playwright specs in `frontend/e2e/*.spec.ts`. Keep live model/video tests gated by explicit environment variables and avoid spending provider credits in default CI.
+Backend uses pytest (`backend/tests/test_*.py`); infra-bound tests skip cleanly when Postgres/Redis/S3 are unavailable, and live model/video tests stay gated by env (`KINORA_LIVE_TESTS`; `KINORA_LIVE_VIDEO` stays off). The shared core uses Vitest (`packages/core`). Desktop e2e is Playwright-on-Electron (`apps/desktop/e2e`); mobile e2e is Maestro (`apps/mobile/.maestro`) — both need a display / emulator, and their CI jobs are wired.
 
 ## Commit & Pull Request Guidelines
 
-History uses short, imperative subjects, sometimes with scopes such as `fix(frontend): ...` or review summaries like `Harden backend ...`. Keep commits focused and mention migrations, env changes, or API contract changes in the body when relevant. Pull requests should describe backend/frontend impact, list verification commands, link issues when available, and include screenshots for visible UI changes.
+History uses short, imperative subjects, often scoped (`feat(desktop): ...`, `feat(core): ...`, `chore: ...`). Keep commits focused and mention migrations, env changes, or API-contract changes in the body. Pull requests should describe backend/app impact, list verification commands, link issues, and include screenshots for visible UI changes.
 
 ## Security & Configuration Tips
 
-Copy `.env.example` to `backend/.env` for local work and never commit secrets. Keep `KINORA_LIVE_VIDEO` off unless intentionally testing live generation. Document new required environment variables in `.env.example`, Docker Compose, and CI together.
+Copy `.env.example` to `backend/.env` for local work; never commit secrets. Keep `KINORA_LIVE_VIDEO` off unless intentionally testing live generation. The apps read the API base from `VITE_KINORA_API_URL` (desktop) and `apps/mobile/src/lib/config.ts` (mobile). pnpm uses `node-linker=hoisted`; native build-script approvals live in `pnpm-workspace.yaml` under `allowBuilds`.
