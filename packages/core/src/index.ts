@@ -20,3 +20,5 @@ export type { paths, components, operations } from "./api/schema";
 export * from "./events";
 export * from "./sync/velocity";
 export * from "./sync/timeline";
+export * from "./sync/SyncEngine";
+export * from "./realtime/socket";
