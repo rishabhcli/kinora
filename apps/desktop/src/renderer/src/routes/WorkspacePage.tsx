@@ -12,9 +12,11 @@ import { CinemaPanel } from "../components/reader/CinemaPanel";
 import { ConflictDialog } from "../components/reader/ConflictDialog";
 import { PdfReadingColumn } from "../components/reader/PdfReadingColumn";
 import { ReadingToolbar } from "../components/reader/ReadingToolbar";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { useCanonRegen } from "../hooks/useCanonRegen";
 import { useDirectorHistory } from "../hooks/useDirectorHistory";
 import { useSyncEngine } from "../hooks/useSyncEngine";
+import { useWideLayout } from "../hooks/useWideLayout";
 import { api } from "../lib/api";
 import { useReadingTheme } from "../lib/readingTheme";
 
@@ -23,6 +25,9 @@ const FEED_KEY = "kinora.feed.open.v1";
 const MODE_KEY = "kinora.director.mode.v1";
 
 type WorkspaceMode = "viewer" | "director";
+type ReadingView = "read" | "watch";
+
+const VIEW_KEY = "kinora.reading.view.v1";
 
 function loadBookmarks(): Record<string, number> {
   if (typeof localStorage === "undefined") return {};
@@ -60,12 +65,28 @@ function saveMode(bookId: string, mode: WorkspaceMode): void {
   }
 }
 
+function loadView(): ReadingView {
+  if (typeof localStorage === "undefined") return "read";
+  return localStorage.getItem(VIEW_KEY) === "watch" ? "watch" : "read";
+}
+
+function saveView(view: ReadingView): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    /* private mode — keep in memory */
+  }
+}
+
 /** The reading room: a comfortable serif page (left) and the generated film
  *  (right) sharing one playhead, under an Apple Books-style glass toolbar. */
 export default function WorkspacePage() {
   const { id: bookId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const reading = useReadingTheme();
+  const isWide = useWideLayout();
+  const [view, setView] = useState<ReadingView>(loadView);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -239,6 +260,11 @@ export default function WorkspacePage() {
     });
   };
 
+  const onViewChange = (next: ReadingView) => {
+    setView(next);
+    saveView(next);
+  };
+
   // A regen entry links to its shot: seek the playhead there, which swaps the
   // cinema to that shot's clip and (under video ownership) follows in the page.
   const onSelectShot = (shotId: string) => {
@@ -276,6 +302,75 @@ export default function WorkspacePage() {
 
   const bookmarked = bookmarks[bookId] === visiblePage;
 
+  const cinemaPane = (
+    <>
+      <CinemaPanel
+        engine={engine}
+        clipUrl={snapshot.currentClipUrl}
+        sourceId={snapshot.currentSource?.id ?? null}
+        playheadSeekS={snapshot.playheadSeekS}
+        playheadSeekSeq={snapshot.playheadSeekSeq}
+        nextSource={snapshot.nextSource}
+        stage={snapshot.currentStage}
+        keyframeUrl={snapshot.currentKeyframeUrl}
+        illustrationUrl={snapshot.currentIllustrationUrl}
+        beatId={snapshot.currentBeatId}
+        underBudgetPressure={snapshot.underBudgetPressure}
+        isPlaying={snapshot.isPlaying}
+        mode={snapshot.mode}
+        onToggleMode={() => engine.setMode(snapshot.mode === "viewer" ? "director" : "viewer")}
+        socketStatus={socketStatus}
+        budgetRemaining={budgetRemaining}
+        activity={activity}
+        sceneShots={sceneShots}
+        currentShotId={snapshot.currentShotId}
+        onSeekShot={(shot) => engine.seek(shot.startWord, performance.now())}
+        onSendComment={async (note, regionPng) => {
+          const shotId = snapshot.currentShotId;
+          const res = await sendComment(note, shotId, regionPng);
+          if (res && shotId) {
+            history.record(shotId, { note, agent: res.agent, aspect: res.aspect, at: Date.now() });
+          }
+          return res;
+        }}
+        directionCounts={history.counts}
+        directions={history.recentFor(snapshot.currentShotId)}
+        loadingShots={shots === undefined}
+      />
+      <BufferIndicator
+        sessionId={sessionId}
+        bufferState={bufferState}
+        focusWord={snapshot.focusWord}
+        velocity={snapshot.velocity}
+        stage={snapshot.currentStage}
+        budgetLow={snapshot.underBudgetPressure}
+      />
+      <AgentActivityFeed
+        activity={activity}
+        socketStatus={socketStatus}
+        open={feedOpen}
+        onToggle={toggleFeed}
+        onSelectShot={onSelectShot}
+        onResolveConflict={(c) => reopenConflict(c.conflictId)}
+      />
+    </>
+  );
+
+  const readingPane = (
+    <PdfReadingColumn
+      bookId={bookId}
+      numPages={book?.num_pages ?? null}
+      page={enginePage}
+      autoFollow={snapshot.owner === "video"}
+      highlightWordIndex={snapshot.owner === "video" ? snapshot.highlightWordIndex : null}
+      settings={reading.settings}
+      theme={reading.theme}
+      onSeekWord={(word) => engine.seek(word, performance.now())}
+      onReportScroll={(word) => engine.reportScroll(word, performance.now())}
+      onVisiblePageChange={setVisiblePage}
+    />
+  );
+
   return (
     <div className="flex h-screen flex-col bg-walnut font-sans text-parchment">
       <ReadingToolbar
@@ -295,73 +390,30 @@ export default function WorkspacePage() {
         canonOpen={canonOpen}
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="min-h-0 border-r border-white/10">
-          <PdfReadingColumn
-            bookId={bookId}
-            numPages={book?.num_pages ?? null}
-            page={enginePage}
-            autoFollow={snapshot.owner === "video"}
-            highlightWordIndex={snapshot.owner === "video" ? snapshot.highlightWordIndex : null}
-            settings={reading.settings}
-            theme={reading.theme}
-            onSeekWord={(word) => engine.seek(word, performance.now())}
-            onReportScroll={(word) => engine.reportScroll(word, performance.now())}
-            onVisiblePageChange={setVisiblePage}
-          />
-        </section>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {isWide ? (
+          <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="min-h-0 border-r border-white/10">{readingPane}</section>
+            <section className="relative min-h-0">{cinemaPane}</section>
+          </div>
+        ) : view === "watch" ? (
+          <section className="relative min-h-0 flex-1">{cinemaPane}</section>
+        ) : (
+          <section className="min-h-0 flex-1">{readingPane}</section>
+        )}
 
-        <section className="relative hidden min-h-0 lg:block">
-          <CinemaPanel
-            engine={engine}
-            clipUrl={snapshot.currentClipUrl}
-            sourceId={snapshot.currentSource?.id ?? null}
-            playheadSeekS={snapshot.playheadSeekS}
-            playheadSeekSeq={snapshot.playheadSeekSeq}
-            nextSource={snapshot.nextSource}
-            stage={snapshot.currentStage}
-            keyframeUrl={snapshot.currentKeyframeUrl}
-            illustrationUrl={snapshot.currentIllustrationUrl}
-            beatId={snapshot.currentBeatId}
-            underBudgetPressure={snapshot.underBudgetPressure}
-            isPlaying={snapshot.isPlaying}
-            mode={snapshot.mode}
-            onToggleMode={() => engine.setMode(snapshot.mode === "viewer" ? "director" : "viewer")}
-            socketStatus={socketStatus}
-            budgetRemaining={budgetRemaining}
-            activity={activity}
-            sceneShots={sceneShots}
-            currentShotId={snapshot.currentShotId}
-            onSeekShot={(shot) => engine.seek(shot.startWord, performance.now())}
-            onSendComment={async (note, regionPng) => {
-              const shotId = snapshot.currentShotId;
-              const res = await sendComment(note, shotId, regionPng);
-              if (res && shotId) {
-                history.record(shotId, { note, agent: res.agent, aspect: res.aspect, at: Date.now() });
-              }
-              return res;
-            }}
-            directionCounts={history.counts}
-            directions={history.recentFor(snapshot.currentShotId)}
-            loadingShots={shots === undefined}
-          />
-          <BufferIndicator
-            sessionId={sessionId}
-            bufferState={bufferState}
-            focusWord={snapshot.focusWord}
-            velocity={snapshot.velocity}
-            stage={snapshot.currentStage}
-            budgetLow={snapshot.underBudgetPressure}
-          />
-          <AgentActivityFeed
-            activity={activity}
-            socketStatus={socketStatus}
-            open={feedOpen}
-            onToggle={toggleFeed}
-            onSelectShot={onSelectShot}
-            onResolveConflict={(c) => reopenConflict(c.conflictId)}
-          />
-        </section>
+        {!isWide && (
+          <div className="no-drag z-30 shrink-0 border-t border-white/10 bg-walnut/95 px-4 py-3 backdrop-blur-md">
+            <SegmentedControl<ReadingView>
+              value={view}
+              onChange={onViewChange}
+              options={[
+                { value: "read", label: "Read" },
+                { value: "watch", label: "Watch" },
+              ]}
+            />
+          </div>
+        )}
       </div>
 
       {metricsOpen && (
