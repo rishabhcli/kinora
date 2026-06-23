@@ -245,14 +245,161 @@
       transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
       opacity 320ms ease;
   }
+
+  /* A status chip for a book that is still importing or has failed — a small
+     frosted pill (set via [data-tone]) that reads as a deliberate state badge
+     rather than a broken cover. */
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 9999px;
+    padding: 0.18rem 0.5rem 0.18rem 0.42rem;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid transparent;
+  }
+  .status-chip[data-tone="working"] {
+    color: #fbd9ab;
+    background: rgba(224, 134, 58, 0.24);
+    border-color: rgba(244, 168, 93, 0.4);
+  }
+  .status-chip[data-tone="failed"] {
+    color: #f0c6c6;
+    background: rgba(120, 58, 58, 0.32);
+    border-color: rgba(220, 140, 140, 0.32);
+  }
+
+  /* The chip's leading dot — pulses softly while a book is still working. */
+  .status-pulse {
+    position: relative;
+    display: inline-flex;
+    height: 5px;
+    width: 5px;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+  .status-pulse[data-live="true"]::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0.55;
+    animation: kinora-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* A slow shimmer for skeleton placeholders + working covers — a warm
+     highlight that sweeps across, so loading reads as the room warming up. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgba(255, 236, 205, 0.13) 50%,
+      transparent 70%
+    );
+    transform: translateX(-100%);
+    animation: kinora-shimmer 2s ease-in-out infinite;
+    /* Per-element offset (set inline) so a row of skeletons ripples in sequence. */
+    animation-delay: var(--shimmer-delay, 0ms);
+  }
+
+  /* A bare skeleton surface (covers, text lines) — a faint warm panel that
+     sits quietly on the dark wall. */
+  .skeleton {
+    background: linear-gradient(180deg, rgba(122, 81, 47, 0.32), rgba(36, 24, 17, 0.5));
+    border: 1px solid rgba(255, 236, 205, 0.07);
+  }
+
+  /* A refined ghost "add a book" slot on the shelf — a dashed plate that
+     stands where a cover would, inviting one more. */
+  .add-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 3px 7px 7px 3px;
+    border: 1.5px dashed rgba(244, 168, 93, 0.28);
+    background: linear-gradient(160deg, rgba(122, 81, 47, 0.14), rgba(0, 0, 0, 0.22));
+    color: rgba(244, 168, 93, 0.72);
+    transition:
+      border-color 220ms ease,
+      color 220ms ease,
+      background 220ms ease,
+      transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .add-slot:hover {
+    border-color: rgba(244, 168, 93, 0.55);
+    color: #f4a85d;
+    background: linear-gradient(160deg, rgba(122, 81, 47, 0.24), rgba(0, 0, 0, 0.2));
+    transform: translateY(-4px);
+  }
+  .add-slot:focus-visible {
+    outline: none;
+    border-color: rgba(244, 168, 93, 0.7);
+    box-shadow: 0 0 0 3px rgba(244, 168, 93, 0.32);
+  }
+
+  /* A drop cap for the reading leaf's opening paragraph — a large theme-inked
+     initial that anchors the page like a printed book. Rendered as an explicit
+     span (not ::first-letter) so it survives the karaoke word <button>s. */
+  .reading-leaf .drop-cap-letter {
+    float: left;
+    font-weight: 600;
+    line-height: 0.74;
+    padding: 0.06em 0.07em 0 0;
+    font-size: 3.2em;
+    color: var(--page-accent);
+  }
+}
+
+@keyframes kinora-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes kinora-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .toolbar-btn,
   .toolbar-btn:active,
   .reading-leaf .word,
-  .shelf-contact {
+  .shelf-contact,
+  .add-slot {
     transition: none;
+  }
+  .shimmer::after,
+  .status-pulse[data-live="true"]::after {
+    animation: none;
+  }
+  .shimmer::after {
+    opacity: 0;
   }
 }
 

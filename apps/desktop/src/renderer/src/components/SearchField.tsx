@@ -8,7 +8,7 @@ export function SearchField({ value, onChange }: { value: string; onChange: (v: 
 
   return (
     <div
-      className={`glass flex h-9 items-center rounded-full transition-[width] duration-300 ease-out ${
+      className={`glass flex h-9 items-center overflow-hidden rounded-full transition-[width] duration-300 ease-out focus-within:ring-2 focus-within:ring-ember-glow/70 ${
         expanded ? "w-56" : "w-9"
       }`}
     >
@@ -19,7 +19,7 @@ export function SearchField({ value, onChange }: { value: string; onChange: (v: 
           setOpen(true);
           requestAnimationFrame(() => inputRef.current?.focus());
         }}
-        className="flex h-9 w-9 shrink-0 items-center justify-center text-white/70 transition hover:text-white"
+        className="flex h-9 w-9 shrink-0 items-center justify-center text-white/70 transition hover:text-white focus-visible:text-white focus-visible:outline-none"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="7" />

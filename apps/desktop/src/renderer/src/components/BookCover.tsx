@@ -11,12 +11,25 @@ function colorFor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
+/** A short, human label for a book that isn't ready yet — the import stage in
+ *  sentence case, or a clean fallback. */
+function stageLabel(book: BookResponse): string {
+  if (book.status === "failed") return "Import failed";
+  const stage = book.stage?.trim();
+  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
+  return "Preparing";
+}
+
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
  *  on the plank with a contact shadow, a tasteful hover lift, and a pop-out
- *  animation on select before it opens in its own window. */
+ *  animation on select before it opens in its own window. A book still importing
+ *  (or whose import failed) reads as a deliberate, dimmed state with a status
+ *  chip rather than a broken cover. */
 export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => void }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
+  const failed = book.status === "failed";
+  const working = !ready && !failed;
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -48,7 +61,7 @@ export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => 
       style={{ width: 138 }}
     >
       <div
-        className={`relative aspect-[2/3] w-[138px] origin-bottom rounded-[3px_7px_7px_3px] transition-[transform,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:-translate-y-2.5 group-focus-visible:-translate-y-2.5 ${
+        className={`relative aspect-[2/3] w-[138px] origin-bottom rounded-[3px_7px_7px_3px] transition-[transform,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:-translate-y-2.5 group-focus-visible:-translate-y-2.5 group-focus-visible:ring-2 group-focus-visible:ring-ember-glow/80 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-walnut-deep ${
           popping ? "-translate-y-8 scale-[1.08]" : ""
         }`}
         style={{
@@ -58,7 +71,9 @@ export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => 
         }}
       >
         <div
-          className="relative h-full w-full overflow-hidden rounded-[3px_7px_7px_3px]"
+          className={`relative h-full w-full overflow-hidden rounded-[3px_7px_7px_3px] transition-[filter,opacity] duration-300 ${
+            ready ? "" : "opacity-90 saturate-[0.78] brightness-[0.72] group-hover:brightness-[0.82]"
+          }`}
           style={cover ? undefined : { backgroundImage: `linear-gradient(150deg, ${colorFor(book.id)}, rgba(0,0,0,0.9))` }}
         >
           {cover ? (
@@ -68,7 +83,11 @@ export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => 
               <p className="line-clamp-4 font-display text-sm font-medium leading-tight text-white/95">
                 {book.title}
               </p>
-              <p className="text-[9px] uppercase tracking-[0.14em] text-white/55">{book.author ?? ""}</p>
+              {book.author && (
+                <p className="line-clamp-1 text-[9px] uppercase tracking-[0.14em] text-white/55">
+                  {book.author}
+                </p>
+              )}
             </div>
           )}
 
@@ -77,10 +96,22 @@ export function BookCover({ book, onOpen }: { book: BookResponse; onOpen: () => 
           <div className="pointer-events-none absolute inset-y-0 left-[7px] w-px bg-white/12" />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,rgba(255,255,255,0.2),transparent_34%,transparent_88%,rgba(0,0,0,0.22))]" />
 
+          {/* A book that's still importing or has failed: a soft scrim + a frosted
+              status chip pinned to the foot of the cover, so it reads as a
+              deliberate state rather than a broken card. */}
           {!ready && (
-            <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-center text-[9px] font-medium uppercase tracking-wider text-ember-glow">
-              {book.stage ?? book.status}
-            </div>
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/15" />
+              {working && (
+                <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
+              )}
+              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+                <span className="status-chip" data-tone={failed ? "failed" : "working"}>
+                  <span className="status-pulse" data-live={working ? "true" : undefined} />
+                  {stageLabel(book)}
+                </span>
+              </div>
+            </>
           )}
         </div>
       </div>

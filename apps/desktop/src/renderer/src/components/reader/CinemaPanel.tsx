@@ -145,18 +145,28 @@ export function CinemaPanel({
           />
 
           {!clipUrl && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[linear-gradient(160deg,#1a120c,#0c0805)] text-center">
-              <div className="relative flex h-14 w-14 items-center justify-center">
-                <span className="absolute inset-0 animate-ping rounded-full bg-ember/30 motion-reduce:hidden" />
-                <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-ember/20 text-ember-glow">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5.5v13l11-6.5-11-6.5Z" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-[radial-gradient(120%_100%_at_50%_0%,#1c130c,#0b0705_72%)] text-center">
+              {/* Cinematic letterbox bars + a slow warm sweep, so the idle stage
+                  reads as a film about to begin rather than an empty box. */}
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[7%] bg-black/55" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[7%] bg-black/55" />
+              <div className="shimmer pointer-events-none absolute inset-0 opacity-60 motion-reduce:hidden" />
+
+              {/* A soft ember beacon — two breathing rings around a still center,
+                  signalling work without implying the clip is ready to play. */}
+              <div className="relative flex h-16 w-16 items-center justify-center">
+                <span className="absolute inset-0 animate-ping rounded-full bg-ember/25 [animation-duration:2.4s] motion-reduce:hidden" />
+                <span className="absolute inset-2 animate-ping rounded-full bg-ember/20 [animation-duration:2.4s] [animation-delay:0.4s] motion-reduce:hidden" />
+                <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-ember/25 text-ember-glow ring-1 ring-ember-glow/30">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 5h16v14H4z" />
+                    <path d="M4 9h16M9 5 7 9M15 5l-2 4" />
                   </svg>
                 </span>
               </div>
-              <div>
+              <div className="px-6">
                 <p className="font-display text-[17px] text-parchment">Rendering the next shot</p>
-                <p className="mt-1 text-[13px] text-white/45">
+                <p className="mx-auto mt-1.5 max-w-[15rem] text-[13px] leading-relaxed text-white/45">
                   The crew is generating film a few seconds ahead of you.
                 </p>
               </div>

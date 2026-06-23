@@ -95,6 +95,11 @@ export function ReadingColumn({
     [data?.text, data?.word_boxes],
   );
 
+  // A printed-book drop cap on the opening paragraph — only on page one, and only
+  // when the page actually begins with a letter (so we never enlarge punctuation
+  // or a page that resumes mid-sentence).
+  const dropCap = safePage === 1 && /^\p{L}/u.test(words[0]?.text ?? "");
+
   // Keep the spoken word in view as playback advances, gently.
   useEffect(() => {
     if (highlightWordIndex === null) return;
@@ -139,9 +144,25 @@ export function ReadingColumn({
           </header>
 
           {isLoading && (
-            <p className="font-sans text-sm" style={{ color: "var(--page-ink-soft)" }}>
-              Turning the page…
-            </p>
+            <div aria-hidden className="space-y-3">
+              {[100, 96, 99, 92, 97, 88, 0, 95, 90].map((w, i) =>
+                w === 0 ? (
+                  <div key={i} className="h-3" />
+                ) : (
+                  <div
+                    key={i}
+                    className="shimmer h-[0.85em] rounded-[3px]"
+                    style={
+                      {
+                        width: `${w}%`,
+                        background: "color-mix(in srgb, var(--page-ink) 9%, transparent)",
+                        "--shimmer-delay": `${i * 70}ms`,
+                      } as CSSProperties
+                    }
+                  />
+                ),
+              )}
+            </div>
           )}
 
           {!isLoading && words.length === 0 && (
@@ -150,24 +171,35 @@ export function ReadingColumn({
             </p>
           )}
 
-          <p className="font-display [text-wrap:pretty]" style={{ hyphens: "auto" }}>
-            {words.map((word, i) =>
-              word.index === null ? (
-                <span key={`p-${i}`}>{word.text} </span>
-              ) : (
-                <button
-                  key={`w-${word.index}-${i}`}
-                  type="button"
-                  ref={word.index === highlightWordIndex ? activeRef : undefined}
-                  data-active={word.index === highlightWordIndex}
-                  onClick={() => onSeekWord(word.index as number)}
-                  className="word inline px-[1px] text-left align-baseline"
-                >
-                  {word.text}
-                </button>
-              ),
-            )}
-          </p>
+          {!isLoading && words.length > 0 && (
+            <p className="font-display [text-wrap:pretty]" style={{ hyphens: "auto" }}>
+              {words.map((word, i) => {
+                if (word.index === null) return <span key={`p-${i}`}>{word.text} </span>;
+                // The opening word carries the drop cap: its first letter is
+                // rendered large and floated, the rest sits beside it.
+                const isFirstWord = dropCap && i === 0;
+                return (
+                  <button
+                    key={`w-${word.index}-${i}`}
+                    type="button"
+                    ref={word.index === highlightWordIndex ? activeRef : undefined}
+                    data-active={word.index === highlightWordIndex}
+                    onClick={() => onSeekWord(word.index as number)}
+                    className="word inline px-[1px] text-left align-baseline"
+                  >
+                    {isFirstWord ? (
+                      <>
+                        <span className="drop-cap-letter">{word.text.slice(0, 1)}</span>
+                        {word.text.slice(1)}
+                      </>
+                    ) : (
+                      word.text
+                    )}{" "}
+                  </button>
+                );
+              })}
+            </p>
+          )}
         </article>
       </div>
 
@@ -180,23 +212,21 @@ export function ReadingColumn({
           type="button"
           disabled={!canPrev}
           onClick={() => onTurnPage(safePage - 1)}
-          className="flex h-8 items-center gap-1.5 rounded-full px-3 font-sans text-[13px] transition enabled:hover:opacity-100 disabled:opacity-30"
-          style={{ opacity: 0.8 }}
+          className="flex h-8 items-center gap-1.5 rounded-full px-3 font-sans text-[13px] opacity-80 transition enabled:hover:opacity-100 disabled:opacity-25 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--page-accent)]"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
           </svg>
           Previous
         </button>
-        <span className="font-sans text-[11px] uppercase tracking-[0.18em]" style={{ opacity: 0.7 }}>
+        <span className="font-sans text-[11px] uppercase tracking-[0.18em] opacity-70">
           Page {safePage} of {total}
         </span>
         <button
           type="button"
           disabled={!canNext}
           onClick={() => onTurnPage(safePage + 1)}
-          className="flex h-8 items-center gap-1.5 rounded-full px-3 font-sans text-[13px] transition enabled:hover:opacity-100 disabled:opacity-30"
-          style={{ opacity: 0.8 }}
+          className="flex h-8 items-center gap-1.5 rounded-full px-3 font-sans text-[13px] opacity-80 transition enabled:hover:opacity-100 disabled:opacity-25 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--page-accent)]"
         >
           Next
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
