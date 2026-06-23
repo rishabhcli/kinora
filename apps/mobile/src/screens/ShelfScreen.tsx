@@ -19,6 +19,7 @@ import {
   Surface,
 } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { useShelfIngestSync, shelfHasImporting } from "../hooks/useShelfIngestSync";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
@@ -69,6 +70,8 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
       return data;
     },
   });
+
+  useShelfIngestSync(shelfHasImporting(books));
 
   // Cover warming: once the library resolves, fetch each ready book's page-1
   // (into the same React Query cache the BookCard reads, so the cover is an

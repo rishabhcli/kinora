@@ -8,6 +8,7 @@ import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { useShelfIngestSync, shelfHasImporting } from "../hooks/useShelfIngestSync";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
@@ -90,6 +91,8 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  useShelfIngestSync(shelfHasImporting(books));
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same

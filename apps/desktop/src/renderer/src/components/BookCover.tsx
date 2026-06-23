@@ -16,8 +16,14 @@ function colorFor(id: string): string {
 function stageLabel(book: BookResponse): string {
   if (book.status === "failed") return "Import failed";
   const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
+  let label: string;
+  if (stage) label = stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
+  else label = "Preparing";
+  const pct =
+    book.progress != null && book.status === "importing"
+      ? Math.round(Math.min(1, Math.max(0, book.progress)) * 100)
+      : null;
+  return pct != null ? `${label} · ${pct}%` : label;
 }
 
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
