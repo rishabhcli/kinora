@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 
 /** The simple demo reader (owns the seeded library) — one tap to explore. */
-const DEMO = { email: "e2e@kinora.test", password: "e2e-password-123" } as const;
+const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 
 async function loginAndLoadUser(email: string, password: string): Promise<string | null> {
   const { data, error } = await api.POST("/api/auth/login", { body: { email, password } });
