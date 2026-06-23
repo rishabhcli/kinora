@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { DirectorBar } from "../components/DirectorBar";
 import { PdfReader } from "../components/PdfReader";
 import { VideoStage } from "../components/VideoStage";
 import { useSyncEngine } from "../hooks/useSyncEngine";
@@ -27,7 +28,7 @@ export default function WorkspacePage() {
     };
   }, [bookId]);
 
-  const { engine, snapshot } = useSyncEngine(sessionId);
+  const { engine, snapshot, activity, budgetRemaining, sendComment } = useSyncEngine(sessionId);
 
   const { data: shots } = useQuery({
     queryKey: queryKeys.shots(bookId ?? ""),
@@ -57,6 +58,7 @@ export default function WorkspacePage() {
           {snapshot.owner} · {snapshot.velocity.toFixed(1)} wps · {shots?.length ?? 0} shots
         </span>
       </header>
+
       <div className="grid min-h-0 flex-1 grid-cols-2">
         <section className="min-h-0 border-r border-neutral-900">
           <PdfReader
@@ -70,6 +72,14 @@ export default function WorkspacePage() {
           <VideoStage engine={engine} clipUrl={snapshot.currentClipUrl} />
         </section>
       </div>
+
+      <DirectorBar
+        mode={snapshot.mode}
+        onToggleMode={() => engine.setMode(snapshot.mode === "viewer" ? "director" : "viewer")}
+        activity={activity}
+        budgetRemaining={budgetRemaining}
+        onComment={(note) => sendComment(note, snapshot.currentShotId)}
+      />
     </div>
   );
 }
