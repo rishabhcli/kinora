@@ -46,6 +46,17 @@ BeatsLoader = Callable[[str], Awaitable[Sequence[Any]]]
 #: time), matching the §4.1 reading/screen-time asymmetry.
 WORDS_PER_SHOT = 60
 SHOT_SECONDS = 5.0
+#: Per-shot target duration is decided by the planner from each shot's own
+#: narration length, so a dense shot runs longer than a sparse one instead of
+#: every shot being a fixed constant. The anchor is the §4.2 example — a full
+#: ``WORDS_PER_SHOT`` (60-word) shot ≈ ``SHOT_SECONDS`` (5s) of screen-time,
+#: i.e. ~12 narration words/sec of compressed screen-time (the §4.1 reading↔
+#: screen-time asymmetry, distinct from the §4.3 *reading* velocity). The result
+#: is clamped to ``[MIN_SHOT_SECONDS, MAX_SHOT_SECONDS]`` so no single clip is
+#: jarringly short or burns excess video-seconds.
+SCREEN_WORDS_PER_SECOND = WORDS_PER_SHOT / SHOT_SECONDS  # 12 words/sec → 60 words ≈ 5s
+MIN_SHOT_SECONDS = 3.0
+MAX_SHOT_SECONDS = 8.0
 #: Token-cost estimate per shot: a fixed planning/prompt floor plus per-word.
 BASE_SHOT_TOKENS = 1500
 TOKENS_PER_WORD = 6
@@ -139,25 +150,43 @@ class Adapter(BaseAgent):
     # -- beats → shots (deterministic, §4.2) --------------------------------- #
 
     def plan_shots(self, beats: Sequence[Beat]) -> list[ShotListItem]:
-        """Split each beat into ~5s shots with source spans and cost estimates."""
+        """Split each beat into shots; the planner sets each shot's own duration.
+
+        ``target_duration_s`` is decided per-shot from that shot's narration
+        length (§4.3 reading pace) rather than a fixed constant, then clamped to
+        ``[MIN_SHOT_SECONDS, MAX_SHOT_SECONDS]``. ``est_cost.video_seconds`` —
+        the scarce, hard-capped budget unit — matches the shot's own duration.
+        """
         items: list[ShotListItem] = []
         for beat in beats:
             for shot_index, span in enumerate(self._split_span(beat.source_span)):
                 words = max(span.word_range[1] - span.word_range[0], 0) or WORDS_PER_SHOT
+                duration = self._duration_for_words(words)
                 items.append(
                     ShotListItem(
                         shot_id=f"{beat.beat_id or 'beat'}_shot_{shot_index:02d}",
                         beat_id=beat.beat_id,
                         scene_id=beat.scene_id,
                         source_span=span,
-                        est_duration_s=SHOT_SECONDS,
+                        est_duration_s=duration,
                         est_cost=EstCost(
-                            video_seconds=SHOT_SECONDS,
+                            video_seconds=duration,
                             tokens=BASE_SHOT_TOKENS + words * TOKENS_PER_WORD,
                         ),
                     )
                 )
         return items
+
+    @staticmethod
+    def _duration_for_words(words: int) -> float:
+        """Per-shot target seconds: words / reading-pace, clamped to sane bounds.
+
+        Deterministic (no LLM): a denser shot earns more screen-time, a sparse
+        one less, but never outside ``[MIN_SHOT_SECONDS, MAX_SHOT_SECONDS]``.
+        """
+        seconds = max(words, 0) / SCREEN_WORDS_PER_SECOND
+        clamped = min(max(seconds, MIN_SHOT_SECONDS), MAX_SHOT_SECONDS)
+        return round(clamped, 1)
 
     @staticmethod
     def _split_span(span: SourceSpan) -> list[SourceSpan]:
@@ -226,6 +255,9 @@ def _planner_conformance(adapter: Adapter) -> ShotPlanner:
 
 __all__ = [
     "BASE_SHOT_TOKENS",
+    "MAX_SHOT_SECONDS",
+    "MIN_SHOT_SECONDS",
+    "SCREEN_WORDS_PER_SECOND",
     "SHOT_SECONDS",
     "TOKENS_PER_WORD",
     "WORDS_PER_SHOT",

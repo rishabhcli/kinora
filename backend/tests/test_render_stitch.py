@@ -28,6 +28,27 @@ def test_concat_two_clips_into_one_valid_mp4() -> None:
     assert degrade.verify_playable(scene) is True
 
 
+def test_concat_outputs_1080p_and_combines_shot_durations() -> None:
+    """Spec ("mashed-up version on device, 1080p"): the offline scene stitch
+    concatenates a scene's shots into one 1920x1080 mp4 whose duration is the sum
+    of the shots'. Fully offline — only ffmpeg, no model/network. The clips are
+    rendered at the production geometry (``degrade.DEFAULT_SIZE``), the same size
+    ``SceneStitcher`` infers from the first shot when no override is passed."""
+    assert degrade.DEFAULT_SIZE == (1920, 1080)  # the production render geometry
+    # Two real 1080p Ken-Burns shots of different lengths (per-shot durations).
+    shot_a = degrade.ken_burns_over_image(png_bytes(1920, 1080), 2.0, audio_bytes=wav_bytes(2.0))
+    shot_b = degrade.ken_burns_over_image(png_bytes(1920, 1080), 3.0)  # silence-padded
+
+    # No size override → the stitcher's production path (size inferred from shot A).
+    scene = concat_clips([shot_a, shot_b])
+
+    info = degrade.probe(scene)
+    assert (info.width, info.height) == (1920, 1080)  # 1080p out
+    assert info.has_video is True and info.has_audio is True
+    assert abs(info.duration_s - 5.0) < 0.4  # 2s + 3s combined
+    assert degrade.verify_playable(scene) is True
+
+
 def test_concat_keeps_full_duration_when_audio_shorter_and_no_ffprobe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
