@@ -14,6 +14,7 @@ import {
 
 import { ReflowReader } from "../components/ReflowReader";
 import { SegmentedControl } from "../components/ui";
+import { usePreferences } from "../hooks/usePreferences";
 import { useSyncEngine } from "../hooks/useSyncEngine";
 import { api } from "../lib/api";
 import { alpha, BOTTOM_INSET, palette, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
@@ -34,6 +35,7 @@ export function ReadingScreen({ bookId, onBack }: { bookId: string; onBack: () =
   const isWide = width >= TABLET_BREAKPOINT || width > height;
   const [view, setView] = useState<ReadingView>("read");
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const autoplay = usePreferences((state) => state.autoplayOnOpen);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,12 +68,14 @@ export function ReadingScreen({ bookId, onBack }: { bookId: string; onBack: () =
 
   const player = useVideoPlayer(snapshot.currentClipUrl, (instance) => {
     instance.timeUpdateEventInterval = 0.25;
-    instance.play();
+    // Respect the "autoplay video on open" preference; when off, the reader
+    // starts playback themselves via the native controls.
+    if (autoplay) instance.play();
   });
 
   useEffect(() => {
-    if (snapshot.currentClipUrl) player.play();
-  }, [snapshot.currentClipUrl, player]);
+    if (autoplay && snapshot.currentClipUrl) player.play();
+  }, [autoplay, snapshot.currentClipUrl, player]);
 
   const timeUpdate = useEvent(player, "timeUpdate");
 

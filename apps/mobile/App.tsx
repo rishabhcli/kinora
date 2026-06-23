@@ -8,6 +8,7 @@ import { useAuth } from "./src/hooks/useAuth";
 import { api } from "./src/lib/api";
 import { authStore, loadPersistedToken, persistToken } from "./src/lib/auth";
 import { loadHasOnboarded, persistHasOnboarded } from "./src/lib/onboarding";
+import { loadPersistedPreferences } from "./src/lib/preferences";
 import { queryClient } from "./src/lib/queryClient";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
@@ -28,6 +29,10 @@ function useBootstrap(): OnboardingState {
 
   useEffect(() => {
     let cancelled = false;
+    // Warm persisted preferences (reduce-motion override, autoplay) into the
+    // store; independent of the boot gate — defaults apply until it resolves.
+    void loadPersistedPreferences();
+
     void (async () => {
       const seen = await loadHasOnboarded();
       if (!cancelled) setOnboarding(seen ? "done" : "needed");
