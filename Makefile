@@ -8,7 +8,7 @@ SEED_ARGS ?=
 MCP_ARGS ?= --http
 
 .PHONY: help install up down stack-up stack-down migrate revision \
-        worker mcp demo-pdf seed-demo lint fmt test \
+        worker mcp demo-pdf seed-demo seed-library lint fmt test \
         app-install app-typecheck app-test app-desktop-dev app-desktop-build app-mobile-start \
         app-native app-native-bundle
 
@@ -22,8 +22,9 @@ help:
 	@echo "  revision     alembic revision --autogenerate (REV_MSG=...)"
 	@echo "  worker       run the render worker locally (python -m app.queue.worker)"
 	@echo "  mcp          run the MCP canon-memory server (MCP_ARGS=--http by default)"
-	@echo "  demo-pdf     (re)build the bundled public-domain demo book PDF"
-	@echo "  seed-demo    load the demo book via the real flow (SEED_ARGS=... e.g. '--via direct')"
+	@echo "  demo-pdf     (re)build all bundled public-domain demo book PDFs"
+	@echo "  seed-demo    load the Frog-King demo via the real flow (SEED_ARGS=...)"
+	@echo "  seed-library load every bundled demo book (SEED_ARGS=... e.g. '--via direct')"
 	@echo "  lint         ruff check + mypy"
 	@echo "  fmt          black + ruff --fix"
 	@echo "  test         pytest"
@@ -70,10 +71,13 @@ mcp:
 # -- Demo content ------------------------------------------------------------ #
 
 demo-pdf:
-	backend/.venv/bin/python assets/books/build_demo_pdf.py
+	backend/.venv/bin/python assets/books/build_all_books.py
 
 seed-demo:
 	cd backend && .venv/bin/python scripts/seed_demo.py $(SEED_ARGS)
+
+seed-library:
+	cd backend && .venv/bin/python scripts/seed_library.py $(SEED_ARGS)
 
 # -- Quality gates ----------------------------------------------------------- #
 
