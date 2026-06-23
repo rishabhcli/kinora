@@ -18,6 +18,7 @@ import {
   SearchField,
   Surface,
 } from "../components/ui";
+import { useLibraryIngestEvents } from "../hooks/useLibraryIngestEvents";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
@@ -55,6 +56,8 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+
+  useLibraryIngestEvents();
 
   const isTablet = width >= TABLET_BREAKPOINT;
   const perRow = isTablet ? Math.min(5, Math.max(3, Math.floor((width - SCREEN_PADDING * 2) / 190))) : 2;

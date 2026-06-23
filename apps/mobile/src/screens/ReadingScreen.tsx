@@ -414,7 +414,7 @@ export function ReadingScreen({ bookId, onBack }: { bookId: string; onBack: () =
         onClose={() => setCanonOpen(false)}
       />
 
-      <MetricsSheet visible={metricsOpen} bookId={bookId} onClose={() => setMetricsOpen(false)} />ic
+      <MetricsSheet visible={metricsOpen} bookId={bookId} onClose={() => setMetricsOpen(false)} />
 
       <AgentActivityFeed
         activity={activity}
@@ -439,6 +439,7 @@ function Header({
   unread,
   onOpenFeed,
   onOpenCanon,
+  onOpenMetrics,
 }: {
   onBack: () => void;
   velocity: number;
@@ -448,6 +449,7 @@ function Header({
   unread: number;
   onOpenFeed: () => void;
   onOpenCanon: () => void;
+  onOpenMetrics: () => void;
 }) {
   const dotColor =
     socketStatus === "open" ? "#86efac" : socketStatus === "connecting" ? "#fcd34d" : alpha.white40;
@@ -466,6 +468,15 @@ function Header({
           style={styles.crewBtn}
         >
           <Text style={styles.crewLabel}>Canon</Text>
+        </Pressable>
+        <Pressable
+          onPress={onOpenMetrics}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Metrics"
+          style={styles.crewBtn}
+        >
+          <Text style={styles.crewLabel}>Metrics</Text>
         </Pressable>
         <Pressable
           onPress={onOpenFeed}

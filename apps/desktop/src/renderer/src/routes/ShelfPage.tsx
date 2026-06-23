@@ -7,6 +7,7 @@ import { BookCover } from "../components/BookCover";
 import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
+import { useLibraryIngestEvents } from "../hooks/useLibraryIngestEvents";
 import { useAuth } from "../hooks/useAuth";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
@@ -15,7 +16,7 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+async function uploadBook(file: File): Promise<{ ok: true } | { ok: false; message: string }> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +25,15 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let message = "Couldn't add that book.";
+  try {
+    const body = (await response.json()) as { message?: string; detail?: string };
+    message = body.message ?? body.detail ?? message;
+  } catch {
+    message = response.status === 413 ? "That file is too large." : message;
+  }
+  return { ok: false, message };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -76,13 +85,16 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
 
-  const { data: books, isLoading } = useQuery({
+  useLibraryIngestEvents();
+
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
     queryFn: async () => {
       const { data, error } = await api.GET("/api/books");
@@ -150,9 +162,14 @@ export default function ShelfPage() {
     event.target.value = "";
     if (!file) return;
     setUploading(true);
-    const ok = await uploadBook(file);
+    setUploadError(null);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    } else {
+      setUploadError(result.message);
+    }
   }
 
   function signOut() {
@@ -161,7 +178,8 @@ export default function ShelfPage() {
     navigate("/login");
   }
 
-  const empty = !isLoading && filtered.length === 0;
+  const empty = !isLoading && !isError && filtered.length === 0;
+  const failedBooks = (books ?? []).filter((b) => b.status === "failed");
 
   return (
     <div className="flex h-screen flex-col bg-transparent font-sans text-parchment">
@@ -238,6 +256,37 @@ export default function ShelfPage() {
         </div>
       </header>
 
+      {(uploadError || failedBooks.length > 0) && (
+        <div className="no-drag relative z-20 mx-10 mt-3 space-y-2">
+          {uploadError ? (
+            <div className="glass flex items-start gap-3 rounded-glass px-4 py-3 text-sm text-white/90">
+              <p className="flex-1">{uploadError}</p>
+              <button
+                type="button"
+                onClick={() => setUploadError(null)}
+                className="shrink-0 text-white/55 transition hover:text-white"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
+          {failedBooks.length > 0 ? (
+            <div className="glass rounded-glass px-4 py-3 text-sm text-white/85">
+              <p className="font-medium text-white">
+                {failedBooks.length === 1
+                  ? `“${failedBooks[0]!.title}” couldn't finish importing.`
+                  : `${failedBooks.length} books couldn't finish importing.`}
+              </p>
+              <p className="mt-1 text-white/65">
+                This usually means the DashScope API key is missing or invalid. Check{" "}
+                <code className="text-white/80">backend/.env</code>, then upload the book again.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">
         {/* Back wall: a warm walnut panel with a faint vertical grain. */}
@@ -268,6 +317,29 @@ export default function ShelfPage() {
               </div>
             ))}
 
+          {/* Backend unreachable — distinct from a bare shelf. */}
+          {!isLoading && isError && (
+            <div className="mb-16">
+              <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
+                <div className="glass max-w-sm rounded-glass px-8 py-7 text-center">
+                  <p className="font-display text-lg text-white">Can't reach Kinora</p>
+                  <p className="mt-1.5 text-sm text-white/60">
+                    The library didn't load. Make sure the backend is running at{" "}
+                    <code className="text-white/75">{API_BASE_URL}</code>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="mt-5 rounded-xl bg-gradient-to-b from-ember-glow to-ember-deep px-4 py-2 text-sm font-semibold text-walnut-deep shadow-[0_10px_28px_-10px_rgba(224,134,58,0.7)] transition hover:brightness-[1.06] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+              <Shelf />
+            </div>
+          )}
+
           {/* Nothing matched the search — a quiet, distinct note (not the bare-shelf
               empty state). */}
           {!isLoading && empty && q && (
@@ -283,7 +355,7 @@ export default function ShelfPage() {
           )}
 
           {/* A truly empty library — one composed, centered invitation. */}
-          {!isLoading && empty && !q && (
+          {!isLoading && !isError && empty && !q && (
             <div className="mb-16">
               <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
                 <div className="glass max-w-sm rounded-glass px-8 py-7 text-center">
@@ -312,6 +384,7 @@ export default function ShelfPage() {
           )}
 
           {!isLoading &&
+            !isError &&
             !empty &&
             shelves.map((row, i) => (
               <div key={i} className="mb-16">
