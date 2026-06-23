@@ -9,7 +9,8 @@ MCP_ARGS ?= --http
 
 .PHONY: help install up down stack-up stack-down migrate revision \
         worker mcp demo-pdf seed-demo lint fmt test \
-        app-install app-typecheck app-test app-desktop-dev app-desktop-build app-mobile-start
+        app-install app-typecheck app-test app-desktop-dev app-desktop-build app-mobile-start \
+        app-native app-native-bundle
 
 help:
 	@echo "Kinora make targets:"
@@ -28,6 +29,8 @@ help:
 	@echo "  test         pytest"
 	@echo "  app-install / app-typecheck / app-test                   apps monorepo (pnpm)"
 	@echo "  app-desktop-dev / app-desktop-build / app-mobile-start   run the apps"
+	@echo "  app-native        run the native macOS Liquid Glass shell (needs app-desktop-dev for :5173)"
+	@echo "  app-native-bundle build + open KinoraGlass.app (real .app bundle)"
 
 install:
 	cd backend && $(PYTHON) -m venv .venv && \
@@ -106,3 +109,14 @@ app-desktop-build:
 
 app-mobile-start:
 	pnpm --filter @kinora/mobile run start
+
+# -- Native macOS shell (real Liquid Glass; SwiftPM, needs the macOS 26+ SDK) - #
+# Hosts the renderer in a WKWebView. Requires the renderer dev server on :5173,
+# so run `make app-desktop-dev` in another shell first for live development.
+
+app-native:
+	swift run --package-path apps/desktop-native
+
+app-native-bundle:
+	bash apps/desktop-native/build-app.sh
+	open apps/desktop-native/KinoraGlass.app
