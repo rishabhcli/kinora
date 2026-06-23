@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BookResponse } from "./api/types";
-import { applyIngestProgress, importGateMessage, progressPercent, shelfNeedsIngestUpdates, stageLabel } from "./shelf";
+import { applyIngestProgress, displayBookTitle, importGateMessage, progressPercent, shelfNeedsIngestUpdates, stageLabel } from "./shelf";
 
 const book = (overrides: Partial<BookResponse> = {}): BookResponse => ({
   id: "b1",
@@ -11,6 +11,11 @@ const book = (overrides: Partial<BookResponse> = {}): BookResponse => ({
 });
 
 describe("shelf helpers", () => {
+  it("strips internal seed suffixes from titles", () => {
+    expect(displayBookTitle("The Frog-King (e2e seed)")).toBe("The Frog-King");
+    expect(displayBookTitle("Little Red Riding Hood")).toBe("Little Red Riding Hood");
+  });
+
   it("formats stage labels", () => {
     expect(stageLabel(book({ status: "failed" }))).toBe("Import failed");
     expect(stageLabel(book({ stage: "analyse_pages" }))).toBe("Analyse pages");

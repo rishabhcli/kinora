@@ -177,6 +177,7 @@ export default function ShelfPage() {
   }
 
   function signOut() {
+    if (!window.confirm("Sign out of Kinora?")) return;
     persistToken(null);
     authStore.getState().setAnonymous();
     navigate("/login");
@@ -350,7 +351,7 @@ export default function ShelfPage() {
                       key={book.id}
                       book={book}
                       onOpen={() => openBook(book)}
-                      onMetrics={() => setMetricsBookId(book.id)}
+                      onMetrics={import.meta.env.DEV ? () => setMetricsBookId(book.id) : undefined}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (

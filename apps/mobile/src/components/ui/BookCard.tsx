@@ -1,4 +1,4 @@
-import { type BookResponse, progressPercent, queryKeys, stageLabel } from "@kinora/core";
+import { displayBookTitle, type BookResponse, progressPercent, queryKeys, stageLabel } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
@@ -57,6 +57,7 @@ export function BookCard({
     },
   });
   const cover = data?.image_url ?? null;
+  const title = displayBookTitle(book.title);
 
   function animate(to: number) {
     if (reduced) return;
@@ -71,7 +72,7 @@ export function BookCard({
       onPressIn={() => animate(1)}
       onPressOut={() => animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
+      accessibilityLabel={`Open ${title}${book.author ? `, by ${book.author}` : ""}`}
       style={{ width }}
     >
       <Animated.View
@@ -84,7 +85,7 @@ export function BookCard({
             <View pointerEvents="none" style={styles.coverWash} />
             <View style={styles.titledInner}>
               <Text style={styles.titledTitle} numberOfLines={4}>
-                {book.title}
+                {title}
               </Text>
               {book.author ? (
                 <Text style={styles.titledAuthor} numberOfLines={1}>
@@ -119,7 +120,7 @@ export function BookCard({
       <View style={styles.contact} />
 
       <Text style={styles.caption} numberOfLines={1}>
-        {book.title}
+        {title}
       </Text>
     </Pressable>
   );

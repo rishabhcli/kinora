@@ -4,6 +4,11 @@
  */
 import type { BookResponse } from "./api/types";
 
+/** Strip internal seed/dev suffixes from titles shown in the product UI. */
+export function displayBookTitle(title: string): string {
+  return title.replace(/\s*\((e2e seed|dev seed)\)\s*$/i, "").trim();
+}
+
 /** Human-readable import stage for status chips (sentence case). */
 export function stageLabel(book: Pick<BookResponse, "status" | "stage">): string {
   if (book.status === "failed") return "Import failed";

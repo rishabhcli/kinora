@@ -1,4 +1,4 @@
-import { type BookResponse, progressPercent, queryKeys, stageLabel } from "@kinora/core";
+import { displayBookTitle, type BookResponse, progressPercent, queryKeys, stageLabel } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -43,6 +43,7 @@ export function BookCover({
     },
   });
   const cover = data?.image_url ?? null;
+  const title = displayBookTitle(book.title);
 
   function select() {
     if (!ready) {
@@ -75,11 +76,11 @@ export function BookCover({
           style={cover ? undefined : { backgroundImage: `linear-gradient(150deg, ${colorFor(book.id)}, rgba(0,0,0,0.9))` }}
         >
           {cover ? (
-            <img src={cover} alt={book.title} draggable={false} className="h-full w-full object-cover" />
+            <img src={cover} alt={title} draggable={false} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full flex-col justify-between p-3">
               <p className="line-clamp-4 font-display text-sm font-medium leading-tight text-white/95">
-                {book.title}
+                {title}
               </p>
               {book.author && (
                 <p className="line-clamp-1 text-[9px] uppercase tracking-[0.14em] text-white/55">
@@ -122,8 +123,8 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
+          title={title}
+          aria-label={`Open ${title}`}
           className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
         />
         {ready && onMetrics && (
@@ -147,7 +148,7 @@ export function BookCover({
       <div className="shelf-contact mt-1 w-[86%] opacity-90 group-hover:w-[78%] group-hover:opacity-60 group-focus-within:w-[78%] group-focus-within:opacity-60" />
 
       <p className="pointer-events-none absolute top-[calc(100%+12px)] left-1/2 max-w-[148px] -translate-x-1/2 truncate text-center font-sans text-[11px] text-white/0 transition-colors duration-200 group-hover:text-white/85 group-focus-within:text-white/85">
-        {book.title}
+        {title}
       </p>
     </div>
   );
