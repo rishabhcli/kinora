@@ -44,6 +44,39 @@ def test_audio_text_card_bottom_rung_is_playable() -> None:
     assert abs(info.duration_s - 1.5) < 0.3
 
 
+def test_inspect_falls_back_to_ffmpeg_when_no_ffprobe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``inspect`` must return real facts even on the bundled-ffmpeg-only image.
+
+    The portable render image ships ``imageio-ffmpeg`` but no ``ffprobe``; the
+    stitch/concat path relies on duration / geometry / audio presence, so the
+    ffprobe-free fallback (parsing ``ffmpeg -i`` stderr) has to agree with the
+    ffprobe path. Regression guard for the silent stitch-truncation bug.
+    """
+    clip = degrade.ken_burns_over_image(png_bytes(1280, 720), 3.0, audio_bytes=wav_bytes(2.0))
+    truth = degrade.probe(clip)  # ffprobe path (host CI has ffprobe)
+
+    # Force the no-ffprobe condition the production container actually hits.
+    monkeypatch.setattr(degrade, "get_ffprobe_exe", lambda: None)
+    fallback = degrade.inspect(clip)
+
+    assert fallback.raw.get("source") == "ffmpeg-stderr"  # truly took the fallback
+    assert fallback.has_video is True
+    assert fallback.has_audio is True  # the bug mis-read this as False → truncation
+    assert fallback.width == truth.width and fallback.height == truth.height
+    assert fallback.video_codec == "h264"
+    assert abs(fallback.duration_s - truth.duration_s) < 0.2
+
+
+def test_inspect_reads_video_only_clip_without_ffprobe(monkeypatch: pytest.MonkeyPatch) -> None:
+    clip = degrade.ken_burns_over_image(png_bytes(640, 360), 2.0)  # no audio
+    monkeypatch.setattr(degrade, "get_ffprobe_exe", lambda: None)
+    info = degrade.inspect(clip)
+    assert info.has_video is True
+    assert info.has_audio is False
+    assert info.width == 1920 and info.height == 1080
+    assert abs(info.duration_s - 2.0) < 0.3
+
+
 def test_extract_frames_returns_real_frames() -> None:
     clip = degrade.ken_burns_over_image(png_bytes(640, 360), 2.0)
     frames = degrade.extract_frames(clip, 4)

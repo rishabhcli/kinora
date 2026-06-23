@@ -28,6 +28,28 @@ def test_concat_two_clips_into_one_valid_mp4() -> None:
     assert degrade.verify_playable(scene) is True
 
 
+def test_concat_keeps_full_duration_when_audio_shorter_and_no_ffprobe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: degraded clips mux narration that is *shorter* than the video,
+    and the production render image has no ``ffprobe``. The stitcher used to call
+    ``probe`` directly, which raised, so ``_normalize_segment`` mis-read the clips
+    as audio-less and truncated each to ~0.1s — the stitched scene collapsed to a
+    fraction of a second. With the ffprobe-free ``inspect`` fallback the concat
+    must preserve the full combined duration."""
+    # 4s video with only 2s of narration — the real degraded-clip shape.
+    clip_a = degrade.ken_burns_over_image(png_bytes(640, 360), 4.0, audio_bytes=wav_bytes(2.0))
+    clip_b = degrade.ken_burns_over_image(png_bytes(640, 360), 4.0, audio_bytes=wav_bytes(2.0))
+
+    monkeypatch.setattr(degrade, "get_ffprobe_exe", lambda: None)  # the prod container
+    scene = concat_clips([clip_a, clip_b], size=(640, 360))
+
+    assert degrade.verify_playable(scene) is True
+    info = degrade.inspect(scene)
+    assert info.has_video is True and info.has_audio is True
+    assert abs(info.duration_s - 8.0) < 0.5  # full 4+4, not a truncated 0.2s
+
+
 def test_merge_sync_segments_has_cumulative_timestamps() -> None:
     seg_a = SyncSegment(
         shot_id="a",

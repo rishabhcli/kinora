@@ -38,7 +38,7 @@ from app.render.degrade import (
     DEFAULT_SIZE,
     FfmpegError,
     get_ffmpeg_exe,
-    probe,
+    inspect,
     run_ffmpeg,
 )
 from app.render.sync_map import SyncSegment
@@ -133,14 +133,14 @@ def merge_sync_segments(
 
 def _safe_has_audio(clip: bytes) -> bool:
     try:
-        return probe(clip).has_audio
+        return inspect(clip).has_audio
     except FfmpegError:
         return False
 
 
 def _probe_size(clip: bytes) -> tuple[int, int] | None:
     try:
-        info = probe(clip)
+        info = inspect(clip)
     except FfmpegError:
         return None
     if info.width and info.height:
@@ -163,7 +163,7 @@ def _normalize_segment(clip: bytes, *, size: tuple[int, int], fps: int) -> bytes
     has_audio = _safe_has_audio(clip)
     duration = 0.0
     try:
-        duration = probe(clip).duration_s
+        duration = inspect(clip).duration_s
     except FfmpegError:
         duration = 0.0
 
@@ -387,7 +387,7 @@ class SceneStitcher:
         if shot.duration_s:
             return float(shot.duration_s)
         try:
-            return probe(clip_bytes).duration_s
+            return inspect(clip_bytes).duration_s
         except FfmpegError:
             return 0.0
 

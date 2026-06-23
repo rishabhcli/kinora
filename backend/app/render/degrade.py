@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -189,6 +190,70 @@ def probe(data: bytes) -> ProbeInfo:
         nb_streams=len(streams),
         raw=payload,
     )
+
+
+#: ``Duration: HH:MM:SS.ss`` as ffmpeg prints it to stderr on an ``-i`` probe.
+_FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
+#: ``Stream #..: Video: <codec> ..., <W>x<H>`` — grab codec + the first WxH.
+_FFMPEG_VIDEO_RE = re.compile(r"Stream #\S+:\s*Video:\s*(\w+).*?(\d{2,5})x(\d{2,5})", re.DOTALL)
+_FFMPEG_AUDIO_RE = re.compile(r"Stream #\S+:\s*Audio:\s*(\w+)")
+
+
+def _probe_via_ffmpeg(data: bytes) -> ProbeInfo:
+    """ffprobe-free fallback: parse ``ffmpeg -i`` stderr for the salient facts.
+
+    The portable image ships only the ``imageio-ffmpeg`` binary (no ``ffprobe``),
+    so the stitch path must still learn each clip's duration / geometry / audio
+    presence. ``ffmpeg -i`` with no output exits non-zero but prints the stream
+    table to stderr; we parse it. Best-effort — unknown fields stay ``None``/0.
+    """
+    if not data:
+        return ProbeInfo(0.0, False, False, None, None, None, None, 0, {})
+    ffmpeg = get_ffmpeg_exe()
+    with tempfile.TemporaryDirectory(prefix="kinora_ffinfo_") as tmp:
+        path = Path(tmp) / "clip.mp4"
+        path.write_bytes(data)
+        # No output file → ffmpeg exits 1 after printing the input's stream table.
+        proc = subprocess.run(  # noqa: S603 - binary is resolved, args are fixed
+            [ffmpeg, "-hide_banner", "-i", str(path)],
+            capture_output=True,
+            timeout=_FFMPEG_TIMEOUT_S,
+            check=False,
+        )
+    err = proc.stderr.decode("utf-8", "replace")
+    duration = 0.0
+    if (m := _FFMPEG_DURATION_RE.search(err)) is not None:
+        h, mnt, sec = m.groups()
+        duration = int(h) * 3600 + int(mnt) * 60 + float(sec)
+    video = _FFMPEG_VIDEO_RE.search(err)
+    audio = _FFMPEG_AUDIO_RE.search(err)
+    width = int(video.group(2)) if video else None
+    height = int(video.group(3)) if video else None
+    nb_streams = len(re.findall(r"Stream #\S+:", err))
+    return ProbeInfo(
+        duration_s=duration,
+        has_video=video is not None,
+        has_audio=audio is not None,
+        width=width,
+        height=height,
+        video_codec=video.group(1) if video else None,
+        audio_codec=audio.group(1) if audio else None,
+        nb_streams=nb_streams,
+        raw={"source": "ffmpeg-stderr"},
+    )
+
+
+def inspect(data: bytes) -> ProbeInfo:
+    """Probe a clip, preferring ffprobe but falling back to ``ffmpeg -i`` stderr.
+
+    This is the portable entry point siblings (e.g. :mod:`app.render.stitch`)
+    should use: it returns the same :class:`ProbeInfo` whether or not an
+    ``ffprobe`` binary is installed, so the stitch/concat path is correct on the
+    bundled-``ffmpeg``-only image (where :func:`probe` would raise).
+    """
+    if get_ffprobe_exe() is not None:
+        return probe(data)
+    return _probe_via_ffmpeg(data)
 
 
 def verify_playable(data: bytes) -> bool:
@@ -453,6 +518,7 @@ __all__ = [
     "ffmpeg_available",
     "get_ffmpeg_exe",
     "get_ffprobe_exe",
+    "inspect",
     "ken_burns_over_image",
     "probe",
     "run_ffmpeg",
