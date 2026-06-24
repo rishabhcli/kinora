@@ -1,4 +1,10 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import {
+  applyLibraryEventToBooks,
+  LibraryEvents,
+  libraryEventNeedsRefetch,
+  type BookResponse,
+  queryKeys,
+} from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -82,7 +88,7 @@ export default function ShelfPage() {
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
 
-  const { data: books, isLoading } = useQuery({
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
     queryFn: async () => {
       const { data, error } = await api.GET("/api/books");
@@ -90,6 +96,25 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  // Live ingest progress over the library SSE channel (§5.1) — the shelf
+  // updates stage + percent while Phase A runs instead of freezing on "Preparing".
+  useEffect(() => {
+    const client = new LibraryEvents({
+      baseUrl: API_BASE_URL,
+      getToken: () => authStore.getState().token,
+      onEvent: (event) => {
+        queryClient.setQueryData<BookResponse[]>(queryKeys.books(), (old) =>
+          applyLibraryEventToBooks(old, event),
+        );
+        if (libraryEventNeedsRefetch(event)) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+        }
+      },
+    });
+    void client.connect();
+    return () => client.close();
+  }, [queryClient]);
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -161,7 +186,7 @@ export default function ShelfPage() {
     navigate("/login");
   }
 
-  const empty = !isLoading && filtered.length === 0;
+  const empty = !isLoading && !isError && filtered.length === 0;
 
   return (
     <div className="flex h-screen flex-col bg-transparent font-sans text-parchment">
@@ -268,6 +293,28 @@ export default function ShelfPage() {
               </div>
             ))}
 
+          {/* Backend unreachable — distinct from a bare shelf or a failed search. */}
+          {!isLoading && isError && (
+            <div className="mb-16">
+              <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
+                <div className="glass max-w-sm rounded-glass px-8 py-7 text-center">
+                  <p className="font-display text-lg text-white">Can&apos;t reach Kinora</p>
+                  <p className="mt-1.5 text-sm text-white/60">
+                    The library couldn&apos;t load. Make sure the backend is running, then try again.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="mt-5 rounded-xl bg-gradient-to-b from-ember-glow to-ember-deep px-4 py-2 text-sm font-semibold text-walnut-deep shadow-[0_10px_28px_-10px_rgba(224,134,58,0.7)] transition hover:brightness-[1.06] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+              <Shelf />
+            </div>
+          )}
+
           {/* Nothing matched the search — a quiet, distinct note (not the bare-shelf
               empty state). */}
           {!isLoading && empty && q && (
@@ -312,6 +359,7 @@ export default function ShelfPage() {
           )}
 
           {!isLoading &&
+            !isError &&
             !empty &&
             shelves.map((row, i) => (
               <div key={i} className="mb-16">

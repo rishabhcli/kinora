@@ -12,12 +12,24 @@ function colorFor(id: string): string {
 }
 
 /** A short, human label for a book that isn't ready yet — the import stage in
- *  sentence case, or a clean fallback. */
+ *  sentence case with an optional percent, or a clean fallback. */
 function stageLabel(book: BookResponse): string {
   if (book.status === "failed") return "Import failed";
   const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
+  const pct =
+    book.progress != null && book.progress > 0 && book.progress < 1
+      ? Math.round(book.progress * 100)
+      : null;
+  const label = stage
+    ? stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ")
+    : "Preparing";
+  return pct != null ? `${label} · ${pct}%` : label;
+}
+
+function progressFraction(book: BookResponse): number | null {
+  if (book.status === "ready") return 1;
+  if (book.progress == null || book.progress <= 0) return null;
+  return Math.min(1, Math.max(0, book.progress));
 }
 
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
@@ -38,6 +50,7 @@ export function BookCover({
   const ready = book.status === "ready";
   const failed = book.status === "failed";
   const working = !ready && !failed;
+  const fraction = progressFraction(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -53,6 +66,7 @@ export function BookCover({
   const cover = data?.image_url ?? null;
 
   function select() {
+    if (!ready) return;
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -107,7 +121,22 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-2 pb-2.5">
+                {fraction != null && working ? (
+                  <div
+                    className="h-1 w-[78%] overflow-hidden rounded-full bg-black/35"
+                    role="progressbar"
+                    aria-valuenow={Math.round(fraction * 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Adaptation progress for ${book.title}`}
+                  >
+                    <div
+                      className="h-full rounded-full bg-ember-glow/90 transition-[width] duration-500 ease-out"
+                      style={{ width: `${Math.round(fraction * 100)}%` }}
+                    />
+                  </div>
+                ) : null}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
                   {stageLabel(book)}
@@ -122,9 +151,13 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          disabled={!ready}
+          title={ready ? book.title : stageLabel(book)}
+          aria-label={ready ? `Open ${book.title}` : `${book.title} — ${stageLabel(book)}`}
+          aria-disabled={!ready}
+          className={`absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep ${
+            ready ? "" : "cursor-default"
+          }`}
         />
         {ready && onMetrics && (
           <button

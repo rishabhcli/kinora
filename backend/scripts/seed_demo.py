@@ -38,11 +38,14 @@ import sys
 import time
 from pathlib import Path
 
-# Default to the committed demo book (repo-root/assets/books/the_frog_king.pdf).
+# Default to the committed demo books (repo-root/assets/books/*.pdf).
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PDF = _REPO_ROOT / "assets" / "books" / "the_frog_king.pdf"
+SECOND_PDF = _REPO_ROOT / "assets" / "books" / "little_red_riding_hood.pdf"
 DEFAULT_TITLE = "The Frog-King"
+SECOND_TITLE = "Little Red Riding Hood"
 DEFAULT_ART = "painterly storybook"
+SECOND_ART = "enchanted forest storybook"
 
 
 # --------------------------------------------------------------------------- #
@@ -58,6 +61,7 @@ def seed_via_api(
     password: str,
     title: str,
     art_direction: str,
+    author: str,
     timeout_s: float,
 ) -> int:
     """Register -> upload -> poll the live API until the book is ready."""
@@ -80,7 +84,7 @@ def seed_via_api(
         files = {"file": (pdf_path.name, pdf_bytes, "application/pdf")}
         data = {
             "title": title,
-            "author": "Brothers Grimm (public domain)",
+            "author": author,
             "art_direction": art_direction,
         }
         up = http.post("/api/books", files=files, data=data, headers=headers)
@@ -126,7 +130,7 @@ def seed_via_api(
 
 
 async def _seed_direct(
-    *, pdf_path: Path, title: str, art_direction: str
+    *, pdf_path: Path, title: str, art_direction: str, author: str
 ) -> int:
     from app.core.config import get_settings
     from app.core.logging import configure_logging
@@ -156,7 +160,7 @@ async def _seed_direct(
     async with get_session() as session:
         await BookRepo(session).create(
             title=title,
-            author="Brothers Grimm (public domain)",
+            author=author,
             source_pdf_key=pdf_key,
             status=BookStatus.IMPORTING,
             art_direction=art_direction,
@@ -202,6 +206,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf", type=Path, default=DEFAULT_PDF, help="demo PDF path")
     parser.add_argument("--title", default=DEFAULT_TITLE)
     parser.add_argument("--art-direction", default=DEFAULT_ART)
+    parser.add_argument(
+        "--author",
+        default="Brothers Grimm (public domain)",
+        help="book author metadata",
+    )
+    parser.add_argument(
+        "--all-books",
+        action="store_true",
+        help="seed both bundled public-domain demo books (Frog-King + Little Red Riding Hood)",
+    )
     parser.add_argument("--email", default="demo@kinora.local")
     parser.add_argument("--password", default="demo-password-123")
     parser.add_argument(
@@ -212,22 +226,40 @@ def main(argv: list[str] | None = None) -> int:
     pdf_path = args.pdf if args.pdf.is_absolute() else (Path.cwd() / args.pdf)
     if not pdf_path.exists():
         print(f"demo PDF not found: {pdf_path}", file=sys.stderr)
-        print("build it first: python assets/books/build_demo_pdf.py", file=sys.stderr)
+        print("build it first: make demo-pdf", file=sys.stderr)
         return 1
 
-    if args.via == "api":
-        return seed_via_api(
-            api_url=args.api_url,
-            pdf_path=pdf_path,
-            email=args.email,
-            password=args.password,
-            title=args.title,
-            art_direction=args.art_direction,
-            timeout_s=args.timeout,
-        )
-    return asyncio.run(
-        _seed_direct(pdf_path=pdf_path, title=args.title, art_direction=args.art_direction)
-    )
+    books: list[tuple[Path, str, str, str]] = [
+        (pdf_path, args.title, args.art_direction, args.author),
+    ]
+    if args.all_books:
+        if not SECOND_PDF.exists():
+            print(f"second demo PDF not found: {SECOND_PDF}", file=sys.stderr)
+            print("build it first: make demo-pdf", file=sys.stderr)
+            return 1
+        books.append((SECOND_PDF, SECOND_TITLE, SECOND_ART, args.author))
+
+    exit_code = 0
+    for book_pdf, title, art, author in books:
+        if args.via == "api":
+            code = seed_via_api(
+                api_url=args.api_url,
+                pdf_path=book_pdf,
+                email=args.email,
+                password=args.password,
+                title=title,
+                art_direction=art,
+                author=author,
+                timeout_s=args.timeout,
+            )
+        else:
+            code = asyncio.run(
+                _seed_direct(pdf_path=book_pdf, title=title, art_direction=art, author=author)
+            )
+        if code != 0:
+            exit_code = code
+            break
+    return exit_code
 
 
 if __name__ == "__main__":
