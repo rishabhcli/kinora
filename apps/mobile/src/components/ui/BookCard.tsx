@@ -80,7 +80,8 @@ export function BookCard({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={ready ? onPress : undefined}
+      disabled={!ready}
       onPressIn={() => animate(1)}
       onPressOut={() => animate(0)}
       accessibilityRole="button"

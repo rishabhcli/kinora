@@ -21,6 +21,7 @@ import {
 import {
   AmbientBackdrop,
   BookCard,
+  PrimaryButton,
   SearchField,
   Surface,
 } from "../components/ui";
@@ -68,7 +69,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const innerWidth = Math.min(width, 1040) - SCREEN_PADDING * 2;
   const cardWidth = Math.floor((innerWidth - GRID_GAP * (perRow - 1)) / perRow);
 
-  const { data: books, isLoading } = useQuery({
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
     queryFn: async () => {
       const { data, error } = await api.GET("/api/books");
@@ -141,7 +142,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
     authStore.getState().setAnonymous();
   }
 
-  const empty = !isLoading && filtered.length === 0;
+  const empty = !isLoading && !isError && filtered.length === 0;
 
   return (
     <AmbientBackdrop>
@@ -174,6 +175,14 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
             <ActivityIndicator color={palette.emberGlow} />
             <Text style={styles.loadingText}>Opening your library…</Text>
           </View>
+        ) : isError ? (
+          <Surface style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Can&apos;t reach Kinora</Text>
+            <Text style={styles.emptyBody}>
+              The library couldn&apos;t load. Make sure the backend is running, then try again.
+            </Text>
+            <PrimaryButton label="Retry" onPress={() => void refetch()} style={styles.retryBtn} />
+          </Surface>
         ) : empty ? (
           <Surface style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>
@@ -280,6 +289,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
   },
+  retryBtn: { marginTop: space.lg, alignSelf: "center", minWidth: 140 },
 });
 
 const railStyles = StyleSheet.create({

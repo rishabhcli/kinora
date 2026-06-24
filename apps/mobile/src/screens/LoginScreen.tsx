@@ -1,3 +1,4 @@
+import { AUTH_TIMEOUT_MS, CONNECTION_ERROR, withTimeout } from "@kinora/core";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -14,7 +15,7 @@ import { authStore, persistToken } from "../lib/auth";
 import { alpha, BOTTOM_INSET, space, TOP_INSET, type } from "../theme/tokens";
 
 /** The seeded demo reader (owns the bundled library) — one tap to explore. */
-const DEMO = { email: "e2e@kinora.test", password: "e2e-password-123" } as const;
+const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 
 type Mode = "login" | "register";
 
@@ -32,12 +33,19 @@ export function LoginScreen() {
 
   /** Exchange credentials for a session and load the account (shared by both modes). */
   async function loginAndLoad(currentEmail: string, currentPassword: string): Promise<string | null> {
-    const { data, error: loginError } = await api.POST("/api/auth/login", {
-      body: { email: currentEmail, password: currentPassword },
-    });
+    const login = await withTimeout(
+      api.POST("/api/auth/login", { body: { email: currentEmail, password: currentPassword } }),
+      AUTH_TIMEOUT_MS,
+    );
+    if (login === null) return CONNECTION_ERROR;
+    const { data, error: loginError } = login;
     if (loginError || !data) return "That email and password didn't match.";
     authStore.getState().setToken(data.access_token);
-    const me = await api.GET("/api/auth/me");
+    const me = await withTimeout(api.GET("/api/auth/me"), AUTH_TIMEOUT_MS);
+    if (me === null) {
+      authStore.getState().setAnonymous();
+      return CONNECTION_ERROR;
+    }
     if (me.error || !me.data) {
       authStore.getState().setAnonymous();
       return "Signed in, but couldn't load your account.";
@@ -54,10 +62,18 @@ export function LoginScreen() {
     authStore.getState().setAuthenticating();
     let message: string | null;
     if (asRegister) {
-      const reg = await api.POST("/api/auth/register", {
-        body: { email: currentEmail, password: currentPassword },
-      });
-      message = reg.error || !reg.data ? "Couldn't create that account." : await loginAndLoad(currentEmail, currentPassword);
+      const reg = await withTimeout(
+        api.POST("/api/auth/register", {
+          body: { email: currentEmail, password: currentPassword },
+        }),
+        AUTH_TIMEOUT_MS,
+      );
+      message =
+        reg === null
+          ? CONNECTION_ERROR
+          : reg.error || !reg.data
+            ? "Couldn't create that account."
+            : await loginAndLoad(currentEmail, currentPassword);
     } else {
       message = await loginAndLoad(currentEmail, currentPassword);
     }

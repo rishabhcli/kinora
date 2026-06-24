@@ -1,3 +1,4 @@
+import { AUTH_TIMEOUT_MS, CONNECTION_ERROR, withTimeout } from "@kinora/core";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -9,11 +10,20 @@ import { authStore, persistToken } from "../lib/auth";
 const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 
 async function loginAndLoadUser(email: string, password: string): Promise<string | null> {
-  const { data, error } = await api.POST("/api/auth/login", { body: { email, password } });
+  const login = await withTimeout(
+    api.POST("/api/auth/login", { body: { email, password } }),
+    AUTH_TIMEOUT_MS,
+  );
+  if (login === null) return CONNECTION_ERROR;
+  const { data, error } = login;
   if (error || !data) return "That email and password didn't match.";
   authStore.getState().setToken(data.access_token);
   persistToken(data.access_token);
-  const me = await api.GET("/api/auth/me");
+  const me = await withTimeout(api.GET("/api/auth/me"), AUTH_TIMEOUT_MS);
+  if (me === null) {
+    persistToken(null);
+    return CONNECTION_ERROR;
+  }
   if (me.error || !me.data) {
     persistToken(null);
     return "Signed in, but couldn't load your account.";
@@ -36,13 +46,18 @@ export default function LoginPage() {
     authStore.getState().setAuthenticating();
     let message: string | null;
     if (mode === "register") {
-      const reg = await api.POST("/api/auth/register", {
-        body: { email: currentEmail, password: currentPassword },
-      });
+      const reg = await withTimeout(
+        api.POST("/api/auth/register", {
+          body: { email: currentEmail, password: currentPassword },
+        }),
+        AUTH_TIMEOUT_MS,
+      );
       message =
-        reg.error || !reg.data
-          ? "Couldn't create that account."
-          : await loginAndLoadUser(currentEmail, currentPassword);
+        reg === null
+          ? CONNECTION_ERROR
+          : reg.error || !reg.data
+            ? "Couldn't create that account."
+            : await loginAndLoadUser(currentEmail, currentPassword);
     } else {
       message = await loginAndLoadUser(currentEmail, currentPassword);
     }
