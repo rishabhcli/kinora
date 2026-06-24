@@ -1,8 +1,9 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, hasImportingBooks, importGateMessage, queryKeys, useLibraryShelfSync } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -21,6 +22,7 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
+import { API_BASE_URL } from "../lib/config";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
 import { SettingsSheet } from "./SettingsSheet";
 
@@ -51,6 +53,7 @@ function ShelfRail() {
  */
 export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const email = useAuth((state) => state.user?.email);
+  const token = useAuth((state) => state.token);
   const { width } = useWindowDimensions();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
@@ -61,13 +64,24 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const innerWidth = Math.min(width, 1040) - SCREEN_PADDING * 2;
   const cardWidth = Math.floor((innerWidth - GRID_GAP * (perRow - 1)) / perRow);
 
-  const { data: books, isLoading } = useQuery({
+  const fetchBooks = useCallback(async () => {
+    const { data, error } = await api.GET("/api/books");
+    if (error || !data) throw new Error("failed to load books");
+    return data;
+  }, []);
+
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/books");
-      if (error || !data) throw new Error("failed to load books");
-      return data;
-    },
+    queryFn: fetchBooks,
+  });
+
+  useLibraryShelfSync({
+    baseUrl: API_BASE_URL,
+    getToken: () => Promise.resolve(authStore.getState().token),
+    queryClient,
+    enabled: Boolean(token),
+    hasImporting: hasImportingBooks(books),
+    fetchBooks,
   });
 
   // Cover warming: once the library resolves, fetch each ready book's page-1
@@ -111,6 +125,14 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
 
   const rows: BookResponse[][] = useMemo(() => intoRows(filtered, perRow), [filtered, perRow]);
 
+  function openBook(book: BookResponse) {
+    if (book.status !== "ready") {
+      Alert.alert("Not ready yet", importGateMessage(book), [{ text: "OK" }]);
+      return;
+    }
+    onOpen(book.id);
+  }
+
   function signOut() {
     persistToken(null);
     authStore.getState().setAnonymous();
@@ -149,6 +171,20 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
             <ActivityIndicator color={palette.emberGlow} />
             <Text style={styles.loadingText}>Opening your library…</Text>
           </View>
+        ) : isError ? (
+          <Surface style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Could not reach your library</Text>
+            <Text style={styles.emptyBody}>
+              Check that the Kinora backend is running at {API_BASE_URL}, then try again.
+            </Text>
+            <Pressable
+              onPress={() => void refetch()}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.retryBtn, pressed && styles.profilePressed]}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </Surface>
         ) : empty ? (
           <Surface style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>
@@ -169,7 +205,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     key={book.id}
                     book={book}
                     width={cardWidth}
-                    onPress={() => onOpen(book.id)}
+                    onPress={() => openBook(book)}
                   />
                 ))}
               </View>
@@ -254,6 +290,18 @@ const styles = StyleSheet.create({
     lineHeight: type.body.lineHeight,
     textAlign: "center",
     marginTop: 6,
+  },
+  retryBtn: {
+    marginTop: space.lg,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: alpha.white16,
+  },
+  retryText: {
+    color: palette.parchment,
+    fontSize: type.label.fontSize,
+    fontWeight: "600",
   },
 });
 

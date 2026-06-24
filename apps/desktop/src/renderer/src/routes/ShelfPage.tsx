@@ -1,7 +1,7 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, hasImportingBooks, importGateMessage, queryKeys, useLibraryShelfSync } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { type ChangeEvent, type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import { BookCover } from "../components/BookCover";
 import { DirectingStylePanel } from "../components/DirectingStylePanel";
@@ -15,7 +15,12 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+interface UploadResult {
+  ok: boolean;
+  message?: string;
+}
+
+async function uploadBook(file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +29,17 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let message = "Could not add that book. Try a PDF or EPUB under the page limit.";
+  try {
+    const body = (await response.json()) as { message?: string; error?: string };
+    message = body.message ?? body.error ?? message;
+  } catch {
+    if (response.status === 413) message = "That file is too large or has too many pages.";
+    else if (response.status === 415) message = "Kinora needs a PDF or EPUB file.";
+    else if (response.status === 429) message = "Your library is full — remove a book before adding another.";
+  }
+  return { ok: false, message };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -69,26 +84,75 @@ function AddSlot({ onClick }: { onClick: () => void }) {
   );
 }
 
+async function deleteBook(bookId: string): Promise<boolean> {
+  const token = authStore.getState().token;
+  const response = await fetch(`${API_BASE_URL}/api/books/${bookId}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.status === 204;
+}
+
 export default function ShelfPage() {
   const email = useAuth((state) => state.user?.email);
+  const token = useAuth((state) => state.token);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [gateBook, setGateBook] = useState<BookResponse | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
+  const location = useLocation();
+  const shelfNotice =
+    (location.state as { shelfNotice?: string } | null)?.shelfNotice ?? null;
 
-  const { data: books, isLoading } = useQuery({
+  const fetchBooks = useCallback(async () => {
+    const { data, error } = await api.GET("/api/books");
+    if (error || !data) throw new Error("failed to load books");
+    return data;
+  }, []);
+
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/books");
-      if (error || !data) throw new Error("failed to load books");
-      return data;
+    queryFn: fetchBooks,
+  });
+
+  useLibraryShelfSync({
+    baseUrl: API_BASE_URL,
+    getToken: () => Promise.resolve(authStore.getState().token),
+    queryClient,
+    enabled: Boolean(token),
+    hasImporting: hasImportingBooks(books),
+    createEventSource: (url) => {
+      const es = new EventSource(url);
+      let openHandler: ((event?: unknown) => void) | null = null;
+      let errorHandler: ((event?: unknown) => void) | null = null;
+      return {
+        close: () => es.close(),
+        get onopen() {
+          return openHandler;
+        },
+        set onopen(handler) {
+          openHandler = handler;
+          es.onopen = handler ? () => handler() : null;
+        },
+        get onerror() {
+          return errorHandler;
+        },
+        set onerror(handler) {
+          errorHandler = handler;
+          es.onerror = handler ? () => handler() : null;
+        },
+        addEventListener: (type, listener) => es.addEventListener(type, listener),
+      };
     },
+    fetchBooks,
   });
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
@@ -139,20 +203,26 @@ export default function ShelfPage() {
   // doesn't drift to the top-left corner of a big empty wall.
   const sparse = filtered.length > 0 && filtered.length <= 2 && !q;
 
-  function openBook(id: string) {
+  function openBook(book: BookResponse) {
+    if (book.status !== "ready") {
+      setGateBook(book);
+      return;
+    }
     const bridge = (globalThis as { kinora?: { openBook?: (bookId: string) => Promise<void> } }).kinora;
-    if (bridge?.openBook) void bridge.openBook(id);
-    else navigate(`/book/${id}`);
+    if (bridge?.openBook) void bridge.openBook(book.id);
+    else navigate(`/book/${book.id}`);
   }
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    else if (result.message) setUploadError(result.message);
   }
 
   function signOut() {
@@ -185,6 +255,7 @@ export default function ShelfPage() {
         <div className="no-drag ml-auto flex items-center gap-2">
           <SearchField value={query} onChange={setQuery} />
           <button
+            type="button"
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             className="flex h-9 items-center gap-1.5 rounded-full bg-white/[0.14] px-3.5 text-sm font-medium text-white backdrop-blur-md transition hover:bg-white/25 active:scale-[0.97] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
@@ -238,6 +309,34 @@ export default function ShelfPage() {
         </div>
       </header>
 
+      {uploadError ? (
+        <div className="no-drag relative z-20 mx-10 mt-3 flex items-start gap-3 rounded-xl border border-red-400/30 bg-red-950/50 px-4 py-3 text-sm text-red-100 backdrop-blur-md">
+          <p className="flex-1">{uploadError}</p>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="shrink-0 text-red-200/80 hover:text-white"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
+      {shelfNotice ? (
+        <div className="no-drag relative z-20 mx-10 mt-3 flex items-start gap-3 rounded-xl border border-amber-300/25 bg-amber-950/40 px-4 py-3 text-sm text-amber-50 backdrop-blur-md">
+          <p className="flex-1">{shelfNotice}</p>
+          <button
+            type="button"
+            onClick={() => navigate("/", { replace: true, state: {} })}
+            className="shrink-0 text-amber-100/80 hover:text-white"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">
         {/* Back wall: a warm walnut panel with a faint vertical grain. */}
@@ -268,9 +367,31 @@ export default function ShelfPage() {
               </div>
             ))}
 
+          {/* Library failed to load — distinct from empty/search miss. */}
+          {!isLoading && isError && (
+            <div className="mb-16">
+              <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
+                <div className="glass max-w-sm rounded-glass px-7 py-6 text-center">
+                  <p className="font-display text-lg text-white">Could not reach your library</p>
+                  <p className="mt-1 text-sm text-white/60">
+                    Check that the Kinora backend is running, then try again.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="mt-5 rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+              <Shelf />
+            </div>
+          )}
+
           {/* Nothing matched the search — a quiet, distinct note (not the bare-shelf
               empty state). */}
-          {!isLoading && empty && q && (
+          {!isLoading && !isError && empty && q && (
             <div className="mb-16">
               <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
                 <div className="glass max-w-sm rounded-glass px-7 py-6 text-center">
@@ -283,7 +404,7 @@ export default function ShelfPage() {
           )}
 
           {/* A truly empty library — one composed, centered invitation. */}
-          {!isLoading && empty && !q && (
+          {!isLoading && !isError && empty && !q && (
             <div className="mb-16">
               <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
                 <div className="glass max-w-sm rounded-glass px-8 py-7 text-center">
@@ -312,6 +433,7 @@ export default function ShelfPage() {
           )}
 
           {!isLoading &&
+            !isError &&
             !empty &&
             shelves.map((row, i) => (
               <div key={i} className="mb-16">
@@ -323,8 +445,18 @@ export default function ShelfPage() {
                     <BookCover
                       key={book.id}
                       book={book}
-                      onOpen={() => openBook(book.id)}
+                      onOpen={() => openBook(book)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onRemove={
+                        book.status === "failed"
+                          ? () => {
+                              void (async () => {
+                                const ok = await deleteBook(book.id);
+                                if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+                              })();
+                            }
+                          : undefined
+                      }
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (
@@ -345,6 +477,37 @@ export default function ShelfPage() {
           onClose={() => setMetricsBookId(null)}
         />
       )}
+
+      {gateBook ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
+          <div className="glass max-w-md rounded-glass px-7 py-6 text-center">
+            <p className="font-display text-lg text-white">Not ready yet</p>
+            <p className="mt-2 text-sm text-white/70">{importGateMessage(gateBook)}</p>
+            <button
+              type="button"
+              onClick={() => setGateBook(null)}
+              className="mt-5 rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
+            >
+              Back to shelf
+            </button>
+            {gateBook.status === "failed" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    const ok = await deleteBook(gateBook.id);
+                    setGateBook(null);
+                    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+                  })();
+                }}
+                className="mt-3 block w-full rounded-xl bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/30"
+              >
+                Remove book
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

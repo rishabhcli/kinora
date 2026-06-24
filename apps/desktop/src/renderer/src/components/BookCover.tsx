@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, ingestProgressFraction, queryKeys, stageLabel } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -13,11 +13,8 @@ function colorFor(id: string): string {
 
 /** A short, human label for a book that isn't ready yet — the import stage in
  *  sentence case, or a clean fallback. */
-function stageLabel(book: BookResponse): string {
-  if (book.status === "failed") return "Import failed";
-  const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
+function coverStageLabel(book: BookResponse): string {
+  return stageLabel(book);
 }
 
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
@@ -29,15 +26,18 @@ export function BookCover({
   book,
   onOpen,
   onMetrics,
+  onRemove,
 }: {
   book: BookResponse;
   onOpen: () => void;
   onMetrics?: () => void;
+  onRemove?: () => void;
 }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
   const failed = book.status === "failed";
   const working = !ready && !failed;
+  const progress = ingestProgressFraction(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -107,11 +107,32 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-2 pb-2.5">
+                {working && progress !== null ? (
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-ember-glow transition-[width] duration-500 ease-out"
+                      style={{ width: `${Math.round(progress * 100)}%` }}
+                    />
+                  </div>
+                ) : null}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {coverStageLabel(book)}
+                  {working && progress !== null ? ` · ${Math.round(progress * 100)}%` : ""}
                 </span>
+                {failed && onRemove ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemove();
+                    }}
+                    className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/90 transition hover:bg-white/25"
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </div>
             </>
           )}
