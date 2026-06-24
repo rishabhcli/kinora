@@ -5,8 +5,10 @@ import { BookWall } from "../components/BookWall";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 
-/** The simple demo reader (owns the seeded library) — one tap to explore. */
-const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
+/** Credentials seeded by ``make seed-demo`` (the README quick-start path). */
+const DEMO_LOCAL = { email: "demo@kinora.local", password: "demo-password-123" } as const;
+/** Credentials seeded by ``seed_e2e.py`` (CI + fast local dev without DashScope). */
+const DEMO_E2E = { email: "e2e@kinora.test", password: "e2e-password-123" } as const;
 
 async function loginAndLoadUser(email: string, password: string): Promise<string | null> {
   const { data, error } = await api.POST("/api/auth/login", { body: { email, password } });
@@ -25,8 +27,8 @@ async function loginAndLoadUser(email: string, password: string): Promise<string
 export default function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState<string>(DEMO.email);
-  const [password, setPassword] = useState<string>(DEMO.password);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -58,6 +60,23 @@ export default function LoginPage() {
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void run(email, password);
+  }
+
+  async function exploreDemo() {
+    setMode("login");
+    setBusy(true);
+    setError(null);
+    authStore.getState().setAuthenticating();
+    // Try the README seed-demo account first, then the fast e2e seed (CI / local).
+    let message = await loginAndLoadUser(DEMO_LOCAL.email, DEMO_LOCAL.password);
+    if (message) message = await loginAndLoadUser(DEMO_E2E.email, DEMO_E2E.password);
+    if (message) {
+      setError("No demo library found — run make seed-demo or seed_e2e.py, then try again.");
+      authStore.getState().setAnonymous();
+      setBusy(false);
+      return;
+    }
+    navigate("/");
   }
 
   return (
@@ -105,13 +124,9 @@ export default function LoginPage() {
           <div className="mt-5 flex items-center justify-between text-xs text-white/55">
             <button
               type="button"
-              onClick={() => {
-                setEmail(DEMO.email);
-                setPassword(DEMO.password);
-                setMode("login");
-                void run(DEMO.email, DEMO.password);
-              }}
-              className="rounded-lg px-2 py-1 text-white/75 transition hover:text-white"
+              onClick={() => void exploreDemo()}
+              disabled={busy}
+              className="rounded-lg px-2 py-1 text-white/75 transition hover:text-white disabled:opacity-60"
             >
               Explore the demo library →
             </button>

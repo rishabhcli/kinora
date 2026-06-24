@@ -74,7 +74,7 @@ export function BookCover({
         <div
           className={`relative h-full w-full overflow-hidden rounded-[3px_7px_7px_3px] transition-[filter,opacity] duration-300 ${
             ready ? "" : "opacity-90 saturate-[0.78] brightness-[0.72] group-hover:brightness-[0.82]"
-          }`}
+          } ${failed ? "ring-2 ring-rose-400/70 ring-inset" : ""}`}
           style={cover ? undefined : { backgroundImage: `linear-gradient(150deg, ${colorFor(book.id)}, rgba(0,0,0,0.9))` }}
         >
           {cover ? (
