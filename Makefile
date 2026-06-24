@@ -22,7 +22,7 @@ help:
 	@echo "  revision     alembic revision --autogenerate (REV_MSG=...)"
 	@echo "  worker       run the render worker locally (python -m app.queue.worker)"
 	@echo "  mcp          run the MCP canon-memory server (MCP_ARGS=--http by default)"
-	@echo "  demo-pdf     (re)build the bundled public-domain demo book PDF"
+	@echo "  demo-pdf     (re)build the bundled public-domain demo book PDFs"
 	@echo "  seed-demo    load the demo book via the real flow (SEED_ARGS=... e.g. '--via direct')"
 	@echo "  lint         ruff check + mypy"
 	@echo "  fmt          black + ruff --fix"
@@ -71,6 +71,7 @@ mcp:
 
 demo-pdf:
 	backend/.venv/bin/python assets/books/build_demo_pdf.py
+	backend/.venv/bin/python assets/books/build_little_red_riding_hood_pdf.py
 
 seed-demo:
 	cd backend && .venv/bin/python scripts/seed_demo.py $(SEED_ARGS)

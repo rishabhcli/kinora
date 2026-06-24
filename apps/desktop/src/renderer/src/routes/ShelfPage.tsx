@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, booksNeedPolling, BOOKS_POLL_INTERVAL_MS, queryKeys, uploadErrorMessage } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+async function uploadBook(file: File): Promise<{ ok: true } | { ok: false; message: string }> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +24,8 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  return { ok: false, message: await uploadErrorMessage(response) };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -76,20 +77,25 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [blockedHint, setBlockedHint] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
 
-  const { data: books, isLoading } = useQuery({
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
     queryFn: async () => {
       const { data, error } = await api.GET("/api/books");
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    refetchInterval: (query) => (booksNeedPolling(query.state.data) ? BOOKS_POLL_INTERVAL_MS : false),
   });
+
+  const importingCount = (books ?? []).filter((b) => b.status === "importing").length;
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -149,10 +155,21 @@ export default function ShelfPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    else setUploadError(result.message);
+  }
+
+  function onBlockedOpen(book: BookResponse) {
+    const label =
+      book.status === "failed"
+        ? "Import failed — try uploading again or remove the book."
+        : "Kinora is still preparing this book. It will open automatically when ready.";
+    setBlockedHint(label);
+    window.setTimeout(() => setBlockedHint(null), 5_000);
   }
 
   function signOut() {
@@ -237,6 +254,46 @@ export default function ShelfPage() {
           </button>
         </div>
       </header>
+
+      {/* Import-in-progress notice — visible while any book is still adapting. */}
+      {importingCount > 0 && (
+        <div className="relative z-20 border-b border-ember/20 bg-ember/10 px-5 py-2.5 text-center text-sm text-ember-glow">
+          {importingCount === 1
+            ? "A book is being adapted — Kinora analyses the text, locks characters, and plans shots. This usually takes a few minutes."
+            : `${importingCount} books are being adapted — progress updates on each cover.`}
+        </div>
+      )}
+
+      {/* Upload or shelf-load errors — dismissible banners above the shelves. */}
+      {(uploadError || isError) && (
+        <div className="relative z-20 flex items-center justify-center gap-3 border-b border-rose-400/25 bg-rose-950/50 px-5 py-2.5 text-sm text-rose-100">
+          <span>{uploadError ?? "Couldn't load your library. Check your connection and try again."}</span>
+          {isError && !uploadError && (
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white transition hover:bg-white/20"
+            >
+              Retry
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            aria-label="Dismiss"
+            className="rounded-full px-2 text-white/60 transition hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Brief hint when the user taps a book that isn't ready yet. */}
+      {blockedHint && (
+        <div className="pointer-events-none relative z-20 border-b border-white/10 bg-walnut-deep/80 px-5 py-2 text-center text-sm text-white/80">
+          {blockedHint}
+        </div>
+      )}
 
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">
@@ -324,6 +381,7 @@ export default function ShelfPage() {
                       key={book.id}
                       book={book}
                       onOpen={() => openBook(book.id)}
+                      onBlockedOpen={onBlockedOpen}
                       onMetrics={() => setMetricsBookId(book.id)}
                     />
                   ))}
