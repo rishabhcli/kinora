@@ -151,9 +151,8 @@ export function BookCover({
       {/* Contact shadow on the plank: tightens + darkens as the book lifts. */}
       <div className="shelf-contact mt-1 w-[86%] opacity-90 group-hover:w-[78%] group-hover:opacity-60 group-focus-within:w-[78%] group-focus-within:opacity-60" />
 
-      {/* Title sits just below the shelf board; absolute so the cover seats on
-          the rail rather than the label. Fades in only on hover/focus. */}
-      <p className="pointer-events-none absolute top-[calc(100%+12px)] left-1/2 max-w-[148px] -translate-x-1/2 truncate text-center font-sans text-[11px] text-white/0 transition-colors duration-200 group-hover:text-white/85 group-focus-within:text-white/85">
+      {/* Title always visible below the shelf so the library is scannable without hover. */}
+      <p className="pointer-events-none mt-2.5 max-w-[148px] truncate text-center font-sans text-[11px] leading-tight text-white/72 transition-colors duration-200 group-hover:text-white/95 group-focus-within:text-white/95">
         {book.title}
       </p>
     </div>
