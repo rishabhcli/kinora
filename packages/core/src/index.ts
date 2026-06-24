@@ -31,5 +31,8 @@ export * from "./sync/lruMap";
 export * from "./sync/ladderTelemetry";
 export * from "./sync/SyncEngine";
 export * from "./realtime/socket";
+export * from "./realtime/libraryStream";
+export * from "./shelf";
+export * from "./hooks/useLibraryShelfSync";
 export * from "./stores/authStore";
 export * from "./query/keys";

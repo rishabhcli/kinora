@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, ingestProgressFraction, queryKeys, stageLabel } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
@@ -41,6 +41,9 @@ export function BookCard({
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
   const ready = book.status === "ready";
+  const failed = book.status === "failed";
+  const working = !ready && !failed;
+  const progress = ingestProgressFraction(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -99,8 +102,14 @@ export function BookCard({
 
         {!ready ? (
           <View style={styles.statusBar}>
+            {working && progress !== null ? (
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+              </View>
+            ) : null}
             <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+              {stageLabel(book).toUpperCase()}
+              {working && progress !== null ? ` · ${Math.round(progress * 100)}%` : ""}
             </Text>
           </View>
         ) : null}
@@ -157,10 +166,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  progressTrack: {
+    height: 3,
+    width: "88%",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
   },
   statusText: {
     color: palette.emberGlow,
