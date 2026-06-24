@@ -1,4 +1,10 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import {
+  applyLibraryEventToBooks,
+  LibraryEvents,
+  libraryEventNeedsRefetch,
+  type BookResponse,
+  queryKeys,
+} from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -90,6 +96,25 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  // Live ingest progress over the library SSE channel (§5.1) — the shelf
+  // updates stage + percent while Phase A runs instead of freezing on "Preparing".
+  useEffect(() => {
+    const client = new LibraryEvents({
+      baseUrl: API_BASE_URL,
+      getToken: () => authStore.getState().token,
+      onEvent: (event) => {
+        queryClient.setQueryData<BookResponse[]>(queryKeys.books(), (old) =>
+          applyLibraryEventToBooks(old, event),
+        );
+        if (libraryEventNeedsRefetch(event)) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+        }
+      },
+    });
+    void client.connect();
+    return () => client.close();
+  }, [queryClient]);
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same

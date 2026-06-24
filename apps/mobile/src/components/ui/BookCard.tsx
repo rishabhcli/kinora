@@ -23,6 +23,17 @@ function spineColor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
+function stageLabel(book: BookResponse): string {
+  if (book.status === "failed") return "IMPORT FAILED";
+  const stage = book.stage?.trim();
+  const pct =
+    book.progress != null && book.progress > 0 && book.progress < 1
+      ? Math.round(book.progress * 100)
+      : null;
+  const label = (stage ?? book.status).replace(/[_-]+/g, " ").toUpperCase();
+  return pct != null ? `${label} · ${pct}%` : label;
+}
+
 /**
  * A book standing on the shelf — its page-1 image as the cover when the book is
  * `ready`, otherwise a titled spine card in a warm hue. The bound spine edge, a
@@ -41,6 +52,11 @@ export function BookCard({
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
   const ready = book.status === "ready";
+  const working = book.status === "importing";
+  const fraction =
+    book.progress != null && book.progress > 0 && book.progress < 1
+      ? Math.min(1, book.progress)
+      : null;
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -98,10 +114,21 @@ export function BookCard({
         <View pointerEvents="none" style={styles.sheen} />
 
         {!ready ? (
-          <View style={styles.statusBar}>
-            <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
-            </Text>
+          <View style={styles.statusWrap}>
+            {fraction != null && working ? (
+              <View
+                style={styles.progressTrack}
+                accessibilityRole="progressbar"
+                accessibilityValue={{ min: 0, max: 100, now: Math.round(fraction * 100) }}
+              >
+                <View style={[styles.progressFill, { width: `${Math.round(fraction * 100)}%` }]} />
+              </View>
+            ) : null}
+            <View style={styles.statusBar}>
+              <Text style={styles.statusText} numberOfLines={1}>
+                {stageLabel(book)}
+              </Text>
+            </View>
           </View>
         ) : null}
       </Animated.View>
@@ -152,6 +179,16 @@ const styles = StyleSheet.create({
   spineShade: { position: "absolute", top: 0, bottom: 0, left: 0, width: 7, backgroundColor: "rgba(0,0,0,0.40)" },
   spineSeam: { position: "absolute", top: 0, bottom: 0, left: 7, width: StyleSheet.hairlineWidth, backgroundColor: alpha.white12 },
   sheen: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(255,255,255,0.05)" },
+  statusWrap: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  progressTrack: {
+    marginHorizontal: 10,
+    marginBottom: 4,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: 999, backgroundColor: palette.emberGlow },
   statusBar: {
     position: "absolute",
     left: 0,

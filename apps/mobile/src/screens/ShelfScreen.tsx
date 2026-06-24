@@ -1,4 +1,10 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import {
+  applyLibraryEventToBooks,
+  LibraryEvents,
+  libraryEventNeedsRefetch,
+  type BookResponse,
+  queryKeys,
+} from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -21,6 +27,7 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
+import { API_BASE_URL } from "../lib/config";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
 import { SettingsSheet } from "./SettingsSheet";
 
@@ -69,6 +76,24 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
       return data;
     },
   });
+
+  // Live ingest progress while books adapt on the shelf (§5.1 library SSE).
+  useEffect(() => {
+    const client = new LibraryEvents({
+      baseUrl: API_BASE_URL,
+      getToken: () => authStore.getState().token,
+      onEvent: (event) => {
+        queryClient.setQueryData<BookResponse[]>(queryKeys.books(), (old) =>
+          applyLibraryEventToBooks(old, event),
+        );
+        if (libraryEventNeedsRefetch(event)) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+        }
+      },
+    });
+    void client.connect();
+    return () => client.close();
+  }, [queryClient]);
 
   // Cover warming: once the library resolves, fetch each ready book's page-1
   // (into the same React Query cache the BookCard reads, so the cover is an
