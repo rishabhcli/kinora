@@ -209,9 +209,26 @@ def render_pages(pdf_path: Path, num_pages: int, *, dpi: int = 110) -> list[Rend
 
 
 async def seed_e2e(
-    *, pdf_path: Path, num_pages: int = DEFAULT_NUM_PAGES, num_shots: int = DEFAULT_NUM_SHOTS
+    *,
+    pdf_path: Path,
+    num_pages: int = DEFAULT_NUM_PAGES,
+    num_shots: int = DEFAULT_NUM_SHOTS,
+    email: str = E2E_EMAIL,
+    password: str = E2E_PASSWORD,
+    book_id: str = BOOK_ID,
+    book_title: str = BOOK_TITLE,
+    book_author: str = BOOK_AUTHOR,
+    art_direction: str = ART_DIRECTION,
 ) -> SeedResult:
     """Write the full deterministic e2e book and return a summary."""
+    # Parameter aliases keep the body identical to the module constants.
+    BOOK_ID = book_id
+    BOOK_TITLE = book_title
+    BOOK_AUTHOR = book_author
+    ART_DIRECTION = art_direction
+    E2E_EMAIL = email
+    E2E_PASSWORD = password
+
     from app.api.security import hash_password
     from app.core.config import get_settings
     from app.db.hashing import compute_shot_hash
@@ -581,9 +598,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--pages", type=int, default=DEFAULT_NUM_PAGES, help="story pages to rasterise"
     )
+    parser.add_argument("--book-id", default=BOOK_ID)
+    parser.add_argument("--title", default=BOOK_TITLE)
     parser.add_argument(
         "--shots", type=int, default=DEFAULT_NUM_SHOTS, help="shots in the source-span grid"
     )
+    parser.add_argument("--email", default=E2E_EMAIL)
+    parser.add_argument("--password", default=E2E_PASSWORD)
     args = parser.parse_args(argv)
 
     pdf_path = args.pdf if args.pdf.is_absolute() else (Path.cwd() / args.pdf)
@@ -597,16 +618,24 @@ def main(argv: list[str] | None = None) -> int:
 
     configure_logging(get_settings().log_level)
     result = asyncio.run(
-        seed_e2e(pdf_path=pdf_path, num_pages=max(1, args.pages), num_shots=max(2, args.shots))
+        seed_e2e(
+            pdf_path=pdf_path,
+            num_pages=max(1, args.pages),
+            num_shots=max(2, args.shots),
+            email=args.email,
+            password=args.password,
+            book_id=args.book_id,
+            book_title=args.title,
+        )
     )
 
     print("\n=== E2E SEED OK ===")
     for key, value in result.to_dict().items():
         print(f"  {key}: {value}")
     print("\nlogin with:")
-    print(f"  email:    {E2E_EMAIL}")
-    print(f"  password: {E2E_PASSWORD}")
-    print(f"  title:    {BOOK_TITLE}")
+    print(f"  email:    {args.email}")
+    print(f"  password: {args.password}")
+    print(f"  title:    {args.title}")
     return 0
 
 

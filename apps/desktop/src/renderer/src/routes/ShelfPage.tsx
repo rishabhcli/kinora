@@ -8,14 +8,25 @@ import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { useLibraryShelfSync } from "../hooks/useLibraryShelfSync";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
+const BOOKMARK_KEY = "kinora.bookmarks.v1";
 
-async function uploadBook(file: File): Promise<boolean> {
+function loadBookmarks(): Record<string, number> {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(BOOKMARK_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+async function uploadBook(file: File): Promise<{ ok: true } | { ok: false; message: string }> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +35,15 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let message = "Could not add that book. Check the file and try again.";
+  try {
+    const body = (await response.json()) as { detail?: string; message?: string };
+    message = body.detail ?? body.message ?? message;
+  } catch {
+    /* non-JSON error body */
+  }
+  return { ok: false, message };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -76,13 +95,27 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
+  const [importGate, setImportGate] = useState<{ book: BookResponse; message: string } | null>(null);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
   // session here, so the buffer sawtooth shows its "start reading" placeholder).
   const [metricsBookId, setMetricsBookId] = useState<string | null>(null);
+  const [bookmarks, setBookmarks] = useState<Record<string, number>>(loadBookmarks);
 
-  const { data: books, isLoading } = useQuery({
+  useEffect(() => {
+    const refresh = () => setBookmarks(loadBookmarks());
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
     queryFn: async () => {
       const { data, error } = await api.GET("/api/books");
@@ -90,6 +123,8 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  useLibraryShelfSync(books, !isLoading && !isError);
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -149,13 +184,19 @@ export default function ShelfPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    else setUploadError(result.message);
   }
 
   function signOut() {
+    setConfirmSignOut(true);
+  }
+
+  function confirmSignOutNow() {
     persistToken(null);
     authStore.getState().setAnonymous();
     navigate("/login");
@@ -184,6 +225,11 @@ export default function ShelfPage() {
         {email && <span className="hidden text-xs text-white/45 sm:inline">{email}</span>}
         <div className="no-drag ml-auto flex items-center gap-2">
           <SearchField value={query} onChange={setQuery} />
+          {uploadError && (
+            <p className="max-w-[220px] truncate text-xs text-red-300" role="alert" title={uploadError}>
+              {uploadError}
+            </p>
+          )}
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
@@ -254,8 +300,6 @@ export default function ShelfPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(100%_55%_at_50%_-8%,rgba(224,134,58,0.16),transparent_58%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_100%_at_50%_60%,transparent_38%,rgba(8,5,3,0.6))]" />
         <div className="relative mx-auto max-w-5xl">
-          {/* Loading: a couple of shelves of shimmering placeholder spines so the
-              library reads as filling in, not a blank wall. */}
           {isLoading &&
             [0, 1].map((row) => (
               <div key={row} className="mb-16">
@@ -268,9 +312,26 @@ export default function ShelfPage() {
               </div>
             ))}
 
-          {/* Nothing matched the search — a quiet, distinct note (not the bare-shelf
-              empty state). */}
-          {!isLoading && empty && q && (
+          {!isLoading && isError && (
+            <div className="mb-16">
+              <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
+                <div className="glass max-w-sm rounded-glass px-7 py-6 text-center">
+                  <p className="font-display text-lg text-white">Couldn&apos;t load your library</p>
+                  <p className="mt-1 text-sm text-white/60">Check that the Kinora backend is running, then try again.</p>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="mt-4 rounded-xl bg-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/25"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+              <Shelf />
+            </div>
+          )}
+
+          {!isLoading && !isError && empty && q && (
             <div className="mb-16">
               <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
                 <div className="glass max-w-sm rounded-glass px-7 py-6 text-center">
@@ -282,8 +343,7 @@ export default function ShelfPage() {
             </div>
           )}
 
-          {/* A truly empty library — one composed, centered invitation. */}
-          {!isLoading && empty && !q && (
+          {!isLoading && !isError && empty && !q && (
             <div className="mb-16">
               <div className="flex items-end justify-center" style={{ minHeight: 232 }}>
                 <div className="glass max-w-sm rounded-glass px-8 py-7 text-center">
@@ -312,6 +372,7 @@ export default function ShelfPage() {
           )}
 
           {!isLoading &&
+            !isError &&
             !empty &&
             shelves.map((row, i) => (
               <div key={i} className="mb-16">
@@ -323,8 +384,10 @@ export default function ShelfPage() {
                     <BookCover
                       key={book.id}
                       book={book}
+                      resumePage={bookmarks[book.id]}
                       onOpen={() => openBook(book.id)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onImportGate={(b, message) => setImportGate({ book: b, message })}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (
@@ -344,6 +407,47 @@ export default function ShelfPage() {
           bookTitle={books?.find((b) => b.id === metricsBookId)?.title ?? null}
           onClose={() => setMetricsBookId(null)}
         />
+      )}
+
+      {importGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
+          <div className="glass max-w-md rounded-glass px-7 py-6 text-center shadow-2xl">
+            <p className="font-display text-lg text-white">Still preparing</p>
+            <p className="mt-2 text-sm leading-relaxed text-white/70">{importGate.message}</p>
+            <button
+              type="button"
+              onClick={() => setImportGate(null)}
+              className="mt-5 rounded-xl bg-gradient-to-b from-ember-glow to-ember-deep px-5 py-2 text-sm font-semibold text-walnut-deep"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmSignOut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
+          <div className="glass max-w-sm rounded-glass px-7 py-6 text-center shadow-2xl">
+            <p className="font-display text-lg text-white">Sign out?</p>
+            <p className="mt-1 text-sm text-white/60">You can sign back in anytime to reach your library.</p>
+            <div className="mt-5 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmSignOut(false)}
+                className="rounded-xl bg-white/12 px-4 py-2 text-sm text-white hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmSignOutNow}
+                className="rounded-xl bg-gradient-to-b from-ember-glow to-ember-deep px-4 py-2 text-sm font-semibold text-walnut-deep"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

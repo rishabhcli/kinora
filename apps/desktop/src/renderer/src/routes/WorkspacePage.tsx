@@ -1,4 +1,4 @@
-import { conflictResolution, queryKeys, selectActiveConflict } from "@kinora/core";
+import { conflictResolution, importGateMessage, isBookReady, queryKeys, selectActiveConflict } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -273,6 +273,22 @@ export default function WorkspacePage() {
   };
 
   if (!bookId) return null;
+
+  if (book && !isBookReady(book)) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-walnut px-8 text-center text-parchment">
+        <p className="font-display text-2xl">Still preparing your book</p>
+        <p className="mt-3 max-w-md text-sm leading-relaxed text-white/65">{importGateMessage(book)}</p>
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="mt-6 rounded-xl bg-gradient-to-b from-ember-glow to-ember-deep px-5 py-2.5 text-sm font-semibold text-walnut-deep"
+        >
+          Back to library
+        </button>
+      </div>
+    );
+  }
 
   const bookmarked = bookmarks[bookId] === visiblePage;
 
