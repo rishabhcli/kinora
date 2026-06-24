@@ -1,4 +1,4 @@
-import { conflictResolution, queryKeys, selectActiveConflict } from "@kinora/core";
+import { conflictResolution, queryKeys, selectActiveConflict, importGateMessage } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -148,6 +148,12 @@ export default function WorkspacePage() {
       return data;
     },
   });
+
+  // A book still importing (or failed) should not trap the reader in an empty room.
+  useEffect(() => {
+    if (!book || book.status === "ready") return;
+    navigate("/", { replace: true, state: { gateMessage: importGateMessage(book) } });
+  }, [book, navigate]);
 
   const { data: shots } = useQuery({
     queryKey: queryKeys.shots(bookId ?? ""),

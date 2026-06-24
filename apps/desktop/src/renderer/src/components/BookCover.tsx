@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, queryKeys, displayBookTitle, stageLabel } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -9,15 +9,6 @@ function colorFor(id: string): string {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
-}
-
-/** A short, human label for a book that isn't ready yet — the import stage in
- *  sentence case, or a clean fallback. */
-function stageLabel(book: BookResponse): string {
-  if (book.status === "failed") return "Import failed";
-  const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
 }
 
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
@@ -38,6 +29,10 @@ export function BookCover({
   const ready = book.status === "ready";
   const failed = book.status === "failed";
   const working = !ready && !failed;
+  const progress =
+    typeof book.progress === "number" && Number.isFinite(book.progress)
+      ? Math.max(0, Math.min(1, book.progress))
+      : null;
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -79,11 +74,11 @@ export function BookCover({
           style={cover ? undefined : { backgroundImage: `linear-gradient(150deg, ${colorFor(book.id)}, rgba(0,0,0,0.9))` }}
         >
           {cover ? (
-            <img src={cover} alt={book.title} draggable={false} className="h-full w-full object-cover" />
+            <img src={cover} alt={displayBookTitle(book.title)} draggable={false} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full flex-col justify-between p-3">
               <p className="line-clamp-4 font-display text-sm font-medium leading-tight text-white/95">
-                {book.title}
+                {displayBookTitle(book.title)}
               </p>
               {book.author && (
                 <p className="line-clamp-1 text-[9px] uppercase tracking-[0.14em] text-white/55">
@@ -107,7 +102,15 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 px-2 pb-2.5">
+                {working && progress !== null ? (
+                  <div className="h-1 w-[88%] overflow-hidden rounded-full bg-black/45">
+                    <div
+                      className="h-full rounded-full bg-ember-glow transition-[width] duration-500 ease-out"
+                      style={{ width: `${Math.round(progress * 100)}%` }}
+                    />
+                  </div>
+                ) : null}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
                   {stageLabel(book)}
