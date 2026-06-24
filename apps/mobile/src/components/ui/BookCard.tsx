@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, booksNeedPolling, BOOKS_POLL_INTERVAL_MS, ingestProgressPercent, ingestStageLabel, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
@@ -33,14 +33,19 @@ export function BookCard({
   book,
   width,
   onPress,
+  onBlockedPress,
 }: {
   book: BookResponse;
   width: number;
   onPress: () => void;
+  onBlockedPress?: (book: BookResponse) => void;
 }) {
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
   const ready = book.status === "ready";
+  const failed = book.status === "failed";
+  const working = !ready && !failed;
+  const progressPct = ingestProgressPercent(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -62,13 +67,25 @@ export function BookCard({
 
   const translateY = lift.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
 
+  function handlePress() {
+    if (!ready) {
+      onBlockedPress?.(book);
+      return;
+    }
+    onPress();
+  }
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       onPressIn={() => animate(1)}
       onPressOut={() => animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
+      accessibilityLabel={
+        ready
+          ? `Open ${book.title}${book.author ? `, by ${book.author}` : ""}`
+          : `${book.title} is ${ingestStageLabel(book).toLowerCase()}`
+      }
       style={{ width }}
     >
       <Animated.View
@@ -99,8 +116,15 @@ export function BookCard({
 
         {!ready ? (
           <View style={styles.statusBar}>
+            {working && progressPct != null ? (
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+              </View>
+            ) : null}
             <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+              {working && progressPct != null
+                ? `${ingestStageLabel(book).toUpperCase()} · ${progressPct}%`
+                : ingestStageLabel(book).toUpperCase()}
             </Text>
           </View>
         ) : null}
@@ -161,6 +185,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  progressTrack: {
+    width: "100%",
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
   },
   statusText: {
     color: palette.emberGlow,

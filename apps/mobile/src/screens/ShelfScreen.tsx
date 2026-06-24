@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, booksNeedPolling, BOOKS_POLL_INTERVAL_MS, queryKeys } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -61,14 +61,19 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const innerWidth = Math.min(width, 1040) - SCREEN_PADDING * 2;
   const cardWidth = Math.floor((innerWidth - GRID_GAP * (perRow - 1)) / perRow);
 
-  const { data: books, isLoading } = useQuery({
+  const [blockedHint, setBlockedHint] = useState<string | null>(null);
+
+  const { data: books, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.books(),
     queryFn: async () => {
       const { data, error } = await api.GET("/api/books");
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    refetchInterval: (query) => (booksNeedPolling(query.state.data) ? BOOKS_POLL_INTERVAL_MS : false),
   });
+
+  const importingCount = (books ?? []).filter((b) => b.status === "importing").length;
 
   // Cover warming: once the library resolves, fetch each ready book's page-1
   // (into the same React Query cache the BookCard reads, so the cover is an
@@ -116,6 +121,15 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
     authStore.getState().setAnonymous();
   }
 
+  function onBlockedPress(book: BookResponse) {
+    const label =
+      book.status === "failed"
+        ? "Import failed — try uploading again from desktop."
+        : "Kinora is still preparing this book. It will open when ready.";
+    setBlockedHint(label);
+    setTimeout(() => setBlockedHint(null), 5_000);
+  }
+
   const empty = !isLoading && filtered.length === 0;
 
   return (
@@ -139,6 +153,31 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
       <View style={styles.searchRow}>
         <SearchField value={query} onChangeText={setQuery} />
       </View>
+
+      {importingCount > 0 ? (
+        <View style={styles.importBanner}>
+          <Text style={styles.importBannerText}>
+            {importingCount === 1
+              ? "A book is being adapted — progress updates on each cover."
+              : `${importingCount} books are being adapted.`}
+          </Text>
+        </View>
+      ) : null}
+
+      {isError ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>Couldn't load your library.</Text>
+          <Pressable onPress={() => void refetch()} accessibilityRole="button">
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {blockedHint ? (
+        <View style={styles.hintBanner}>
+          <Text style={styles.hintBannerText}>{blockedHint}</Text>
+        </View>
+      ) : null}
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { maxWidth: 1040, alignSelf: "center", width: "100%" }]}
@@ -170,6 +209,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     book={book}
                     width={cardWidth}
                     onPress={() => onOpen(book.id)}
+                    onBlockedPress={onBlockedPress}
                   />
                 ))}
               </View>
@@ -234,6 +274,50 @@ const styles = StyleSheet.create({
   searchRow: {
     paddingHorizontal: SCREEN_PADDING,
     paddingBottom: space.lg,
+  },
+  importBanner: {
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: space.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    backgroundColor: alpha.emberSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(244,168,93,0.35)",
+  },
+  importBannerText: {
+    color: palette.emberGlow,
+    fontSize: type.caption.fontSize,
+    textAlign: "center",
+    lineHeight: type.caption.lineHeight,
+  },
+  errorBanner: {
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: space.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(120,58,58,0.32)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.md,
+  },
+  errorBannerText: { color: "#f0c6c6", fontSize: type.caption.fontSize },
+  retryText: { color: palette.parchment, fontSize: type.caption.fontSize, fontWeight: "600" },
+  hintBanner: {
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: space.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    backgroundColor: alpha.white08,
+  },
+  hintBannerText: {
+    color: alpha.white72,
+    fontSize: type.caption.fontSize,
+    textAlign: "center",
+    lineHeight: type.caption.lineHeight,
   },
   scroll: { paddingHorizontal: SCREEN_PADDING, paddingBottom: BOTTOM_INSET + space.huge },
   loading: { alignItems: "center", paddingTop: space.huge, gap: space.md },

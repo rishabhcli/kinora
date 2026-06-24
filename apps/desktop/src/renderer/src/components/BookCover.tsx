@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, ingestProgressPercent, ingestStageLabel, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -11,33 +11,28 @@ function colorFor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
-/** A short, human label for a book that isn't ready yet — the import stage in
- *  sentence case, or a clean fallback. */
-function stageLabel(book: BookResponse): string {
-  if (book.status === "failed") return "Import failed";
-  const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
-}
-
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
  *  on the plank with a contact shadow, a tasteful hover lift, and a pop-out
  *  animation on select before it opens in its own window. A book still importing
  *  (or whose import failed) reads as a deliberate, dimmed state with a status
- *  chip rather than a broken cover. */
+ *  chip rather than a broken cover — and cannot be opened until it is ready. */
 export function BookCover({
   book,
   onOpen,
+  onBlockedOpen,
   onMetrics,
 }: {
   book: BookResponse;
   onOpen: () => void;
+  /** Called when the user taps a book that is not ready yet. */
+  onBlockedOpen?: (book: BookResponse) => void;
   onMetrics?: () => void;
 }) {
   const [popping, setPopping] = useState(false);
   const ready = book.status === "ready";
   const failed = book.status === "failed";
   const working = !ready && !failed;
+  const progressPct = ingestProgressPercent(book);
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -53,6 +48,10 @@ export function BookCover({
   const cover = data?.image_url ?? null;
 
   function select() {
+    if (!ready) {
+      onBlockedOpen?.(book);
+      return;
+    }
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -107,10 +106,15 @@ export function BookCover({
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 px-2 pb-2.5">
+                {working && progressPct != null && (
+                  <div className="ingest-progress w-full" aria-hidden="true">
+                    <div className="ingest-progress-fill" style={{ width: `${progressPct}%` }} />
+                  </div>
+                )}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {working && progressPct != null ? `${ingestStageLabel(book)} · ${progressPct}%` : ingestStageLabel(book)}
                 </span>
               </div>
             </>
@@ -122,9 +126,12 @@ export function BookCover({
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
-          className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
+          title={ready ? book.title : `${book.title} — ${ingestStageLabel(book)}`}
+          aria-label={ready ? `Open ${book.title}` : `${book.title} is ${ingestStageLabel(book).toLowerCase()}`}
+          aria-disabled={!ready}
+          className={`absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep ${
+            ready ? "" : "cursor-default"
+          }`}
         />
         {ready && onMetrics && (
           <button
