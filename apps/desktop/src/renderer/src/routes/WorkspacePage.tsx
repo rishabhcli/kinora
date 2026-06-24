@@ -1,4 +1,4 @@
-import { conflictResolution, queryKeys, selectActiveConflict } from "@kinora/core";
+import { conflictResolution, importGateMessage, queryKeys, selectActiveConflict } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -148,6 +148,12 @@ export default function WorkspacePage() {
       return data;
     },
   });
+
+  useEffect(() => {
+    if (!book || book.status === "ready") return;
+    const message = importGateMessage(book);
+    navigate("/", { replace: true, state: { shelfNotice: message } });
+  }, [book, navigate]);
 
   const { data: shots } = useQuery({
     queryKey: queryKeys.shots(bookId ?? ""),

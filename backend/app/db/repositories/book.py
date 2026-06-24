@@ -84,6 +84,15 @@ class BookRepo(BaseRepository):
         )
         await self.session.flush()
 
+    async def delete(self, book_id: str) -> bool:
+        """Delete a book row (cascades pages, shots, canon, …). Returns whether it existed."""
+        book = await self.get(book_id)
+        if book is None:
+            return False
+        await self.session.delete(book)
+        await self.session.flush()
+        return True
+
 
 class PageRepo(BaseRepository):
     """Create and query extracted pages."""
