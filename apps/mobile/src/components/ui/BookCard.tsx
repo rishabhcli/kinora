@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, queryKeys, displayBookTitle, stageLabel } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
@@ -41,6 +41,11 @@ export function BookCard({
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
   const ready = book.status === "ready";
+  const working = book.status === "importing";
+  const progress =
+    typeof book.progress === "number" && Number.isFinite(book.progress)
+      ? Math.max(0, Math.min(1, book.progress))
+      : null;
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -68,7 +73,7 @@ export function BookCard({
       onPressIn={() => animate(1)}
       onPressOut={() => animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
+      accessibilityLabel={`Open ${displayBookTitle(book.title)}${book.author ? `, by ${book.author}` : ""}`}
       style={{ width }}
     >
       <Animated.View
@@ -81,7 +86,7 @@ export function BookCard({
             <View pointerEvents="none" style={styles.coverWash} />
             <View style={styles.titledInner}>
               <Text style={styles.titledTitle} numberOfLines={4}>
-                {book.title}
+                {displayBookTitle(book.title)}
               </Text>
               {book.author ? (
                 <Text style={styles.titledAuthor} numberOfLines={1}>
@@ -99,8 +104,13 @@ export function BookCard({
 
         {!ready ? (
           <View style={styles.statusBar}>
+            {working && progress !== null ? (
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+              </View>
+            ) : null}
             <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+              {stageLabel(book)}
             </Text>
           </View>
         ) : null}
@@ -110,7 +120,7 @@ export function BookCard({
       <View style={styles.contact} />
 
       <Text style={styles.caption} numberOfLines={1}>
-        {book.title}
+        {displayBookTitle(book.title)}
       </Text>
     </Pressable>
   );
@@ -157,10 +167,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  progressTrack: {
+    width: "88%",
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
   },
   statusText: {
     color: palette.emberGlow,

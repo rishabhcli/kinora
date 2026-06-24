@@ -1,13 +1,14 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, queryKeys, canOpenBook, importGateMessage, uploadErrorMessage, type EventSourceLike } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import { BookCover } from "../components/BookCover";
 import { DirectingStylePanel } from "../components/DirectingStylePanel";
 import { MetricsPanel } from "../components/metrics/MetricsPanel";
 import { SearchField } from "../components/SearchField";
 import { useAuth } from "../hooks/useAuth";
+import { useLibraryShelfSync } from "../hooks/useLibraryShelfSync";
 import { NATIVE_TOP_INSET, useNativeShell } from "../hooks/useNativeShell";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
@@ -15,7 +16,9 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+type UploadResult = { ok: true } | { ok: false; message: string };
+
+async function uploadBook(file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +27,14 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    /* non-JSON error body */
+  }
+  return { ok: false, message: uploadErrorMessage(response.status, body) };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -71,11 +81,23 @@ function AddSlot({ onClick }: { onClick: () => void }) {
 
 export default function ShelfPage() {
   const email = useAuth((state) => state.user?.email);
+  const token = useAuth((state) => state.token);
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const msg = (location.state as { gateMessage?: string } | null)?.gateMessage;
+    if (msg) {
+      setGateMessage(msg);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate]);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
@@ -90,6 +112,24 @@ export default function ShelfPage() {
       return data;
     },
   });
+
+  useLibraryShelfSync({
+    apiBaseUrl: API_BASE_URL,
+    getToken: async () => token,
+    createEventSource: (url) => new EventSource(url) as unknown as EventSourceLike,
+    enabled: Boolean(token),
+  });
+
+  async function removeBook(bookId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/books/${bookId}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.ok) {
+      setGateMessage(null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    }
+  }
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -139,20 +179,26 @@ export default function ShelfPage() {
   // doesn't drift to the top-left corner of a big empty wall.
   const sparse = filtered.length > 0 && filtered.length <= 2 && !q;
 
-  function openBook(id: string) {
+  function openBook(book: BookResponse) {
+    if (!canOpenBook(book)) {
+      setGateMessage(importGateMessage(book));
+      return;
+    }
     const bridge = (globalThis as { kinora?: { openBook?: (bookId: string) => Promise<void> } }).kinora;
-    if (bridge?.openBook) void bridge.openBook(id);
-    else navigate(`/book/${id}`);
+    if (bridge?.openBook) void bridge.openBook(book.id);
+    else navigate(`/book/${book.id}`);
   }
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    else setUploadError(result.message);
   }
 
   function signOut() {
@@ -184,6 +230,27 @@ export default function ShelfPage() {
         {email && <span className="hidden text-xs text-white/45 sm:inline">{email}</span>}
         <div className="no-drag ml-auto flex items-center gap-2">
           <SearchField value={query} onChange={setQuery} />
+          {(uploadError || gateMessage) && (
+            <div
+              role="alert"
+              className="flex max-w-md items-center gap-2 rounded-full bg-rose-950/70 py-1.5 pl-3 pr-1.5 text-xs text-rose-100 backdrop-blur-md"
+            >
+              <p className="min-w-0 flex-1 truncate" title={uploadError ?? gateMessage ?? undefined}>
+                {uploadError ?? gateMessage}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadError(null);
+                  setGateMessage(null);
+                }}
+                aria-label="Dismiss"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-rose-200/80 hover:bg-white/10 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
@@ -323,8 +390,10 @@ export default function ShelfPage() {
                     <BookCover
                       key={book.id}
                       book={book}
-                      onOpen={() => openBook(book.id)}
+                      onOpen={() => openBook(book)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onRemove={book.status === "failed" ? () => void removeBook(book.id) : undefined}
+                      onRetry={book.status === "failed" ? () => fileRef.current?.click() : undefined}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (

@@ -33,3 +33,5 @@ export * from "./sync/SyncEngine";
 export * from "./realtime/socket";
 export * from "./stores/authStore";
 export * from "./query/keys";
+export * from "./shelf";
+export * from "./library/LibraryEventStream";

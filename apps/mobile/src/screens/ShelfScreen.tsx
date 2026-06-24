@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, queryKeys, canOpenBook, importGateMessage, displayBookTitle, stageLabel } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -19,6 +19,7 @@ import {
   Surface,
 } from "../components/ui";
 import { useAuth } from "../hooks/useAuth";
+import { useLibraryShelfSync } from "../hooks/useLibraryShelfSync";
 import { api } from "../lib/api";
 import { authStore, persistToken } from "../lib/auth";
 import { alpha, BOTTOM_INSET, fonts, HIT_TARGET, palette, radius, space, TABLET_BREAKPOINT, TOP_INSET, type } from "../theme/tokens";
@@ -55,6 +56,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
 
   const isTablet = width >= TABLET_BREAKPOINT;
   const perRow = isTablet ? Math.min(5, Math.max(3, Math.floor((width - SCREEN_PADDING * 2) / 190))) : 2;
@@ -69,6 +71,16 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
       return data;
     },
   });
+
+  useLibraryShelfSync({ enabled: Boolean(authStore.getState().token) });
+
+  function tryOpen(book: BookResponse) {
+    if (!canOpenBook(book)) {
+      setGateMessage(importGateMessage(book));
+      return;
+    }
+    onOpen(book.id);
+  }
 
   // Cover warming: once the library resolves, fetch each ready book's page-1
   // (into the same React Query cache the BookCard reads, so the cover is an
@@ -140,6 +152,12 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
         <SearchField value={query} onChangeText={setQuery} />
       </View>
 
+      {gateMessage ? (
+        <View style={styles.gateBanner}>
+          <Text style={styles.gateText}>{gateMessage}</Text>
+        </View>
+      ) : null}
+
       <ScrollView
         contentContainerStyle={[styles.scroll, { maxWidth: 1040, alignSelf: "center", width: "100%" }]}
         showsVerticalScrollIndicator={false}
@@ -169,7 +187,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
                     key={book.id}
                     book={book}
                     width={cardWidth}
-                    onPress={() => onOpen(book.id)}
+                    onPress={() => tryOpen(book)}
                   />
                 ))}
               </View>
@@ -234,6 +252,22 @@ const styles = StyleSheet.create({
   searchRow: {
     paddingHorizontal: SCREEN_PADDING,
     paddingBottom: space.lg,
+  },
+  gateBanner: {
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderRadius: radius.lg,
+    backgroundColor: alpha.emberSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: alpha.white16,
+  },
+  gateText: {
+    color: palette.parchment,
+    fontSize: type.label.fontSize,
+    lineHeight: type.body.lineHeight,
+    textAlign: "center",
   },
   scroll: { paddingHorizontal: SCREEN_PADDING, paddingBottom: BOTTOM_INSET + space.huge },
   loading: { alignItems: "center", paddingTop: space.huge, gap: space.md },

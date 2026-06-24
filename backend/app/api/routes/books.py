@@ -378,6 +378,19 @@ async def get_book(book_id: str, container: ContainerDep, user: CurrentUser) -> 
     return await _book_response(container, book)
 
 
+@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(book_id: str, container: ContainerDep, user: CurrentUser) -> None:
+    """Remove a book from the user's shelf (failed imports, duplicates, etc.)."""
+    async with container.session_factory() as session:
+        book = await BookRepo(session).get(book_id)
+        if book is None or book.user_id != user.id:
+            raise APIError("book_not_found", "no such book for this user", status=404)
+        await session.delete(book)
+        await session.commit()
+    await container.redis.delete(book_progress_key(book_id))
+    logger.info("books.deleted", book_id=book_id, user_id=user.id)
+
+
 @router.get("/{book_id}/pages/{page_number}", response_model=PageResponse)
 async def get_page(
     book_id: str, page_number: int, container: ContainerDep, user: CurrentUser
