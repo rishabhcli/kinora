@@ -96,9 +96,12 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-2xl bg-gradient-to-b from-ember-glow to-ember-deep py-3 text-[15px] font-semibold text-walnut-deep shadow-[0_12px_34px_-8px_rgba(224,134,58,0.65)] transition hover:brightness-[1.06] active:scale-[0.99] disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-ember-glow to-ember-deep py-3 text-[15px] font-semibold text-walnut-deep shadow-[0_12px_34px_-8px_rgba(224,134,58,0.65)] transition hover:brightness-[1.06] active:scale-[0.99] disabled:opacity-60"
             >
-              {busy ? "One moment…" : mode === "login" ? "Sign in" : "Create account"}
+              {busy && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-walnut-deep/30 border-t-walnut-deep motion-reduce:animate-none" />
+              )}
+              {busy ? "Signing in…" : mode === "login" ? "Sign in" : "Create account"}
             </button>
           </form>
 

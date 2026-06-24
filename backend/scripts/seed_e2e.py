@@ -86,6 +86,9 @@ DEFAULT_NUM_PAGES = 3
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PDF = _REPO_ROOT / "assets" / "books" / "the_frog_king.pdf"
+LRRH_BOOK_ID = "e2e0red0riding00000000000000seed2"
+LRRH_BOOK_TITLE = "Little Red Riding Hood (e2e seed)"
+LRRH_PDF = _REPO_ROOT / "assets" / "books" / "little_red_riding_hood.pdf"
 
 
 # --------------------------------------------------------------------------- #
@@ -209,7 +212,13 @@ def render_pages(pdf_path: Path, num_pages: int, *, dpi: int = 110) -> list[Rend
 
 
 async def seed_e2e(
-    *, pdf_path: Path, num_pages: int = DEFAULT_NUM_PAGES, num_shots: int = DEFAULT_NUM_SHOTS
+    *,
+    pdf_path: Path,
+    book_id: str = BOOK_ID,
+    book_title: str = BOOK_TITLE,
+    book_author: str = BOOK_AUTHOR,
+    num_pages: int = DEFAULT_NUM_PAGES,
+    num_shots: int = DEFAULT_NUM_SHOTS,
 ) -> SeedResult:
     """Write the full deterministic e2e book and return a summary."""
     from app.api.security import hash_password
@@ -240,6 +249,9 @@ async def seed_e2e(
 
     rendered = render_pages(pdf_path, num_pages)
     total_words = sum(len(p.word_boxes) for p in rendered)
+    # Scene/beat/shot ids are globally unique — prefix per book so we can seed
+    # multiple demo titles on one shelf.
+    idpfx = book_id[-12:]
 
     # ----- user (get-or-create, real bcrypt path) -------------------------- #
     async with get_session() as session:
@@ -253,33 +265,33 @@ async def seed_e2e(
 
     # ----- wipe any prior seeded book (cascade), then rebuild -------------- #
     async with get_session() as session:
-        existing = await BookRepo(session).get(BOOK_ID)
+        existing = await BookRepo(session).get(book_id)
         if existing is not None:
             await session.delete(existing)
 
     # Upload page stills first (so we can reuse page 1 for the Ken-Burns clip).
     page_image_keys: dict[int, str] = {}
     for page in rendered:
-        key = f"pages/{BOOK_ID}/{page.page_number}.png"
+        key = f"pages/{book_id}/{page.page_number}.png"
         store.put_bytes(key, page.png, "image/png")
         page_image_keys[page.page_number] = key
 
     # ----- book + pages ---------------------------------------------------- #
     async with get_session() as session:
         await BookRepo(session).create(
-            title=BOOK_TITLE,
-            author=BOOK_AUTHOR,
+            title=book_title,
+            author=book_author,
             user_id=user_id,
-            source_pdf_key=keys.pdf(BOOK_ID),
+            source_pdf_key=keys.pdf(book_id),
             status=BookStatus.READY,
             num_pages=len(rendered),
             art_direction=ART_DIRECTION,
-            book_id=BOOK_ID,
+            book_id=book_id,
         )
         page_repo = PageRepo(session)
         for page in rendered:
             await page_repo.create(
-                book_id=BOOK_ID,
+                book_id=book_id,
                 page_number=page.page_number,
                 image_key=page_image_keys[page.page_number],
                 text=page.text,
@@ -287,12 +299,12 @@ async def seed_e2e(
             )
 
     # Also keep the source PDF in object storage (parity with the upload route).
-    store.put_bytes(keys.pdf(BOOK_ID), pdf_path.read_bytes(), "application/pdf")
+    store.put_bytes(keys.pdf(book_id), pdf_path.read_bytes(), "application/pdf")
 
     # ----- canon entities (2 chars w/ locked refs, a location, a Style node) #
     char_refs: dict[str, str] = {}
     for key in (CHAR_FROG_KEY, CHAR_PRINCESS_KEY):
-        ref_key = keys.ref(BOOK_ID, key, "ref_front.png")
+        ref_key = keys.ref(book_id, key, "ref_front.png")
         # Reuse a page still as a real, locked reference image (no model spend).
         store.put_bytes(ref_key, rendered[0].png, "image/png")
         char_refs[key] = ref_key
@@ -300,7 +312,7 @@ async def seed_e2e(
     async with get_session() as session:
         entities = EntityRepo(session)
         await entities.upsert_new_version(
-            book_id=BOOK_ID,
+            book_id=book_id,
             entity_key=CHAR_FROG_KEY,
             entity_type=EntityType.CHARACTER,
             name="the Frog Prince",
@@ -314,10 +326,10 @@ async def seed_e2e(
                 ],
                 "locked": True,
             },
-            first_appearance={"page": 2, "beat_id": "beat_0001"},
+            first_appearance={"page": 2, "beat_id": f"{idpfx}_beat_0001"},
         )
         await entities.upsert_new_version(
-            book_id=BOOK_ID,
+            book_id=book_id,
             entity_key=CHAR_PRINCESS_KEY,
             entity_type=EntityType.CHARACTER,
             name="the Princess",
@@ -331,10 +343,10 @@ async def seed_e2e(
                 ],
                 "locked": True,
             },
-            first_appearance={"page": 1, "beat_id": "beat_0000"},
+            first_appearance={"page": 1, "beat_id": f"{idpfx}_beat_0000"},
         )
         await entities.upsert_new_version(
-            book_id=BOOK_ID,
+            book_id=book_id,
             entity_key=LOC_WELL_KEY,
             entity_type=EntityType.LOCATION,
             name="the old well",
@@ -344,7 +356,7 @@ async def seed_e2e(
         # The Style node — no appearance/reference, so a canon-edit on it never
         # touches the embedder (zero model spend), yet it drives every shot's look.
         await entities.upsert_new_version(
-            book_id=BOOK_ID,
+            book_id=book_id,
             entity_key=STYLE_ENTITY_KEY,
             entity_type=EntityType.STYLE,
             name="Painterly storybook",
@@ -361,7 +373,7 @@ async def seed_e2e(
     # ----- scenes + beats -------------------------------------------------- #
     scene_titles = ["The golden ball", "A promise at the well", "The spell is broken"]
     num_scenes = min(len(scene_titles), max(1, len(rendered)))
-    scene_ids: list[str] = [f"scene_{i:03d}" for i in range(num_scenes)]
+    scene_ids: list[str] = [f"{idpfx}_scene_{i:03d}" for i in range(num_scenes)]
     beat_ids: list[str] = []
     async with get_session() as session:
         scenes = SceneRepo(session)
@@ -369,7 +381,7 @@ async def seed_e2e(
         for i in range(num_scenes):
             page_no = min(i + 1, len(rendered))
             await scenes.create(
-                book_id=BOOK_ID,
+                book_id=book_id,
                 scene_index=i,
                 page_start=page_no,
                 page_end=page_no,
@@ -382,9 +394,9 @@ async def seed_e2e(
         beat_index = 0
         for s in range(num_scenes):
             for b in range(beats_per_scene):
-                beat_id = f"beat_{beat_index:04d}"
+                beat_id = f"{idpfx}_beat_{beat_index:04d}"
                 await beats.create(
-                    book_id=BOOK_ID,
+                    book_id=book_id,
                     scene_id=scene_ids[s],
                     beat_index=beat_index,
                     summary=f"{scene_titles[s]} — beat {b + 1}",
@@ -405,17 +417,17 @@ async def seed_e2e(
     clip_bytes = ken_burns_over_image(
         rendered[0].png, duration_s=2.0, size=(320, 180), fps=24
     )
-    accepted_shot_id = "shot_0000"
-    clip_key = keys.clip(BOOK_ID, accepted_shot_id)
+    accepted_shot_id = f"{idpfx}_shot_0000"
+    clip_key = keys.clip(book_id, accepted_shot_id)
     store.put_bytes(clip_key, clip_bytes, "video/mp4")
-    last_frame_key = keys.lastframe(BOOK_ID, accepted_shot_id)
+    last_frame_key = keys.lastframe(book_id, accepted_shot_id)
     store.put_bytes(last_frame_key, rendered[0].png, "image/png")
 
     # A couple of speculative keyframes (cheap stills) for early beats so the
     # shot timeline shows thumbnails and the Ken-Burns bridge has an image.
     keyframe_keys: list[str] = []
     for bi in beat_ids[:2]:
-        kkey = keys.keyframe(BOOK_ID, bi)
+        kkey = keys.keyframe(book_id, bi)
         store.put_bytes(kkey, rendered[0].png, "image/png")
         keyframe_keys.append(kkey)
 
@@ -439,7 +451,7 @@ async def seed_e2e(
         shot_repo = ShotRepo(session)
         cache = ShotCacheRepo(session)
         for i in range(num_shots):
-            shot_id = f"shot_{i:04d}"
+            shot_id = f"{idpfx}_shot_{i:04d}"
             start = i * WORD_STEP
             end = start + WORD_STEP - 1
             page_no = min(len(rendered), 1 + (i // max(1, num_shots // len(rendered))))
@@ -450,7 +462,7 @@ async def seed_e2e(
             if i == 0:
                 # The one accepted shot with real playable content (a Ken-Burns clip).
                 shot_hash = compute_shot_hash(
-                    book_id=BOOK_ID,
+                    book_id=book_id,
                     beat_id=beat_id,
                     canon_version_at_render=1,
                     render_mode="ken_burns_keyframe",
@@ -459,7 +471,7 @@ async def seed_e2e(
                 )
                 await shot_repo.create(
                     id=shot_id,
-                    book_id=BOOK_ID,
+                    book_id=book_id,
                     scene_id=scene_id,
                     beat_id=beat_id,
                     source_span=source_span,
@@ -488,7 +500,7 @@ async def seed_e2e(
                 )
                 await cache.put(
                     shot_hash=shot_hash,
-                    book_id=BOOK_ID,
+                    book_id=book_id,
                     clip_key=clip_key,
                     last_frame_key=last_frame_key,
                     qa={"verdict": "pass", "ccs": 0.92},
@@ -501,7 +513,7 @@ async def seed_e2e(
                 status = ShotStatus.KEYFRAMED if i <= 2 else ShotStatus.PLANNED
                 await shot_repo.create(
                     id=shot_id,
-                    book_id=BOOK_ID,
+                    book_id=book_id,
                     scene_id=scene_id,
                     beat_id=beat_id,
                     source_span=source_span,
@@ -517,7 +529,7 @@ async def seed_e2e(
                 )
             spans.append(
                 {
-                    "book_id": BOOK_ID,
+                    "book_id": book_id,
                     "word_index_start": start,
                     "word_index_end": end,
                     "shot_id": shot_id,
@@ -529,15 +541,14 @@ async def seed_e2e(
 
     # ----- ownership (Redis) + cached eval report -------------------------- #
     owner_key = f"kinora:user:{user_id}:books"
-    await redis.delete(owner_key)
-    await redis.raw.sadd(owner_key, BOOK_ID)
+    await redis.raw.sadd(owner_key, book_id)
     await redis.set_json(
-        f"kinora:book:progress:{BOOK_ID}", {"stage": "ready", "pct": 1.0}
+        f"kinora:book:progress:{book_id}", {"stage": "ready", "pct": 1.0}
     )
     await redis.set_json(
-        f"kinora:eval:report:{BOOK_ID}",
+        f"kinora:eval:report:{book_id}",
         {
-            "book_id": BOOK_ID,
+            "book_id": book_id,
             "ccs": {"crew": 0.91, "baseline": 0.78},
             "efficiency": {"crew": 86.0, "baseline": 61.0},
             "regen_rate": {"crew": 0.12, "baseline": 0.34},
@@ -547,13 +558,12 @@ async def seed_e2e(
             "per_character_ccs": {CHAR_FROG_KEY: 0.92, CHAR_PRINCESS_KEY: 0.90},
         },
     )
-    await redis.close()
 
     return SeedResult(
-        book_id=BOOK_ID,
+        book_id=book_id,
         user_id=user_id,
         email=E2E_EMAIL,
-        title=BOOK_TITLE,
+        title=book_title,
         num_pages=len(rendered),
         num_words=total_words,
         num_scenes=num_scenes,
@@ -584,6 +594,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--shots", type=int, default=DEFAULT_NUM_SHOTS, help="shots in the source-span grid"
     )
+    parser.add_argument(
+        "--also-lrrh",
+        action="store_true",
+        help="also seed the Little Red Riding Hood demo book on the same shelf",
+    )
     args = parser.parse_args(argv)
 
     pdf_path = args.pdf if args.pdf.is_absolute() else (Path.cwd() / args.pdf)
@@ -596,17 +611,43 @@ def main(argv: list[str] | None = None) -> int:
     from app.core.logging import configure_logging
 
     configure_logging(get_settings().log_level)
-    result = asyncio.run(
-        seed_e2e(pdf_path=pdf_path, num_pages=max(1, args.pages), num_shots=max(2, args.shots))
-    )
+
+    async def _run() -> list[SeedResult]:
+        results = [
+            await seed_e2e(
+                pdf_path=pdf_path, num_pages=max(1, args.pages), num_shots=max(2, args.shots)
+            )
+        ]
+        lrrh_path = LRRH_PDF if LRRH_PDF.is_absolute() else (Path.cwd() / LRRH_PDF)
+        if args.also_lrrh:
+            if not lrrh_path.exists():
+                print(f"Little Red Riding Hood PDF not found: {lrrh_path}", file=sys.stderr)
+                print("build it first: python assets/books/build_little_red_riding_hood_pdf.py", file=sys.stderr)
+                raise SystemExit(1)
+            results.append(
+                await seed_e2e(
+                    pdf_path=lrrh_path,
+                    book_id=LRRH_BOOK_ID,
+                    book_title=LRRH_BOOK_TITLE,
+                    num_pages=max(1, args.pages),
+                    num_shots=max(2, args.shots),
+                )
+            )
+        return results
+
+    results = asyncio.run(_run())
 
     print("\n=== E2E SEED OK ===")
-    for key, value in result.to_dict().items():
-        print(f"  {key}: {value}")
+    for result in results:
+        print(f"\n  [{result.title}]")
+        for key, value in result.to_dict().items():
+            print(f"    {key}: {value}")
     print("\nlogin with:")
     print(f"  email:    {E2E_EMAIL}")
     print(f"  password: {E2E_PASSWORD}")
-    print(f"  title:    {BOOK_TITLE}")
+    print("  titles:")
+    for result in results:
+        print(f"    - {result.title}")
     return 0
 
 
