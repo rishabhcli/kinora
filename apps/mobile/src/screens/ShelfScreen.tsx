@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { bookIsOpenable, bookProgressPercent, bookStageLabel, booksRefetchInterval, type BookResponse, queryKeys } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -68,6 +68,7 @@ export function ShelfScreen({ onOpen }: { onOpen: (bookId: string) => void }) {
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    refetchInterval: (query) => booksRefetchInterval(query.state.data),
   });
 
   // Cover warming: once the library resolves, fetch each ready book's page-1

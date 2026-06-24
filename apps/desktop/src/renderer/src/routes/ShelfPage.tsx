@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { booksRefetchInterval, type BookResponse, queryKeys } from "@kinora/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import { API_BASE_URL } from "../lib/config";
 
 const PER_SHELF = 5;
 
-async function uploadBook(file: File): Promise<boolean> {
+async function uploadBook(file: File): Promise<{ ok: true } | { ok: false; message: string }> {
   const form = new FormData();
   form.append("file", file);
   const token = authStore.getState().token;
@@ -24,7 +24,16 @@ async function uploadBook(file: File): Promise<boolean> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  return response.ok;
+  if (response.ok) return { ok: true };
+  let message = `Upload failed (${response.status})`;
+  try {
+    const body = (await response.json()) as { detail?: string | { msg?: string }[] };
+    if (typeof body.detail === "string") message = body.detail;
+    else if (Array.isArray(body.detail) && body.detail[0]?.msg) message = body.detail[0].msg;
+  } catch {
+    // Keep the status-based fallback.
+  }
+  return { ok: false, message };
 }
 
 /** A single oak shelf board with its lit top edge and shadowed front face. */
@@ -76,6 +85,7 @@ export default function ShelfPage() {
   const native = useNativeShell();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showStyle, setShowStyle] = useState(false);
   // The book whose §13 metrics are open from the shelf (report-only — no live
@@ -89,6 +99,7 @@ export default function ShelfPage() {
       if (error || !data) throw new Error("failed to load books");
       return data;
     },
+    refetchInterval: (query) => booksRefetchInterval(query.state.data),
   });
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
@@ -149,10 +160,12 @@ export default function ShelfPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setUploadError(null);
     setUploading(true);
-    const ok = await uploadBook(file);
+    const result = await uploadBook(file);
     setUploading(false);
-    if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    if (result.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    else setUploadError(result.message);
   }
 
   function signOut() {
@@ -237,6 +250,20 @@ export default function ShelfPage() {
           </button>
         </div>
       </header>
+
+      {uploadError && (
+        <div className="no-drag relative z-20 mx-10 mt-3 flex items-start gap-3 rounded-glass border border-red-400/30 bg-red-950/50 px-4 py-3 text-sm text-red-100 backdrop-blur-md">
+          <p className="flex-1">{uploadError}</p>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            aria-label="Dismiss upload error"
+            className="shrink-0 text-red-200/80 transition hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Opaque wooden wall + shelves (kept opaque so the desktop doesn't bleed through). */}
       <div className="relative flex-1 overflow-y-auto px-10 pb-20 pt-14">
