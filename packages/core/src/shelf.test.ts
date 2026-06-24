@@ -39,6 +39,7 @@ describe("shelf helpers", () => {
 
   it("formats titles and gate copy", () => {
     expect(displayBookTitle("Demo (e2e seed)")).toBe("Demo");
+    expect(displayBookTitle("little red riding hood")).toBe("Little Red Riding Hood");
     expect(stageLabel(book({ status: "failed" }))).toBe("Import failed");
     expect(importGateMessage(book())).toContain("20%");
     expect(canOpenBook(book({ status: "ready" }))).toBe(true);

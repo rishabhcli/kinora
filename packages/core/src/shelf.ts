@@ -26,7 +26,13 @@ export function applyIngestProgress(
 
 /** Human title for shelf cards — strips internal seed suffixes from e2e fixtures. */
 export function displayBookTitle(title: string): string {
-  return title.replace(/\s*\(e2e seed\)\s*$/i, "").trim();
+  const stripped = title.replace(/\s*\(e2e seed\)\s*$/i, "").trim();
+  if (!stripped) return title;
+  // Title-case filenames that arrived all-lowercase from upload.
+  if (stripped === stripped.toLowerCase()) {
+    return stripped.replace(/\b\w+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+  }
+  return stripped;
 }
 
 /** Sentence-case label for an import stage chip. */
@@ -40,7 +46,7 @@ export function stageLabel(book: BookResponse): string {
 /** User-facing copy when a book cannot be opened yet. */
 export function importGateMessage(book: BookResponse): string {
   if (book.status === "failed") {
-    return `${displayBookTitle(book.title)} could not be imported. Try uploading it again from desktop.`;
+    return `${displayBookTitle(book.title)} could not be imported. Remove it and try again, or check your API key.`;
   }
   const label = stageLabel(book);
   const pct =

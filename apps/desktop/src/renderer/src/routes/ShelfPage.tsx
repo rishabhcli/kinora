@@ -81,6 +81,7 @@ function AddSlot({ onClick }: { onClick: () => void }) {
 
 export default function ShelfPage() {
   const email = useAuth((state) => state.user?.email);
+  const token = useAuth((state) => state.token);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -114,10 +115,21 @@ export default function ShelfPage() {
 
   useLibraryShelfSync({
     apiBaseUrl: API_BASE_URL,
-    getToken: async () => authStore.getState().token,
+    getToken: async () => token,
     createEventSource: (url) => new EventSource(url) as unknown as EventSourceLike,
-    enabled: Boolean(authStore.getState().token),
+    enabled: Boolean(token),
   });
+
+  async function removeBook(bookId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/books/${bookId}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.ok) {
+      setGateMessage(null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.books() });
+    }
+  }
 
   // Warm each book's page-1 cover the moment the library resolves, so covers
   // appear instantly instead of streaming in one-by-one. We prefetch the same
@@ -219,13 +231,25 @@ export default function ShelfPage() {
         <div className="no-drag ml-auto flex items-center gap-2">
           <SearchField value={query} onChange={setQuery} />
           {(uploadError || gateMessage) && (
-            <p
+            <div
               role="alert"
-              className="max-w-xs truncate rounded-full bg-rose-950/70 px-3 py-1.5 text-xs text-rose-100 backdrop-blur-md"
-              title={uploadError ?? gateMessage ?? undefined}
+              className="flex max-w-md items-center gap-2 rounded-full bg-rose-950/70 py-1.5 pl-3 pr-1.5 text-xs text-rose-100 backdrop-blur-md"
             >
-              {uploadError ?? gateMessage}
-            </p>
+              <p className="min-w-0 flex-1 truncate" title={uploadError ?? gateMessage ?? undefined}>
+                {uploadError ?? gateMessage}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadError(null);
+                  setGateMessage(null);
+                }}
+                aria-label="Dismiss"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-rose-200/80 hover:bg-white/10 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
           )}
           <button
             onClick={() => fileRef.current?.click()}
@@ -368,6 +392,8 @@ export default function ShelfPage() {
                       book={book}
                       onOpen={() => openBook(book)}
                       onMetrics={() => setMetricsBookId(book.id)}
+                      onRemove={book.status === "failed" ? () => void removeBook(book.id) : undefined}
+                      onRetry={book.status === "failed" ? () => fileRef.current?.click() : undefined}
                     />
                   ))}
                   {showAddSlot && i === lastFilledShelf && row.length < PER_SHELF && (
