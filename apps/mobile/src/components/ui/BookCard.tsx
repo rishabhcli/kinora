@@ -1,7 +1,8 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, displayBookTitle, importGateMessage, importStageLabel, isBookReady, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import {
+  Alert,
   Animated,
   Image,
   Platform,
@@ -25,9 +26,7 @@ function spineColor(id: string): string {
 
 /**
  * A book standing on the shelf — its page-1 image as the cover when the book is
- * `ready`, otherwise a titled spine card in a warm hue. The bound spine edge, a
- * diagonal sheen and a soft shadow give it depth; a status pill shows while a
- * book is still being adapted. Pressing lifts it (unless reduce-motion is on).
+ * `ready`, otherwise a titled spine card with live import progress.
  */
 export function BookCard({
   book,
@@ -40,7 +39,13 @@ export function BookCard({
 }) {
   const reduced = useReducedMotion();
   const lift = useRef(new Animated.Value(0)).current;
-  const ready = book.status === "ready";
+  const ready = isBookReady(book);
+  const failed = book.status === "failed";
+  const working = !ready && !failed;
+  const progressPct =
+    book.progress != null && book.progress > 0 && book.progress < 1
+      ? Math.round(book.progress * 100)
+      : null;
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -60,15 +65,23 @@ export function BookCard({
     Animated.spring(lift, { toValue: to, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
   }
 
+  function handlePress() {
+    if (!ready) {
+      Alert.alert("Still preparing", importGateMessage(book));
+      return;
+    }
+    onPress();
+  }
+
   const translateY = lift.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       onPressIn={() => animate(1)}
       onPressOut={() => animate(0)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${book.title}${book.author ? `, by ${book.author}` : ""}`}
+      accessibilityLabel={`Open ${displayBookTitle(book.title)}${book.author ? `, by ${book.author}` : ""}`}
       style={{ width }}
     >
       <Animated.View
@@ -81,7 +94,7 @@ export function BookCard({
             <View pointerEvents="none" style={styles.coverWash} />
             <View style={styles.titledInner}>
               <Text style={styles.titledTitle} numberOfLines={4}>
-                {book.title}
+                {displayBookTitle(book.title)}
               </Text>
               {book.author ? (
                 <Text style={styles.titledAuthor} numberOfLines={1}>
@@ -92,25 +105,29 @@ export function BookCard({
           </View>
         )}
 
-        {/* Bound spine edge + a thin page seam + a diagonal sheen. */}
         <View pointerEvents="none" style={styles.spineShade} />
         <View pointerEvents="none" style={styles.spineSeam} />
         <View pointerEvents="none" style={styles.sheen} />
 
         {!ready ? (
           <View style={styles.statusBar}>
-            <Text style={styles.statusText} numberOfLines={1}>
-              {(book.stage ?? book.status).toUpperCase()}
+            {working && book.progress != null && book.progress > 0 ? (
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.max(4, Math.round(book.progress * 100))}%` }]} />
+              </View>
+            ) : null}
+            <Text style={styles.statusText} numberOfLines={2}>
+              {importStageLabel(book)}
+              {progressPct != null ? ` · ${progressPct}%` : ""}
             </Text>
           </View>
         ) : null}
       </Animated.View>
 
-      {/* Contact shadow on the plank. */}
       <View style={styles.contact} />
 
       <Text style={styles.caption} numberOfLines={1}>
-        {book.title}
+        {displayBookTitle(book.title)}
       </Text>
     </Pressable>
   );
@@ -157,16 +174,30 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.62)",
     alignItems: "center",
+    gap: 4,
+  },
+  progressTrack: {
+    height: 3,
+    width: "100%",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: palette.emberGlow,
   },
   statusText: {
     color: palette.emberGlow,
     fontSize: type.micro.fontSize,
     fontWeight: "600",
-    letterSpacing: 1,
+    letterSpacing: 0.4,
+    textAlign: "center",
   },
   contact: {
     height: 8,

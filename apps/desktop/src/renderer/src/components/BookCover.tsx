@@ -1,4 +1,4 @@
-import { type BookResponse, queryKeys } from "@kinora/core";
+import { type BookResponse, displayBookTitle, importGateMessage, importStageLabel, isBookReady, queryKeys } from "@kinora/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -11,33 +11,34 @@ function colorFor(id: string): string {
   return SPINES[h % SPINES.length] ?? SPINES[0]!;
 }
 
-/** A short, human label for a book that isn't ready yet — the import stage in
- *  sentence case, or a clean fallback. */
-function stageLabel(book: BookResponse): string {
-  if (book.status === "failed") return "Import failed";
-  const stage = book.stage?.trim();
-  if (stage) return stage.charAt(0).toUpperCase() + stage.slice(1).replace(/[_-]+/g, " ");
-  return "Preparing";
-}
-
 /** A book standing on the shelf: its page-1 cover (or a titled spine box) sitting
  *  on the plank with a contact shadow, a tasteful hover lift, and a pop-out
  *  animation on select before it opens in its own window. A book still importing
  *  (or whose import failed) reads as a deliberate, dimmed state with a status
- *  chip rather than a broken cover. */
+ *  chip and progress bar rather than a broken cover. */
 export function BookCover({
   book,
+  resumePage,
   onOpen,
   onMetrics,
+  onImportGate,
 }: {
   book: BookResponse;
+  /** Last bookmarked page from a prior reading session (local). */
+  resumePage?: number;
   onOpen: () => void;
   onMetrics?: () => void;
+  /** Called when the reader taps a book that is not ready yet. */
+  onImportGate?: (book: BookResponse, message: string) => void;
 }) {
   const [popping, setPopping] = useState(false);
-  const ready = book.status === "ready";
+  const ready = isBookReady(book);
   const failed = book.status === "failed";
   const working = !ready && !failed;
+  const progressPct =
+    book.progress != null && book.progress > 0 && book.progress < 1
+      ? Math.round(book.progress * 100)
+      : null;
 
   const { data } = useQuery({
     queryKey: queryKeys.page(book.id, 1),
@@ -53,6 +54,10 @@ export function BookCover({
   const cover = data?.image_url ?? null;
 
   function select() {
+    if (!ready) {
+      onImportGate?.(book, importGateMessage(book));
+      return;
+    }
     setPopping(true);
     window.setTimeout(() => {
       onOpen();
@@ -64,8 +69,8 @@ export function BookCover({
     <div className="group relative flex shrink-0 flex-col items-center" style={{ width: 138 }}>
       <div
         className={`relative aspect-[2/3] w-[138px] origin-bottom rounded-[3px_7px_7px_3px] transition-[transform,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform group-hover:-translate-y-2.5 group-focus-within:-translate-y-2.5 ${
-          popping ? "-translate-y-8 scale-[1.08]" : ""
-        }`}
+          ready ? "" : "cursor-default"
+        } ${popping ? "-translate-y-8 scale-[1.08]" : ""}`}
         style={{
           boxShadow: popping
             ? "0 44px 64px -18px rgba(0,0,0,0.78), inset 0 0 0 1px rgba(255,255,255,0.08)"
@@ -79,11 +84,11 @@ export function BookCover({
           style={cover ? undefined : { backgroundImage: `linear-gradient(150deg, ${colorFor(book.id)}, rgba(0,0,0,0.9))` }}
         >
           {cover ? (
-            <img src={cover} alt={book.title} draggable={false} className="h-full w-full object-cover" />
+            <img src={cover} alt={displayBookTitle(book.title)} draggable={false} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full flex-col justify-between p-3">
               <p className="line-clamp-4 font-display text-sm font-medium leading-tight text-white/95">
-                {book.title}
+                {displayBookTitle(book.title)}
               </p>
               {book.author && (
                 <p className="line-clamp-1 text-[9px] uppercase tracking-[0.14em] text-white/55">
@@ -93,39 +98,47 @@ export function BookCover({
             </div>
           )}
 
-          {/* The bound spine edge (darkened left band) + a soft page sheen. */}
           <div className="pointer-events-none absolute inset-y-0 left-0 w-[7px] bg-gradient-to-r from-black/45 to-transparent" />
           <div className="pointer-events-none absolute inset-y-0 left-[7px] w-px bg-white/12" />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,rgba(255,255,255,0.2),transparent_34%,transparent_88%,rgba(0,0,0,0.22))]" />
 
-          {/* A book that's still importing or has failed: a soft scrim + a frosted
-              status chip pinned to the foot of the cover, so it reads as a
-              deliberate state rather than a broken card. */}
           {!ready && (
             <>
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/15" />
               {working && (
                 <div className="shimmer pointer-events-none absolute inset-0 motion-reduce:hidden" />
               )}
-              <div className="absolute inset-x-0 bottom-0 flex justify-center px-2 pb-2.5">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 px-2 pb-2.5">
+                {working && book.progress != null && book.progress > 0 && (
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-ember-glow transition-[width] duration-500 ease-out"
+                      style={{ width: `${Math.max(4, Math.round(book.progress * 100))}%` }}
+                    />
+                  </div>
+                )}
                 <span className="status-chip" data-tone={failed ? "failed" : "working"}>
                   <span className="status-pulse" data-live={working ? "true" : undefined} />
-                  {stageLabel(book)}
+                  {importStageLabel(book)}
+                  {progressPct != null ? ` · ${progressPct}%` : ""}
                 </span>
               </div>
             </>
           )}
         </div>
 
-        {/* Full-cover open button + a hover metrics affordance — siblings (no
-            nested <button>); both lift with the cover via the group. */}
         <button
           type="button"
           onClick={select}
-          title={book.title}
-          aria-label={`Open ${book.title}`}
+          title={displayBookTitle(book.title)}
+          aria-label={ready ? `Open ${displayBookTitle(book.title)}` : importGateMessage(book)}
           className="absolute inset-0 rounded-[3px_7px_7px_3px] outline-none focus-visible:ring-2 focus-visible:ring-ember-glow/80 focus-visible:ring-offset-2 focus-visible:ring-offset-walnut-deep"
         />
+        {ready && resumePage != null && resumePage > 1 && (
+          <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-walnut-deep/80 px-2 py-0.5 text-[9px] font-medium text-ember-glow backdrop-blur-md">
+            Resume p.{resumePage}
+          </span>
+        )}
         {ready && onMetrics && (
           <button
             type="button"
@@ -134,7 +147,7 @@ export function BookCover({
               onMetrics();
             }}
             title="Metrics"
-            aria-label={`Metrics for ${book.title}`}
+            aria-label={`Metrics for ${displayBookTitle(book.title)}`}
             className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-walnut-deep/70 text-white/85 opacity-0 backdrop-blur-md transition hover:bg-walnut-deep hover:text-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember-glow group-hover:opacity-100 motion-reduce:transition-none"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
@@ -144,13 +157,10 @@ export function BookCover({
         )}
       </div>
 
-      {/* Contact shadow on the plank: tightens + darkens as the book lifts. */}
       <div className="shelf-contact mt-1 w-[86%] opacity-90 group-hover:w-[78%] group-hover:opacity-60 group-focus-within:w-[78%] group-focus-within:opacity-60" />
 
-      {/* Title sits just below the shelf board; absolute so the cover seats on
-          the rail rather than the label. Fades in only on hover/focus. */}
       <p className="pointer-events-none absolute top-[calc(100%+12px)] left-1/2 max-w-[148px] -translate-x-1/2 truncate text-center font-sans text-[11px] text-white/0 transition-colors duration-200 group-hover:text-white/85 group-focus-within:text-white/85">
-        {book.title}
+        {displayBookTitle(book.title)}
       </p>
     </div>
   );
