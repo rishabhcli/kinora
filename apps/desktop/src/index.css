@@ -338,3 +338,31 @@ body {
   content-visibility: auto;
   contain-intrinsic-size: 1px 240px;
 }
+
+/* ===== Login book wall — scrolling cover columns ===== */
+@keyframes kinoraWallUp {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+
+@keyframes kinoraWallDown {
+  from { transform: translateY(-50%); }
+  to   { transform: translateY(0); }
+}
+
+.bookwall-col-up {
+  animation: kinoraWallUp var(--dur, 80s) linear infinite;
+  will-change: transform;
+}
+
+.bookwall-col-down {
+  animation: kinoraWallDown var(--dur, 80s) linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookwall-col-up,
+  .bookwall-col-down {
+    animation: none;
+  }
+}
