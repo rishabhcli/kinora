@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "lib": ["ES2020", "DOM"],
+    "outDir": "../dist-electron",
+    "rootDir": ".",
+    "noEmit": false,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["main.ts", "preload.ts"]
+}

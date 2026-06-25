@@ -27,6 +27,7 @@ frontend/dist/
 
 # Electron build output
 apps/desktop/release/
+apps/desktop/dist-electron/
 
 # Expo / React Native
 .expo/

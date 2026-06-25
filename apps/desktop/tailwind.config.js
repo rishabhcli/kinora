@@ -1,31 +1,39 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/renderer/index.html", "./src/renderer/src/**/*.{ts,tsx}"],
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // Warm library
-        walnut: { DEFAULT: "#241811", deep: "#160e08" },
-        oak: { DEFAULT: "#7a512f", light: "#9c6d40", dark: "#5a3c22" },
-        parchment: { DEFAULT: "#f3ecdd", warm: "#efe5cf" },
-        ink: { DEFAULT: "#1c150f", soft: "#5b4d40", faint: "#9b8a78" },
-        // Cinematic accent (projector ember)
-        ember: { DEFAULT: "#e0863a", deep: "#c26a24", glow: "#f4a85d" },
+        kinora: {
+          bg: "#181614",
+          "bg-deep": "#0e0d0c",
+          text: "#e8e2d8",
+          muted: "#a89e94",
+          subtle: "#6b6258",
+          gold: "#d4a44e",
+          "gold-light": "#e8c878",
+        },
       },
       fontFamily: {
-        display: ['ui-serif', '"New York"', "Georgia", "Times New Roman", "serif"],
         sans: [
+          "DM Sans",
           "-apple-system",
           "BlinkMacSystemFont",
-          '"SF Pro Text"',
-          "system-ui",
+          "SF Pro Display",
+          "Segoe UI",
+          "Roboto",
           "sans-serif",
         ],
+        serif: ["Fraunces", "Georgia", "serif"],
       },
-      borderRadius: { glass: "26px" },
-      boxShadow: {
-        glass: "0 12px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.30)",
-        cover: "0 12px 30px rgba(0,0,0,0.55)",
+      animation: {
+        "fade-in": "fadeIn 0.4s ease-out",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
     },
   },
