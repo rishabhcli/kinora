@@ -1,5 +1,21 @@
 # Agent 02 — verification
 
+## Scope notes (honest accounting)
+
+- **Mounting:** the engine is published and verified in isolation (demo harness);
+  it is **not yet wired into `ReadingRoom.tsx`** — that's Agent 12's integration
+  seam (the mission forbids me touching the ReadingRoom shell). Contract +
+  wiring notes are in `coordination/CONTRACTS.md`.
+- **Inertia / parallax / scrub indicator** (WS1): done — inertia is native momentum
+  on the overflow scroller; parallax + scrub indicator are imperative GPU transforms.
+- **Scroll-snap to scene boundaries** (named in WS1 prose, *not* in the numbered DoD
+  acceptance): **deliberately deferred.** Two reasons: (1) there's no reliable
+  scene→DOM anchor — shots carry book-global `word_range`s while the text column is
+  page text, so snap points would be guesses; (2) `scroll-snap` nudges
+  programmatic/settle scroll positions, which fights frame-accurate scrub pinning.
+  Native inertia covers the "settle" feel without that risk. Revisit if Agent 5
+  exposes per-paragraph word offsets.
+
 ## Definition of Done → evidence
 
 | DoD item | How it's verified | Result |
