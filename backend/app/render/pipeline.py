@@ -59,6 +59,7 @@ from app.providers.errors import LiveVideoDisabled, ProviderError
 from app.providers.types import TtsResult
 from app.render.conflict import ConflictResolution
 from app.render.degrade import (
+    FILM_SIZE,
     DegradeRung,
     FfmpegError,
     audio_text_card,
@@ -979,14 +980,19 @@ class RenderPipeline:
             )
             clip_bytes = await anyio.to_thread.run_sync(
                 lambda: ken_burns_over_image(
-                    still, clip_dur, audio_bytes=audio_bytes, zoom_max=zoom_max, grade=grade
+                    still,
+                    clip_dur,
+                    audio_bytes=audio_bytes,
+                    size=FILM_SIZE,
+                    zoom_max=zoom_max,
+                    grade=grade,
                 )
             )
             last_frame_bytes = still
         else:
             rung = DegradeRung.AUDIO_TEXT_ONLY
             clip_bytes = await anyio.to_thread.run_sync(
-                lambda: audio_text_card(clip_dur, audio_bytes=audio_bytes)
+                lambda: audio_text_card(clip_dur, audio_bytes=audio_bytes, size=FILM_SIZE)
             )
 
         clip_key = keys.clip(ctx.book_id, ctx.shot_id)

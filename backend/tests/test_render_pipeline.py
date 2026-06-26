@@ -326,6 +326,10 @@ async def test_live_gate_off_goes_straight_to_degradation() -> None:
 
     clip = bundle.store.store[keys.clip(BOOK_ID, SHOT_ID)]
     assert degrade.verify_playable(clip) is True
+    # The degraded shot is rendered at the vertical film geometry (720×1280) so the
+    # per-shot clips match the stitched event film — no resolution jump end-to-end.
+    info = degrade.inspect(clip)
+    assert (info.width, info.height) == degrade.FILM_SIZE
     assert result.sync_segment is not None
 
 

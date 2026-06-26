@@ -37,7 +37,14 @@ from app.core.logging import get_logger
 
 logger = get_logger("app.render.degrade")
 
-#: Default render geometry/timing for a degradation clip ("1080p-ish, sane fps").
+#: The canonical Kinora **film** geometry: vertical **720×1280** (short-drama
+#: format, like a phone-native reel — *not* landscape 1080p, and never upscaled
+#: to 4K). Every shot the event director renders and every stitched event film is
+#: produced at this geometry so the aspect is uniform end-to-end with no
+#: resolution jump mid-event (§4.2 scene = stitch boundary).
+FILM_SIZE: tuple[int, int] = (720, 1280)
+#: Legacy landscape geometry. Retained for non-film stills/derivations, but the
+#: film/stitch path uses :data:`FILM_SIZE`. (Stitching to this was the bug.)
 DEFAULT_SIZE: tuple[int, int] = (1920, 1080)
 DEFAULT_FPS: int = 30
 #: Slow Ken-Burns zoom ceiling over the shot (1.0 → ZOOM_MAX across its length).
@@ -572,6 +579,7 @@ __all__ = [
     "DEFAULT_FPS",
     "DEFAULT_SIZE",
     "DEFAULT_ZOOM_MAX",
+    "FILM_SIZE",
     "DegradeRung",
     "FfmpegError",
     "ProbeInfo",
