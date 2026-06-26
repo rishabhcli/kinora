@@ -280,14 +280,17 @@ html.kinora-native [class*="rounded-3xl"] {
 /* ===== Books ===== */
 .book-3d-wrapper {
   position: relative;
+  transition: box-shadow 0.3s ease, border-radius 0.3s ease;
+  transform-style: preserve-3d;
 }
 
 .book-cover {
   aspect-ratio: 2 / 3;
-  /* Bound (flat) left corners, rounded outer right corners — like a real book. */
-  border-radius: 2px 5px 5px 2px;
+  border-radius: 3px;
   position: relative;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), 0 3px 8px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.3s ease, border-radius 0.3s ease;
+  transform-style: preserve-3d;
 }
 
 .book-cover-inner {
@@ -295,95 +298,51 @@ html.kinora-native [class*="rounded-3xl"] {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
-  backface-visibility: hidden;
 }
 
-/* ===== Physical 3D book body — page block, spine, back cover =====
-   These faces sit on the static body (not the cover), so the book reads as a
-   solid object that tilts with the mouse, while the cover still swings open on
-   its spine without taking the pages with it. Depth = --bt (set per card). */
-.book-body {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-/* Fore-edge — stacked page edges on the right. */
-.book-edge-right {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  right: calc(-1 * var(--bt, 18px));
-  width: var(--bt, 18px);
-  border-radius: 0 2px 2px 0;
-  background-color: #e7dcc4;
-  background-image:
-    linear-gradient(90deg, rgba(35, 26, 12, 0.30), rgba(35, 26, 12, 0) 24%, rgba(35, 26, 12, 0) 72%, rgba(35, 26, 12, 0.20) 100%),
-    repeating-linear-gradient(90deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.18) 1.4px, rgba(120, 98, 60, 0.18) 1.7px);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), inset 0 -1px 2px rgba(120, 100, 70, 0.20);
-}
-
-/* Head — top edge. */
-.book-edge-top {
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  top: calc(-1 * var(--bt, 18px));
-  height: var(--bt, 18px);
-  background-color: #d8ccb3;
-  background-image:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.05) 60%),
-    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.14) 1.4px, rgba(120, 98, 60, 0.14) 1.7px);
-}
-
-/* Tail — bottom edge. */
-.book-edge-bottom {
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  bottom: calc(-1 * var(--bt, 18px));
-  height: var(--bt, 18px);
-  background-color: #cdc1a7;
-  background-image:
-    linear-gradient(0deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.08) 60%),
-    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.12) 1.4px, rgba(120, 98, 60, 0.12) 1.7px);
-}
-
-/* Spine — bound left edge (colour set per book via inline style) */
-.book-spine-face {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(-1 * var(--bt, 18px));
-  width: var(--bt, 18px);
-  border-radius: 2px 0 0 2px;
-  box-shadow: inset 4px 0 8px rgba(0, 0, 0, 0.45), inset -2px 0 5px rgba(255, 255, 255, 0.06);
-}
-
-/* Spine sheen + a hint of raised binding bands */
-.book-spine-face::after {
+/* 3D book thickness — right edge (pages side) */
+.book-cover::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.40) 0%, transparent 24%, transparent 76%, rgba(255, 255, 255, 0.12) 100%);
+  top: 2px;
+  bottom: 2px;
+  right: -8px;
+  width: 8px;
+  background: repeating-linear-gradient(
+    180deg,
+    #e8e2d8 0px,
+    #d4cec4 1px,
+    #e8e2d8 2px,
+    #d8d2c8 3px
+  );
+  border-radius: 0 2px 2px 0;
+  transform: rotateY(90deg);
+  transform-origin: left center;
 }
 
-/* Back cover */
-.book-back {
+/* 3D book thickness — bottom edge */
+.book-cover::after {
+  content: "";
   position: absolute;
-  inset: 0;
-  border-radius: 2px 5px 5px 2px;
-  background: linear-gradient(135deg, #2c2722 0%, #16130f 100%);
-  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.55);
-}
-
-.book-3d-wrapper:hover {
-  transform: translateY(-4px) scale(1.03);
+  left: 2px;
+  right: 2px;
+  bottom: -8px;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    #e8e2d8 0px,
+    #d4cec4 1px,
+    #e8e2d8 2px,
+    #d8d2c8 3px
+  );
+  border-radius: 0 0 2px 2px;
+  transform: rotateX(90deg);
+  transform-origin: top center;
 }
 
 .book-3d-wrapper:hover .book-cover {
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5), 0 5px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
 }
 
 .book-spine {
@@ -397,6 +356,7 @@ html.kinora-native [class*="rounded-3xl"] {
   background: linear-gradient(135deg,
     rgba(255, 255, 255, 0.1) 0%, transparent 25%,
     transparent 75%, rgba(255, 255, 255, 0.04) 100%);
+  transition: opacity 0.3s ease;
 }
 
 .book-3d-wrapper:hover .book-gloss {
@@ -924,8 +884,8 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
 }
 
 .login-input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   color: #ffffff;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -1064,6 +1024,17 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
 
 .login-form-enter {
   animation: login-form-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Solid frosted card so the form stays legible over the moving bookshelf —
+     and isn't thinned out by native-mode translucency (not a .kinora-bg surface). */
+  padding: 30px 28px;
+  border-radius: 24px;
+  background: rgba(15, 13, 11, 0.86);
+  -webkit-backdrop-filter: blur(34px) saturate(135%);
+  backdrop-filter: blur(34px) saturate(135%);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 30px 80px -18px rgba(0, 0, 0, 0.82);
 }
 
 @keyframes login-form-fade-in {
