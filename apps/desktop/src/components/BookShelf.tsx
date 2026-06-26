@@ -169,6 +169,12 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
         )}
         <motion.div
           ref={scrollRef}
+          // Keyboard-focusable scroll region (axe scrollable-region-focusable): the
+          // row is reachable by Tab + arrow-scrollable, and its BookCards are
+          // themselves focusable controls.
+          tabIndex={0}
+          role="group"
+          aria-label={`${title} books, scrollable`}
           className="flex gap-4 overflow-x-auto hide-scrollbar px-1 pb-3 select-none"
           style={{ cursor: "grab" }}
           onMouseDown={handleMouseDown}

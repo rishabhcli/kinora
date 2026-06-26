@@ -140,9 +140,11 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
               aria-pressed={active}
               className="rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors"
               style={{
-                background: active ? "rgba(212,164,78,0.9)" : "rgba(255,255,255,0.06)",
-                color: active ? "#1a1408" : "rgba(232,226,216,0.82)",
-                border: "0.5px solid rgba(255,255,255,0.12)",
+                // Darker inactive chip + near-opaque cream text clears WCAG AA 4.5:1
+                // (the prior translucent-white bg + 0.82 alpha failed axe color-contrast).
+                background: active ? "rgba(212,164,78,0.95)" : "rgba(18,16,12,0.66)",
+                color: active ? "#1a1408" : "rgba(236,231,223,0.96)",
+                border: "0.5px solid rgba(255,255,255,0.14)",
               }}
             >
               {c}

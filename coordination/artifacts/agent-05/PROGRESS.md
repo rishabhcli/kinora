@@ -1,42 +1,39 @@
-# Agent 05 — live progress checklist (cross-iteration memory for the Ralph loop)
+# Agent 05 — live progress (cross-iteration memory for the Ralph loop)
 
-> Read this first each iteration. `git log --oneline agent/05-library` is the other
-> source of truth. **My branch is MERGED with overnight/integration** (all 11 agents).
+> Read first. `git log --oneline agent/05-library`. Branch MERGED with overnight/integration.
 
-## Environment (verified)
-- Worktree `../kinora-a05` on `agent/05-library`. Worktree venv `backend/.venv` (imports worktree app).
-- Data plane (Docker singleton): postgres@**55432** (override remaps; NOT 5433), redis@6379, minio@9000.
-- backend/.env (gitignored) points host→55432. Run API/scripts from the worktree venv.
-- Integration tests: `KINORA_TEST_DATABASE_URL=...@localhost:55432/kinora_conflict_test`,
-  `KINORA_TEST_REDIS_URL=redis://localhost:6379/15`, `KINORA_TEST_S3_ENDPOINT_URL=http://localhost:9000`.
-  (Reset test schema if a column is added: `DROP SCHEMA public CASCADE; CREATE SCHEMA public; CREATE EXTENSION vector;`)
-- Alembic head: `e843aa7682b2` (my cover_key, merged, single head). DB at head.
-- An **Agent 12 captain** session continuously merges agents → overnight/integration.
+## Environment
+- Worktree `../kinora-a05`, venv `backend/.venv`. Data plane: postgres@**55432**, redis@6379, minio@9000.
+- backend/.env → host 55432. Test env: KINORA_TEST_DATABASE_URL=...@55432/kinora_conflict_test,
+  _REDIS_URL=redis://localhost:6379/15, _S3_ENDPOINT_URL=http://localhost:9000.
+- Alembic head e843aa7682b2 (cover_key). Captain (A12) continuously merges agents.
 
-## DONE ✅
-- WS2a cover_key (model+repo+migration e843aa7682b2, round-trips) — merged.
-- WS2b/c cover_url on BookResponse + GET /books/{id}/cover (routes/library.py, registered) — merged.
-- WS1 catalog: app/library/catalog.py + assets/books/catalog.json (130 books, 12 genres) — merged.
-- WS2d covers: app/library/covers.py (OpenLibrary→Google HD + typographic fallback + upscaler).
-- WS1 seeder: scripts/seed_library_100.py + seed_public_domain_direct.py (engine) — zero-spend,
-  idempotent, bounded shots, sets cover_key. Downloader improved (cache-mirror first, 30s, retry).
-- WS3 UploadBook.tsx (drag-drop + validation + polling + announce()).
-- WS4 LibraryPage rebuilt (real backend, search/genre/sort/shelves, <main>), BookCard genre tag + kbd.
-- lib/api/library.ts + data/catalog.ts. data/books.ts +genre?/era?.
-- Merged overnight/integration (all agents). a11y audit from A6 addressed.
-- 22 backend tests pass (test_api_library/covers/catalog). My lane ruff+mypy CLEAN.
-- Frontend `typecheck && build` GREEN (post-merge). DoD2 ✅.
+## Gate status
+- `make test` → **533 passed, 0 failed** ✅
+- `pnpm --filter @kinora/desktop typecheck && build` → ✅
+- My lane `ruff` + `mypy` → CLEAN ✅
+- `make lint` → ❌ blocked by 3 **sibling** mypy errors (A7 test_optim_cache, A1 test_render_continuity_qa),
+  pre-existing on integration. Flagged: coordination/requests/agent-12-from-05.md. NOT my lane — captain to clear.
 
-## REMAINING
-- [ ] **Seed ≥100 books** into live DB (DoD3). Run: `backend/.venv/bin/python backend/scripts/seed_library_100.py`
-      (idempotent; ~6 seeded already; downloader now faster). Verify `select count(*) from books`.
-- [ ] **Screenshots**: populated library + EPUB upload → coordination/artifacts/agent-05/.
-      Need API (run from venv: `uvicorn app.main:app`) + the desktop renderer / Playwright.
-- [ ] **make lint green**: BLOCKED by 3 pre-existing sibling mypy errors (A7 test_optim_cache,
-      A1 test_render_continuity_qa) — flagged to captain (requests/agent-12-from-05.md). NOT my lane.
-- [ ] **make test green**: run full suite once seed/infra stable (my 22 pass).
-- [ ] Update STATUS.md + CONTRACTS finalize. Re-merge integration before final.
+## Seed (the remaining gate for ≥100 books)
+- Running in background (nohup): `backend/scripts/seed_library_100.py` → live kinora DB.
+- Downloader: mirror fallback (pglaf/aleph/www) + HTTP Range-resume + zip-validate. Gutenberg
+  throttles this IP (~12–27KB/s) so it's SLOW (~1 book/min) but reliable. ~36/130 done.
+- Check: `docker exec kinora-postgres-1 psql -U kinora -d kinora -tc "select count(*) from books where id like 'pubdom%'"`
+- If the seed died, relaunch (idempotent, cached EPUBs skip): `cd backend && nohup .venv/bin/python scripts/seed_library_100.py &`
+- Covers: mostly `openlibrary` (HD), some `generated` (typographic fallback). seed-report.json at end.
 
-## Promise gate
-Output `<promise>AGENT 05 COMPLETE</promise>` ONLY when: ≥100 books seeded + screenshots captured
-+ gates green (or sibling blockers cleared by captain). Honest — do not false-promise.
+## Screenshots / app (for re-shoot at ≥100)
+- A pre-merge `kinora-api-1` container holds :8000 (NO cover_url). So run my API on **8010**:
+  `cd backend && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010`
+- Renderer: `apps/desktop/.env.local` has `VITE_KINORA_API_URL=http://127.0.0.1:8010`; run
+  `cd apps/desktop && node_modules/.bin/vite --port 5173`.
+- Capture: `cd apps/desktop && node _a05_capture.mjs` (or coordination/artifacts/agent-05/capture.mjs).
+  Outputs 01-library.png + 02-upload.png. Temps (_a05_capture.mjs, .env.local) are UNTRACKED — don't commit.
+
+## TO FINISH (then output <promise>AGENT 05 COMPLETE</promise>)
+1. [ ] Seed ≥100 books (wait for background seed). Verify count.
+2. [ ] Re-shoot 01-library.png at ≥100 books; commit final artifacts.
+3. [ ] Re-merge overnight/integration (pick up captain's sibling-lint fix → make lint green).
+4. [ ] Confirm make lint + make test green; typecheck+build green.
+5. [ ] Output the promise ONLY when all true. Do NOT false-promise.
