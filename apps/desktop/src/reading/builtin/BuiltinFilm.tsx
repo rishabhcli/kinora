@@ -237,8 +237,9 @@ function CrossfadeFilm({
   const shownRef = useRef(false);
 
   useEffect(() => {
-    setLayers((prev) => pushSrc(prev, src, keyRef.current + 1));
-    if (src) keyRef.current += 1;
+    if (!src) return; // generating — hold the current frame on screen
+    const key = ++keyRef.current; // capture atomically so two layers never collide
+    setLayers((prev) => pushSrc(prev, src, key));
   }, [src]);
 
   const fireShown = () => {

@@ -265,12 +265,47 @@ async function scenarioLeak() {
   return { baselineKeydown, ...counters, keydownLeak: counters.keydownNet - baselineKeydown };
 }
 
+// ---- Scenario 5: rapid same-book close→reopen (P0 regression) ---------------
+// Reopening the SAME book during the exit animation must still reveal (not freeze
+// in the warm-up). Detected via the [data-warmup] overlay being gone after reopen.
+async function scenarioRapidReopen() {
+  const { ctx, page } = await newCtx("rapid-reopen");
+  await page.addInitScript(installOffline);
+  await enterDemo(page);
+  const warmupGoes = () =>
+    page
+      .waitForFunction(() => !document.querySelector("[data-warmup]"), null, { timeout: 4500 })
+      .then(() => true)
+      .catch(() => false);
+
+  await openBook(page, "Dune");
+  const revealed1 = await warmupGoes(); // first open dismisses the warm-up
+  // Close, then reopen the SAME book mid-exit (~150ms in, within the ~1s exit) so
+  // AnimatePresence interrupts the exit and reuses the instance — the P0 case.
+  await page.getByRole("button", { name: /Close reader and go back/i }).click();
+  await sleep(150);
+  await page.evaluate(() => {
+    const card = [...document.querySelectorAll("div.cursor-pointer")].find((c) => (c.textContent || "").includes("Dune"));
+    card?.click();
+  });
+  await page.waitForSelector('[role="dialog"]', { timeout: 6000 });
+  const warmupGone = await warmupGoes(); // MUST dismiss again (not freeze)
+  const rest = await page.evaluate(() => ({
+    dialog: !!document.querySelector('[role="dialog"]'),
+    videoPlaying: (() => { const v = document.querySelector("video"); return !!v && !v.paused && v.readyState >= 2; })(),
+  }));
+  await page.screenshot({ path: `${ART}/reopen-01-revealed.png` });
+  await ctx.close();
+  return { revealed1, warmupGone, ...rest };
+}
+
 const results = {};
 for (const [name, fn] of [
   ["noBackend", scenarioNoBackend],
   ["ready", scenarioReady],
   ["midIngest", scenarioMidIngest],
   ["leak", scenarioLeak],
+  ["rapidReopen", scenarioRapidReopen],
 ]) {
   try {
     results[name] = await fn();

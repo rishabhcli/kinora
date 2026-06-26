@@ -24,7 +24,21 @@ scenario stubs `/api/*` as offline.
 | **Mid-ingest open** (ANALYZING, shots delayed) | `midingest-01-warmup.png`, `midingest-02-revealed.png` | Honest warm-up progress (monotonic step checklist + crew feed) during the load, then resolves seamlessly into a playing film. |
 | **No-backend fallback** | `nobackend-01-opening.png`, `nobackend-02-playing.png`, `nobackend-03-scrolled.png` | Cover swings open → dissolves into a playing bundled film; text reads + scrubs; never a black/empty frame. |
 | **Close animation** | `close-01-closing.png` | Cover swings shut + room dissolves back to the shelf; reader's place preserved. |
+| **Rapid same-book reopen** (close→reopen mid-exit) | `reopen-01-revealed.png` | Reopening the same book *during* its exit animation still reveals (warm-up dismisses, film plays) — does not freeze. Regression test for the P0 below; verified RED without the fix, GREEN with it. |
 | **Teardown leak check** (open/close ×10) | — | `EventSource` opened **10** == closed **10**; net document keydown listeners **0**; `0` dialogs / `0` videos left mounted. |
+
+## Independent code review (fixed before sign-off)
+An independent reviewer traced every flow against React 18 StrictMode + framer-motion 12.
+Findings, all addressed:
+- **P0** — same-book reopen during the exit animation froze in the warm-up
+  (AnimatePresence reuses the instance, so the open-timer's `openedRef` never re-armed
+  → `ANIM_READY` never re-fired). Fixed: re-arm on `useIsPresent()` re-entry. Regression
+  test above (proven RED→GREEN).
+- **P1** — sequential page fetch could exceed the 7s loading safety-net on a healthy-but-slow
+  backend and wrongly downgrade to the fallback. Fixed: bounded-parallel page fetch (batches of 8).
+- **P2** (latent) — `CrossfadeFilm` minted React keys via a lazy `keyRef` read. Fixed: capture
+  the key atomically. Reviewer also explicitly cleared teardown/leak, never-black, machine
+  stuck-states, effect-ordering, and unstable-`onClose` as correct.
 
 ## DoD checklist
 - [x] `typecheck && build` green.

@@ -31,6 +31,7 @@ export function WarmUp({
 
   return (
     <motion.div
+      data-warmup
       className="absolute inset-0 z-20 grid place-items-center"
       initial={reduce ? { opacity: 1 } : { opacity: 0 }}
       animate={{ opacity: 1 }}

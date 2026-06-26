@@ -31,8 +31,13 @@ export function BuiltinBookOpenTransition({
   onOpenedRef.current = onOpened;
 
   // The open choreography completes at a known time — reveal then, regardless of
-  // whether any frame/animation callback fires. Fires exactly once.
+  // whether any frame/animation callback fires. Re-arms on (re-)entry: if a rapid
+  // same-book close→reopen interrupts the exit, AnimatePresence REUSES this
+  // instance (isPresent flips back true) — without re-arming, onOpened/ANIM_READY
+  // would never fire again and the room would freeze in the warm-up.
   useEffect(() => {
+    if (!isPresent) return; // exiting — don't arm
+    openedRef.current = false; // (re-)arm on entry / re-entry
     const ms = reduce ? 260 : 1050;
     const t = window.setTimeout(() => {
       if (!openedRef.current) {
@@ -41,7 +46,7 @@ export function BuiltinBookOpenTransition({
       }
     }, ms);
     return () => window.clearTimeout(t);
-  }, [reduce]);
+  }, [reduce, isPresent]);
 
   const noBlur = prefersReducedTransparency();
 
