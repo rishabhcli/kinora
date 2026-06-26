@@ -133,6 +133,7 @@ function NavButtons({
 }
 
 export default function Navbar({ active, onNavigate, onLogout }: { active: string; onNavigate: (page: string) => void; onLogout?: () => void }) {
+  const { reduced } = useMotion();
   const [profileOpen, setProfileOpen] = useState(false);
   const [scrollState, setScrollState] = useState<"top" | "middle" | "bottom">("top");
 
@@ -201,7 +202,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
             <button
               onClick={() => setProfileOpen(!profileOpen)}
               aria-label="Open profile menu"
-              className="w-7 h-7 rounded-full overflow-hidden border border-white/10 flex items-center justify-center transition-transform hover:scale-105"
+              className={`w-7 h-7 rounded-full overflow-hidden border border-white/10 flex items-center justify-center ${reduced ? "" : "transition-transform hover:scale-105"}`}
             >
               <GeometricAvatar size={28} />
             </button>

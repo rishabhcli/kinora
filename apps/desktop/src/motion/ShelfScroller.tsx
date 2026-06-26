@@ -270,23 +270,29 @@ export function ShelfScroller({
     }
   };
 
-  // — Wheel: vertical → horizontal, releasing to the page at the ends —
-  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (!wheelHorizontal) return;
-    const rail = railRef.current!;
-    const max = rail.scrollWidth - rail.clientWidth;
-    if (max <= 0) return;
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    const atLeft = rail.scrollLeft <= 0 && delta < 0;
-    const atRight = rail.scrollLeft >= max && delta > 0;
-    if (atLeft || atRight) return; // let the page scroll past the shelf
-    e.preventDefault();
-    cancelRaf();
-    rail.scrollLeft = Math.max(0, Math.min(max, rail.scrollLeft + delta));
-    updateEdges();
-    if (wheelStop.current) window.clearTimeout(wheelStop.current);
-    wheelStop.current = window.setTimeout(() => doSnap(0), 120);
-  };
+  // — Wheel: vertical → horizontal, releasing to the page at the ends.
+  // Attached natively as a NON-passive listener (React's onWheel is passive,
+  // so preventDefault there is a no-op) so the scroll-jack actually works. —
+  const handleWheel = useCallback(
+    (e: WheelEvent) => {
+      if (!wheelHorizontal) return;
+      const rail = railRef.current;
+      if (!rail) return;
+      const max = rail.scrollWidth - rail.clientWidth;
+      if (max <= 0) return;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const atLeft = rail.scrollLeft <= 0 && delta < 0;
+      const atRight = rail.scrollLeft >= max && delta > 0;
+      if (atLeft || atRight) return; // let the page scroll past the shelf
+      e.preventDefault();
+      cancelRaf();
+      rail.scrollLeft = Math.max(0, Math.min(max, rail.scrollLeft + delta));
+      updateEdges();
+      if (wheelStop.current) window.clearTimeout(wheelStop.current);
+      wheelStop.current = window.setTimeout(() => doSnap(0), 120);
+    },
+    [wheelHorizontal, updateEdges, doSnap],
+  );
 
   const nudge = (dir: 1 | -1) => {
     const rail = railRef.current;
@@ -294,21 +300,31 @@ export function ShelfScroller({
     glideTo(rail.scrollLeft + dir * rail.clientWidth * 0.8);
   };
 
+  // Attach listeners once (re-attach only if a handler identity changes,
+  // e.g. reduced-motion toggles). NOT keyed on `children` — a parent that
+  // builds children inline would otherwise thrash the listeners and clear
+  // the pending wheel-snap timer on every render.
   useEffect(() => {
-    updateEdges();
     const rail = railRef.current;
     if (!rail) return;
     const onScroll = () => updateEdges();
     const onResize = () => updateEdges();
     rail.addEventListener("scroll", onScroll, { passive: true });
+    rail.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("resize", onResize);
     return () => {
       rail.removeEventListener("scroll", onScroll);
+      rail.removeEventListener("wheel", handleWheel);
       window.removeEventListener("resize", onResize);
       cancelRaf();
       if (wheelStop.current) window.clearTimeout(wheelStop.current);
     };
-  }, [updateEdges, children]);
+  }, [updateEdges, handleWheel]);
+
+  // Recompute edge state when the content changes (no listener churn).
+  useEffect(() => {
+    updateEdges();
+  }, [children, updateEdges]);
 
   return (
     <div className={`relative ${className ?? ""}`} style={style}>
@@ -336,7 +352,6 @@ export function ShelfScroller({
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        onWheel={onWheel}
       >
         {children}
       </div>

@@ -161,6 +161,12 @@
     background-color var(--mo-t-base) var(--mo-ease-glide);
 }
 
+/* Looping affordances — apply the keyframes via these CLASSES (not inline
+   `animation` with a hardcoded duration) so the reduced-motion law reaches
+   them. A travelling sheen for skeletons; a soft attention pulse. */
+.mo-shimmer { animation: mo-shimmer 1.5s var(--mo-ease-glide) infinite; }
+.mo-pulse { animation: mo-pulse 2s var(--mo-ease-glide) infinite; }
+
 /* Horizontal depth-of-field for shelves: covers dissolve toward the
    row edges so the rail reads as receding into space. */
 .mo-edge-fade-x {
@@ -230,7 +236,11 @@
   .mo-press:active:not(:disabled),
   .mo-press-soft:active:not(:disabled) { transform: none; }
   .mo-tilt-glare { display: none; }
-  [class*="mo-"] {
+  /* Neutralise looping motion-system animations. Scope to classes that START
+     with `mo-` (or are space-separated `mo-…`) — a bare [class*="mo-"] also
+     hits unrelated names like `promo-card` / `demo-banner`. */
+  [class^="mo-"],
+  [class*=" mo-"] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }

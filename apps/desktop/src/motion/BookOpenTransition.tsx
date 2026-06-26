@@ -52,7 +52,12 @@ export interface BookOpenTransitionProps {
   children: (opened: boolean) => ReactNode;
 }
 
-type Phase = "idle" | "travel" | "open" | "close";
+type Phase = "idle" | "travel" | "settle" | "open" | "close";
+
+// How long the clone parks (opaque) over the freshly-mounted room before
+// fading. The room's heavy mount (big tree + first video decode) happens
+// during this STATIC hold — nothing is animating, so the stall is invisible.
+const SETTLE_MS = 240;
 
 const COVER_RADIUS = "3px 8px 8px 3px"; // matches the reading room's cover
 
@@ -71,7 +76,10 @@ export function BookOpenTransition({
 
   // Drive the phase machine off the `open` boolean.
   useEffect(() => {
-    if (open && phase === "idle") {
+    // Start (or RESTART from a close-in-flight, so re-tapping a book mid-close
+    // isn't dropped — otherwise `open` stays true, the effect never re-fires,
+    // and the room is stuck blank).
+    if (open && (phase === "idle" || phase === "close")) {
       origin.current = originRect ?? heroCoverRect();
       hero.current = heroCoverRect();
       if (reduced) {
@@ -80,7 +88,7 @@ export function BookOpenTransition({
       } else {
         setPhase("travel");
       }
-    } else if (!open && (phase === "open" || phase === "travel")) {
+    } else if (!open && phase !== "idle" && phase !== "close") {
       if (reduced) {
         setPhase("idle");
         onClosed?.();
@@ -93,8 +101,22 @@ export function BookOpenTransition({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const opened = phase === "open" || phase === "close";
-  const showClone = phase === "travel" || phase === "close";
+  // Settle: the room is mounted (and warming up) while the clone holds still
+  // and opaque on top. Once it has had a beat to paint, fade the clone.
+  useEffect(() => {
+    if (phase !== "settle") return;
+    const id = window.setTimeout(() => {
+      setPhase("open");
+      onOpened?.();
+    }, SETTLE_MS);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // Room mounts at settle (covered by the static clone), stays through close.
+  const opened = phase === "settle" || phase === "open" || phase === "close";
+  // Clone is on screen while travelling, holding (settle), or returning.
+  const showClone = phase === "travel" || phase === "settle" || phase === "close";
 
   const flip =
     origin.current && hero.current
@@ -150,14 +172,14 @@ export function BookOpenTransition({
                 willChange: "transform, opacity",
               }}
               initial={
-                phase === "travel"
-                  ? { x: flip.x, y: flip.y, scale: flip.scale, opacity: 1 }
-                  : { x: 0, y: 0, scale: 1, opacity: 0 }
+                phase === "close"
+                  ? { x: 0, y: 0, scale: 1, opacity: 0 }
+                  : { x: flip.x, y: flip.y, scale: flip.scale, opacity: 1 }
               }
               animate={
-                phase === "travel"
-                  ? { x: 0, y: 0, scale: 1, opacity: 1 }
-                  : { x: flip.x, y: flip.y, scale: flip.scale, opacity: 1 }
+                phase === "close"
+                  ? { x: flip.x, y: flip.y, scale: flip.scale, opacity: 1 }
+                  : { x: 0, y: 0, scale: 1, opacity: 1 }
               }
               transition={
                 phase === "close"
@@ -165,10 +187,10 @@ export function BookOpenTransition({
                   : cloneTransition
               }
               onAnimationComplete={() => {
-                if (phase === "travel") {
-                  setPhase("open");
-                  onOpened?.();
-                } else if (phase === "close") {
+                // travel → park over the mounting room (settle); the timer
+                // takes it to `open`. close → tell the consumer to drop the book.
+                if (phase === "travel") setPhase("settle");
+                else if (phase === "close") {
                   setPhase("idle");
                   onClosed?.();
                 }
