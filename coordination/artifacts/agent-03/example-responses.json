@@ -1,0 +1,112 @@
+{
+  "_note": "Concrete examples of the Agent-03 film contract (CONTRACTS.md §Agent-03). Field names/types are exactly what the backend emits and what films.ts declares — no adapter.",
+
+  "GET /api/books/{book_id}/events": {
+    "book_id": "book_42",
+    "url_ttl_s": 3600,
+    "events": [
+      {
+        "event_id": "scene_005",
+        "event_index": 5,
+        "book_id": "book_42",
+        "page_start": 12,
+        "page_end": 13,
+        "word_range": [4501, 4620],
+        "stitched": true,
+        "oss_url": "http://localhost:9000/kinora/clips/book_42/scene_005.mp4",
+        "url_expires_at": "2026-06-26T13:30:00+00:00",
+        "duration_s": 8.0,
+        "shot_count": 2,
+        "sync_map": {
+          "scene_id": "scene_005",
+          "duration_s": 8.0,
+          "segments": [
+            {
+              "shot_id": "shot_00042",
+              "scene_id": "scene_005",
+              "word_range": [4501, 4530],
+              "t_start_s": 0.0,
+              "t_end_s": 5.0,
+              "page": 12,
+              "page_turn_at_s": 4.8,
+              "words": [
+                { "word_index": 4501, "text": "She", "t_start": 0.1, "t_end": 0.32, "bbox": [0.12, 0.34, 0.04, 0.02] },
+                { "word_index": 4502, "text": "stood", "t_start": 0.32, "t_end": 0.61, "bbox": [0.17, 0.34, 0.06, 0.02] }
+              ]
+            },
+            {
+              "shot_id": "shot_00043",
+              "scene_id": "scene_005",
+              "word_range": [4531, 4620],
+              "t_start_s": 5.0,
+              "t_end_s": 8.0,
+              "page": 13,
+              "page_turn_at_s": 7.8,
+              "words": [
+                { "word_index": 4531, "text": "He", "t_start": 5.0, "t_end": 5.4, "bbox": null }
+              ]
+            }
+          ]
+        },
+        "scenes": [
+          { "scene_id": "scene_005", "scene_index": 5, "word_range": [4501, 4620], "stitched": true, "duration_s": 8.0 }
+        ]
+      },
+      {
+        "event_id": "scene_006",
+        "event_index": 6,
+        "book_id": "book_42",
+        "page_start": 14,
+        "page_end": 14,
+        "word_range": [4621, 4700],
+        "stitched": false,
+        "oss_url": null,
+        "url_expires_at": null,
+        "duration_s": null,
+        "shot_count": 0,
+        "sync_map": { "scene_id": "scene_006", "duration_s": 0.0, "segments": [] },
+        "scenes": [
+          { "scene_id": "scene_006", "scene_index": 6, "word_range": [4621, 4700], "stitched": false, "duration_s": null }
+        ]
+      }
+    ],
+    "restore": {
+      "session_id": "sess_abc123",
+      "focus_word": 4540,
+      "current_event_index": 5,
+      "current_scene_id": "scene_005",
+      "mode": "viewer"
+    }
+  },
+
+  "GET /api/books/{book_id}/scenes/{scene_id}/film": {
+    "scene_id": "scene_005",
+    "event_id": "scene_005",
+    "book_id": "book_42",
+    "scene_index": 5,
+    "event_index": 5,
+    "page_start": 12,
+    "page_end": 13,
+    "word_range": [4501, 4620],
+    "stitched": true,
+    "oss_url": "http://localhost:9000/kinora/clips/book_42/scene_005.mp4",
+    "url_expires_at": "2026-06-26T13:30:00+00:00",
+    "duration_s": 8.0,
+    "shot_count": 2,
+    "sync_map": { "scene_id": "scene_005", "duration_s": 8.0, "segments": ["…as above…"] }
+  },
+
+  "SSE scene_stitched (rides Agent 12's session stream, §5.6)": {
+    "event": "scene_stitched",
+    "scene_id": "scene_005",
+    "oss_url": "http://localhost:9000/kinora/clips/book_42/scene_005.mp4",
+    "sync_map": { "scene_id": "scene_005", "duration_s": 8.0, "segments": ["…FilmSyncSegment[]…"] }
+  },
+
+  "SSE event_stitched (event-level rollup; event == scene today)": {
+    "event": "event_stitched",
+    "event_id": "scene_005",
+    "oss_url": "http://localhost:9000/kinora/clips/book_42/scene_005.mp4",
+    "sync_map": { "scene_id": "scene_005", "duration_s": 8.0, "segments": ["…FilmSyncSegment[]…"] }
+  }
+}
