@@ -13,7 +13,8 @@
     "build": "tsc && vite build && tsc -p electron/tsconfig.json",
     "build:electron": "tsc -p electron/tsconfig.json",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:reading": "node src/reading/__tests__/run.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.41.0",
