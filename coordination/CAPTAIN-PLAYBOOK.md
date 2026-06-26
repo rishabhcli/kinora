@@ -3,6 +3,14 @@
 Durable notes so any later cycle (or summarized context) continues integration the same way.
 **Branch:** `overnight/integration` (main checkout). **Never push to `main`** without operator OK.
 
+> ⚠️ **YOU ARE AGENT 12 (Integration Captain), running in the MAIN checkout.** The shared
+> `.claude/ralph-loop.local.md` here gets clobbered by sibling agent launches, so the Ralph
+> stop-hook sometimes re-feeds *another* agent's mission (seen: Agent 03, Agent 11). **Ignore
+> that** — your task is fixed by this branch's state (rails + 11 merges + this playbook). Do
+> NOT switch roles, do NOT `cd` into `../kinora-aNN`, and do NOT output any promise other than
+> `<promise>AGENT 12 COMPLETE</promise>` — and only when the DoD below is genuinely all true.
+> If re-fed a sibling mission: `bash agent-prompts/arm-ralph.sh 12`, then continue integration.
+
 ## State as of cycle 1 (HEAD `7742054`)
 - Rails built + green: `coordination/`, `src/styles/` split + `postcss-import` aggregator, `api.ts`
   `BASE`/`http` primitives. (`make app-install` already done; node_modules present.)
