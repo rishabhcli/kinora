@@ -38,7 +38,7 @@ import asyncio
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import anyio
 from pydantic import BaseModel, ConfigDict, Field
@@ -51,12 +51,16 @@ from app.render.degrade import (
     DEFAULT_FPS,
     FILM_SIZE,
     audio_text_card,
+    inspect,
     ken_burns_over_image,
     zoom_for_camera,
 )
 from app.render.stitch import SceneSyncMap, concat_clips, merge_sync_segments
 from app.render.sync_map import SyncSegment, build_sync_segment
 from app.storage.object_store import keys
+
+if TYPE_CHECKING:
+    from app.render.continuity_qa import EventContinuityReport
 
 logger = get_logger("app.render.event_director")
 
@@ -192,8 +196,10 @@ def camera_for_ordinal(ordinal: int, total: int, beat: Beat) -> Camera:
     rule) refines.
     """
     mood = f"{_lower(beat.mood)} {_lower(beat.summary)}"
-    speed = "fast" if any(c in mood for c in _FAST_CUES) else (
-        "slow" if any(c in mood for c in _SLOW_CUES) else "medium"
+    speed = (
+        "fast"
+        if any(c in mood for c in _FAST_CUES)
+        else ("slow" if any(c in mood for c in _SLOW_CUES) else "medium")
     )
     if ordinal == 0:
         return Camera(move="push_in", speed=speed, shot_size="wide")
@@ -205,9 +211,7 @@ def camera_for_ordinal(ordinal: int, total: int, beat: Beat) -> Camera:
 def _has_locked_character(canon: CanonSlice | None) -> bool:
     if canon is None:
         return False
-    return any(
-        any(ref.locked for ref in c.reference_images) for c in canon.characters
-    )
+    return any(any(ref.locked for ref in c.reference_images) for c in canon.characters)
 
 
 def _wardrobe_from_canon(canon: CanonSlice | None) -> str | None:
@@ -387,6 +391,8 @@ class EventRenderResult:
     clip_key: str | None = None
     clip_url: str | None = None
     last_frame_keys: dict[str, str] = field(default_factory=dict)
+    #: The deterministic seam-continuity verdict for the stitched event (WS3).
+    continuity: EventContinuityReport | None = None
 
 
 class EventShotRenderer(Protocol):
@@ -405,9 +411,7 @@ class KenBurnsEventRenderer:
     push (``zoom_for_camera``); a shot with no still drops to the audio/text card.
     """
 
-    def __init__(
-        self, *, film_size: tuple[int, int] = FILM_SIZE, fps: int = DEFAULT_FPS
-    ) -> None:
+    def __init__(self, *, film_size: tuple[int, int] = FILM_SIZE, fps: int = DEFAULT_FPS) -> None:
         self._film_size = film_size
         self._fps = fps
 
@@ -524,6 +528,7 @@ class EventDirector:
             lambda: concat_clips(clips, size=self._film_size, fps=self._fps)
         )
         sync_map = merge_sync_segments(segments, scene_id=script.event_id, durations=durations)
+        continuity = await self._score_continuity(script, rendered)
 
         clip_key, clip_url, last_frame_keys = await self._persist(script, clip_bytes, rendered)
 
@@ -548,7 +553,28 @@ class EventDirector:
             clip_key=clip_key,
             clip_url=clip_url,
             last_frame_keys=last_frame_keys,
+            continuity=continuity,
         )
+
+    async def _score_continuity(
+        self, script: EventScript, rendered: Sequence[RenderedShot]
+    ) -> EventContinuityReport:
+        """Probe each shot's geometry and score the event's seam continuity (WS3)."""
+        # Local import breaks the cycle (continuity_qa builds on this module's models).
+        from app.render.continuity_qa import ShotGeometry, score_event_continuity
+
+        geometries: list[ShotGeometry] = []
+        for shot_result in rendered:
+            info = await anyio.to_thread.run_sync(inspect, shot_result.clip_bytes)
+            geometries.append(
+                ShotGeometry(
+                    shot_id=shot_result.shot_id,
+                    width=info.width or 0,
+                    height=info.height or 0,
+                    duration_s=shot_result.duration_s,
+                )
+            )
+        return score_event_continuity(script, geometries, film_size=self._film_size)
 
     async def _persist(
         self, script: EventScript, clip_bytes: bytes, rendered: Sequence[RenderedShot]

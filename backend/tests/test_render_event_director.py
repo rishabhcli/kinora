@@ -156,8 +156,7 @@ def test_plan_event_script_first_shot_continues_from_prior_event_endpoint() -> N
 
 def test_plan_event_script_caps_shots_at_max() -> None:
     beats = [
-        Beat(beat_id=f"b{i}", scene_id="s", beat_index=i, summary=f"beat {i}")
-        for i in range(9)
+        Beat(beat_id=f"b{i}", scene_id="s", beat_index=i, summary=f"beat {i}") for i in range(9)
     ]
     script = plan_event_script(
         event_id="evt", book_id="book_demo", scene_id="s", beats=beats, max_shots=6
@@ -256,3 +255,11 @@ async def test_event_director_stitches_three_ken_burns_into_one_vertical_film() 
     assert len(result.last_frame_keys) == 3
     for shot in script.shots:
         assert store.exists(keys.lastframe("book_demo", shot.shot_id))
+
+    # The integrated continuity QA passes: uniform vertical geometry, chained
+    # modes, explicit hand-offs → no seam needs repair.
+    from app.render.continuity_qa import SeamRepair
+
+    assert result.continuity is not None
+    assert result.continuity.ok is True
+    assert result.continuity.action == SeamRepair.ACCEPT
