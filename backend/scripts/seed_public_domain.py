@@ -14,7 +14,6 @@ from __future__ import annotations
 import os
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 import httpx
@@ -26,9 +25,11 @@ PASSWORD = os.environ.get("KINORA_DEMO_PASSWORD", "demo-password-123")
 # (gutenberg_id, title, author, art_direction) — shortest complete works first
 # so at least the early ones finish quickly even if the image quota throttles.
 BOOKS = [
-    (1952, "The Yellow Wallpaper", "Charlotte Perkins Gilman", "painterly gothic, muted candlelight"),
+    (1952, "The Yellow Wallpaper", "Charlotte Perkins Gilman",
+     "painterly gothic, muted candlelight"),
     (5200, "The Metamorphosis", "Franz Kafka", "surreal muted, uneasy shadows"),
-    (43, "The Strange Case of Dr Jekyll and Mr Hyde", "Robert Louis Stevenson", "victorian noir, gaslit fog"),
+    (43, "The Strange Case of Dr Jekyll and Mr Hyde", "Robert Louis Stevenson",
+     "victorian noir, gaslit fog"),
     (46, "A Christmas Carol", "Charles Dickens", "warm victorian, snow and hearthlight"),
     (11, "Alice's Adventures in Wonderland", "Lewis Carroll", "whimsical storybook, dreamlike"),
 ]
@@ -47,7 +48,10 @@ def download(gid: int) -> Path | None:
     ):
         print(f"download {url}", flush=True)
         try:
-            with httpx.Client(follow_redirects=True, timeout=180.0, headers={"User-Agent": "Mozilla/5.0 (Kinora seed)"}) as dc:
+            with httpx.Client(
+                follow_redirects=True, timeout=180.0,
+                headers={"User-Agent": "Mozilla/5.0 (Kinora seed)"},
+            ) as dc:
                 r = dc.get(url)
                 r.raise_for_status()
             if len(r.content) < 20000:
@@ -101,7 +105,11 @@ def main() -> int:
                     print(f"  poll error: {e}", flush=True)
                     continue
                 status = b.get("status", "?")
-                print(f"  {title}: status={status} progress={b.get('progress')} stage={b.get('stage')}", flush=True)
+                print(
+                    f"  {title}: status={status} progress={b.get('progress')} "
+                    f"stage={b.get('stage')}",
+                    flush=True,
+                )
                 if status in ("ready", "failed"):
                     break
             results.append((title, status))
