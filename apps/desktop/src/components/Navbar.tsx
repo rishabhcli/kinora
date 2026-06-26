@@ -53,18 +53,24 @@ const SearchIcon = ({ size = 15 }: { size?: number }) => (
   </svg>
 );
 
-export const GeometricAvatar = ({ size = 34 }: { size?: number }) => (
+export const GeometricAvatar = ({ size = 34, ring = false }: { size?: number; ring?: boolean }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
     <defs>
       <linearGradient id="avatarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#c8c4be" />
-        <stop offset="100%" stopColor="#7a7570" />
+        <stop offset="0%" stopColor="#d4c5a9" />
+        <stop offset="100%" stopColor="#8b7355" />
       </linearGradient>
+      {ring && (
+        <linearGradient id="avatarRing" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgba(212,164,78,0.6)" />
+          <stop offset="100%" stopColor="rgba(212,164,78,0.15)" />
+        </linearGradient>
+      )}
     </defs>
-    <circle cx="20" cy="20" r="19" fill="url(#avatarGrad)" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-    <path d="M20 7L33 20L20 33L7 20z" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
-    <circle cx="20" cy="16" r="4" fill="rgba(255,255,255,0.6)" />
-    <path d="M12 28c0-4.5 3.5-7 8-7s8 2.5 8 7" fill="rgba(255,255,255,0.4)" />
+    <circle cx="20" cy="20" r="19" fill="url(#avatarGrad)" stroke={ring ? "url(#avatarRing)" : "rgba(255,255,255,0.12)"} strokeWidth={ring ? 1.5 : 0.5} />
+    <path d="M20 7L33 20L20 33L7 20z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+    <circle cx="20" cy="16" r="4" fill="rgba(255,255,255,0.55)" />
+    <path d="M12 28c0-4.5 3.5-7 8-7s8 2.5 8 7" fill="rgba(255,255,255,0.35)" />
   </svg>
 );
 
@@ -211,82 +217,85 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
 
         {/* Profile dropdown */}
         {profileOpen && (
-          <div
-            className="absolute top-12 right-6 w-60 rounded-2xl overflow-hidden z-[60]"
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-12 right-6 w-64 rounded-2xl overflow-hidden z-[60]"
             style={{
-              background: "rgba(22, 20, 18, 0.98)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
-              animation: "mo-dropdown-in var(--mo-t-fast) var(--mo-ease-emphasized) both",
+              background: "rgba(20, 18, 16, 0.96)",
+              border: "1px solid rgba(212, 164, 78, 0.12)",
+              boxShadow: "0 16px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.03)",
             }}
           >
-            {/* Header */}
+            {/* Header with gradient */}
             <div
-              className="flex items-center gap-3 px-4 py-3"
-              style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+              className="relative px-4 py-3.5"
+              style={{
+                background: "linear-gradient(135deg, rgba(212,164,78,0.08) 0%, transparent 100%)",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+              }}
             >
-              <GeometricAvatar size={32} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-kinora-text truncate">User</p>
-                <p className="text-[10px] text-kinora-muted truncate">user@kinora.app</p>
+              <div className="flex items-center gap-3">
+                <div className="relative" style={{ filter: "drop-shadow(0 2px 8px rgba(212,164,78,0.2))" }}>
+                  <GeometricAvatar size={36} ring />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-kinora-text truncate">User</p>
+                  <p className="text-[10px] text-kinora-muted truncate">user@kinora.app</p>
+                </div>
               </div>
             </div>
 
             {/* Menu items */}
-            <div className="py-1">
-              <button
-                onClick={() => { onNavigate("Edit Profile"); setProfileOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-kinora-muted hover:text-kinora-text hover:bg-white/[0.03] transition-colors"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 12.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
-                  <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-                </svg>
-                <span className="flex-1 text-left">Edit Profile</span>
-              </button>
-              <button
-                onClick={() => { onNavigate("Settings"); setProfileOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-kinora-muted hover:text-kinora-text hover:bg-white/[0.03] transition-colors"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
-                </svg>
-                <span className="flex-1 text-left">Settings</span>
-              </button>
-              <button
-                onClick={() => { onNavigate("Pricing"); setProfileOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-kinora-muted hover:text-kinora-text hover:bg-white/[0.03] transition-colors"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-                <span className="flex-1 text-left">Pricing</span>
-              </button>
+            <div className="py-1.5">
+              {[
+                { label: "Edit Profile", icon: <path d="M12 12.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />, icon2: <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />, action: () => { onNavigate("Edit Profile"); setProfileOpen(false); } },
+                { label: "Settings", icon: <circle cx="12" cy="12" r="3" />, icon2: <path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />, action: () => { onNavigate("Settings"); setProfileOpen(false); } },
+                { label: "Pricing", icon: <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />, icon2: null, action: () => { onNavigate("Pricing"); setProfileOpen(false); } },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={item.action}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-kinora-muted transition-all duration-200 group"
+                  style={{ borderRadius: 0 }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="transition-colors duration-200 group-hover:text-[rgba(212,164,78,0.9)]">
+                    {item.icon}
+                    {item.icon2}
+                  </svg>
+                  <span className="flex-1 text-left transition-colors duration-200 group-hover:text-kinora-text">{item.label}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="opacity-0 group-hover:opacity-40 transition-opacity duration-200">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              ))}
             </div>
 
-            {/* Divider + Log Out */}
-            <div className="h-px mx-3" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
-            <div className="py-1">
+            {/* Divider */}
+            <div className="h-px mx-4" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)" }} />
+
+            {/* Log Out */}
+            <div className="py-1.5">
               <button
                 onClick={() => { setProfileOpen(false); onLogout?.(); }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-white/[0.03] transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-red-400/60 hover:text-red-400 transition-all duration-200 group"
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200 group-hover:translate-x-[-1px]">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <path d="M16 17l5-5-5-5M21 12H9" />
                 </svg>
                 <span className="flex-1 text-left">Log Out</span>
               </button>
             </div>
-          </div>
+          </motion.div>
         )}
       </header>
 
       {/* Floating dock — appears at bottom when scrolling through middle of page */}
       {showDock && (
       <div
-        className="fixed z-50 liquid-glass-dock"
+        className="fixed z-50"
         style={{
           position: "fixed",
           bottom: 28,
@@ -294,6 +303,9 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
           transform: `translateX(-50%) translateY(${dockVisible ? 0 : 120}px)`,
           borderRadius: "999px",
           padding: "5px 7px",
+          background: "rgba(15, 14, 12, 0.92)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          boxShadow: "0 8px 32px -8px rgba(0, 0, 0, 0.6)",
           opacity: dockVisible ? 1 : 0,
           transition: "transform var(--mo-t-slow) var(--mo-ease-emphasized), opacity var(--mo-t-base) var(--mo-ease-glide)",
           pointerEvents: dockVisible ? "auto" : "none",

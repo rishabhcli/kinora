@@ -133,7 +133,7 @@ export function BookOpenTransition({
       <motion.div
         animate={{ opacity: phase === "close" ? 0 : 1 }}
         transition={{ duration: reduced ? 0 : 0.24, ease: "linear" }}
-        style={{ position: "relative", zIndex: 1 }}
+        style={{ position: "relative", zIndex: 100 }}
       >
         {children(opened)}
       </motion.div>

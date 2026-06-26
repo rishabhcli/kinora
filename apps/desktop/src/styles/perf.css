@@ -4,10 +4,17 @@
    default profile quieter; `?cinematic=1` restores the older full-effects path. */
 
 html.kinora-balanced .home-aurora-blob {
-  filter: blur(56px);
-  opacity: 0.28;
+  filter: none !important;
+  opacity: 1;
   animation: none;
-  will-change: auto;
+  will-change: auto !important;
+  contain: strict;
+}
+html.kinora-balanced .home-aurora-blob--gold {
+  background: radial-gradient(circle, rgba(212,164,78,0.055) 0%, transparent 65%);
+}
+html.kinora-balanced .home-aurora-blob--amber {
+  background: radial-gradient(circle, rgba(180,130,60,0.05) 0%, transparent 65%);
 }
 
 html.kinora-balanced .ambient-mote,
@@ -38,40 +45,82 @@ html.kinora-balanced .shelf-rail--right {
 
 html.kinora-balanced .auth-card,
 html.kinora-balanced .login-form-enter {
-  -webkit-backdrop-filter: blur(18px) saturate(120%);
-  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  backdrop-filter: blur(8px) saturate(120%);
 }
 
 html.kinora-balanced .glass-card,
 html.kinora-balanced .glass-input,
 html.kinora-balanced .liquid-glass-dock,
-html.kinora-balanced .footer-glass,
 html.kinora-balanced .surface-frosted {
-  -webkit-backdrop-filter: blur(8px) saturate(140%) brightness(1.03);
-  backdrop-filter: blur(8px) saturate(140%) brightness(1.03);
+  -webkit-backdrop-filter: blur(4px) saturate(130%);
+  backdrop-filter: blur(4px) saturate(130%);
 }
 
-html.kinora-balanced .glass-control,
-html.kinora-balanced button:not([class*="from-"]):not([class*="gradient"]),
-html.kinora-balanced [role="button"],
-html.kinora-balanced a[class*="rounded"],
-html.kinora-balanced input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-html.kinora-balanced select,
-html.kinora-balanced [class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(img):not(video) {
-  -webkit-backdrop-filter: blur(6px) saturate(135%) brightness(1.02);
-  backdrop-filter: blur(6px) saturate(135%) brightness(1.02);
+html.kinora-balanced .footer-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgb(var(--k-bg-rgb) / 0.88);
+}
+
+html.kinora-balanced .glass-card,
+html.kinora-balanced .liquid-glass-dock {
+  border: none;
+  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.5);
+}
+
+html.kinora-balanced .glass-card:focus-visible,
+html.kinora-balanced .liquid-glass-dock:focus-visible,
+html.kinora-balanced .liquid-glass-dock button:focus-visible {
+  outline: none !important;
+}
+
+html.kinora-balanced .glass-control {
+  -webkit-backdrop-filter: blur(3px) saturate(130%);
+  backdrop-filter: blur(3px) saturate(130%);
+}
+
+html.kinora-balanced .nav-btn-active {
+  -webkit-backdrop-filter: blur(4px) saturate(150%);
+  backdrop-filter: blur(4px) saturate(150%);
 }
 
 html.kinora-balanced .comet-glare {
-  mix-blend-mode: normal;
-  background: radial-gradient(
-    180px circle at var(--mx, 50%) var(--my, 0%),
-    rgba(255, 255, 255, 0.2) 0%,
-    rgba(232, 200, 120, 0.08) 35%,
-    transparent 62%
-  );
+  display: none;
+}
+
+html.kinora-balanced .book-gloss {
+  transition: none;
+}
+
+html.kinora-balanced .book-cover img,
+html.kinora-balanced .book-cover-inner img {
+  transition: none;
+}
+
+/* Skip rendering for offscreen shelf rows — huge win when 4+ shelves are below the fold */
+html.kinora-balanced [class*="shelf"],
+html.kinora-balanced .book-3d-wrapper {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Kill preserve-3d on book cards — only needed during hover (CometCard sets it inline).
+   This removes 20+ permanent GPU compositor layers. */
+html.kinora-balanced .book-3d-wrapper,
+html.kinora-balanced .book-cover {
+  transform-style: flat !important;
+}
+
+/* Hide the auth-enter-flash after it finishes — it stays at opacity:0 in DOM forever */
+html.kinora-balanced .auth-enter-flash {
+  display: none;
 }
 
 html.kinora-balanced .auth-grain {
   display: none;
+}
+
+html.kinora-balanced .skeleton-shimmer-overlay {
+  animation: none;
 }

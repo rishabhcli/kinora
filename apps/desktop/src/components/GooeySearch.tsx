@@ -45,18 +45,18 @@ export default function GooeySearch() {
       className="relative flex items-center"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={() => { if (!open) setOpen(true); }}
       style={{
         height: 28,
         borderRadius: "999px",
-        width: 180,
-        background: open ? "rgba(40, 38, 34, 0.85)" : "transparent",
-        boxShadow: open ? "0 2px 10px rgba(0,0,0,0.2)" : "none",
-        overflow: "hidden",
-        clipPath: open
-          ? "inset(0 0 0 0 round 999px)"
-          : "inset(0 0 0 calc(180px - 28px) round 999px)",
-        transition: "clip-path 0.35s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease, box-shadow 0.25s ease",
+        width: open ? 180 : 28,
+        background: open ? "rgba(40, 38, 34, 0.9)" : "transparent",
+        boxShadow: open ? "0 2px 12px rgba(0,0,0,0.3)" : "none",
+        transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease, box-shadow 0.25s ease",
         flexDirection: "row-reverse",
+        cursor: "pointer",
+        overflow: "hidden",
+        zIndex: 10,
       }}
     >
       {/* Search icon — always visible, right side */}
@@ -86,16 +86,18 @@ export default function GooeySearch() {
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
         placeholder="Search"
-        className="bg-transparent border-none outline-none text-[11px] flex-1"
+        className="bg-transparent border-none outline-none text-[11px] flex-1 min-w-0"
         style={{
           color: "rgba(232, 226, 216, 0.9)",
           opacity: open ? 1 : 0,
-          transition: "opacity 0.2s ease 0.1s",
+          transition: "opacity 0.2s ease 0.15s",
           whiteSpace: "nowrap",
           paddingLeft: 8,
           paddingRight: 4,
           textAlign: "left",
+          pointerEvents: open ? "auto" : "none",
         }}
       />
     </div>

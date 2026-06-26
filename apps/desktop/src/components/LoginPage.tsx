@@ -32,6 +32,16 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
       <div className="login-hero relative w-1/2 overflow-hidden">
         <div className="aurora-vignette" />
 
+        {/* Blend gradient on the right edge — fades into the login side */}
+        <div
+          className="absolute inset-y-0 right-0 pointer-events-none"
+          style={{
+            width: 120,
+            background: "linear-gradient(90deg, transparent 0%, rgba(15,14,12,0.6) 50%, rgba(15,14,12,1) 100%)",
+            zIndex: 5,
+          }}
+        />
+
         {/* Tagline content */}
         <div className="absolute inset-0 flex flex-col justify-between p-12" style={{ zIndex: 10 }}>
           <div className="flex items-center gap-3">
@@ -42,12 +52,12 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
             <h1 className="font-serif text-[44px] leading-[1.1] font-medium text-white">
               Where stories<br />come to life.
             </h1>
-            <p className="mt-5 text-[14px] leading-relaxed text-white/55">
+            <p className="mt-5 text-[14px] leading-relaxed text-white">
               Your library, reimagined as cinema. Books become films, pages become scenes — watched in the quiet of an evening.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/35">
-            <span className="inline-block h-px w-8 bg-white/35" />
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white">
+            <span className="inline-block h-px w-8 bg-white" />
             Reading, rewritten
           </div>
         </div>
@@ -55,14 +65,25 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
 
       {/* Right half — login form */}
       <div className="kinora-bg relative flex w-1/2 items-center justify-center overflow-hidden">
+        {/* Blend gradient on the left edge — fades from the hero side */}
+        <div
+          className="absolute inset-y-0 left-0 pointer-events-none"
+          style={{
+            width: 120,
+            background: "linear-gradient(270deg, transparent 0%, rgba(15,14,12,0.6) 50%, rgba(15,14,12,1) 100%)",
+            zIndex: 5,
+          }}
+        />
+
       <div
         className="login-form-enter w-full max-w-[380px] px-6"
+        style={{ position: "relative", zIndex: 10 }}
       >
         {/* Heading */}
         <h2 className="mb-1.5 text-center font-serif text-[22px] font-semibold text-white">
           {mode === "login" ? "Sign in" : "Sign up"}
         </h2>
-        <p className="mb-6 text-center text-[13px] text-kinora-muted">
+        <p className="mb-6 text-center text-[13px] text-white">
           {mode === "login"
             ? "Welcome back to your library"
             : "Start watching books as films"}
@@ -90,11 +111,11 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
 
           {mode === "login" && (
             <div className="flex items-center justify-between text-[12px]">
-              <label className="flex cursor-pointer items-center gap-2 text-kinora-muted">
-                <input type="checkbox" className="h-3.5 w-3.5 accent-kinora-muted" defaultChecked />
+              <label className="flex cursor-pointer items-center gap-2 text-white">
+                <input type="checkbox" className="h-3.5 w-3.5" style={{ accentColor: "#ffffff" }} defaultChecked />
                 Remember me
               </label>
-              <button type="button" className="text-kinora-muted transition hover:text-kinora-text">
+              <button type="button" className="transition text-white">
                 Forgot password?
               </button>
             </div>
@@ -112,7 +133,7 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
         {/* Divider */}
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />
-          <span className="text-[10px] uppercase tracking-widest text-kinora-subtle">or</span>
+          <span className="text-[10px] uppercase tracking-widest text-white">or</span>
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />
         </div>
 
@@ -161,13 +182,13 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
         <button
           type="button"
           onClick={() => { setMode("login"); enter(); }}
-          className="mt-3 w-full text-center text-[11px] text-kinora-subtle transition hover:text-kinora-muted"
+          className="mt-3 w-full text-center text-[11px] transition text-white"
         >
           Explore the demo library →
         </button>
 
         <div className="mt-5 flex items-center justify-center gap-1.5 text-[12px]">
-          <span className="text-kinora-subtle">
+          <span className="text-white">
             {mode === "login" ? "New to Kinora?" : "Already have an account?"}
           </span>
           <button

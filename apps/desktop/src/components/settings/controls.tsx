@@ -15,16 +15,23 @@ export function SectionTitle({
   subtitle?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 mb-5">
+    <div className="flex items-start gap-3.5 mb-6">
       <span
         className="grid place-items-center rounded-xl shrink-0"
-        style={{ width: 34, height: 34, background: "rgba(212,164,78,0.14)", color: "#e8c878" }}
+        style={{
+          width: 38,
+          height: 38,
+          background: "linear-gradient(135deg, rgba(212,164,78,0.18) 0%, rgba(212,164,78,0.06) 100%)",
+          color: "#e8c878",
+          border: "1px solid rgba(212,164,78,0.15)",
+          boxShadow: "0 2px 12px -4px rgba(212,164,78,0.2)",
+        }}
       >
-        <Icon name={icon} size={19} weight="medium" />
+        <Icon name={icon} size={20} weight="medium" />
       </span>
-      <div className="min-w-0">
-        <h2 className="font-serif text-[19px] font-semibold text-kinora-text leading-tight">{title}</h2>
-        {subtitle && <p className="text-[12px] text-kinora-muted mt-0.5">{subtitle}</p>}
+      <div className="min-w-0 pt-0.5">
+        <h2 className="font-serif text-[20px] font-semibold text-kinora-text leading-tight">{title}</h2>
+        {subtitle && <p className="text-[12px] text-kinora-muted mt-1">{subtitle}</p>}
       </div>
     </div>
   );
@@ -42,7 +49,11 @@ export function SettingsGroup({ title, children }: { title?: string; children: R
       )}
       <div
         className="rounded-2xl overflow-hidden"
-        style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.08)" }}
+        style={{
+          background: "linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.025) 100%)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "0 4px 24px -12px rgba(0,0,0,0.4)",
+        }}
       >
         {rows.map((row, i) => (
           <div key={i}>
@@ -72,9 +83,9 @@ export function Row({
   align?: "center" | "start";
 }) {
   return (
-    <div className={`flex gap-3 px-3.5 py-3 ${align === "start" ? "items-start" : "items-center"}`}>
+    <div className={`flex gap-3.5 px-4 py-3.5 ${align === "start" ? "items-start" : "items-center"} transition-colors hover:bg-white/[0.015]`}>
       {icon && (
-        <span className="text-kinora-muted shrink-0 mt-0.5" aria-hidden="true">
+        <span className="text-kinora-muted/80 shrink-0 mt-0.5" aria-hidden="true">
           <Icon name={icon} size={17} />
         </span>
       )}
@@ -82,7 +93,7 @@ export function Row({
         <label htmlFor={htmlFor} className="text-[13px] font-medium text-kinora-text block">
           {label}
         </label>
-        {description && <p className="text-[11.5px] text-kinora-muted mt-0.5 leading-snug">{description}</p>}
+        {description && <p className="text-[11.5px] text-kinora-muted/80 mt-0.5 leading-snug">{description}</p>}
       </div>
       {children && <div className="shrink-0">{children}</div>}
     </div>
@@ -111,16 +122,20 @@ export function Switch({
       onClick={() => onChange(!checked)}
       className="kn-set-focusable relative rounded-full shrink-0"
       style={{
-        width: 40,
-        height: 24,
-        background: checked ? "#d4a44e" : "rgba(255,255,255,0.14)",
-        transition: "background 0.2s ease",
+        width: 42,
+        height: 25,
+        background: checked
+          ? "linear-gradient(135deg, #d4a44e 0%, #c8923a 100%)"
+          : "rgba(255,255,255,0.12)",
+        border: checked ? "none" : "1px solid rgba(255,255,255,0.06)",
+        boxShadow: checked ? "0 2px 8px -2px rgba(212,164,78,0.4)" : "none",
+        transition: "background 0.25s ease, box-shadow 0.25s ease",
       }}
     >
       <motion.span
         className="absolute rounded-full"
-        style={{ width: 20, height: 20, top: 2, left: 2, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
-        animate={{ x: checked ? 16 : 0 }}
+        style={{ width: 19, height: 19, top: 3, left: 3, background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }}
+        animate={{ x: checked ? 17 : 0 }}
         transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 600, damping: 36 }}
       />
     </button>
@@ -292,11 +307,15 @@ export function RowButton({
 }) {
   const color =
     tone === "danger" ? "#f0928a" : tone === "accent" ? "#e8c878" : "rgba(232,226,216,0.92)";
+  const hoverBg =
+    tone === "danger" ? "rgba(240,146,138,0.08)" : tone === "accent" ? "rgba(232,200,120,0.08)" : "rgba(255,255,255,0.05)";
   return (
     <button
       onClick={onClick}
-      className="kn-set-focusable inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium hover:bg-white/[0.06] transition-colors"
-      style={{ color }}
+      className="kn-set-focusable inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12.5px] font-medium transition-all duration-200"
+      style={{ color, background: "transparent" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
     >
       {icon && <Icon name={icon} size={14} />}
       {children}

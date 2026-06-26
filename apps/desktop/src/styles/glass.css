@@ -239,41 +239,13 @@ html.lg-refract-on .glass-input {
     0 6px 16px -6px rgba(0, 0, 0, 0.4) !important;
 }
 
-/* ---- Blanket glass on EVERY interactive control + rounded surface ----
-   Catches all radii (lg/md/full/[Npx], not just xl), plus buttons, links-as-
-   buttons, inputs and selects. Solid gradient CTAs (`from-*`/`gradient`) and
-   media are excluded so they stay as designed. */
-button:not([class*="from-"]):not([class*="gradient"]),
-[role="button"],
-a[class*="rounded"],
-input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-select,
-[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(img):not(video) {
-  -webkit-backdrop-filter: blur(11px) saturate(175%) brightness(1.06);
-  backdrop-filter: blur(11px) saturate(175%) brightness(1.06);
-}
-
-/* Give rounded controls a real translucent glass skin + specular rim so even
-   opaque ones read as Liquid Glass (blur alone can't — it needs something to
-   refract). Excludes the gold gradient CTAs and the already-styled nav pill. */
-button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(.nav-btn-active),
-[role="button"][class*="rounded"]:not([class*="from-"]):not([class*="gradient"]),
-a[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]) {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08),
-    0 8px 20px -8px rgba(0, 0, 0, 0.45);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.14s ease;
-}
-button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(.nav-btn-active):hover,
-[role="button"][class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):hover {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-}
-button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
-  transform: scale(0.96);
-}
+/* NOTE: Blanket glass-on-every-button rules removed.
+   They overrode inline styles with !important, causing unwanted outlines,
+   wrong colors, and broken button styling across the app.
+   Glass is now applied selectively via .glass-card, .glass-input,
+   .glass-control, .liquid-glass-dock, and .surface-frosted.
+   The native macOS shell (html.kinora-native) still gets blanket blur
+   via the scoped rules in base.css. */
 
 /* ── Below: Agent 8 design-system layer (merged; token-driven, wins on overlap) ── */
 /* ============================================================================

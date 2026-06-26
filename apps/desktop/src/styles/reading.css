@@ -12,10 +12,14 @@
 }
 
 .skeleton-shimmer-overlay {
-  animation: shimmer-slide 1.5s ease-in-out infinite;
-}
-
-@keyframes shimmer-slide {
-  0% { transform: translateX(-50%); }
-  100% { transform: translateX(0%); }
+  /* Static gradient — no animation to avoid GPU compositor drain from
+     many simultaneous shimmer overlays while covers load. */
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(110deg,
+    transparent 0%,
+    rgba(255,255,255,0.04) 35%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 65%,
+    transparent 100%);
 }

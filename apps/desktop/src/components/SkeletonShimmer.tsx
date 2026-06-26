@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 
 interface SkeletonShimmerProps {
   className?: string;
@@ -7,27 +7,8 @@ interface SkeletonShimmerProps {
 }
 
 export function SkeletonShimmer({ className = "", style }: SkeletonShimmerProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          setVisible(entry.isIntersecting);
-        }
-      },
-      { rootMargin: "100px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <div
-      ref={ref}
       className={`${className} skeleton-shimmer`}
       style={{
         ...style,
@@ -35,16 +16,7 @@ export function SkeletonShimmer({ className = "", style }: SkeletonShimmerProps)
         overflow: "hidden",
       }}
     >
-      {visible && (
-        <div
-          className="skeleton-shimmer-overlay"
-          style={{
-            width: "200%",
-            height: "100%",
-            background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)",
-          }}
-        />
-      )}
+      <div className="skeleton-shimmer-overlay" />
     </div>
   );
 }

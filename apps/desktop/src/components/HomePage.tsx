@@ -10,7 +10,6 @@ import {
   MotionProvider,
   MotionDebugOverlay,
   PageTransition,
-  Reveal,
   BookOpenTransition,
   useSharedElement,
   type Rect,
@@ -131,16 +130,14 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
             <Greeting />
           </div>
-          {/* Shelves cascade in on first paint (motion-system stagger). */}
-          <Reveal stagger>
-            {myBooks.length > 0 && (
-              <BookShelf title="Read Live · Public Domain" books={myBooks} onOpen={handleOpen} />
-            )}
-            <BookShelf title="Continue Reading" books={continueReading} onOpen={handleOpen} />
-            <BookShelf title="Recently Added" books={recentlyAdded} onOpen={handleOpen} />
-            <BookShelf title="Popular on Kinora" books={popularOnKinora} onOpen={handleOpen} />
-            <BookShelf title="Recommended for You" books={recommended} onOpen={handleOpen} />
-          </Reveal>
+          {/* Shelves animate in via their own whileInView (BookShelf internals). */}
+          {myBooks.length > 0 && (
+            <BookShelf title="Read Live · Public Domain" books={myBooks} onOpen={handleOpen} />
+          )}
+          <BookShelf title="Continue Reading" books={continueReading} onOpen={handleOpen} />
+          <BookShelf title="Recently Added" books={recentlyAdded} onOpen={handleOpen} />
+          <BookShelf title="Popular on Kinora" books={popularOnKinora} onOpen={handleOpen} />
+          <BookShelf title="Recommended for You" books={recommended} onOpen={handleOpen} />
         </div>
       </main>
     ),

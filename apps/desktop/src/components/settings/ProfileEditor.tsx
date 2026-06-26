@@ -51,18 +51,26 @@ export default function ProfileEditor({ compact = false }: { compact?: boolean }
     }
   };
 
-  const labelCls = "block text-[11px] font-medium text-kinora-muted mb-1.5";
-  const inputCls = "glass-input w-full px-3.5 py-2.5 rounded-xl text-[13px] text-kinora-text";
+  const labelCls = "block text-[11px] font-medium text-kinora-muted mb-1.5 tracking-wide";
+  const inputCls = "glass-input w-full px-3.5 py-2.5 rounded-xl text-[13px] text-kinora-text transition-all duration-200";
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-5">
-        <GeometricAvatar size={compact ? 48 : 56} />
+      {/* Avatar header */}
+      <div
+        className="flex items-center gap-4 mb-6 -mx-2 -mt-2 px-2 pt-2 pb-4 rounded-xl"
+        style={{
+          background: "linear-gradient(135deg, rgba(212,164,78,0.06) 0%, transparent 100%)",
+        }}
+      >
+        <div style={{ filter: "drop-shadow(0 2px 10px rgba(212,164,78,0.15))" }}>
+          <GeometricAvatar size={compact ? 48 : 56} ring />
+        </div>
         <div className="min-w-0">
           <p className="text-[14px] font-semibold text-kinora-text truncate">{profile.displayName}</p>
           <p className="text-[11px] text-kinora-muted truncate">{profile.email}</p>
         </div>
-        <button className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-kinora-muted hover:text-kinora-text transition-colors">
+        <button className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-kinora-muted hover:text-kinora-text transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04]">
           <Icon name="photo" size={14} />
           Change avatar
         </button>
@@ -146,8 +154,16 @@ export default function ProfileEditor({ compact = false }: { compact?: boolean }
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold text-[#1a1512]"
-          style={{ background: "#d4a44e" }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200"
+          style={{
+            background: saved
+              ? "linear-gradient(135deg, rgba(120,200,120,0.9) 0%, rgba(100,180,100,0.9) 100%)"
+              : "linear-gradient(135deg, #d4a44e 0%, #c8923a 100%)",
+            color: "#1a1512",
+            boxShadow: saved
+              ? "0 2px 12px -2px rgba(120,200,120,0.3)"
+              : "0 2px 12px -2px rgba(212,164,78,0.35)",
+          }}
         >
           <Icon name={saved ? "checkmark" : "checkmark.circle.fill"} size={15} weight="semibold" />
           {saved ? "Saved" : "Save Changes"}

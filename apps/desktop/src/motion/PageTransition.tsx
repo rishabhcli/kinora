@@ -37,7 +37,6 @@ export function PageTransition({
           position: "relative",
           zIndex: 1,
           transformOrigin: "top center",
-          willChange: "transform, opacity",
         }}
       >
         {children}

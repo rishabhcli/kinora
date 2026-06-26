@@ -84,8 +84,8 @@
 
 /* ---- Keyboard focus ring (the app otherwise strips outlines) ---------------- */
 :focus-visible {
-  outline: 2px solid var(--kinora-a11y-focus) !important;
-  outline-offset: 2px;
+  outline: 1px solid rgb(var(--k-accent-rgb) / 0.4) !important;
+  outline-offset: 1px;
   border-radius: 3px;
 }
 /* Don't show the ring for pointer interactions, only keyboard. */

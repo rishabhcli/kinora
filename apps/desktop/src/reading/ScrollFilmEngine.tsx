@@ -264,8 +264,27 @@ export function ScrollFilmEngine({
           aria-label="Reading text — use arrow keys, space, or Page Up/Down to scroll"
           className="scrollbar-slim min-h-0 flex-1 overflow-y-auto pr-6 focus:outline-none"
         >
-          <p className="mb-2 text-[10px] uppercase tracking-widest text-kinora-muted">Now Reading</p>
-          <h1 className="mb-1 font-serif text-2xl font-semibold text-kinora-text">{book.title}</h1>
+          <div className="mb-2 flex items-center gap-3">
+            <span
+              className="inline-block"
+              style={{ width: 30, height: 1, background: "linear-gradient(90deg, #d4a44e, transparent)" }}
+            />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "#d4a44e" }}>
+              Now Reading
+            </span>
+          </div>
+          <h1
+            className="mb-1 font-serif text-2xl font-semibold"
+            style={{
+              background: "linear-gradient(168deg, #f4efe6 0%, #efe3cf 42%, #e8c878 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              color: "transparent",
+            }}
+          >
+            {book.title}
+          </h1>
           <p className="mb-7 text-[13px] text-kinora-muted">by {book.author}</p>
           <div className="pb-[40vh]">
             <div
@@ -308,7 +327,7 @@ export function ScrollFilmEngine({
 
         {/* Read-so-far + committed-ahead rail; ticks = shots, dot = your place. */}
         <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-1 rounded-full" aria-hidden style={{ background: "rgba(255,255,255,0.06)" }}>
-          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "rgba(212,164,78,0.55)" }} />
+          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "linear-gradient(180deg, rgba(212,164,78,0.7) 0%, rgba(212,164,78,0.4) 100%)" }} />
           {live && (
             <div
               ref={railLeadRef}
@@ -336,7 +355,7 @@ export function ScrollFilmEngine({
       <div className="flex-shrink-0 self-start">
         <div
           className="glass-card relative overflow-hidden rounded-[24px]"
-          style={{ width: FILM_W, aspectRatio: "9 / 16", boxShadow: "0 28px 70px -18px rgba(0,0,0,0.7)" } as CSSProperties}
+          style={{ width: FILM_W, aspectRatio: "9 / 16", boxShadow: "inset 0 1px 0 rgba(246,240,231,0.1), 0 34px 90px -22px rgba(6,5,4,0.85)" } as CSSProperties}
         >
           <div
             ref={parallaxRef}

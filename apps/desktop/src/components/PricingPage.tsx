@@ -135,11 +135,20 @@ export default function PricingPage() {
         <div
           ref={containerRef}
           className="inline-flex items-center rounded-full p-1 relative"
-          style={{ background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.06)" }}
+          style={{
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+            boxShadow: "inset 0 1px 3px rgba(0,0,0,0.2)",
+          }}
         >
           <motion.div
             className="absolute top-1 bottom-1 rounded-full"
-            style={{ background: "rgba(255, 255, 255, 0.1)" }}
+            style={{
+              background: billing === "yearly"
+                ? "linear-gradient(135deg, rgba(212,164,78,0.25) 0%, rgba(212,164,78,0.1) 100%)"
+                : "rgba(255, 255, 255, 0.1)",
+              border: billing === "yearly" ? "1px solid rgba(212,164,78,0.15)" : "1px solid transparent",
+            }}
             animate={{ left: pillStyle.left, width: pillStyle.width }}
             transition={{ type: "spring", stiffness: 400, damping: 32 }}
           />
@@ -158,13 +167,16 @@ export default function PricingPage() {
             onClick={() => setBilling("yearly")}
             className="relative z-10 px-5 py-2 rounded-full text-[12px] font-medium transition-colors flex items-center gap-2"
             style={{
-              color: billing === "yearly" ? "rgba(232, 226, 216, 0.9)" : "rgba(168, 158, 148, 0.6)",
+              color: billing === "yearly" ? "#e8c878" : "rgba(168, 158, 148, 0.6)",
             }}
           >
             Yearly
             <span
               className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(255, 255, 255, 0.08)", color: "rgba(232, 226, 216, 0.7)" }}
+              style={{
+                background: billing === "yearly" ? "rgba(212,164,78,0.15)" : "rgba(255, 255, 255, 0.08)",
+                color: billing === "yearly" ? "#e8c878" : "rgba(232, 226, 216, 0.7)",
+              }}
             >
               -20%
             </span>
@@ -177,22 +189,27 @@ export default function PricingPage() {
         {plans.map((plan) => (
           <div
             key={plan.name}
-            className="rounded-2xl p-6 flex flex-col relative"
+            className="rounded-2xl p-6 flex flex-col relative transition-all duration-300"
             style={{
               background: plan.recommended
-                ? "rgba(255, 255, 255, 0.04)"
-                : "rgba(255, 255, 255, 0.02)",
+                ? "linear-gradient(180deg, rgba(212,164,78,0.06) 0%, rgba(255,255,255,0.02) 100%)"
+                : "linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)",
               border: plan.recommended
-                ? "1px solid rgba(255, 255, 255, 0.12)"
-                : "1px solid rgba(255, 255, 255, 0.05)",
+                ? "1px solid rgba(212,164,78,0.2)"
+                : "1px solid rgba(255, 255, 255, 0.06)",
+              boxShadow: plan.recommended
+                ? "0 8px 32px -8px rgba(212,164,78,0.15), 0 4px 16px -8px rgba(0,0,0,0.4)"
+                : "0 4px 24px -12px rgba(0,0,0,0.4)",
             }}
           >
             {plan.recommended && (
               <div
                 className="absolute -top-px left-1/2 -translate-x-1/2 px-3 py-1 rounded-b-lg text-[9px] font-semibold tracking-wider uppercase"
                 style={{
-                  background: "rgba(232, 226, 216, 0.1)",
-                  color: "rgba(232, 226, 216, 0.8)",
+                  background: "linear-gradient(135deg, rgba(212,164,78,0.2) 0%, rgba(212,164,78,0.08) 100%)",
+                  color: "#e8c878",
+                  border: "1px solid rgba(212,164,78,0.15)",
+                  borderTop: "none",
                 }}
               >
                 Recommended
@@ -229,27 +246,32 @@ export default function PricingPage() {
             {/* CTA */}
             <button
               disabled={plan.current}
-              className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors mb-6"
+              className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 mb-6"
               style={{
                 background: plan.current
                   ? "rgba(255, 255, 255, 0.03)"
                   : plan.recommended
-                  ? "rgba(232, 226, 216, 0.12)"
+                  ? "linear-gradient(135deg, #d4a44e 0%, #c8923a 100%)"
                   : "rgba(255, 255, 255, 0.06)",
                 color: plan.current
                   ? "rgba(168, 158, 148, 0.4)"
+                  : plan.recommended
+                  ? "#1a1512"
                   : "rgba(232, 226, 216, 0.9)",
                 border: plan.recommended && !plan.current
-                  ? "1px solid rgba(232, 226, 216, 0.15)"
-                  : "1px solid transparent",
+                  ? "none"
+                  : "1px solid rgba(255,255,255,0.08)",
                 cursor: plan.current ? "default" : "pointer",
+                boxShadow: plan.recommended && !plan.current
+                  ? "0 2px 12px -2px rgba(212,164,78,0.3)"
+                  : "none",
               }}
             >
               {plan.cta}
             </button>
 
             {/* Divider */}
-            <div className="h-px mb-4" style={{ background: "rgba(255, 255, 255, 0.05)" }} />
+            <div className="h-px mb-4" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)" }} />
 
             {/* Features */}
             <ul className="space-y-2.5 flex-1">
@@ -267,7 +289,8 @@ export default function PricingPage() {
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="shrink-0 mt-0.5 opacity-40"
+                    className="shrink-0 mt-0.5"
+                    style={{ color: plan.recommended ? "rgba(212,164,78,0.6)" : "rgba(255,255,255,0.3)" }}
                   >
                     <path d="M5 12l5 5L20 7" />
                   </svg>

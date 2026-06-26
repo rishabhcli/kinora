@@ -86,11 +86,73 @@ export function BuiltinBookOpenTransition({
         // .kinora-bg sets position:relative; force absolute back so inset-0 fills.
         style={{ transformOrigin: "center", position: "absolute" }}
       >
-        {children}
+        {/* Aurora warm-light wash — mirrors login page's aurora blobs */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          <div
+            className="absolute"
+            style={{
+              width: 420,
+              height: 420,
+              top: "-8%",
+              left: "-5%",
+              borderRadius: "50%",
+              filter: "blur(80px)",
+              opacity: 0.4,
+              background: "radial-gradient(circle, rgba(212,164,78,0.12), transparent 70%)",
+            }}
+          />
+          <div
+            className="absolute"
+            style={{
+              width: 380,
+              height: 380,
+              bottom: "-5%",
+              right: "-8%",
+              borderRadius: "50%",
+              filter: "blur(80px)",
+              opacity: 0.35,
+              background: "radial-gradient(circle, rgba(120,90,50,0.10), transparent 70%)",
+            }}
+          />
+        </div>
+        {/* Film grain — same subtle noise as login */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden
+          style={{
+            opacity: 0.022,
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E\")",
+            zIndex: 1,
+          }}
+        />
+        <div className="relative z-10 flex h-full flex-col">{children}</div>
       </motion.div>
 
       {/* The cover swings open on its spine, then lifts away (skipped on reduced motion) */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ perspective: 2200 } as CSSProperties}>
+        {/* Static "first page" — revealed as the cover swings open */}
+        {!reduce && (
+          <div
+            className="absolute"
+            style={{
+              width: "min(40vh, 300px)",
+              aspectRatio: "2 / 3",
+              background: "linear-gradient(135deg, #f5efe4 0%, #ebe5d8 50%, #e0d9ca 100%)",
+              borderRadius: "3px 8px 8px 3px",
+              boxShadow: "0 20px 50px -16px rgba(0,0,0,0.6)",
+              opacity: 0.92,
+            } as CSSProperties}
+          >
+            {/* Page text lines suggestion */}
+            <div className="absolute inset-0 flex flex-col gap-[3px] px-5 py-6" style={{ opacity: 0.15 }}>
+              {Array.from({ length: 14 }).map((_, i) => (
+                <div key={i} style={{ height: 2, background: "#8a7a60", borderRadius: 1, width: i % 3 === 2 ? "60%" : "100%" }} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <motion.div
           className="relative"
           style={{
@@ -109,6 +171,7 @@ export function BuiltinBookOpenTransition({
               : { rotateY: { duration: 0.95, ease: HINGE, delay: 0.12 }, opacity: { duration: 0.25, ease: "linear", delay: 0.95 } }
           }
         >
+          {/* Front cover face */}
           <div
             className="absolute inset-0 overflow-hidden"
             style={{
@@ -127,6 +190,24 @@ export function BuiltinBookOpenTransition({
               />
             )}
             <div className="absolute inset-y-0 left-0" style={{ width: 14, background: "linear-gradient(90deg, rgba(0,0,0,0.4), transparent)" }} />
+          </div>
+
+          {/* Back cover face (inside of the front cover) — visible when rotated past 90° */}
+          <div
+            className="absolute inset-0 overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, #2a2520 0%, #1e1a16 100%)",
+              borderRadius: "8px 3px 3px 8px",
+              backfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+              boxShadow: "inset 0 0 30px rgba(0,0,0,0.5)",
+            }}
+          >
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span style={{ color: "rgba(212,164,78,0.3)", fontSize: 11, fontStyle: "italic", letterSpacing: "0.05em" }}>
+                {cover.title}
+              </span>
+            </div>
           </div>
         </motion.div>
       </div>

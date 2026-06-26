@@ -131,29 +131,28 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
   };
 
   return (
-    <section className="mb-8" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 280px" }}>
+    <section className="mb-8">
       {/* Header */}
       <motion.div
         className="flex items-center justify-between mb-3 px-1"
         initial={reduce ? { opacity: 0 } : { opacity: 0, x: -10 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true, margin: "0px 0px -70px 0px" }}
+        animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, ease: EASE }}
       >
         <div className="flex items-center gap-2">
           <motion.div
-            className="w-1 h-4 bg-kinora-gold/60 origin-top"
+            className="w-1 h-4 rounded-full origin-top"
             initial={reduce ? { scaleY: 1 } : { scaleY: 0 }}
-            whileInView={{ scaleY: 1 }}
-            viewport={{ once: true, margin: "0px 0px -70px 0px" }}
+            animate={{ scaleY: 1 }}
             transition={{ duration: 0.45, ease: EASE, delay: 0.1 }}
+            style={{ background: "linear-gradient(180deg, rgba(212,164,78,0.8) 0%, rgba(212,164,78,0.3) 100%)" }}
           />
           <h2 className="font-serif text-base font-semibold text-kinora-text tracking-wide">
             {title}
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <button aria-label={`See all ${title}`} className="flex items-center gap-1 text-[11px] text-kinora-muted hover:text-kinora-text transition-colors">
+          <button aria-label={`See all ${title}`} className="flex items-center gap-1 text-[11px] text-kinora-muted hover:text-kinora-text transition-colors px-2 py-1 rounded-lg hover:bg-white/[0.04]">
             <span>See All</span>
             <ArrowIcon size={10} />
           </button>
@@ -203,8 +202,7 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
           onClickCapture={handleClickCapture}
           variants={container}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "0px 0px -60px 0px" }}
+          animate="show"
         >
           {books.map((book) => (
             <motion.div key={book.id} variants={item} style={{ flex: "0 0 auto" }}>
