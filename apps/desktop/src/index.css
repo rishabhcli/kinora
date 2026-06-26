@@ -754,3 +754,113 @@ html.kinora-native [class*="rounded-3xl"] {
     animation: none;
   }
 }
+
+/* ============================================================
+   LIQUID GLASS — macOS 26 "Tahoe" material. Real light-bending
+   refraction in Chromium (html.lg-refract-on) via the #lg-refract
+   SVG filter; vibrant blur + specular rim + sheen + floating
+   concentric capsules + gel interactions everywhere. Defined last
+   so it wins over the earlier glass classes.
+   ============================================================ */
+.glass-card,
+.glass-control,
+.glass-input,
+.liquid-glass-dock {
+  position: relative;
+  isolation: isolate;
+  -webkit-backdrop-filter: blur(13px) saturate(190%) brightness(1.12);
+  backdrop-filter: blur(13px) saturate(190%) brightness(1.12);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),        /* top specular rim */
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1),       /* edge light */
+    inset 0 -12px 26px -20px rgba(0, 0, 0, 0.55),     /* base depth */
+    0 16px 40px -14px rgba(0, 0, 0, 0.5);             /* float */
+}
+
+/* Light refractive tint (inline dark fills, e.g. the login card, still win). */
+.glass-card,
+.glass-control,
+.liquid-glass-dock {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* The signature specular glint — concentrated at the top-left, transparent over
+   content so text stays readable. */
+.glass-card::after,
+.glass-control::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.06) 18%,
+    transparent 40%,
+    transparent 72%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+
+/* Chromium: bend the backdrop like real glass. */
+html.lg-refract-on .glass-card,
+html.lg-refract-on .glass-control,
+html.lg-refract-on .liquid-glass-dock,
+html.lg-refract-on .glass-input {
+  -webkit-backdrop-filter: url(#lg-refract) blur(7px) saturate(190%) brightness(1.12);
+  backdrop-filter: url(#lg-refract) blur(7px) saturate(190%) brightness(1.12);
+  will-change: backdrop-filter;
+}
+
+/* Buttons → concentric glass capsules with a gel press. */
+.glass-control {
+  border-radius: 999px;
+  color: rgba(245, 242, 236, 0.96);
+  transition: transform 0.16s cubic-bezier(0.34, 1.45, 0.5, 1), box-shadow 0.22s ease, background 0.22s ease;
+}
+.glass-control:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.17);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.2),
+    0 20px 46px -16px rgba(0, 0, 0, 0.55);
+}
+.glass-control:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+}
+
+/* The dock is the floating functional layer — Find My's tab capsule. */
+.liquid-glass-dock {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* Nav tabs as bright glass pills. */
+.nav-btn-active {
+  background: rgba(255, 255, 255, 0.18) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(180%) brightness(1.1);
+  backdrop-filter: blur(10px) saturate(180%) brightness(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    0 6px 16px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Blanket glass skin on every control + rounded surface (cheap, no refraction)
+   so ad-hoc panels/buttons read as glass too. Blur is a no-op on opaque fills,
+   so solid CTAs (the gold buttons) stay solid. */
+button,
+[class*="rounded-xl"],
+[class*="rounded-2xl"],
+[class*="rounded-3xl"] {
+  -webkit-backdrop-filter: blur(10px) saturate(165%);
+  backdrop-filter: blur(10px) saturate(165%);
+}
