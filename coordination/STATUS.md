@@ -1,10 +1,13 @@
 # STATUS — overnight/integration live board
 
 **Captain:** Agent 12 · **Branch:** `overnight/integration` · **Base:** `4863a0c` (main)
-**HEAD:** `aa2b406` · **Last updated:** 2026-06-26 (Captain — integration cycle 1 complete)
+**HEAD:** `fcffae1` · **Last updated:** 2026-06-26 (Captain — integration cycle 2 complete)
 
-## 🏁 MILESTONE: all 11 agents first-merged · gate GREEN
-Every agent branch has been integrated at least once and the tree is green both ends.
+## 🏁 MILESTONE: all 11 agents re-merged to latest · gate GREEN
+Cycle 1 first-merged all 11; **cycle 2 re-merged all 11 to their latest** (deterministic CSS
+per CAPTAIN-PLAYBOOK; re-parented A7's migration to collapse a 2-head alembic fork; A8's DoD#2
+before/after screenshots landed). Tree green both ends. Residual pending (agents committed during
+the sweep): A6+4, A5/A7/A10+1 → next cycle. See MERGE-LOG cycle 2.
 
 ## 🚦 GATE: GREEN ✅
 - Frontend: `pnpm --filter @kinora/desktop typecheck && build` → **green** (CSS 73 kB).

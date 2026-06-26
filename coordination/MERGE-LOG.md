@@ -32,3 +32,22 @@ Captain-only file.
 
 **Pending re-merges** (agents advanced after first merge): A1+4, A3+1, A4+3, A6+5, A7+1, A8+1, A9+3.
 A2/A5/A10/A11 current (0 pending). Re-merge sweep is the next cycle (git rerere auto-applies seam resolutions).
+
+## Cycle 2 — re-merge sweep (deterministic, per CAPTAIN-PLAYBOOK)
+| # | Agent | Merge commit | Captain resolution | Gate |
+|---|---|---|---|---|
+| 17 | A8 +1 | `02f344a` | glass.css regen; **+10 DoD#2 before/after screenshots** | tc+build green |
+| 18 | A6 +6 | `3bc2014` | a11y.css regen; requests **unioned** (kept vitest note + A6's A9 audit) | tc+build green |
+| 19 | A4 +5 | `c1a81a6` | motion.css regen | tc+build green |
+| 20 | A9 +3 | `43a5903` | coordination ours | tc+build; vitest 92 pass |
+| 21 | A1 +4 | `7806c89` | test_api_director → typed `PubSub` (imported) | `make test` 408 |
+| 22 | A3 +1 | `b6f6353` | coordination ours | tc+build + `make test` 408 |
+| 23 | A2 +2 | `381debd` | coordination ours; demo prefs fix retained | tc+build green |
+| 24 | A5 +2 | `7575eb0` | seed_* → theirs (A5 lane); single head | `make test` 408 |
+| 25 | A10 +1 | `5875b9b` | reading.css regen | tc+build green |
+| 26 | A11 +4 | `4bf3033` | login.css regen; index.css stays deleted | tc+build green |
+| 27 | A7 +2 | `fcffae1` | **re-parented migration `d9e2f4a6b8c1`→`e843aa7682b2`** (collapsed 2-head fork); `__init__.py` ours (films+library+optim) | `make test` 408 / **single head** |
+
+### 🏁 Cycle 2 complete — all 11 re-merged to latest; gate GREEN (tc+build + make test 408/0).
+Residual pending (agents committed during the sweep): A6+4, A5+1, A7+1, A10+1 → next cycle.
+**Captain helper:** `scratchpad/remerge.sh` (deterministic CSS + coordination policy + requests union).
