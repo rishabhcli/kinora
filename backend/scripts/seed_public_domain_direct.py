@@ -110,22 +110,27 @@ def _stream_resume(url: str, tmp: Path, timeout: float, max_attempts: int = 6) -
     return tmp.exists() and tmp.stat().st_size > 20000 and zipfile.is_zipfile(tmp)
 
 
-def download(gid: int, url: str | None = None, *, timeout: float = 45.0) -> Path | None:
+def download(
+    gid: int, url: str | None = None, *, timeout: float = 45.0, mirror_start: int = 0
+) -> Path | None:
     """Download (and cache) a Gutenberg EPUB; idempotent (skips a good cached file).
 
     Tries faster mirrors then the main site, the ``-images`` variant as a fallback,
     each Range-resumed across Gutenberg's mid-transfer drops and validated as a real
     EPUB (zip) before it is accepted — so a throttled/flaky connection still
-    eventually lands a complete file.
+    eventually lands a complete file. ``mirror_start`` rotates which mirror is tried
+    first, so concurrent prefetch spreads load across hosts (no per-host cutoff).
     """
     DEST.mkdir(parents=True, exist_ok=True)
     out = DEST / f"pg{gid}.epub"
     if out.exists() and out.stat().st_size > 20000:
         return out
     tmp = out.with_suffix(".part")
+    n = len(_MIRRORS)
+    mirrors = [_MIRRORS[(mirror_start + i) % n] for i in range(n)]
     candidates = [
         f"{base}/cache/epub/{gid}/pg{gid}{suffix}.epub"
-        for base in _MIRRORS
+        for base in mirrors
         for suffix in ("", "-images")
     ]
     if url:
