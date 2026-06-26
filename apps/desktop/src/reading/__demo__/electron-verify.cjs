@@ -128,6 +128,27 @@ async function probeLayers(reduce) {
   return { sawTwo, final: await js(`window.__pane.videoCount()`) };
 }
 
+async function testScrubTracking() {
+  // Enter a film via scrub, then scrub the SAME film to a new time. currentTime must
+  // follow the scrub target — not get yanked back toward the entry frame by an
+  // onSeeked→onReady re-seek (regression guard for the stale-pendingTime bug).
+  await nav(`${BASE}/filmpane-probe.html?reduce=0`);
+  await js(`window.__pane.setPlayhead('/generated/film-01.mp4',0,true)`);
+  for (let i = 0; i < 60; i++) {
+    if ((await js(`window.__pane.duration()`)) > 0) break;
+    await sleep(150);
+  }
+  await js(`window.__pane.setPlayhead('/generated/film-01.mp4',3.0,true)`);
+  let t = -1;
+  for (let i = 0; i < 16; i++) {
+    await sleep(40);
+    t = await js(`window.__pane.currentTime()`);
+    if (Math.abs(t - 3.0) <= 0.4) break;
+  }
+  const paused = await js(`window.__pane.paused()`);
+  record("scrub within one film tracks currentTime (no re-seek yank)", Math.abs(t - 3.0) <= 0.4 && paused === true, `currentTime=${Number(t).toFixed(2)} paused=${paused}`);
+}
+
 async function testCrossfadeVsReduced() {
   const a = await probeLayers(0);
   record("crossfade (normal): src change shows 2 layers, then promotes to 1", a.sawTwo && a.final === 1, `sawTwo=${a.sawTwo} final=${a.final}`);
@@ -146,6 +167,7 @@ app.whenReady().then(async () => {
   try {
     await testFallbackScrub();
     await testLiveHandoff();
+    await testScrubTracking();
     await testCrossfadeVsReduced();
   } catch (e) {
     console.log("FAIL  driver threw — " + (e && e.stack ? e.stack : e));

@@ -7,12 +7,34 @@
 | `typecheck && build` green | `pnpm --filter @kinora/desktop typecheck && pnpm --filter @kinora/desktop build` | green (baseline + final) |
 | Pure sync-map math | 27 unit tests, `pnpm --filter @kinora/desktop test:reading` | 27/27 |
 | Scrub frame-accurate to sync map (±1 shot) | runtime: `currentTime` pinned to `fraction·duration` at 0.25/0.5/0.75/0.9 (exact) | PASS |
-| 60fps under fast flicks | runtime: 109 rAF frames / 0.9s of continuous scroll, **median 8.3ms, p95 9.9ms** while scrubbing+decoding | PASS |
+| Scrub *within* one film tracks (no re-seek yank) | runtime: scrub a film to t=3.0 → `currentTime`=3.00 (regression guard, see review below) | PASS |
+| 60fps under fast flicks | runtime: 109 rAF frames / 0.9s of continuous scroll, **median 8.3ms, p95 ~10ms** while scrubbing+decoding | PASS |
 | Cross-event handoff (WS2) | runtime: segment src swaps film-01→03→04 by word range; normal motion crossfades (2 layers→1) | PASS |
 | Reduced motion = instant cuts | runtime: a src change never creates a 2nd layer under reduced motion | PASS |
 | Fallback parity (WS3) | runtime: single bundled film scrubs identically with `live=false` | PASS |
 
-Full output: [`verify-output.txt`](./verify-output.txt) — **13/13 runtime checks**.
+Full output: [`verify-output.txt`](./verify-output.txt) — **14/14 runtime checks**.
+
+## Code review (peer) outcome
+
+A fresh-eyes reviewer traced the FilmPane state machine + rAF loop and ran the
+tests. Findings and resolution:
+
+- **BLOCKING — `onSeeked → onReady` re-seeked to a stale `pendingTime`.** `onSeeked`
+  fires on *every* seek, including the rAF loop's live scrub seeks, so scrubbing
+  *within* a freshly-entered live segment was yanked back to the entry frame. The
+  fallback verifier missed it (single src ⇒ the re-seek path stayed dormant).
+  Reproduced deterministically via the FilmPane probe (scrub→3.0 read `currentTime`
+  0.00), then fixed: `onReady` is now reveal-only; `currentTime` is owned solely by
+  `applyActive`, initial play by `autoPlay`. New regression check is green (3.00).
+- **Real, edge-path — momentary blank pane** when two src changes land inside one
+  crossfade window: `revealKey` pointed at an evicted layer ⇒ all layers opacity 0.
+  Fixed with a `shownKey` fallback (reveal the oldest mounted layer when `revealKey`
+  is absent), so a layer is always visible.
+- **Minor — a flick interrupting a settle-crossfade** now hard-cuts to the active
+  layer (scrub is always single-layer/instant) instead of finishing the fade.
+- Verified clean by the reviewer: timeline math, the 60fps no-per-frame-setState
+  architecture, scheduler signalling parity, lane adherence, rAF lifecycle/cleanup.
 
 ## Why Electron (not Playwright)
 
