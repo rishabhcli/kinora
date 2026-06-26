@@ -1067,3 +1067,39 @@ html.kinora-native .auth-root {
 .auth-backdrop.is-static .auth-beam {
   animation: none;
 }
+
+/* ====================== REDUCED TRANSPARENCY ====================== */
+/* Honour the OS "reduce transparency" setting: drop the frost so the card and
+   controls are fully opaque and text is maximally crisp. The room stays — just
+   without the glass. (!important beats the native-shell blanket backdrop-filter.) */
+@media (prefers-reduced-transparency: reduce) {
+  .auth-card {
+    background: var(--auth-bg-2);
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .auth-input,
+  .auth-social {
+    background: var(--auth-surface);
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* ====================== INCREASED CONTRAST ====================== */
+/* Honour the OS "increase contrast" setting: lift secondary text and firm up
+   hairlines/borders so every edge and label clears AA with headroom. */
+@media (prefers-contrast: more) {
+  :root {
+    --auth-muted: #d3cabd;
+    --auth-subtle: #b3a99d;
+    --auth-line: rgba(var(--auth-hi), 0.24);
+    --auth-line-strong: rgba(var(--auth-hi), 0.36);
+  }
+  .auth-card {
+    border-color: rgba(var(--auth-hi), 0.42);
+  }
+  .auth-input {
+    border-width: 1.5px;
+  }
+}
