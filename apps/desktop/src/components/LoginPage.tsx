@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import BookWall from "./BookWall";
+import { api } from "../lib/api";
 
 const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 
@@ -13,12 +14,17 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
   const [password, setPassword] = useState<string>(DEMO.password);
   const [busy, setBusy] = useState(false);
 
-  function enter() {
+  async function enter() {
     setBusy(true);
-    window.setTimeout(() => {
-      setBusy(false);
-      onEnter();
-    }, 450);
+    // Real auth against the backend; if it's unreachable we still enter so the
+    // demo catalogue is browsable offline.
+    try {
+      await api.loginOrRegister(email, password);
+    } catch {
+      /* backend down — continue in demo mode */
+    }
+    setBusy(false);
+    onEnter();
   }
 
   function onSubmit(event: FormEvent) {

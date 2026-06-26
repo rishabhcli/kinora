@@ -1,5 +1,6 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import type React from "react";
+import { api, toUiBook, toBrowserUrl } from "../lib/api";
 import Navbar, { navItems } from "./Navbar";
 import Greeting from "./Greeting";
 import ContinueReadingCard from "./ContinueReadingCard";
@@ -34,6 +35,36 @@ const PageFallback = () => (
 export default function HomePage() {
   const [activePage, setActivePageState] = useState("Home");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [myBooks, setMyBooks] = useState<Book[]>([]);
+
+  // Pull the signed-in user's real library from the backend (cover = rendered
+  // page 1). Silently no-ops in demo mode (not authed / backend down).
+  useEffect(() => {
+    if (!api.isAuthed()) return;
+    let alive = true;
+    (async () => {
+      try {
+        const books = await api.listBooks();
+        const mapped = await Promise.all(
+          books.map(async (b) => {
+            let cover = "";
+            try {
+              cover = toBrowserUrl((await api.getPage(b.id, 1)).image_url);
+            } catch {
+              /* no page image yet */
+            }
+            return toUiBook(b, cover);
+          })
+        );
+        if (alive) setMyBooks(mapped);
+      } catch {
+        /* backend down / not authed — demo catalogue still renders below */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const setActivePage = (page: string) => {
     setActivePageState(page);
@@ -48,6 +79,9 @@ export default function HomePage() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
             <Greeting />
           </div>
+          {myBooks.length > 0 && (
+            <BookShelf title="Your Library" books={myBooks} onOpen={setSelectedBook} />
+          )}
           <BookShelf title="Continue Reading" books={continueReading} onOpen={setSelectedBook} />
           <BookShelf title="Recently Added" books={recentlyAdded} onOpen={setSelectedBook} />
           <BookShelf title="Popular on Kinora" books={popularOnKinora} onOpen={setSelectedBook} />

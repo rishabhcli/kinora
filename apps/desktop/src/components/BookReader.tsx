@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState, useEffect, type CSSProperties } from "react";
 import type { Book } from "../data/books";
+import { api, toBrowserUrl } from "../lib/api";
 
 interface BookReaderProps {
   book: Book | null;
@@ -13,9 +14,30 @@ const HINGE: [number, number, number, number] = [0.66, 0, 0.2, 1];
 
 export default function BookReader({ book, onClose }: BookReaderProps) {
   const [page, setPage] = useState(0);
+  const [clipUrl, setClipUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (book) setPage(0);
+  }, [book]);
+
+  // For a real backend book, play its actual rendered shot clip. Mock catalogue
+  // books 404 here and fall back to the bundled AI film.
+  useEffect(() => {
+    setClipUrl(null);
+    if (!book || !api.isAuthed()) return;
+    let alive = true;
+    (async () => {
+      try {
+        const shots = await api.getShots(book.id);
+        const withClip = shots.find((s) => s.clip_url);
+        if (alive && withClip?.clip_url) setClipUrl(toBrowserUrl(withClip.clip_url));
+      } catch {
+        /* not a backend book / no clips yet — keep the bundled film */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, [book]);
 
   // Lock body scroll while the reader is open.
@@ -109,8 +131,8 @@ export default function BookReader({ book, onClose }: BookReaderProps) {
                   {/* The generated film — real AI video (Wan), playing in-app. */}
                   <div className="glass-card rounded-xl overflow-hidden relative" style={{ aspectRatio: "16 / 9", boxShadow: "0 18px 50px rgba(0,0,0,0.55)" }}>
                     <video
-                      key={film}
-                      src={film}
+                      key={clipUrl ?? film}
+                      src={clipUrl ?? film}
                       poster={book.coverImage}
                       autoPlay
                       muted
