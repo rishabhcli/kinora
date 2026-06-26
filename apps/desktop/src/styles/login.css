@@ -568,3 +568,1057 @@
   10% { transform: translateX(200%); }
   100% { transform: translateX(200%); }
 }
+
+/* ── Below: Agent 11 login/auth experience (merged) ────────────────── */
+/* ============================================================================
+   KINORA — Login / Auth experience
+   A private screening room for literature: a wall of books receding into the
+   dark, lit by a warm projector beam with dust adrift in the light, and a
+   frosted "now showing" card.
+
+   Token-driven: every colour derives from the --auth-* custom properties below
+   (one source of truth — Agent 8 can repoint these to global --kinora-* tokens
+   without touching markup). Owned by Agent 11; imported by index.css.
+   ========================================================================== */
+
+:root {
+  /* palette */
+  --auth-abyss: #0a0908;
+  --auth-bg: #0e0d0c;
+  --auth-bg-2: #141210;
+  --auth-surface: #181614;
+  --auth-card: rgba(20, 17, 15, 0.93);
+  --auth-ink: #f4efe6; /* headings */
+  --auth-text: #e8e2d8; /* body */
+  --auth-muted: #b3a99d; /* secondary (AA on card) */
+  --auth-subtle: #8a8074; /* tertiary (still AA) */
+  --auth-gold: #d4a44e;
+  --auth-gold-bright: #e8c878;
+  --auth-danger: #e88c6a;
+  --auth-good: #8fb573;
+
+  /* rgb channels for effects (specular / shadow / warm light) */
+  --auth-hi: 246, 240, 231; /* warm white highlight */
+  --auth-shadow: 6, 5, 4; /* deep shadow */
+  --auth-gold-rgb: 212, 164, 78;
+
+  /* cream page-block (BookWall 3D books) */
+  --auth-page: #e7dcc4;
+  --auth-page-2: #d8ccb3;
+  --auth-page-3: #cdc1a7;
+  --auth-book-back-1: #2c2722;
+  --auth-book-back-2: #16130f;
+
+  /* derived */
+  --auth-line: rgba(var(--auth-hi), 0.1);
+  --auth-line-strong: rgba(var(--auth-hi), 0.16);
+}
+
+/* ====================== ROOT + LAYOUT ====================== */
+.auth-root {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--auth-bg);
+  color: var(--auth-text);
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+.auth-layout {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: 4vw;
+  padding: clamp(28px, 5vw, 80px);
+}
+
+/* ====================== BRAND RAIL ====================== */
+.auth-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  max-width: 520px;
+  padding: 36px 40px;
+  /* a soft local scrim so the rail text stays AA over the moving wall */
+  border-radius: 28px;
+}
+.auth-brand::before {
+  content: "";
+  position: absolute;
+  inset: -8% -12% -8% -16%;
+  background: radial-gradient(
+    70% 80% at 30% 50%,
+    rgba(var(--auth-shadow), 0.66) 0%,
+    rgba(var(--auth-shadow), 0.34) 45%,
+    transparent 78%
+  );
+  z-index: -1;
+  pointer-events: none;
+}
+
+.auth-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+.auth-lockup-mark {
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(var(--auth-shadow), 0.5));
+}
+.auth-lockup-word {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--auth-ink);
+}
+.auth-lockup--md .auth-lockup-word {
+  font-size: 21px;
+}
+.auth-lockup--sm .auth-lockup-word {
+  font-size: 16px;
+}
+
+.auth-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.auth-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  color: var(--auth-gold);
+}
+.auth-eyebrow-rule {
+  display: inline-block;
+  width: 30px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--auth-gold), transparent);
+}
+.auth-tagline {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(34px, 4vw, 52px);
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  background: linear-gradient(168deg, var(--auth-ink) 0%, #efe3cf 42%, var(--auth-gold-bright) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.auth-sub {
+  max-width: 30rem;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--auth-muted);
+}
+.auth-footnote {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  color: var(--auth-subtle);
+}
+
+/* ====================== CARD ====================== */
+.auth-card-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-card {
+  position: relative;
+  width: 100%;
+  max-width: 392px;
+  padding: 34px 32px 30px;
+  border-radius: 24px;
+  background: var(--auth-card);
+  -webkit-backdrop-filter: blur(36px) saturate(135%);
+  backdrop-filter: blur(36px) saturate(135%);
+  border: 0.5px solid var(--auth-line-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--auth-hi), 0.1),
+    0 1px 0 rgba(var(--auth-shadow), 0.4),
+    0 34px 90px -22px rgba(var(--auth-shadow), 0.85);
+}
+.auth-card-head {
+  text-align: center;
+  margin-bottom: 22px;
+}
+.auth-card-mark {
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.auth-card-mark .auth-lockup-word {
+  color: var(--auth-text);
+}
+.auth-card-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: 23px;
+  letter-spacing: -0.01em;
+  color: var(--auth-ink);
+}
+.auth-card-sub {
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--auth-muted);
+}
+
+/* ====================== FORM FIELDS ====================== */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+.auth-field {
+  display: flex;
+  flex-direction: column;
+}
+.auth-field-label {
+  margin: 0 0 6px 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--auth-muted);
+}
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.auth-input-icon {
+  position: absolute;
+  left: 13px;
+  display: inline-flex;
+  color: var(--auth-subtle);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+.auth-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--auth-ink);
+  background: rgba(var(--auth-hi), 0.05);
+  border: 1px solid var(--auth-line-strong);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.auth-input.has-icon {
+  padding-left: 40px;
+}
+.auth-input.has-trailing {
+  padding-right: 44px;
+}
+.auth-input::placeholder {
+  color: var(--auth-subtle);
+  opacity: 0.7;
+}
+.auth-input:hover {
+  border-color: rgba(var(--auth-hi), 0.22);
+}
+.auth-input:focus {
+  outline: none;
+  background: rgba(var(--auth-hi), 0.07);
+  border-color: rgba(var(--auth-gold-rgb), 0.55);
+  box-shadow: 0 0 0 3px rgba(var(--auth-gold-rgb), 0.16);
+}
+.auth-input-wrap:focus-within .auth-input-icon {
+  color: var(--auth-gold);
+}
+.auth-input-wrap.is-invalid .auth-input {
+  border-color: rgba(232, 140, 106, 0.6);
+}
+.auth-input-wrap.is-invalid .auth-input:focus {
+  box-shadow: 0 0 0 3px rgba(232, 140, 106, 0.16);
+}
+.auth-input-trailing {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+}
+.auth-field-error {
+  min-height: 17px;
+  margin: 5px 2px 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--auth-danger);
+}
+
+/* password show/hide */
+.auth-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--auth-subtle);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+.auth-eye:hover {
+  color: var(--auth-text);
+  background: rgba(var(--auth-hi), 0.07);
+}
+
+/* strength meter */
+.auth-strength {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 2px 0;
+}
+.auth-strength-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--auth-hi), 0.08);
+  overflow: hidden;
+}
+.auth-strength-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease;
+}
+.auth-strength-fill.s1 { width: 25%; background: var(--auth-danger); }
+.auth-strength-fill.s2 { width: 50%; background: var(--auth-gold); }
+.auth-strength-fill.s3 { width: 75%; background: var(--auth-gold-bright); }
+.auth-strength-fill.s4 { width: 100%; background: var(--auth-good); }
+.auth-strength-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--auth-subtle);
+  min-width: 42px;
+}
+
+/* remember / forgot row */
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.auth-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--auth-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.auth-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.auth-check-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1px solid var(--auth-line-strong);
+  background: rgba(var(--auth-hi), 0.04);
+  color: transparent;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.auth-check input:checked + .auth-check-box {
+  background: var(--auth-gold);
+  border-color: var(--auth-gold);
+  color: var(--auth-abyss);
+}
+.auth-check input:focus-visible + .auth-check-box {
+  box-shadow: 0 0 0 3px rgba(var(--auth-gold-rgb), 0.3);
+}
+
+/* form-level message (error / info) */
+.auth-formmsg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.auth-formmsg svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.auth-formmsg--error {
+  color: var(--auth-danger);
+  background: rgba(232, 140, 106, 0.1);
+  border: 1px solid rgba(232, 140, 106, 0.22);
+}
+.auth-formmsg--info {
+  color: var(--auth-muted);
+  background: rgba(var(--auth-hi), 0.05);
+  border: 1px solid var(--auth-line);
+}
+
+/* primary CTA */
+.auth-submit {
+  position: relative;
+  width: 100%;
+  height: 46px;
+  margin-top: 18px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--auth-abyss);
+  background: linear-gradient(180deg, var(--auth-gold-bright) 0%, var(--auth-gold) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--auth-hi), 0.5),
+    0 10px 26px -10px rgba(var(--auth-gold-rgb), 0.5);
+  transition: transform 0.16s cubic-bezier(0.34, 1.45, 0.5, 1), box-shadow 0.2s ease, filter 0.2s ease;
+}
+.auth-submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--auth-hi), 0.6),
+    0 16px 34px -12px rgba(var(--auth-gold-rgb), 0.62);
+}
+.auth-submit:active:not(:disabled) {
+  transform: scale(0.985);
+}
+.auth-submit:disabled {
+  cursor: default;
+  opacity: 0.92;
+}
+.auth-submit-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.auth-submit-arrow {
+  transition: transform 0.22s ease;
+}
+.auth-submit:hover:not(:disabled) .auth-submit-arrow {
+  transform: translateX(3px);
+}
+.auth-spin {
+  animation: auth-spin 0.8s linear infinite;
+}
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  color: var(--auth-subtle);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--auth-line);
+}
+
+/* social */
+.auth-social-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.auth-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--auth-text);
+  background: rgba(var(--auth-hi), 0.05);
+  border: 1px solid var(--auth-line-strong);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.14s ease;
+}
+.auth-social:hover:not(:disabled) {
+  background: rgba(var(--auth-hi), 0.1);
+  border-color: rgba(var(--auth-hi), 0.24);
+}
+.auth-social:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.auth-social:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* demo + switch */
+.auth-demo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--auth-muted);
+  transition: color 0.18s ease;
+}
+.auth-demo:hover:not(:disabled) {
+  color: var(--auth-gold-bright);
+}
+.auth-demo svg {
+  transition: transform 0.22s ease;
+}
+.auth-demo:hover:not(:disabled) svg {
+  transform: translateX(3px);
+}
+.auth-switch {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--auth-subtle);
+}
+.auth-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--auth-muted);
+  font: inherit;
+  transition: color 0.16s ease;
+}
+.auth-link:hover {
+  color: var(--auth-text);
+}
+.auth-link--strong {
+  color: var(--auth-gold);
+  font-weight: 600;
+}
+.auth-link--strong:hover {
+  color: var(--auth-gold-bright);
+}
+
+/* focus-visible — a consistent gold ring across every control */
+.auth-root :focus-visible {
+  outline: 2px solid rgba(var(--auth-gold-rgb), 0.75);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.auth-input:focus-visible {
+  outline: none; /* the focus ring is the box-shadow above */
+}
+
+/* ====================== THRESHOLD (enter) ====================== */
+.auth-backdrop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.auth-bloom {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 50% at 50% 46%, rgba(var(--auth-gold-rgb), 0.5) 0%, rgba(var(--auth-gold-rgb), 0.12) 36%, transparent 68%),
+    radial-gradient(120% 90% at 50% 50%, rgba(var(--auth-hi), 0.14), transparent 60%);
+  mix-blend-mode: screen;
+}
+/* warm flash that carries the "library opens" beat into the home view (App.tsx) */
+.auth-enter-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 50% 48%, rgba(var(--auth-gold-rgb), 0.42) 0%, transparent 64%),
+    linear-gradient(180deg, rgba(var(--auth-shadow), 0.2), rgba(var(--auth-shadow), 0.3));
+}
+
+/* ============================================================================
+   CINEMATIC BACKDROP — projector beam + dust + the book wall
+   ========================================================================== */
+.auth-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% -12%, rgba(40, 33, 24, 0.5), transparent 60%),
+    linear-gradient(180deg, var(--auth-abyss) 0%, var(--auth-bg-2) 52%, var(--auth-abyss) 100%);
+  --mx: 0;
+  --my: 0;
+}
+.auth-backdrop-parallax {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(calc(var(--mx) * 7px), calc(var(--my) * 5px), 0);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* push the wall back into shadow — a quiet, deep room */
+.auth-walldim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(var(--auth-shadow), 0.62) 0%, rgba(var(--auth-shadow), 0.5) 52%, rgba(var(--auth-shadow), 0.7) 100%),
+    radial-gradient(140% 90% at var(--beam-x, 50%) -10%, transparent 30%, rgba(var(--auth-shadow), 0.35) 100%);
+}
+
+/* warm key light from above — the room's glow */
+.auth-keylight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    78% 50% at var(--beam-x, 50%) -10%,
+    rgba(var(--auth-gold-rgb), calc(0.28 * var(--warmth, 1))) 0%,
+    rgba(var(--auth-gold-rgb), 0.08) 42%,
+    transparent 64%
+  );
+  mix-blend-mode: screen;
+}
+
+/* the projector beam: a defined warm shaft that slowly sways */
+.auth-beam {
+  position: absolute;
+  inset: -25% -10%;
+  pointer-events: none;
+  transform-origin: var(--beam-x, 50%) 0%;
+  transform: rotate(var(--beam-angle, -12deg)) translate3d(calc(var(--mx) * 12px), 0, 0);
+  background:
+    radial-gradient(
+      20% 88% at var(--beam-x, 50%) -8%,
+      rgba(var(--auth-gold-rgb), calc(0.34 * var(--warmth, 1))) 0%,
+      rgba(var(--auth-gold-rgb), 0.12) 26%,
+      transparent 54%
+    ),
+    radial-gradient(
+      9% 70% at var(--beam-x, 50%) -8%,
+      rgba(var(--auth-hi), calc(0.22 * var(--warmth, 1))) 0%,
+      transparent 46%
+    );
+  mix-blend-mode: screen;
+  filter: blur(7px);
+  animation: auth-beam-sway 16s ease-in-out infinite;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes auth-beam-sway {
+  0%, 100% { transform: rotate(calc(var(--beam-angle, -12deg) - 1.6deg)); }
+  50% { transform: rotate(calc(var(--beam-angle, -12deg) + 1.6deg)); }
+}
+
+/* dust adrift in the light */
+.auth-dust {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.auth-mote {
+  position: absolute;
+  bottom: -2vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--auth-hi), 1) 0%, rgba(var(--auth-gold-rgb), 0.6) 50%, transparent 72%);
+  box-shadow: 0 0 6px rgba(var(--auth-gold-rgb), 0.55);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: auth-mote-rise var(--mote-dur, 32s) linear infinite;
+  animation-delay: var(--mote-delay, 0s);
+}
+@keyframes auth-mote-rise {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  12% { opacity: var(--mote-op, 0.4); }
+  88% { opacity: var(--mote-op, 0.4); }
+  100% { transform: translate3d(var(--mote-dx, 20px), -104vh, 0); opacity: 0; }
+}
+
+/* vignette + grain seal the room and protect card legibility */
+.auth-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(125% 100% at 50% 50%, transparent 38%, rgba(var(--auth-shadow), 0.72) 100%),
+    linear-gradient(180deg, rgba(var(--auth-shadow), 0.5) 0%, transparent 22%, transparent 70%, rgba(var(--auth-shadow), 0.62) 100%);
+}
+.auth-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ====================== BOOK WALL (migrated + depth-parallax) ====================== */
+.bookwall {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.bookwall-shelves {
+  position: absolute;
+  inset: -4% 0 -2%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+.shelf {
+  position: relative;
+  height: 21vh;
+  min-height: 172px;
+  /* depth: top shelves further back — smaller + dimmer (transform/opacity only) */
+  transform: scale(calc(1 - var(--depth, 0) * 0.15));
+  transform-origin: 50% 84%;
+  opacity: calc(1 - var(--depth, 0) * 0.42);
+}
+.shelf-rail {
+  position: absolute;
+  left: 0;
+  bottom: 13px;
+  display: flex;
+  align-items: flex-end;
+  gap: 30px;
+  padding: 0 30px;
+  width: max-content;
+  will-change: transform;
+}
+.shelf-rail--left {
+  animation: shelfSlideLeft var(--dur, 130s) linear infinite;
+}
+.shelf-rail--right {
+  animation: shelfSlideRight var(--dur, 130s) linear infinite;
+}
+@keyframes shelfSlideLeft {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes shelfSlideRight {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+.shelf-glass {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 13px;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--auth-hi), 0.14) 0%,
+    rgba(var(--auth-hi), 0.05) 30%,
+    rgba(var(--auth-hi), 0.015) 72%,
+    rgba(var(--auth-hi), 0.05) 100%
+  );
+  -webkit-backdrop-filter: blur(7px) saturate(118%);
+  backdrop-filter: blur(7px) saturate(118%);
+  box-shadow:
+    0 1px 0 rgba(var(--auth-hi), 0.18) inset,
+    0 16px 30px -16px rgba(var(--auth-shadow), 0.8);
+}
+.shelf-glass::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--auth-hi), 0.5) 16%,
+    rgba(var(--auth-hi), 0.72) 50%,
+    rgba(var(--auth-hi), 0.5) 84%,
+    transparent 100%
+  );
+}
+
+.wallbook {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(92px, 8.2vw, 118px);
+  aspect-ratio: 2 / 3;
+  perspective: 1100px;
+  --bt: 14px;
+  -webkit-box-reflect: below 2px linear-gradient(to bottom, rgba(var(--auth-shadow), 0.3) 0%, transparent 24%);
+}
+.wallbook-3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(-0.5 * var(--bt, 20px))) rotateY(var(--tilt, 23deg));
+}
+.wallbook-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px 5px 5px 2px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  box-shadow:
+    0 26px 46px -20px rgba(var(--auth-shadow), 0.92),
+    0 8px 18px -8px rgba(var(--auth-shadow), 0.6),
+    inset 0 0 0 1px rgba(var(--auth-hi), 0.06);
+}
+.wallbook-img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+.wallbook-gloss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(103deg, rgba(var(--auth-hi), 0.2) 0%, transparent 32%, transparent 70%, rgba(var(--auth-shadow), 0.3) 100%),
+    linear-gradient(
+      90deg,
+      rgba(var(--auth-shadow), 0.42) 0%,
+      rgba(var(--auth-shadow), 0) 6%,
+      rgba(var(--auth-hi), 0.06) 11%,
+      rgba(var(--auth-shadow), 0) 16%,
+      rgba(var(--auth-shadow), 0) 90%,
+      rgba(var(--auth-shadow), 0.16) 100%
+    );
+}
+.wallbook-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--bt, 22px));
+  width: var(--bt, 22px);
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 5px 0 10px rgba(var(--auth-shadow), 0.5), inset -2px 0 5px rgba(var(--auth-hi), 0.06);
+}
+.wallbook-spine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(var(--auth-shadow), 0.45) 0%, transparent 22%, transparent 74%, rgba(var(--auth-hi), 0.14) 100%);
+}
+.wallbook-fore {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: calc(-1 * var(--bt, 22px));
+  width: var(--bt, 22px);
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  border-radius: 0 2px 2px 0;
+  background-color: var(--auth-page);
+  background-image:
+    linear-gradient(90deg, rgba(35, 26, 12, 0.3), rgba(35, 26, 12, 0) 24%, rgba(35, 26, 12, 0) 72%, rgba(35, 26, 12, 0.2) 100%),
+    repeating-linear-gradient(90deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.18) 1.4px, rgba(120, 98, 60, 0.18) 1.7px);
+  box-shadow: inset 0 1px 2px rgba(var(--auth-hi), 0.28), inset 0 -1px 2px rgba(120, 100, 70, 0.2);
+}
+.wallbook-head {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: calc(-1 * var(--bt, 22px));
+  height: var(--bt, 22px);
+  transform-origin: bottom center;
+  transform: rotateX(-90deg);
+  background-color: var(--auth-page-2);
+  background-image:
+    linear-gradient(180deg, rgba(var(--auth-shadow), 0.34), rgba(var(--auth-shadow), 0.05) 60%),
+    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.14) 1.4px, rgba(120, 98, 60, 0.14) 1.7px);
+}
+.wallbook-tail {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: calc(-1 * var(--bt, 22px));
+  height: var(--bt, 22px);
+  transform-origin: top center;
+  transform: rotateX(90deg);
+  background-color: var(--auth-page-3);
+  background-image:
+    linear-gradient(0deg, rgba(var(--auth-shadow), 0.46), rgba(var(--auth-shadow), 0.08) 60%),
+    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.12) 1.4px, rgba(120, 98, 60, 0.12) 1.7px);
+}
+.wallbook-back {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(-1 * var(--bt, 22px)));
+  border-radius: 2px 5px 5px 2px;
+  background: linear-gradient(135deg, var(--auth-book-back-1) 0%, var(--auth-book-back-2) 100%);
+  box-shadow: inset 0 0 22px rgba(var(--auth-shadow), 0.55);
+}
+.wallbook--flip .wallbook-face,
+.wallbook--flip .wallbook-back {
+  border-radius: 5px 2px 2px 5px;
+}
+.wallbook--flip .wallbook-spine {
+  left: auto;
+  right: calc(-1 * var(--bt, 18px));
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  border-radius: 0 2px 2px 0;
+}
+.wallbook--flip .wallbook-spine::after {
+  background: linear-gradient(90deg, rgba(var(--auth-hi), 0.14) 0%, transparent 26%, transparent 78%, rgba(var(--auth-shadow), 0.45) 100%);
+}
+.wallbook--flip .wallbook-fore {
+  right: auto;
+  left: calc(-1 * var(--bt, 18px));
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  border-radius: 2px 0 0 2px;
+}
+.wallbook--flip .wallbook-gloss {
+  background:
+    linear-gradient(257deg, rgba(var(--auth-hi), 0.2) 0%, transparent 32%, transparent 70%, rgba(var(--auth-shadow), 0.3) 100%),
+    linear-gradient(
+      270deg,
+      rgba(var(--auth-shadow), 0.42) 0%,
+      rgba(var(--auth-shadow), 0) 6%,
+      rgba(var(--auth-hi), 0.06) 11%,
+      rgba(var(--auth-shadow), 0) 16%,
+      rgba(var(--auth-shadow), 0) 90%,
+      rgba(var(--auth-shadow), 0.16) 100%
+    );
+}
+
+/* edge fades */
+.bookwall-edge {
+  position: absolute;
+  pointer-events: none;
+}
+.bookwall-edge--l {
+  inset: 0 auto 0 0;
+  width: 13%;
+  background: linear-gradient(90deg, var(--auth-abyss), transparent);
+}
+.bookwall-edge--r {
+  inset: 0 0 0 auto;
+  width: 13%;
+  background: linear-gradient(270deg, var(--auth-abyss), transparent);
+}
+.bookwall-edge--t {
+  inset: 0 0 auto 0;
+  height: 22%;
+  background: linear-gradient(180deg, rgba(var(--auth-shadow), 0.8), transparent);
+}
+.bookwall-edge--b {
+  inset: auto 0 0 0;
+  height: 26%;
+  background: linear-gradient(0deg, rgba(var(--auth-shadow), 0.9), transparent);
+}
+
+/* ====================== NATIVE GLASS (vibrancy shows through) ====================== */
+/* In the macOS native shell the backdrop reads against real Liquid Glass, so the
+   abyss fills go translucent; the card stays solid for legibility. */
+html.kinora-native .auth-backdrop {
+  background: linear-gradient(180deg, rgba(14, 12, 11, 0.34) 0%, rgba(10, 9, 8, 0.46) 100%);
+}
+html.kinora-native .auth-root {
+  background: transparent;
+}
+
+/* ====================== RESPONSIVE ====================== */
+@media (max-width: 880px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 24px;
+  }
+  .auth-brand {
+    align-items: center;
+    text-align: center;
+    padding: 0 16px;
+    gap: 16px;
+    max-width: 440px;
+  }
+  .auth-brand .auth-sub {
+    display: none; /* keep the narrow layout focused on the card */
+  }
+  .auth-eyebrow,
+  .auth-footnote {
+    justify-content: center;
+  }
+  .auth-tagline {
+    font-size: clamp(28px, 7vw, 38px);
+  }
+}
+@media (max-width: 560px) {
+  /* the card carries the brand mark here — drop the rail to avoid a double logo */
+  .auth-brand {
+    display: none;
+  }
+  .auth-card {
+    padding: 28px 22px 24px;
+  }
+}
+/* short viewports: trim the brand so the card never scrolls */
+@media (max-height: 720px) {
+  .auth-brand .auth-sub {
+    display: none;
+  }
+}
+
+/* ====================== REDUCED MOTION ====================== */
+@media (prefers-reduced-motion: reduce) {
+  .shelf-rail--left,
+  .shelf-rail--right,
+  .auth-beam,
+  .auth-spin {
+    animation: none !important;
+  }
+  .auth-mote {
+    display: none;
+  }
+  .auth-backdrop-parallax,
+  .auth-beam {
+    transform: rotate(var(--beam-angle, -12deg));
+  }
+  .auth-backdrop-parallax {
+    transform: none;
+  }
+}
+/* the JS-set static class mirrors the media query for the WKWebView path */
+.auth-backdrop.is-static .auth-mote {
+  display: none;
+}
+.auth-backdrop.is-static .shelf-rail--left,
+.auth-backdrop.is-static .shelf-rail--right,
+.auth-backdrop.is-static .auth-beam {
+  animation: none;
+}
