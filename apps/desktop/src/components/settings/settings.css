@@ -1,0 +1,76 @@
+/* Settings UI — scoped widget styling (Agent 9's lane; NOT index.css).
+   All selectors are prefixed `.kn-set-` so they never collide with global CSS. */
+
+/* Range slider — a slim track with a gold-edged knob, themed for the dark UI. */
+.kn-set-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+.kn-set-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--kn-set-track, rgba(255, 255, 255, 0.12));
+}
+.kn-set-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #f3ede3;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.12s ease;
+}
+.kn-set-slider:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+.kn-set-slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid rgba(212, 164, 78, 0.9);
+  outline-offset: 2px;
+}
+.kn-set-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.kn-set-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 999px;
+  background: #f3ede3;
+}
+
+/* Sidebar item focus ring (keyboard nav). */
+.kn-set-focusable:focus-visible {
+  outline: 2px solid rgba(212, 164, 78, 0.85);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* Detail pane scrollbar — thin, on hover. */
+.kn-set-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+.kn-set-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.kn-set-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+/* A reusable hairline divider between grouped rows. */
+.kn-set-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin-left: 14px;
+}

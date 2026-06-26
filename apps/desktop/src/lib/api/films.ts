@@ -61,7 +61,7 @@ export interface SceneFilm {
   stitched: boolean; // true iff the stitched mp4 exists in the object store
   oss_url: string | null; // presigned GET URL (null until stitched); rewrite via toBrowserUrl()
   url_expires_at: string | null; // ISO-8601 UTC; null when public (non-expiring)
-  duration_s: number | null;
+  duration_s: number | null; // film duration; null when no accepted shots (sync_map.duration_s is 0.0)
   shot_count: number;
   sync_map: FilmSyncMap;
 }
@@ -77,7 +77,7 @@ export interface EventFilm {
   stitched: boolean;
   oss_url: string | null;
   url_expires_at: string | null;
-  duration_s: number | null;
+  duration_s: number | null; // film duration; null when no accepted shots (sync_map.duration_s is 0.0)
   shot_count: number;
   sync_map: FilmSyncMap; // event-level (== the single scene's map today)
   scenes: SceneRef[]; // composing scenes (today: [the event's own scene])

@@ -5,49 +5,9 @@
 // fades out the instant the film is revealed, resolving seamlessly into playback.
 import { motion } from "framer-motion";
 import { SkeletonShimmer } from "../components/SkeletonShimmer";
+import { warmupHeadline, warmupSteps } from "./warmupModel";
 import type { MachineState } from "./machine";
 import type { FilmSession } from "./useFilmSession";
-
-interface Step {
-  label: string;
-  done: boolean;
-}
-
-function stepsFor(state: MachineState, live: boolean): Step[] {
-  const { load, mode } = state;
-  if (mode === "fallback") {
-    return [
-      { label: "Opening the book", done: true },
-      { label: "Cueing the film", done: load.firstFrame },
-    ];
-  }
-  const base: Step[] = [
-    { label: "Opening the book", done: load.meta || load.pages || load.shots || true },
-    { label: "Reading the text", done: load.pages },
-    { label: "Composing the shots", done: load.shots },
-  ];
-  if (live || load.session) {
-    base.push({ label: "Connecting the film", done: load.session });
-    base.push({ label: "Generating ahead", done: load.firstFrame });
-  } else {
-    base.push({ label: "Cueing the film", done: load.firstFrame });
-  }
-  return base;
-}
-
-function headline(state: MachineState): string {
-  if (state.mode === "fallback") return "Preparing your film";
-  switch (state.phase) {
-    case "opening":
-      return "Opening the book";
-    case "loading":
-      return "Reading the story";
-    case "warming":
-      return state.mode === "live" ? "Generating your film" : "Preparing your film";
-    default:
-      return "Almost ready";
-  }
-}
 
 export function WarmUp({
   state,
@@ -60,7 +20,7 @@ export function WarmUp({
   bookTitle: string;
   reduce: boolean;
 }) {
-  const steps = stepsFor(state, session.live);
+  const steps = warmupSteps(state, session.live);
   const latestCrew = session.crew[session.crew.length - 1];
   const subline =
     session.live && latestCrew
@@ -71,6 +31,7 @@ export function WarmUp({
 
   return (
     <motion.div
+      data-warmup
       className="absolute inset-0 z-20 grid place-items-center"
       initial={reduce ? { opacity: 1 } : { opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -94,7 +55,7 @@ export function WarmUp({
         </div>
 
         <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-kinora-muted">{bookTitle}</p>
-        <h2 className="mb-1.5 font-serif text-xl font-semibold text-kinora-text">{headline(state)}</h2>
+        <h2 className="mb-1.5 font-serif text-xl font-semibold text-kinora-text">{warmupHeadline(state)}</h2>
         <p className="mx-auto mb-5 max-w-[34ch] text-[12px] leading-relaxed text-kinora-muted">{subline}</p>
 
         {/* Honest step checklist */}

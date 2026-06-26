@@ -24,19 +24,29 @@ export function BuiltinBookOpenTransition({
 }: BookOpenTransitionProps) {
   const isPresent = useIsPresent();
   const openedRef = useRef(false);
+  // Hold the latest callback in a ref so the open timer depends only on `reduce`
+  // — otherwise an unstable onOpened identity (parent re-renders on every SSE
+  // tick) would reset the timer and the reveal would never fire.
+  const onOpenedRef = useRef(onOpened);
+  onOpenedRef.current = onOpened;
 
   // The open choreography completes at a known time — reveal then, regardless of
-  // whether any frame/animation callback fires. Bulletproof against a hang.
+  // whether any frame/animation callback fires. Re-arms on (re-)entry: if a rapid
+  // same-book close→reopen interrupts the exit, AnimatePresence REUSES this
+  // instance (isPresent flips back true) — without re-arming, onOpened/ANIM_READY
+  // would never fire again and the room would freeze in the warm-up.
   useEffect(() => {
+    if (!isPresent) return; // exiting — don't arm
+    openedRef.current = false; // (re-)arm on entry / re-entry
     const ms = reduce ? 260 : 1050;
     const t = window.setTimeout(() => {
       if (!openedRef.current) {
         openedRef.current = true;
-        onOpened?.();
+        onOpenedRef.current?.();
       }
     }, ms);
     return () => window.clearTimeout(t);
-  }, [reduce, onOpened]);
+  }, [reduce, isPresent]);
 
   const noBlur = prefersReducedTransparency();
 
@@ -45,6 +55,7 @@ export function BuiltinBookOpenTransition({
       className="fixed inset-0 z-[100]"
       role="dialog"
       aria-modal="true"
+      aria-label={cover.title ? `Reading ${cover.title}` : "Reading room"}
       initial="closed"
       animate="open"
       exit="closed"

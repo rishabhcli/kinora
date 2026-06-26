@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from httpx import AsyncClient
+from redis.asyncio.client import PubSub
 
 from app.composition import Container
 from app.db.models.enums import EntityType, RenderPriority, ShotStatus
@@ -197,7 +197,7 @@ async def test_conflict_choice_records_and_announces(
 
 
 async def _collect(
-    container: Container, pubsub: Any, *, until: str, limit: int = 6
+    container: Container, pubsub: PubSub, *, until: str, limit: int = 6
 ) -> list[dict]:
     """Read up to ``limit`` session events, stopping once ``until`` is seen."""
     events: list[dict] = []

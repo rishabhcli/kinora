@@ -102,7 +102,7 @@ async def test_none_result_is_cached_distinctly_from_a_miss() -> None:
     cache = ResultCache(backend, namespace="x")
     calls = 0
 
-    async def factory() -> None:
+    async def factory() -> str | None:
         nonlocal calls
         calls += 1
         return None

@@ -130,7 +130,8 @@ def shot_size_for(ordinal: int, beat: Beat) -> str:
         return "close"  # land a pose / intimate detail on a close insert
     if any(cue in text for cue in _WIDE_CUES):
         return "wide"  # a re-establishing wide (new vista / location)
-    # Interior rhythm: alternate medium / close so the cut sequence breathes.
+    # Interior rhythm: odd ordinals play medium, even ordinals punch in to a close
+    # insert — so the cut sequence breathes instead of holding one size.
     return "medium" if ordinal % 2 == 1 else "close"
 
 

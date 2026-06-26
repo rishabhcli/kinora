@@ -56,7 +56,6 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
   layersRef.current = layers;
   const targetSrc = useRef("");
   const pendingTime = useRef(0);
-  const pendingScrub = useRef(true);
 
   const activeEl = useCallback((): HTMLVideoElement | undefined => {
     const ls = layersRef.current;
@@ -87,13 +86,19 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
       setPlayhead(src, time, scrub) {
         if (!src) return; // generating the next clip — keep the last frame on screen
         if (src === targetSrc.current) {
+          // A flick that interrupts a settle-crossfade hard-cuts to the active layer
+          // (scrubbing shows frames, not fades).
+          if (scrub && layersRef.current.length === 2) {
+            const top = layersRef.current[1];
+            setLayers([top]);
+            setRevealKey(top.key);
+          }
           applyActive(time, scrub); // same film → imperative seek/play, no re-render
           return;
         }
         // The film changed (event/scene boundary).
         targetSrc.current = src;
         pendingTime.current = time;
-        pendingScrub.current = scrub;
         const key = ++keySeq.current;
         const top = layersRef.current[layersRef.current.length - 1];
         if (reducedMotion || scrub || !top) {
@@ -116,14 +121,12 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
     [reducedMotion], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // Incoming layer decoded a frame at the target time → reveal it (crossfade), or
-  // for an instant cut it's already revealed; either way seek + set play state.
+  // A newly-mounted incoming layer decoded its target frame → reveal it (start the
+  // crossfade). We deliberately do NOT touch currentTime here: `onSeeked` fires on
+  // EVERY seek, including the rAF loop's live scrub seeks, so re-seeking here would
+  // yank the playhead back to the entry frame and defeat scrubbing. `currentTime` is
+  // owned solely by `applyActive`; initial play by the `autoPlay` attribute.
   const onReady = (key: number) => {
-    const el = els.current.get(key);
-    if (el) {
-      if (pendingScrub.current && Number.isFinite(pendingTime.current)) seek(el, pendingTime.current);
-      else if (el.paused) void el.play().catch(() => {});
-    }
     const ls = layersRef.current;
     if (ls.length === 2 && ls[1].key === key) setRevealKey(key); // begin fade-in
   };
@@ -156,6 +159,11 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
     );
   }
 
+  // The visible layer. Normally `revealKey`, but if a rapid second src change has
+  // dropped that layer, fall back to the oldest still-mounted one (most likely
+  // already decoded) so a layer is *always* visible — never a blank/black pane.
+  const shownKey = layers.some((l) => l.key === revealKey) ? revealKey : layers[0]?.key;
+
   return (
     <div className={className} style={style}>
       {layers.map((l) => (
@@ -180,7 +188,7 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
           }}
           className="absolute inset-0 h-full w-full bg-black object-cover"
           style={{
-            opacity: layers.length === 1 || l.key === revealKey ? 1 : 0,
+            opacity: layers.length === 1 || l.key === shownKey ? 1 : 0,
             transition: reducedMotion ? "none" : `opacity ${FADE_S}s ease`,
             willChange: "opacity",
           }}

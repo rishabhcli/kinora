@@ -212,6 +212,27 @@ overrides bind via `[data-contrast="high"]` on `<html>`. See
 Nothing. (Coordinates AA / a11y with Agent 06; coordinates the `index.css` split +
 font/dep tooling with Agent 12 — see `requests/agent-12-from-08.md`.)
 
+---
+
+## Producer finalization — A4 / A9 / A1 / A11 (verified from merged code; STATUS: FINAL)
+These contracts are defined in the registry above (§2 motion, §4 icons, §6 event-film);
+confirming the exact exports now on `overnight/integration`:
+
+- **A4 motion** — `src/motion/index.ts` exports: `MotionProvider`, `useMotion`,
+  `useReducedMotionPref`, `Reveal` (+`RevealProps`), `PageTransition`,
+  `BookOpenTransition` (+`BookOpenTransitionProps`, `CoverArt`), `ShelfScroller`
+  (+`ShelfScrollerProps`), `Tilt`/`useTilt` (+`TiltProps`, `TiltOptions`), `Pressable`,
+  `springs`, variants. All reduced-motion-aware (gate on A6).
+- **A9 icons** — `src/components/icons/index.ts` exports: `Icon` (default +named, `IconProps`),
+  `IconName`/`SymbolWeight`/`RenderingMode`/`GlyphDef`/`GlyphLayer` types, `GLYPHS`,
+  `ICON_NAMES`. Usage `<Icon name weight size mode title />` (§4).
+- **A1 event-film** — produces the §6 stitched mp4 + sync map (`SyncEntry`); exposed by
+  A3's `routes/films.py` + `films/contract.py`, consumed by A2's `ScrollFilmEngine`.
+- **A11 login** — consumer (no published contract); composes A8 tokens + A4 motion +
+  A9 icons + the demo/offline library entry. `App.tsx` gates login↔home.
+
+All producer sections in this registry are now filled.
+
 
 ## Agent 06 — A11Y (folded in on merge)
 
@@ -671,10 +692,25 @@ Event names match §5.6. `sync_map` is a `FilmSyncMap` (canonical shape above).
 { event: "event_stitched", event_id: string, oss_url: string, sync_map: FilmSyncMap }
 ```
 
-Builders live in `backend/app/films/contract.py`:
-`scene_stitched_event(stitch_result, shot_spans)` and `event_stitched_event(...)` →
-the canonical payload dicts. Producers (Agent 1 worker / Agent 12) should emit via these so
-SSE and REST are byte-compatible (no client adapter). See `requests/agent-03.md`.
+Builders live in `backend/app/films/contract.py`. **Exact signatures:**
+`scene_stitched_event(*, scene_id, oss_url, sync_map: FilmSyncMap)` and
+`event_stitched_event(*, event_id, oss_url, sync_map: FilmSyncMap)`. A producer emits in two
+steps — convert the merged render map to a `FilmSyncMap`, then build the frame:
+
+```python
+from app.films.contract import film_sync_map_from_merged, scene_stitched_event
+
+# spans: {shot_id: [word_start, word_end]} from each shot's source_span.word_range
+fsm = film_sync_map_from_merged(stitched.sync_map, scene_id=stitched.scene_id, spans=spans)
+await redis.publish(channel, scene_stitched_event(
+    scene_id=stitched.scene_id, oss_url=stitched.clip_url, sync_map=fsm))
+```
+
+Emitting via these keeps SSE byte-compatible with REST (no client adapter). **Current state:** the
+worker (`app/queue/worker.py`, Agent 1) still emits render-shaped `scene_stitched`
+(`video_start_s`/no `word_range`) and nothing emits `event_stitched` yet — so until a producer
+adopts the builders the SSE frames do **not** match this `FilmSyncMap` shape on the wire. Wiring
+is a cross-seam item in `requests/agent-03.md`.
 
 ### 6. Client (films.ts) — Agent 2 consumes this, no adapter
 

@@ -1,0 +1,106 @@
+{
+  "event_id": "bridge_chase",
+  "book_id": "demo_book",
+  "scene_id": "scene_005",
+  "shots": [
+    {
+      "shot_id": "bridge_chase_shot_00",
+      "beat_id": "b0",
+      "ordinal": 0,
+      "render_mode": "reference_to_video",
+      "summary": "A wide stone bridge at dusk, fog rolling low over the water.",
+      "camera": {
+        "move": "push_in",
+        "speed": "slow",
+        "shot_size": "wide"
+      },
+      "duration_s": 6.25,
+      "source_span": {
+        "page": 12,
+        "para": null,
+        "word_range": [
+          100,
+          140
+        ]
+      },
+      "directive": {
+        "wardrobe": "a rain-dark travelling coat",
+        "setting": "a fog-wrapped stone bridge over black water at dusk",
+        "lighting": "low-key",
+        "time_of_day": "dusk",
+        "camera_logic": "establishing",
+        "screen_direction": "neutral",
+        "motion_reversal": false,
+        "hand_off": "end on: A wide stone bridge at dusk, fog rolling low over the water",
+        "continues_from_shot_id": null,
+        "last_frame_key": null
+      }
+    },
+    {
+      "shot_id": "bridge_chase_shot_01",
+      "beat_id": "b1",
+      "ordinal": 1,
+      "render_mode": "video_continuation",
+      "summary": "She sprints across the planks, boots pounding, breath ragged, the pursuers gaining behind her in a frantic, headlong chase.",
+      "camera": {
+        "move": "pan",
+        "speed": "fast",
+        "shot_size": "medium"
+      },
+      "duration_s": 4.56,
+      "source_span": {
+        "page": 12,
+        "para": null,
+        "word_range": [
+          141,
+          180
+        ]
+      },
+      "directive": {
+        "wardrobe": "a rain-dark travelling coat",
+        "setting": "a fog-wrapped stone bridge over black water at dusk",
+        "lighting": "low-key",
+        "time_of_day": "dusk",
+        "camera_logic": "continuation",
+        "screen_direction": "left_to_right",
+        "motion_reversal": false,
+        "hand_off": "end on: She sprints across the planks, boots pounding, breath ragged, the pursuers gaining behind her in a frantic, headlong chase",
+        "continues_from_shot_id": "bridge_chase_shot_00",
+        "last_frame_key": "lastframes/demo_book/bridge_chase_shot_00.png"
+      }
+    },
+    {
+      "shot_id": "bridge_chase_shot_02",
+      "beat_id": "b2",
+      "ordinal": 2,
+      "render_mode": "first_last_frame",
+      "summary": "She reaches the far side and turns to face them.",
+      "camera": {
+        "move": "static",
+        "speed": "medium",
+        "shot_size": "close"
+      },
+      "duration_s": 4.8,
+      "source_span": {
+        "page": 13,
+        "para": null,
+        "word_range": [
+          181,
+          205
+        ]
+      },
+      "directive": {
+        "wardrobe": "a rain-dark travelling coat",
+        "setting": "a fog-wrapped stone bridge over black water at dusk",
+        "lighting": "low-key",
+        "time_of_day": "dusk",
+        "camera_logic": "continuation",
+        "screen_direction": "right_to_left",
+        "motion_reversal": true,
+        "hand_off": "end on: She reaches the far side and turns to face them",
+        "continues_from_shot_id": "bridge_chase_shot_01",
+        "last_frame_key": "lastframes/demo_book/bridge_chase_shot_01.png"
+      }
+    }
+  ]
+}

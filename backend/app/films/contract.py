@@ -222,6 +222,8 @@ def merge_and_build_film_sync_map(
             if durations is not None and i < len(durations)
             else v_end - v_start
         )
+        # Hardening beyond render.merge_sync_segments (which does not clamp): for
+        # well-formed segments (video_end_s >= video_start_s) the result is identical.
         local_dur = max(0.0, local_dur)
         shift = offset - v_start
         shot_id = str(seg.get("shot_id", ""))

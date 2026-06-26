@@ -107,23 +107,34 @@ export function reduce(state: MachineState, event: MachineEvent): MachineState {
       return { ...state, load: { ...state.load, pages: true } };
     case "SHOTS":
       return { ...state, load: { ...state.load, shots: true } };
-    case "SESSION":
+    case "SESSION": {
+      // Enter warming; if a frame is already painted, fast-forward to ready.
+      const warming = bump(state.phase, "warming");
       return {
         ...state,
         // A prior FALLBACK wins — once degraded, stay on the bundled film.
         mode: state.mode === "fallback" ? "fallback" : "live",
         load: { ...state.load, session: true },
-        phase: bump(state.phase, "warming"),
+        phase: state.load.firstFrame ? bump(warming, "ready") : warming,
       };
-    case "FALLBACK":
+    }
+    case "FALLBACK": {
+      const warming = bump(state.phase, "warming");
       return {
         ...state,
         mode: "fallback",
         error: event.message ?? state.error,
-        phase: bump(state.phase, "warming"),
+        phase: state.load.firstFrame ? bump(warming, "ready") : warming,
       };
+    }
     case "FIRST_FRAME":
-      return { ...state, load: { ...state.load, firstFrame: true }, phase: bump(state.phase, "ready") };
+      // Only reveal once we've committed to a film source (warming); an eager
+      // frame during opening/loading is recorded but keeps the warm-up up.
+      return {
+        ...state,
+        load: { ...state.load, firstFrame: true },
+        phase: state.phase === "warming" ? "ready" : state.phase,
+      };
     case "ANIM_READY":
       return { ...state, animReady: true };
     case "REVEAL":

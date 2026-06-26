@@ -1,7 +1,7 @@
 // Password field: builds on Field with a real show/hide toggle button
 // (aria-pressed + label) and, in register mode, a strength meter derived from the
 // pure passwordStrength() estimator.
-import { forwardRef, useId, useState } from "react";
+import { forwardRef, useId, useState, type KeyboardEvent } from "react";
 import Field from "./Field";
 import AuthIcon from "./AuthIcon";
 import { passwordStrength } from "./validation";
@@ -24,8 +24,13 @@ const PasswordField = forwardRef<HTMLInputElement, Props>(function PasswordField
   ref,
 ) {
   const [visible, setVisible] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
   const meterId = useId();
   const strength = meter ? passwordStrength(value) : null;
+
+  const trackCaps = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (typeof e.getModifierState === "function") setCapsOn(e.getModifierState("CapsLock"));
+  };
 
   return (
     <div className="auth-password">
@@ -37,7 +42,12 @@ const PasswordField = forwardRef<HTMLInputElement, Props>(function PasswordField
         type={visible ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
+        onBlur={() => {
+          setCapsOn(false);
+          onBlur?.();
+        }}
+        onKeyDown={trackCaps}
+        onKeyUp={trackCaps}
         error={error}
         showError={showError}
         autoComplete={autoComplete}
@@ -62,6 +72,12 @@ const PasswordField = forwardRef<HTMLInputElement, Props>(function PasswordField
           </div>
           <span className="auth-strength-label">{strength.label}</span>
         </div>
+      )}
+      {capsOn && (
+        <p className="auth-caps" role="status">
+          <AuthIcon name="alert" size={13} brand={false} />
+          Caps Lock is on
+        </p>
       )}
     </div>
   );

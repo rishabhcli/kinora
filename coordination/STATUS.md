@@ -1,61 +1,51 @@
-# STATUS — overnight/integration live board
+# STATUS — overnight/integration (FINAL)
 
 **Captain:** Agent 12 · **Branch:** `overnight/integration` · **Base:** `4863a0c` (main)
-**HEAD:** `aa2b406` · **Last updated:** 2026-06-26 (Captain — integration cycle 1 complete)
+**Last updated:** 2026-06-26 — **integration COMPLETE**
 
-## 🏁 MILESTONE: all 11 agents first-merged · gate GREEN
-Every agent branch has been integrated at least once and the tree is green both ends.
+## 🏁 DONE — all 11 agents integrated, gate GREEN, app verified end-to-end
+All eleven agent branches merged (and re-merged to their latest); every worktree clean
+(pending = 0). The integrated result is green and shippable.
 
-## 🚦 GATE: GREEN ✅
-- Frontend: `pnpm --filter @kinora/desktop typecheck && build` → **green** (CSS 73 kB).
-- Backend: `make test` → **408 passed, 139 skipped, 0 failures**.
-- Bonus (NOT in hard gate): desktop `vitest` → **64 tests pass**; **7 test files fail to load**
-  ("No test suite found" / non-vitest style) — A9 (settings, glyphs, symbol), A10 (crossfade,
-  fallback, machine), A2 (timeline). Tracked in each agent's request queue; not a blocker.
+## 🚦 FINAL GATE: GREEN ✅
+| Gate | Result |
+|---|---|
+| `pnpm --filter @kinora/desktop typecheck` | ✅ pass |
+| `pnpm --filter @kinora/desktop build` | ✅ pass (CSS ~73 kB, all custom classes present) |
+| `make lint` (ruff + mypy) | ✅ All checks passed · mypy: 0 issues / 234 files |
+| `make test` | ✅ **408 passed**, 140 skipped, 0 failed |
+| `alembic heads` | ✅ single head `d9e2f4a6b8c1` (no fork) |
+| desktop `vitest` (bonus) | 92 pass; 8 non-vitest files (A9/A10/A2) tracked — not in gate |
 
-## 📣 Agents: pull the rails + keep your tests vitest-shaped
-`git merge overnight/integration` (clean tree) to get: the **`src/styles/` split** (edit *your*
-partial; aggregator + `main.tsx` are the Captain's), the **`api.ts` `http`/`BASE`** primitives
-(CONTRACTS §7 — A3: drop your private `lib/api/http.ts`, import `{ http } from "../api"`), and
-**`coordination/`**. Write `*.test.ts` with vitest `describe/it/expect` so they register.
+## App walkthrough (DoD #2) — `coordination/artifacts/agent-12/`
+Drove the built renderer (vite :5173) headless; **0 console / 0 page errors** across the
+whole flow. `walkthrough.webm` (recording, incl. scroll-scrub) + `01..06` screenshots +
+`WALKTHROUGH.md`. Verified: login (A11+BookWall) → demo library (A5 public-domain shelf,
+A4 nav, A9 icons, A8 tokens) → open book → reading room (A10 shell + **A2 real
+ScrollFilmEngine** + **A6 ReadingControls** incl. read-aloud — producer swap live + A8) →
+SettingsPage (A9). Offline demo mode (backend optional); `KINORA_LIVE_VIDEO` off.
 
-## Per-agent board (cycle 1)
-| Agent | Branch | Integrated | Pending re-merge | Notes |
-|---|---|---|---|---|
-| A1 | `agent/01-event-director` | ✅ `b2f9709` | +4 | render pipeline (backend) |
-| A2 | `agent/02-scroll-film` | ✅ `49b6cf6` | 0 | timeline + scroll engine; Captain fixed demo prefs drift |
-| A3 | `agent/03-film-api` | ✅ `fb7d6d0` | +1 | films router registered; uses own http.ts (converge to §7) |
-| A4 | `agent/04-motion` | ✅ `c4b13c1` | +3 | motion system |
-| A5 | `agent/05-library` | ✅ `3190158` | 0 | library+covers+migration (single head); frontend pending |
-| A6 | `agent/06-a11y` | ✅ `a123564` | +5 | a11y layer + vitest infra |
-| A7 | `agent/07-optim` | ✅ `7614f84` | +1 | optim modules (default-off); patch proposals pending |
-| A8 | `agent/08-design` | ✅ `d7825ea` | +1 | design tokens (keystone) |
-| A9 | `agent/09-settings-icons` | ✅ `7d5afad` | +3 | icons + settings |
-| A10 | `agent/10-reading-room` | ✅ `20a359e` | 0 | reading shell + state machine |
-| A11 | `agent/11-login` | ✅ `aa2b406` | 0 | login/auth + BookWall |
+## Per-agent — all integrated ✅
+A1 event-director · A2 scroll-film · A3 film-api · A4 motion · A5 library+covers ·
+A6 a11y · A7 optim · A8 design-tokens · A9 settings/icons · A10 reading-room · A11 login.
+(See CHANGELOG.md for per-agent deliverables; MERGE-LOG.md for the gated merge ledger.)
 
-**Steady state:** agents keep committing; the Captain re-merges (git rerere auto-applies the
-seam resolutions). "Pending" = commits on the branch not yet in integration → next re-merge sweep.
+## Captain seam work done
+index.css→styles/ split + postcss-import aggregator · api.ts BASE/http primitives ·
+films + library routers registered · A7 migration re-parented (single head) · readingPrefs
++ ReadingRoom re-export shims · producer swap (reading room → real A2/A6) · deps/lockfile
+union · A2 demo ReadingPrefs contract-drift fix.
 
-## Merge order (dependency) — cycle 1 done in: A9,A4,A8,A6,A1,A7,A10,A2,A3,A5,A11
-`A8 → A6 → A4 → A9 → A1 → A3 → A2 → A5 → A10 → A11 → A7`
+## Docs (DoD #3) ✅
+OWNERSHIP.md (law) · CONTRACTS.md (registry §1–8 + producer appendices, all filled) ·
+MERGE-LOG.md (full ledger) · CAPTAIN-PLAYBOOK.md · CHANGELOG.md (+squash plan) · this STATUS.
+- **Dead deps:** `lucide-react` is **retained, not dead** — A11's `auth/AuthIcon.tsx` uses
+  it. Documented; follow-up: migrate AuthIcon → A9 `<Icon>` then drop the dep.
+- **Shims:** `lib/readingPrefs`→`a11y/readingPrefs` and `components/ReadingRoom`→`reading/`
+  kept (importers still resolve old paths) — documented.
 
-## Seam resolution policy (how the Captain integrates your work)
-- Owned `styles/*.css`: concat (existing split + your layer; yours wins on overlap).
-- `main.tsx`: aggregator import kept; meaningful wrappers (`<A11yProvider>`) adopted.
-- `package.json`: deps/scripts unioned, lockfile regenerated. `tailwind.config.js`: A8.
-- Backend new routers: Captain registers in `api/routes/__init__.py` (films ✅, library ✅).
-- Alembic: Captain keeps a single head (A5 cover migration `e843aa7682b2` ✅).
-- `coordination/`: STATUS/MERGE-LOG = Captain; CONTRACTS = folded; requests/artifacts = yours.
-
-## Remaining toward DoD (Captain)
-- [ ] Re-merge sweep as agents advance (continuous).
-- [ ] When agents are feature-complete: run the app end-to-end (login → 100-book library →
-      open book → fallback film + scroll-scrub → reading prefs/read-aloud → settings) +
-      capture walkthrough/screenshots → `coordination/artifacts/agent-12/`.
-- [ ] Remove dead `lucide-react` once no importers; verify/retire re-export shims.
-- [ ] `CHANGELOG.md` + squash/merge plan `overnight/integration` → `main` (operator review).
-
-## Captain rail checklist (t0) — DONE
-- [x] coordination scaffolding · [x] index.css → styles/ split + postcss-import aggregator
-- [x] api.ts primitives · [x] gate green · [x] GO announced · [x] all 11 first-merged
+## Hand-off (DoD #4)
+`CHANGELOG.md` has the per-agent summary + a recommended grouped squash/merge plan
+`overnight/integration` → `main` (migrations land `e843aa7682b2` → `d9e2f4a6b8c1`).
+**Not pushed to `main`** — staged for operator review. Open follow-ups (non-blocking):
+lucide migration, vitest test-runner hygiene (A9/A10/A2), A3 `http` convergence to §7.

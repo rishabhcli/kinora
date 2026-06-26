@@ -19,7 +19,7 @@ from app.render.continuity_qa import (
     score_event_continuity,
     score_seam,
 )
-from app.render.event_director import plan_event_script
+from app.render.event_director import EventScript, plan_event_script
 from tests.test_render_event_director import _bridge_beats
 from tests.test_render_support import make_slice
 
@@ -30,7 +30,7 @@ def _vertical(shot_id: str, dur: float = 5.0) -> ShotGeometry:
     return ShotGeometry(shot_id=shot_id, width=720, height=1280, duration_s=dur)
 
 
-def _script():
+def _script() -> EventScript:
     return plan_event_script(
         event_id="evt_001",
         book_id="book_demo",

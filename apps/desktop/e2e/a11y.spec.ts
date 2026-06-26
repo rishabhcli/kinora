@@ -70,6 +70,14 @@ test("owned surface — keyboard shortcuts cheat-sheet: zero serious/critical", 
   expect(serious, summarize(serious)).toEqual([]);
 });
 
+test("library (real LibraryPage via harness): report + owned clean", async ({ page }) => {
+  await page.goto("/e2e/harness/library.html");
+  await expect(page.getByRole("heading", { name: /my library/i })).toBeVisible();
+  await scan(page, "app-library"); // full report for findings (Agent 5 chrome)
+  const ownedSerious = await scan(page, "app-library-owned", ".skip-link");
+  expect(ownedSerious, summarize(ownedSerious)).toEqual([]);
+});
+
 test("login screen: report violations; owned additions clean", async ({ page }) => {
   await page.goto("/");
   // Scan the whole login screen for the findings report...

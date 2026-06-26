@@ -88,18 +88,29 @@ export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) =>
         if (!alive) return;
         dispatch({ type: "META" });
 
+        // Fetch pages in bounded-parallel batches — a sequential loop over up to
+        // 60 pages can exceed the 7s loading safety-net on a healthy-but-slow
+        // backend and wrongly downgrade live content to the fallback film.
         const np = Math.min(meta.num_pages ?? 1, 60);
+        const nums = Array.from({ length: np }, (_, i) => i + 1);
         const ps: PageText[] = [];
-        for (let n = 1; n <= np; n++) {
+        const BATCH = 8;
+        for (let i = 0; i < nums.length; i += BATCH) {
           if (!alive) return;
-          try {
-            const p = await api.getPage(book.id, n);
-            if (p.text) ps.push({ n, text: p.text });
-          } catch {
-            /* page not rendered yet */
-          }
+          const batch = await Promise.all(
+            nums.slice(i, i + BATCH).map(async (n) => {
+              try {
+                const p = await api.getPage(book.id, n);
+                return p.text ? { n, text: p.text } : null;
+              } catch {
+                return null; // page not rendered yet
+              }
+            }),
+          );
+          for (const p of batch) if (p) ps.push(p);
         }
         if (!alive) return;
+        ps.sort((a, b) => a.n - b.n); // batches preserve order, but be defensive
         dispatch({ type: "PAGES" });
 
         const sh = (await api.getShots(book.id))

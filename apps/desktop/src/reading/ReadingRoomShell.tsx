@@ -3,7 +3,7 @@
 // rail, and the warm-up overlay; owns the chrome: Escape-to-close, body-scroll
 // lock, a focus trap, and focus-into-the-reader on reveal.
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState, type Dispatch } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch } from "react";
 import type { Book } from "../data/books";
 import { useReadingPrefs } from "../lib/readingPrefs";
 import { ScrollFilmEngine, ReadingControls } from "./producers";
@@ -87,6 +87,10 @@ export function ReadingRoomShell({
     return () => window.clearTimeout(t);
   }, [state.phase]);
 
+  // Stable so the engine's scroll listener isn't re-bound on every re-render.
+  const onProgress = useCallback((frac: number) => setProgress(frac), []);
+  const onFirstFrame = useCallback(() => dispatch({ type: "FIRST_FRAME" }), [dispatch]);
+
   const totalWords =
     session.shots.length && session.shots[session.shots.length - 1].source_span
       ? Math.max(1, session.shots[session.shots.length - 1].source_span!.word_range[1])
@@ -141,8 +145,8 @@ export function ReadingRoomShell({
           live={session.live}
           prefs={prefs}
           reduce={reduce}
-          onProgress={(frac) => setProgress(frac)}
-          onFirstFrame={() => dispatch({ type: "FIRST_FRAME" })}
+          onProgress={onProgress}
+          onFirstFrame={onFirstFrame}
         />
 
         {/* Reading-progress + buffer-ahead rail */}

@@ -156,6 +156,26 @@ test("phase only moves forward — a late META never drags ready back to loading
   assert.equal(stray.load.meta, true); // flag still recorded
 });
 
+test("an early FIRST_FRAME while still loading records the frame but does NOT reveal", () => {
+  // The engine paints the bundled film eagerly, but we keep the warm-up up until
+  // we've actually committed to a film source (session or fallback).
+  const s = run({ type: "OPEN" }, { type: "META" }, { type: "FIRST_FRAME" });
+  assert.equal(s.phase, "loading"); // warm-up stays — ingest still in progress
+  assert.equal(s.load.firstFrame, true);
+  assert.equal(canReveal(s), false);
+});
+
+test("once a session begins with a frame already painted, it goes straight to ready", () => {
+  const s = run({ type: "OPEN" }, { type: "META" }, { type: "FIRST_FRAME" }, { type: "SHOTS" }, { type: "SESSION" });
+  assert.equal(s.phase, "ready");
+});
+
+test("an early FIRST_FRAME then FALLBACK reveals straight to ready", () => {
+  const s = run({ type: "OPEN" }, { type: "FIRST_FRAME" }, { type: "FALLBACK" });
+  assert.equal(s.phase, "ready");
+  assert.equal(s.mode, "fallback");
+});
+
 test("FALLBACK after a live SESSION degrades the film without regressing the phase", () => {
   const degraded = run(
     { type: "OPEN" },

@@ -32,14 +32,21 @@ Branch `agent/02-scroll-film`, worktree `../kinora-a02`, base `overnight/integra
 
 ### Verification
 - [x] `pnpm --filter @kinora/desktop typecheck && build` green (all new files).
-- [x] Runtime harness (`__demo__/`) + Electron verifier: **13/13** — scrub frame-
-      accurate, ~60fps (median 8.3ms) under continuous scroll, segment handoff,
-      crossfade, reduced-motion instant cuts, no runtime errors. See VERIFICATION.md.
+- [x] Runtime harness (`__demo__/`) + Electron verifier: **14/14** — scrub frame-
+      accurate, within-segment tracking, ~60fps (median 8.3ms) under continuous
+      scroll, segment handoff, crossfade, reduced-motion instant cuts, no errors.
 - [x] `test:reading` green — **27/27** (added `computeFrame`, `scrollVelocity`).
+
+### Code review (peer, fresh-eyes) — done
+- [x] BLOCKING `onSeeked` re-seek yank → reproduced + fixed (reveal-only `onReady`).
+- [x] Blank-pane on overlapping crossfades → `shownKey` fallback.
+- [x] Flick interrupting a crossfade → hard-cut to active layer.
+- [x] Reviewer verified clean: timeline math, 60fps architecture, scheduler parity,
+      lane, rAF lifecycle. See VERIFICATION.md.
 
 ### Done
 - [x] CONTRACTS.md matches the shipped signature · artifacts in `coordination/artifacts/agent-02/`.
-- [~] Self code-review, then output `<promise>AGENT 02 COMPLETE</promise>`.
+- [x] typecheck + build green; all DoD items pass → output the completion promise.
 
 ## Notes / decisions
 - `coordination/artifacts/agent-04/` in the mission DoD is template residue — this

@@ -20,12 +20,20 @@ Isolated DB `kinora_a03_test` (Postgres :55432) + redis db 3 + MinIO :9000 — n
 ```
 KINORA_TEST_DATABASE_URL=…/kinora_a03_test KINORA_TEST_REDIS_URL=redis://localhost:6379/3 \
 KINORA_TEST_S3_ENDPOINT_URL=http://localhost:9000 .venv/bin/pytest tests/test_api_films.py
-  -> 7 passed
+  -> 10 passed
 .venv/bin/pytest tests/test_films_contract.py
   -> 7 passed   (pure; runs anywhere)
 ```
 Covered: events list + cumulative sync map, stitched (presigned URL) vs unstitched (null),
-single-scene partial load, 404 for unknown scene + foreign book, restore-state from latest session.
+single-scene partial load, 404 for unknown scene + foreign book, restore-state from latest session,
+empty event (no accepted shots), synthesized segment (no narration), and beat_index ordering
+(adversarial — proves shot order matches the stitcher, not word-span).
+
+## Code review — passed with fixes
+A senior-reviewer subagent audited `4863a0c..HEAD` vs the mission/CLAUDE.md/render. No Critical
+issues; all Important findings addressed (SSE builder-signature doc fix + two-step recipe,
+beat_index ordering to match the stitcher, restore semantics documented). Minors documented in
+code. Re-verified: `make lint` ✅, `make test` 308 passed ✅, desktop typecheck ✅.
 
 ## Desktop — typecheck + build ✅
 ```

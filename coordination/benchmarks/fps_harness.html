@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  /* Mirrors the reading-room CrossfadeFilm: two stacked full-bleed layers, the top
+     one crossfading via opacity; a caption translated on the GPU. 720x1280. A
+     realistic content tree (~the word-stream the reading room renders) sits behind
+     so a forced reflow has real cost — the thing that actually drops frames. */
+  html, body { margin: 0; height: 100%; background: #0b0b10; overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  .layer { position: absolute; inset: 0; will-change: opacity; background-size: cover;
+    transition: opacity 0.55s ease; }
+  .a { background: linear-gradient(135deg,#3a2f5e,#1b2b4a 60%,#0e1430); }
+  .b { background: linear-gradient(135deg,#5e3a44,#2b1b3a 60%,#140e30); opacity: 0; }
+  #words { position:absolute; inset:0; padding:40px; color:#cdd; font:18px/1.6 sans-serif; }
+  #words span { opacity:.55; }
+  #caption { position:absolute; left:0; right:0; bottom:18%; text-align:center; color:#fff;
+    font:600 28px/1.4 sans-serif; text-shadow:0 2px 20px rgba(0,0,0,.6); will-change:transform; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div class="layer a" id="A"></div>
+    <div class="layer b" id="B"></div>
+    <div id="words"></div>
+    <div id="caption">the film generates itself a few seconds ahead of the reader</div>
+  </div>
+<script>
+  const B = document.getElementById('B');
+  const cap = document.getElementById('caption');
+  const words = document.getElementById('words');
+  // Realistic read-along word stream (~600 nodes) so a forced reflow is non-trivial.
+  for (let i = 0; i < 600; i++) {
+    const s = document.createElement('span');
+    s.textContent = 'word' + i + ' ';
+    words.appendChild(s);
+  }
+
+  // Drive `frames` rAF callbacks, timing the per-frame MAIN-THREAD work (the cost that
+  // actually causes dropped frames). Returns rAF fps + per-frame work-time stats.
+  window.runFPS = function (mode, frames) {
+    return new Promise((resolve) => {
+      const ts = [], work = [];
+      let i = 0;
+      function frame(now) {
+        ts.push(now);
+        const t = (i % 120) / 120;
+        const w0 = performance.now();
+        if (mode === 'composited') {
+          // GPU-composited: opacity + transform only — no layout read/write.
+          B.style.opacity = (0.5 + 0.5 * Math.sin(t * 6.283)).toFixed(3);
+          cap.style.transform = 'translate3d(0,' + (t * -40).toFixed(1) + 'px,0)';
+          words.style.transform = 'translate3d(0,' + (t * -120).toFixed(1) + 'px,0)';
+        } else {
+          // Layout-thrash anti-pattern: geometry writes + forced synchronous reflow
+          // of the 600-node tree, every frame.
+          cap.style.top = (200 + t * 80).toFixed(1) + 'px';
+          words.style.fontSize = (17 + (i % 3)) + 'px';
+          void words.offsetHeight;          // forced layout #1
+          B.style.height = (1000 + t * 200).toFixed(0) + 'px';
+          void cap.offsetWidth;             // forced layout #2
+        }
+        work.push(performance.now() - w0);
+        i++;
+        if (i < frames) requestAnimationFrame(frame);
+        else {
+          const d = [];
+          for (let k = 1; k < ts.length; k++) d.push(ts[k] - ts[k - 1]);
+          d.sort((a, b) => a - b);
+          const w = work.slice().sort((a, b) => a - b);
+          const elapsed = ts[ts.length - 1] - ts[0];
+          const r2 = (x) => Math.round(x * 100) / 100;
+          resolve({
+            mode, frames: ts.length,
+            fps: r2((ts.length - 1) / (elapsed / 1000)),
+            frame_interval_median_ms: r2(d[d.length >> 1]),
+            work_median_ms: r2(w[w.length >> 1]),
+            work_p95_ms: r2(w[Math.floor(w.length * 0.95)]),
+            work_max_ms: r2(w[w.length - 1]),
+          });
+        }
+      }
+      requestAnimationFrame(frame);
+    });
+  };
+</script>
+</body>
+</html>
