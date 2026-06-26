@@ -5,7 +5,6 @@ Vite dev server (:5199), driven through Electron's Chromium (real H.264 decode).
 Reproduce: see VERIFICATION.md.
 
 ```
-$ electron apps/desktop/src/reading/__demo__/electron-verify.cjs
 PASS  fallback: bundled film decodes (H.264)  — duration=5.041667
 PASS  fallback: text column is scrollable  — range=2699px
 PASS  fallback: scrub @0.5 pins currentTime≈2.52s  — currentTime=2.52 paused=true
@@ -17,8 +16,9 @@ PASS  60fps: main thread sustains ~60fps under continuous scroll  — frames=109
 PASS  live: scroll @0.1 hands off to film-01  — activeSrc=film-01.mp4
 PASS  live: scroll @0.6 hands off to film-03  — activeSrc=film-03.mp4
 PASS  live: scroll @0.95 hands off to film-04  — activeSrc=film-04.mp4
+PASS  scrub within one film tracks currentTime (no re-seek yank)  — currentTime=3.00 paused=true
 PASS  crossfade (normal): src change shows 2 layers, then promotes to 1  — sawTwo=true final=1
 PASS  reduced motion: src change is an instant cut (never 2 layers)  — everTwo=false final=1
 
-13/13 checks passed
+14/14 checks passed
 ```

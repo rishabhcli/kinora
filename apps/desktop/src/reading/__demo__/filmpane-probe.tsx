@@ -15,15 +15,24 @@ function Probe() {
       setPlayhead(src: string, time: number, scrub: boolean): void;
       videoCount(): number;
       activeSrc(): string;
+      currentTime(): number;
+      paused(): boolean | null;
+      duration(): number;
     };
+  };
+  const lastVideo = () => {
+    const vids = document.querySelectorAll("video");
+    return vids[vids.length - 1] as HTMLVideoElement | undefined;
   };
   w.__pane = {
     setPlayhead: (src, time, scrub) => ref.current?.setPlayhead(src, time, scrub),
     videoCount: () => document.querySelectorAll("video").length,
-    activeSrc: () => {
-      const vids = document.querySelectorAll("video");
-      const last = vids[vids.length - 1] as HTMLVideoElement | undefined;
-      return last?.currentSrc || last?.src || "";
+    activeSrc: () => lastVideo()?.currentSrc || lastVideo()?.src || "",
+    currentTime: () => lastVideo()?.currentTime ?? -1,
+    paused: () => lastVideo()?.paused ?? null,
+    duration: () => {
+      const d = lastVideo()?.duration;
+      return d && Number.isFinite(d) ? d : -1;
     },
   };
   return (
