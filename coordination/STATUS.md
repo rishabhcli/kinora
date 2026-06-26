@@ -1,48 +1,61 @@
 # STATUS — overnight/integration live board
 
 **Captain:** Agent 12 · **Branch:** `overnight/integration` · **Base:** `4863a0c` (main)
-**Last updated:** 2026-06-26 (Captain iteration — rails build)
+**HEAD:** `b2f9709` · **Last updated:** 2026-06-26 (Captain — integration cycle 1)
 
-## 🚦 GATE: setting up (rails not yet committed)
-Runnable gate (per CLAUDE.md current reality — `packages/core`/`apps/mobile` don't exist):
-```
-pnpm install && pnpm --filter @kinora/desktop typecheck && pnpm --filter @kinora/desktop build
-```
-Backend gate (when backend-owned branches merge): `make lint && make test`
+## 🚦 GATE: GREEN ✅
+- Frontend: `pnpm --filter @kinora/desktop typecheck && build` → **green** (CSS 57 kB).
+- Backend: `make test` → **325 passed, 125 skipped, 0 failures**.
+- Bonus: desktop `vitest` → 64 tests pass; 3 A9 test files report "no test suite" (see requests/agent-09.md — not a gate blocker).
 
-## 📣 ANNOUNCEMENT
-**Status: RAILS IN PROGRESS — not yet GO.** Worktrees exist for all 11 agents at the
-baseline. The Captain is laying the t0 rails (CSS partials, `api.ts` primitives,
-coordination docs). **GO** will be announced here once rails are committed and the gate is
-green; at that point each agent branch is fast-forwarded onto `overnight/integration` so
-everyone starts with the rails. Until then: read your mission + `OWNERSHIP.md` + `CONTRACTS.md`,
-and code against the contracts (stub absent producers).
+## 📣 GO — rails are live; integration has begun
+The t0 rails are committed and green. **Agents: pull them.** Your branch was cut from
+`main@4863a0c` *before* the rails existed, so to stop re-creating seams and to drop your
+conflicts to ~zero:
+
+```bash
+# in your worktree, with a clean tree:
+git merge overnight/integration
+```
+
+You will get: the **`src/styles/` split** (edit *your* partial — `tokens/base/glass.css`=A8,
+`motion.css`=A4, `a11y.css`=A6, `login.css`=A11, `reading.css`=A10; the aggregator
+`styles/index.css` is the Captain's — don't re-import partials in `main.tsx`), the
+**`api.ts` `http`/`BASE` primitives** (CONTRACTS §7), and **`coordination/`**. Keeping the
+monolithic `index.css` or importing partials in `main.tsx` creates conflicts the Captain
+then has to unwind — please converge on the split.
 
 ## Per-agent board
-| Agent | Lane | Branch | Worktree | Commits | Merged? | Notes |
+| Agent | Lane | Branch | Commits | Pending re-merge | Integrated | Notes |
 |---|---|---|---|---|---|---|
-| A1 | event-director / stitch | `agent/01-event-director` | `../kinora-a01` | 0 | — | baseline |
-| A2 | scroll-film engine | `agent/02-scroll-film` | `../kinora-a02` | 0 | — | baseline |
-| A3 | film API + sync | `agent/03-film-api` | `../kinora-a03` | 0 | — | baseline |
-| A4 | motion / animation | `agent/04-motion` | `../kinora-a04` | 0 | — | baseline |
-| A5 | library / books / epub | `agent/05-library` | `../kinora-a05` | 0 | — | inherits operator public-domain seeds |
-| A6 | accessibility | `agent/06-a11y` | `../kinora-a06` | 0 | — | baseline |
-| A7 | optimization | `agent/07-optim` | `../kinora-a07` | 0 | — | merges LAST |
-| A8 | color/depth/typography | `agent/08-design` | `../kinora-a08` | 0 | — | merges FIRST; inherits operator tailwind tweak |
-| A9 | settings / SF-symbol icons | `agent/09-settings-icons` | `../kinora-a09` | 0 | — | baseline |
-| A10 | book-open / film experience | `agent/10-reading-room` | `../kinora-a10` | 0 | — | baseline |
-| A11 | login experience | `agent/11-login` | `../kinora-a11` | 0 | — | baseline |
+| A1 | event-director/stitch | `agent/01-event-director` | 7 | 1 | ✅ (backend, 325 tests) | render pipeline in |
+| A2 | scroll-film engine | `agent/02-scroll-film` | 1 | 1 | — | timeline.ts; pkg.json+tsconfig touch |
+| A3 | film API + sync | `agent/03-film-api` | 4 | 4 | — | coordination + (now code) |
+| A4 | motion | `agent/04-motion` | 2 | 0 | ✅ fully | motion system in |
+| A5 | library/books/epub | `agent/05-library` | 3 | 3 | — | inherits operator seeds |
+| A6 | accessibility | `agent/06-a11y` | 6 | 2 | ✅ | a11y layer + vitest in |
+| A7 | optimization | `agent/07-optim` | 6 | 6 | — | backend optim; merges LAST |
+| A8 | color/depth/type | `agent/08-design` | 3 | 1 | ✅ keystone | token system in |
+| A9 | settings/icons | `agent/09-settings-icons` | 4 | 3 | ✅ | icons+settings in |
+| A10 | reading-room | `agent/10-reading-room` | 2 | 2 | — | state machine + fallback |
+| A11 | login | `agent/11-login` | 1 | 1 | — | just started |
 
-## Merge order (dependency order)
-`A8 → A6 → A4 → A9 → A1 → A3 → A2 → A5 → A10 → A11 → A7`
+**Steady state:** the Captain merges a snapshot; you keep committing; the Captain re-merges
+(git rerere remembers the seam resolutions, so re-merges are cheap). "Pending" = commits on
+your branch not yet in integration.
 
-## Blocked / open requests
-_None yet. File cross-seam needs in `coordination/requests/agent-12.md`._
+## Merge order (dependency)
+`A8 → A6 → A4 → A9 → A1 → A3 → A2 → A5 → A10 → A11 → A7` — done so far: A9, A4, A8, A6, A1.
 
-## Captain rail checklist (t0)
-- [x] `coordination/` scaffolding (OWNERSHIP, CONTRACTS, STATUS, MERGE-LOG, requests, artifacts)
-- [ ] Split `index.css` → `styles/` partials + aggregator; point `main.tsx` at it
-- [ ] Refactor `lib/api.ts` to export `BASE`/`auth`/`http`/`toBrowserUrl`
-- [ ] Gate green on `overnight/integration`
-- [ ] Fast-forward all 11 agent branches onto `overnight/integration`
-- [ ] Announce **GO**
+## Seam resolution policy (how the Captain integrates your work)
+- **Your owned `styles/*.css`**: concat (existing split rules + your layer; yours wins on overlap).
+- **`main.tsx`**: aggregator import kept; meaningful wrappers (e.g. `<A11yProvider>`) adopted.
+- **`package.json`**: deps unioned, lockfile regenerated. **`tailwind.config.js`**: A8 owns.
+- **`coordination/`**: STATUS/MERGE-LOG = Captain; CONTRACTS = folded; requests/artifacts = yours.
+
+## Open requests actioned this cycle
+- → A9: 3 test files report "No test suite found" under vitest (`requests/agent-09.md`).
+
+## Captain rail checklist (t0) — DONE
+- [x] `coordination/` scaffolding · [x] `index.css` → `styles/` split + aggregator · [x] `api.ts` primitives
+- [x] postcss-import wired (aggregator inlines @import in order) · [x] gate green · [x] **GO announced**
