@@ -32,6 +32,11 @@ class Book(StrIdMixin, TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     source_pdf_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    #: Object-store key of the book's cover image (``covers/{book_id}``) — set by
+    #: the seeder / HD-cover fetch / EPUB upload. Projected as a presigned
+    #: ``BookResponse.cover_url`` and served by ``GET /books/{id}/cover`` (§5.1).
+    #: Distinct from "page 1's image": a real, dedicated shelf cover.
+    cover_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[BookStatus] = mapped_column(
         str_enum(BookStatus, "book_status"),
         default=BookStatus.IMPORTING,

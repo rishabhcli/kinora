@@ -1,0 +1,2480 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-26T12:08:38.344581+00:00",
+  "count": 130,
+  "books": [
+    {
+      "id": "pubdom27010000000000000000000000",
+      "gutenberg_id": 2701,
+      "title": "Moby Dick; Or, The Whale",
+      "author": "Herman Melville",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "Adventure stories",
+        "Ahab, Captain (Fictitious character) -- Fiction",
+        "Mentally ill -- Fiction",
+        "Psychological fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2701.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Moby Dick; Or, The Whale\" by Herman Melville is an epic novel published in 1851. Sailor Ishmael narrates the obsessive quest of Captain Ahab, who commands the whaling ship Pequod in pursuit of Moby Dick, a giant white sperm whale that destroyed his leg. Ahab's monomaniacal hunt for vengeance drives the ship and its diverse crew across the world's oceans, blending realistic whaling details with profound explorations of good, evil, fate, and human nature in this cornerstone of American literature. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom13420000000000000000000000",
+      "gutenberg_id": 1342,
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Courtship -- Fiction",
+        "Domestic fiction",
+        "England -- Fiction",
+        "Love stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1342.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Pride and Prejudice\" by Jane Austen is a novel published in 1813. It follows Elizabeth Bennet, who must learn to see past first impressions and hasty judgments. With five daughters and an estate that can only pass to male heirs, the Bennet family faces financial pressure to marry well. When wealthy Mr. Darcy arrives in their countryside neighborhood, his pride and Elizabeth's prejudice set the stage for misunderstandings, hidden truths, and unexpected revelations about character and love. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom84000000000000000000000000",
+      "gutenberg_id": 84,
+      "title": "Frankenstein; or, the modern prometheus",
+      "author": "Mary Wollstonecraft Shelley",
+      "genre": "Science Fiction",
+      "era": "19th century",
+      "tags": [
+        "Frankenstein's monster (Fictitious character) -- Fiction",
+        "Frankenstein, Victor (Fictitious character) -- Fiction",
+        "Gothic fiction",
+        "Horror tales"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/84.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Frankenstein; Or, The Modern Prometheus\" by Mary Wollstonecraft Shelley is a Gothic novel published in 1818. It tells the story of Victor Frankenstein, a young scientist who creates a living creature from assembled body parts in an unorthodox experiment. When the creature awakens, Victor flees in horror, abandoning his creation. The conscious being must navigate a world that fears him, learning language and seeking connection, only to face repeated rejection. Embittered and alone, the creature confronts his creator with a desperate request that will set both on a dark path of vengeance and tr"
+    },
+    {
+      "id": "pubdom25540000000000000000000000",
+      "gutenberg_id": 2554,
+      "title": "Crime and Punishment",
+      "author": "Fyodor Dostoyevsky",
+      "genre": "Mystery & Detective",
+      "era": "19th century",
+      "tags": [
+        "Crime -- Psychological aspects -- Fiction",
+        "Detective and mystery stories",
+        "Murder -- Fiction",
+        "Psychological fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2554.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Crime and Punishment\" by Fyodor Dostoevsky is a novel published in 1866. It follows Rodion Raskolnikov, an impoverished former law student in Saint Petersburg who plans to murder an unscrupulous pawnbroker. He convinces himself that certain crimes are justifiable if committed by \"extraordinary\" men pursuing higher goals. Once the deed is done, however, he is consumed by confusion, paranoia, and guilt as his theoretical justifications crumble and he faces the internal and external consequences of his actions. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom11840000000000000000000000",
+      "gutenberg_id": 1184,
+      "title": "The Count of Monte Cristo",
+      "author": "Alexandre Dumas",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "Adventure stories",
+        "Dantès, Edmond (Fictitious character) -- Fiction",
+        "France -- History -- 19th century -- Fiction",
+        "Historical fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1184.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Count of Monte Cristo\" by Alexandre Dumas and Auguste Maquet is an adventure novel serialized from 1844 to 1846. When sailor Edmond Dantès is falsely accused and imprisoned on his wedding day, he spends fourteen years in solitary confinement. After a daring escape and the discovery of a vast hidden treasure, he reinvents himself as the wealthy Count of Monte Cristo. Returning to Paris, he methodically infiltrates high society to confront the three men who destroyed his life, exploring themes of justice, vengeance, mercy, and forgiveness. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom26410000000000000000000000",
+      "gutenberg_id": 2641,
+      "title": "A Room with a View",
+      "author": "E. M. (Edward Morgan) Forster",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "British -- Italy -- Fiction",
+        "England -- Fiction",
+        "Florence (Italy) -- Fiction",
+        "Humorous stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2641.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Room with a View\" by E. M. Forster is a novel published in 1908. Young Lucy Honeychurch travels to Italy with her uptight cousin as chaperone, where an unexpected encounter with the unconventional George Emerson stirs confusing emotions. Back in England, Lucy becomes engaged to the sophisticated but pompous Cecil Vyse. When the Emersons move nearby, Lucy must confront her true feelings and decide between societal expectations and genuine passion in Edwardian England's restrained culture. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom11000000000000000000000000",
+      "gutenberg_id": 11,
+      "title": "Alice's Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "genre": "Fantasy",
+      "era": "19th century",
+      "tags": [
+        "Alice (Fictitious character from Carroll) -- Juvenile fiction",
+        "Children's stories",
+        "Fantasy fiction",
+        "Imaginary places -- Juvenile fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/11.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Alice's Adventures in Wonderland\" by Lewis Carroll is a children's novel published in 1865. When a curious girl named Alice spots a White Rabbit with a pocket watch, she tumbles down a rabbit hole into an extraordinary fantasy world filled with peculiar anthropomorphic creatures. This pioneering work of literary nonsense plays with logic and language, creating a whimsical tale that delights both children and adults. Illustrated by John Tenniel, it helped transform children's literature from didactic instruction to pure entertainment. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom10000000000000000000000000",
+      "gutenberg_id": 100,
+      "title": "The Complete Works of William Shakespeare",
+      "author": "William Shakespeare",
+      "genre": "Poetry",
+      "era": "17th century",
+      "tags": [
+        "English drama -- Early modern and Elizabethan, 1500-1600"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/100.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Complete Works of William Shakespeare\" by William Shakespeare is a comprehensive collection containing all of Shakespeare's plays and poems. This standard volume gathers the playwright's entire output, including histories, tragedies, and comedies that have shaped literature for centuries. Some editions feature collaborative works with other writers, though their authorship remains debated. Published by numerous academic presses and major publishers, these collected editions have become prized possessions for book collectors, often released in luxurious leather-bound formats that preserve "
+    },
+    {
+      "id": "pubdom43000000000000000000000000",
+      "gutenberg_id": 43,
+      "title": "The strange case of Dr. Jekyll and Mr. Hyde",
+      "author": "Robert Louis Stevenson",
+      "genre": "Science Fiction",
+      "era": "19th century",
+      "tags": [
+        "Horror tales",
+        "London (England) -- Fiction",
+        "Multiple personality -- Fiction",
+        "Physicians -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/43.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Strange Case of Dr. Jekyll and Mr. Hyde\" by Robert Louis Stevenson is a Gothic horror novella published in 1886. When London lawyer Gabriel John Utterson investigates strange occurrences involving his old friend Dr. Henry Jekyll and a murderous criminal named Edward Hyde, he uncovers a disturbing mystery. This defining work of Gothic horror explores the duality of human nature and has profoundly influenced popular culture, making \"Jekyll and Hyde\" synonymous with hidden evil beneath respectable appearances. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom64317000000000000000000000",
+      "gutenberg_id": 64317,
+      "title": "The Great Gatsby",
+      "author": "F. Scott (Francis Scott) Fitzgerald",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "First loves -- Fiction",
+        "Long Island (N.Y.) -- Fiction",
+        "Married women -- Fiction",
+        "Psychological fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/64317.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Great Gatsby\" by F. Scott Fitzgerald is a novel published in 1925. Set in the Jazz Age on Long Island, it follows narrator Nick Carraway as he becomes drawn into the world of his mysterious neighbor, Jay Gatsby, a wealthy millionaire who throws extravagant parties. Gatsby harbors an obsession with reuniting with Daisy Buchanan, a woman from his past now married to the affluent Tom. The story captures the glamour, excess, and moral complexities of 1920s America. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom12600000000000000000000000",
+      "gutenberg_id": 1260,
+      "title": "Jane Eyre: An Autobiography",
+      "author": "Charlotte Brontë",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Bildungsromans",
+        "Charity-schools -- Fiction",
+        "Country homes -- Fiction",
+        "England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1260.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Jane Eyre: An Autobiography\" by Charlotte Brontë is a novel published in 1847. It follows the life of Jane Eyre from her oppressed childhood through her education and into adulthood, where she becomes governess at Thornfield Hall and falls in love with the mysterious Mr. Rochester. Told through intimate first-person narrative, this groundbreaking bildungsroman explores moral and spiritual development while addressing class, religion, sexuality, and feminism. The story unfolds across five distinct stages, each shaping Jane's journey toward independence and belonging. (This is an automatically "
+    },
+    {
+      "id": "pubdom16610000000000000000000000",
+      "gutenberg_id": 1661,
+      "title": "The Adventures of Sherlock Holmes",
+      "author": "Arthur Conan Doyle",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories, English",
+        "Holmes, Sherlock (Fictitious character) -- Fiction",
+        "Private investigators -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1661.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Adventures of Sherlock Holmes\" by Arthur Conan Doyle is a collection of short stories first published in 1892. These twelve tales feature the legendary consulting detective Sherlock Holmes and his companion Dr. Watson, narrated from Watson's perspective. Each mystery explores social injustices while showcasing Holmes's brilliant deductive methods and unconventional approach to justice. The stories introduce memorable characters and cases that have captivated readers for over a century, establishing Holmes as one of literature's most enduring detectives. (This is an automatically generated"
+    },
+    {
+      "id": "pubdom34500000000000000000000000",
+      "gutenberg_id": 345,
+      "title": "Dracula",
+      "author": "Bram Stoker",
+      "genre": "Gothic & Horror",
+      "era": "20th century",
+      "tags": [
+        "Dracula, Count (Fictitious character) -- Fiction",
+        "Epistolary fiction",
+        "Gothic fiction",
+        "Horror tales"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/345.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Dracula\" by Bram Stoker is a Gothic horror novel published in 1897. Told through letters, diary entries, and newspaper articles, the story follows solicitor Jonathan Harker's terrifying encounter with Count Dracula in Transylvania. When the vampire Count travels to England and begins preying on victims in Whitby, a small group led by Professor Abraham Van Helsing must hunt him down. This seminal work of Gothic fiction has become the centrepiece of vampire literature, profoundly shaping the popular conception of vampires for generations. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom12590000000000000000000000",
+      "gutenberg_id": 1259,
+      "title": "Twenty years after",
+      "author": "Alexandre Dumas",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "France -- History -- Louis XIV, 1643-1715 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1259.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Twenty years after\" by Alexandre Dumas and Auguste Maquet is a novel serialized from January to August 1845. D'Artagnan, still a lowly lieutenant after two decades, is summoned by the despised Cardinal Mazarin during France's brewing rebellion. Tasked with reuniting the legendary musketeers, he tracks down his old friends—now scattered across vastly different lives. As political turmoil engulfs both France and England during the English Civil War, the four heroes must navigate their conflicting loyalties and set aside their differences for one last mission. (This is an automatically generated"
+    },
+    {
+      "id": "pubdom28054000000000000000000000",
+      "gutenberg_id": 28054,
+      "title": "The Brothers Karamazov",
+      "author": "Fyodor Dostoyevsky",
+      "genre": "Classics",
+      "era": "19th century",
+      "tags": [
+        "Brothers -- Fiction",
+        "Didactic fiction",
+        "Fathers and sons -- Fiction",
+        "Russia -- Social life and customs -- 1533-1917 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/28054.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Brothers Karamazov\" by Fyodor Dostoevsky is a novel published between 1879 and 1880. Set in 19th-century Russia, this passionate philosophical work explores profound questions of God, free will, and morality. The story revolves around the volatile Karamazov family: a disreputable father and his three sons—sensual Dmitri, intellectual Ivan, and idealistic Alyosha. As tensions escalate over inheritance and romantic entanglements, the novel delves into faith, doubt, and reason, with patricide at the heart of its dramatic plot. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom76000000000000000000000000",
+      "gutenberg_id": 76,
+      "title": "Adventures of Huckleberry Finn",
+      "author": "Mark Twain",
+      "genre": "Adventure",
+      "era": "20th century",
+      "tags": [
+        "Adventure stories",
+        "Bildungsromans",
+        "Boys -- Fiction",
+        "Finn, Huckleberry (Fictitious character) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/76.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Adventures of Huckleberry Finn\" by Mark Twain is a picaresque novel published in 1884-1885. Told in vernacular English, it follows young Huck Finn as he escapes his abusive father and flees down the Mississippi River with Jim, an enslaved man seeking freedom. Their journey brings encounters with feuding families, con artists, and moral dilemmas that challenge Huck's conscience. Set in the antebellum South, this sequel to \"Tom Sawyer\" is celebrated for its portrayal of boyhood and its satirical examination of racism and society. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom76800000000000000000000000",
+      "gutenberg_id": 768,
+      "title": "Wuthering Heights",
+      "author": "Emily Brontë",
+      "genre": "Gothic & Horror",
+      "era": "19th century",
+      "tags": [
+        "Domestic fiction",
+        "Foundlings -- Fiction",
+        "Heathcliff (Fictitious character : Brontë) -- Fiction",
+        "Love stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/768.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Wuthering Heights\" by Emily Brontë is a novel published in 1847. Set on the Yorkshire moors, it follows two landowning families and their turbulent relationships with Heathcliff, a mysterious foster son. Driven by obsessive love, possession, and revenge that spans generations, the story unfolds through dark passion and cruelty. This Gothic tale challenged Victorian morality with its depictions of abuse and class conflict, ultimately becoming a cornerstone of English literature despite its initially polarized reception. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom65930000000000000000000000",
+      "gutenberg_id": 6593,
+      "title": "History of Tom Jones, a Foundling",
+      "author": "Henry Fielding",
+      "genre": "Classics",
+      "era": "18th century",
+      "tags": [
+        "Bildungsromans",
+        "England -- Fiction",
+        "Foundlings -- Fiction",
+        "Humorous stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/6593.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"History of Tom Jones, a Foundling\" by Henry Fielding is a comic novel published in 1749. This picaresque tale follows Tom, an abandoned baby raised by the wealthy Squire Allworthy, as he grows into a spirited youth who falls in love with his neighbor's daughter, Sophia Western. When jealous schemes and his status as a foundling threaten their romance, Tom is banished and embarks on adventurous travels across Britain. Mysteries of birth, cases of mistaken identity, and unexpected revelations converge in this intricately plotted story of love and fortune. (This is an automatically generated sum"
+    },
+    {
+      "id": "pubdom98000000000000000000000000",
+      "gutenberg_id": 98,
+      "title": "A Tale of Two Cities",
+      "author": "Charles Dickens",
+      "genre": "Historical",
+      "era": "19th century",
+      "tags": [
+        "British -- France -- Paris -- Fiction",
+        "Executions and executioners -- Fiction",
+        "France -- History -- Revolution, 1789-1799 -- Fiction",
+        "French -- England -- London -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/98.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Tale of Two Cities\" by Charles Dickens is a historical novel published in 1859. Set in London and Paris during the tumultuous French Revolution, it follows Dr. Alexandre Manette after his mysterious 18-year imprisonment in the Bastille and his reunion with his daughter Lucie. Their lives become entangled with a French aristocrat fleeing his heritage and a dissolute English lawyer who harbors secret devotion. Against the backdrop of revolutionary terror and violence, personal sacrifices and hidden connections shape their intertwined fates. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom17400000000000000000000000",
+      "gutenberg_id": 174,
+      "title": "The Picture of Dorian Gray",
+      "author": "Oscar Wilde",
+      "genre": "Gothic & Horror",
+      "era": "19th century",
+      "tags": [
+        "Appearance (Philosophy) -- Fiction",
+        "Conduct of life -- Fiction",
+        "Didactic fiction",
+        "Great Britain -- History -- Victoria, 1837-1901 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/174.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Picture of Dorian Gray\" by Oscar Wilde is a philosophical fiction and Gothic horror novel published in 1890. When a beautiful young man wishes that his portrait would age instead of himself, his desire becomes terrifyingly real. As Dorian pursues a life of pleasure and moral corruption, he remains eternally youthful while his painted image transforms into a horrifying record of his sins. Wilde explores beauty, morality, and the dangerous influence of hedonistic philosophy in this tale of vanity and its consequences. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom26800000000000000000000000",
+      "gutenberg_id": 2680,
+      "title": "Meditations",
+      "author": "Emperor of Rome Marcus Aurelius",
+      "genre": "Philosophy & Essays",
+      "era": "Antiquity",
+      "tags": [
+        "Ethics",
+        "Life",
+        "Stoics"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2680.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Meditations\" by Emperor of Rome Marcus Aurelius is a series of personal writings composed between 170-180 CE. Written in Greek as private notes to himself, this work captures the Roman Emperor's reflections on Stoic philosophy and self-improvement during military campaigns. Never intended for publication, these intimate musings explore finding one's place in the universe, maintaining ethical principles, and achieving inner harmony through reason. The twelve books reveal how one of history's most powerful rulers sought to guide his own character and judgment. (This is an automatically generate"
+    },
+    {
+      "id": "pubdom74000000000000000000000000",
+      "gutenberg_id": 74,
+      "title": "The Adventures of Tom Sawyer, Complete",
+      "author": "Mark Twain",
+      "genre": "Adventure",
+      "era": "20th century",
+      "tags": [
+        "Adventure stories",
+        "Bildungsromans",
+        "Boys -- Fiction",
+        "Child witnesses -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/74.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Adventures of Tom Sawyer, Complete\" by Mark Twain is a novel published in 1876 about a mischievous boy growing up along the Mississippi River in the 1830s-1840s. Tom Sawyer and his friend Huckleberry Finn navigate childhood adventures that take increasingly dangerous turns when they witness a murder in a graveyard. Sworn to secrecy and living in fear, the boys must decide whether to speak the truth as an innocent man faces trial, while a vengeful killer remains free. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom17270000000000000000000000",
+      "gutenberg_id": 1727,
+      "title": "The Odyssey: Rendered into English prose for the use of those who cannot read the original",
+      "author": "Homer",
+      "genre": "Poetry",
+      "era": "Antiquity",
+      "tags": [
+        "Epic poetry, Greek -- Translations into English",
+        "Homer -- Translations into English",
+        "Odysseus, King of Ithaca (Mythological character)"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1727.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Odyssey\" by Homer is an ancient Greek epic composed around the 8th or 7th century BC. It follows Odysseus, king of Ithaca, on his perilous ten-year journey home after the Trojan War. While he battles monsters and loses all his crewmates, his wife Penelope and son Telemachus face aggressive suitors at home who presume him dead. This foundational work of Western literature explores themes of homecoming, wandering, and loyalty through a tale of extraordinary adventure and perseverance. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom25420000000000000000000000",
+      "gutenberg_id": 2542,
+      "title": "A Doll's House : a play",
+      "author": "Henrik Ibsen",
+      "genre": "Drama",
+      "era": "20th century",
+      "tags": [
+        "Man-woman relationships -- Drama",
+        "Marriage -- Drama",
+        "Norwegian drama -- Translations into English",
+        "Wives -- Drama"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2542.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Doll's House : a play by Henrik Ibsen\" is a three-act play written in 1879. Set in a Norwegian town, it follows Nora Helmer, a married woman navigating life in a male-dominated society where opportunities for self-fulfillment are scarce. When a figure from her past threatens to expose a secret financial transgression, Nora faces a crisis that challenges everything she knows about her marriage and identity. The play sparked outraged controversy upon its premiere and remains one of the most performed works in theater history. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom12000000000000000000000000",
+      "gutenberg_id": 120,
+      "title": "Treasure Island",
+      "author": "Robert Louis Stevenson",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "Pirates -- Fiction",
+        "Sea stories",
+        "Treasure Island (Imaginary place) -- Fiction",
+        "Treasure troves -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/120.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Treasure Island\" by Robert Louis Stevenson is an adventure novel published in 1883. When young Jim Hawkins discovers a mysterious treasure map in a dead pirate's sea chest, he sets sail with a crew to find Captain Flint's legendary buried gold. But aboard the ship Hispaniola lurks danger: the charming one-legged cook Long John Silver leads a band of mutinous pirates with their own deadly plans. On a remote island filled with treachery and violence, Jim must navigate shifting alliances and mortal threats to survive this perilous quest for fortune. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom24400000000000000000000000",
+      "gutenberg_id": 244,
+      "title": "A Study in Scarlet",
+      "author": "Arthur Conan Doyle",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories",
+        "England -- Fiction",
+        "Holmes, Sherlock (Fictitious character) -- Fiction",
+        "Private investigators -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/244.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Study in Scarlet\" by Arthur Conan Doyle is a detective novel published in 1887. This groundbreaking work introduces Sherlock Holmes and Dr. Watson as they investigate a mysterious murder in London. When a man is found dead with the word \"RACHE\" written in blood, Holmes must unravel the scarlet thread of murder running through the case. The investigation leads to a dramatic tale of revenge spanning two continents, connecting a London crime scene to events in Utah's Salt Lake Valley decades earlier. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom16100000000000000000000000",
+      "gutenberg_id": 161,
+      "title": "Sense and Sensibility",
+      "author": "Jane Austen",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Domestic fiction",
+        "England -- Fiction",
+        "England -- Social life and customs -- 19th century -- Fiction",
+        "Gentry -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/161.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Sense and Sensibility\" by Jane Austen is a novel published in 1811. When the Dashwood sisters are forced from their family estate into reduced circumstances, they face romantic trials that test their contrasting natures. Sensible Elinor guards her feelings while passionate Marianne wears her heart openly. Both encounter love, disappointment, and betrayal as suitors prove honorable or false. Through heartbreak and revelation, the sisters must navigate society's demands while discovering what truly matters in matters of the heart. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom28520000000000000000000000",
+      "gutenberg_id": 2852,
+      "title": "The Hound of the Baskervilles",
+      "author": "Arthur Conan Doyle",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Blessing and cursing -- Fiction",
+        "Dartmoor (England) -- Fiction",
+        "Detective and mystery stories",
+        "Dogs -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2852.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Hound of the Baskervilles\" by Arthur Conan Doyle is a crime novel serialized from 1901 to 1902. Sherlock Holmes and Watson investigate a centuries-old legend of a demonic hound haunting the Baskerville family on the desolate moors of Dartmoor. When Sir Charles Baskerville dies under mysterious circumstances, his heir Sir Henry arrives from Canada to claim his inheritance—only to face strange threats and supernatural dangers. Holmes must determine whether the curse is real or if a cunning murderer lurks behind the legend. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom12320000000000000000000000",
+      "gutenberg_id": 1232,
+      "title": "The Prince",
+      "author": "Niccolò Machiavelli",
+      "genre": "Philosophy & Essays",
+      "era": "16th century",
+      "tags": [
+        "Political ethics -- Early works to 1800",
+        "Political science -- Philosophy -- Early works to 1800",
+        "State, The -- Early works to 1800"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1232.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Prince\" by Niccolò Machiavelli is a political treatise written in 1513 and published in 1532. Presented as an instruction guide for new rulers, this controversial work suggests that immoral acts may be necessary to achieve political power and glory. Written in vernacular Italian rather than Latin, it breaks from traditional advice literature by focusing on practical effectiveness over abstract ideals. Its worldview challenged dominant Catholic doctrines of the time, making \"Machiavellian\" synonymous with political cunning and contributing to modern negative connotations of politics itself"
+    },
+    {
+      "id": "pubdom26000000000000000000000000",
+      "gutenberg_id": 2600,
+      "title": "War and Peace",
+      "author": "Leo, graf Tolstoy",
+      "genre": "Historical",
+      "era": "20th century",
+      "tags": [
+        "Aristocracy (Social class) -- Russia -- Fiction",
+        "Historical fiction",
+        "Napoleonic Wars, 1800-1815 -- Campaigns -- Russia -- Fiction",
+        "Russia -- History -- Alexander I, 1801-1825 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2600.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"War and Peace\" by graf Leo Tolstoy is a literary work published in 1869. Set during the Napoleonic Wars, it chronicles the French invasion of Russia through five interlocking narratives following different Russian aristocratic families. The work blends fictional storytelling with philosophical discussions about history, war, and power. Tolstoy himself hesitated to classify it, saying it is \"not a novel, even less is it a poem, and still less a historical chronicle.\" It remains one of the most praised classics of world literature. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom14000000000000000000000000",
+      "gutenberg_id": 1400,
+      "title": "Great Expectations",
+      "author": "Charles Dickens",
+      "genre": "Classics",
+      "era": "19th century",
+      "tags": [
+        "Benefactors -- Fiction",
+        "Bildungsromans",
+        "England -- Fiction",
+        "Ex-convicts -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1400.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Great Expectations\" by Charles Dickens is a novel first published serially from 1860 to 1861. The story follows Pip, a young orphan living with his sister and her blacksmith husband on England's coastal marshes. After a terrifying encounter with an escaped convict and strange visits to the bitter Miss Havisham and her cold adopted daughter Estella, Pip's life transforms when he mysteriously receives a fortune from an unknown benefactor. This bildungsroman explores wealth and poverty, love and rejection, through vivid characters and dramatic scenes that have captivated readers for generations."
+    },
+    {
+      "id": "pubdom10800000000000000000000000",
+      "gutenberg_id": 1080,
+      "title": "A Modest Proposal: For preventing the children of poor people in Ireland, from being a burden on their parents or country, and for making them beneficial to the publick",
+      "author": "Jonathan Swift",
+      "genre": "Philosophy & Essays",
+      "era": "18th century",
+      "tags": [
+        "Ireland -- Politics and government -- 18th century -- Humor",
+        "Political satire, English",
+        "Religious satire, English"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1080.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Modest Proposal\" by Jonathan Swift is a satirical essay written and published in 1729. The work shockingly suggests that Ireland's poor could solve their economic troubles by selling their children as food to the wealthy. Through sustained irony and deadpan humor, Swift uses this outrageous premise to mock hostile attitudes toward the poor and expose the dehumanizing policies of British colonial rule. The essay remains celebrated for its dark wit and biting social commentary. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom45304000000000000000000000",
+      "gutenberg_id": 45304,
+      "title": "The City of God, Volume I",
+      "author": "of Hippo, Saint Augustine",
+      "genre": "Philosophy & Essays",
+      "era": "Antiquity",
+      "tags": [
+        "Apologetics -- Early works to 1800",
+        "Kingdom of God -- Early works to 1800"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/45304.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The City of God, Volume I\" by Bishop of Hippo Saint Augustine is a work of Christian philosophy written in Latin in the early 5th century AD. Composed in response to Rome's sack by the Visigoths in 410, Augustine defends Christianity against accusations that it caused Rome's decline. He presents human history as a conflict between the Earthly City—those pursuing worldly pleasures—and the City of God—those dedicated to eternal truths. Through theological argument and historical analysis, Augustine refutes pagan religion and philosophy while expounding on suffering, evil, free will, and origina"
+    },
+    {
+      "id": "pubdom15130000000000000000000000",
+      "gutenberg_id": 1513,
+      "title": "Romeo and Juliet",
+      "author": "William Shakespeare",
+      "genre": "Romance",
+      "era": "17th century",
+      "tags": [
+        "Conflict of generations -- Drama",
+        "Juliet (Fictitious character) -- Drama",
+        "Romeo (Fictitious character) -- Drama",
+        "Tragedies (Drama)"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1513.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Romeo and Juliet\" by William Shakespeare is a tragedy written between 1591 and 1595. Two young lovers from feuding Italian families meet and fall secretly in love in Verona. Their forbidden romance leads them to marry in secret with a friar's help, hoping to unite their warring households. But family hatred, violent duels, and tragic misunderstandings threaten to destroy their bond. This tale of star-crossed lovers has become the archetypal story of young love and remains one of Shakespeare's most frequently performed plays. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom14500000000000000000000000",
+      "gutenberg_id": 145,
+      "title": "Middlemarch",
+      "author": "George Eliot",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Bildungsromans",
+        "City and town life -- Fiction",
+        "Didactic fiction",
+        "Domestic fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/145.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Middlemarch\" by George Eliot is a novel published in 1871-1872. Set in a fictional English Midlands town from 1829 to 1832, it weaves together multiple intersecting stories exploring the status of women, marriage, idealism, and political reform. The narrative follows Dorothea Brooke's search for purpose, Dr. Lydgate's medical ambitions, and several other inhabitants navigating love, debt, scandal, and social change against the backdrop of the approaching Reform Act of 1832. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom67979000000000000000000000",
+      "gutenberg_id": 67979,
+      "title": "The Blue Castle: a novel",
+      "author": "L. M. (Lucy Maud) Montgomery",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Canada -- History -- 1914-1945 -- Fiction",
+        "Choice (Psychology) -- Fiction",
+        "Love -- Fiction",
+        "Romance fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/67979.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Blue Castle: a novel by L. M. Montgomery\" is a novel published in 1926. Twenty-nine-year-old Valancy Stirling has spent her entire life suffocated by her controlling family's expectations. When she receives a shocking medical diagnosis, she decides to finally break free and live on her own terms. She scandalizes her relatives by speaking her mind, moving out, and eventually proposing marriage to the mysterious and supposedly disreputable Barney Snaith. Together they build a new life on a remote island—but secrets still linger. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom37106000000000000000000000",
+      "gutenberg_id": 37106,
+      "title": "Little Women; Or, Meg, Jo, Beth, and Amy",
+      "author": "Louisa May Alcott",
+      "genre": "Children's",
+      "era": "19th century",
+      "tags": [
+        "Autobiographical fiction",
+        "Bildungsromans",
+        "Domestic fiction",
+        "Family life -- New England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/37106.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Little Women; Or, Meg, Jo, Beth, and Amy\" by Louisa May Alcott is a coming-of-age novel published in 1868-1869. The story follows four sisters—Meg, Jo, Beth, and Amy March—as they navigate the passage from childhood to womanhood in Civil War-era Massachusetts. Loosely based on Alcott's own family, the novel explores themes of domesticity, work, and love while depicting the joys and struggles of nineteenth-century women's lives. Through their adventures and challenges, the March sisters embody different aspects of young American womanhood. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom51970000000000000000000000",
+      "gutenberg_id": 5197,
+      "title": "My Life — Volume 1",
+      "author": "Richard Wagner",
+      "genre": "Classics",
+      "era": "19th century",
+      "tags": [
+        "Composers -- Germany -- Biography",
+        "Wagner, Richard, 1813-1883"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/5197.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"My Life — Volume 1\" by Richard Wagner is an autobiography written between 1865 and 1880, covering his life from birth in 1813 to 1864. Dictated to his mistress Cosima von Bülow at the request of King Ludwig II of Bavaria, Wagner recounts his tempestuous career, friendships, and controversies in surprisingly frank detail. Originally printed in limited editions for private circulation, the memoir sparked rumors due to its restricted availability. The work offers a racy, readable account of Wagner's development and the musical world of his era, though his subjective perspective reveals condescen"
+    },
+    {
+      "id": "pubdom84920000000000000000000000",
+      "gutenberg_id": 8492,
+      "title": "The King in Yellow",
+      "author": "Robert W. (Robert William) Chambers",
+      "genre": "Gothic & Horror",
+      "era": "20th century",
+      "tags": [
+        "Horror tales, American",
+        "Short stories, American",
+        "United States -- Social life and customs -- 19th century -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/8492.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The King in Yellow\" by Robert W. Chambers is a collection of short stories published in 1895. The book opens with supernatural horror tales connected by a forbidden play that drives readers to madness. A mysterious entity called the King in Yellow, an eerie Yellow Sign, and the cursed play itself haunt the first four stories, set in a future 1920s America and Paris. The collection gradually shifts tone, ending with romantic tales, but the opening horror stories have earned acclaim as classics of weird fiction. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom16389000000000000000000000",
+      "gutenberg_id": 16389,
+      "title": "The Enchanted April",
+      "author": "Elizabeth Von Arnim",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "British -- Italy -- Fiction",
+        "Domestic fiction",
+        "Female friendship -- Fiction",
+        "Italy -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/16389.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Enchanted April\" by Elizabeth von Arnim is a novel published in 1922. Four dissimilar women escape their dreary lives in 1920s England for a month-long holiday at a medieval Italian castle. Mrs. Arbuthnot and Mrs. Wilkins struggle with unhappy marriages, Lady Caroline seeks refuge from shallow London society, and elderly Mrs. Fisher clings to her Victorian past. Despite initial tensions, the tranquil Mediterranean setting begins to work its magic on each woman, offering possibilities for transformation and renewal. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom21600000000000000000000000",
+      "gutenberg_id": 2160,
+      "title": "The Expedition of Humphry Clinker",
+      "author": "T. (Tobias) Smollett",
+      "genre": "Philosophy & Essays",
+      "era": "18th century",
+      "tags": [
+        "Epistolary fiction",
+        "Great Britain -- Fiction",
+        "Travelers -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2160.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Expedition of Humphry Clinker\" by Tobias Smollett is an epistolary novel published in 1771. Six correspondents—including a gouty Welsh squire, his husband-hunting sister, and their servants—chronicle a journey through England and Scotland's fashionable spa towns and resorts. Through wildly contrasting letters describing the same events, Smollett satirizes eighteenth-century British society, class pretensions, and urban life. The mysterious ostler Humphry Clinker joins their travels, bringing comic misadventures, romantic entanglements, and surprising revelations that transform the expedit"
+    },
+    {
+      "id": "pubdom39400000000000000000000000",
+      "gutenberg_id": 394,
+      "title": "Cranford",
+      "author": "Elizabeth Cleghorn Gaskell",
+      "genre": "Classics",
+      "era": "19th century",
+      "tags": [
+        "England -- Fiction",
+        "Female friendship -- Fiction",
+        "Older women -- Fiction",
+        "Pastoral fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/394.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Cranford\" by Elizabeth Cleghorn Gaskell is an episodic novel published in 1853. Set in a small English country town, the work affectionately portrays a society of elderly women navigating genteel poverty and rigid social codes in a world slowly changing around them. Through the eyes of visitor Mary Smith, readers encounter the \"Amazons\" of Cranford—widows and spinsters maintaining appearances through \"elegant economy\" while resisting the industrial age creeping beyond their boundaries. This gentle chronicle explores class, tradition, and the gradual shift from rank-based society toward human "
+    },
+    {
+      "id": "pubdom59828000000000000000000000",
+      "gutenberg_id": 59828,
+      "title": "The String of Pearls; Or, The Barber of Fleet Street. A Domestic Romance.",
+      "author": "Thomas Peckett Prest",
+      "genre": "Gothic & Horror",
+      "era": "19th century",
+      "tags": [
+        "Bakers -- Fiction",
+        "Barbers -- Fiction",
+        "Cannibalism -- Fiction",
+        "Fleet Street (London, England) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/59828.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The String of Pearls; Or, The Barber of Fleet Street. A Domestic Romance.\" by Rymer et al. is a penny dreadful serial published from 1846 to 1847. This tale introduces Sweeney Todd, the murderous barber of Fleet Street who kills his customers and delivers their corpses to Mrs. Lovett, who bakes the flesh into meat pies. When a sailor mysteriously disappears after visiting Todd's shop, friends and loved ones investigate, uncovering a horrifying secret beneath St. Dunstan's church that reveals the true scale of Todd's crimes. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom67610000000000000000000000",
+      "gutenberg_id": 6761,
+      "title": "The Adventures of Ferdinand Count Fathom — Complete",
+      "author": "T. (Tobias) Smollett",
+      "genre": "Gothic & Horror",
+      "era": "18th century",
+      "tags": [
+        "Adventure stories",
+        "Gothic fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/6761.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Adventures of Ferdinand Count Fathom\" by Tobias Smollett is a satirical novel written in the mid-18th century. The narrative follows the cunning and morally ambiguous character of Ferdinand Count Fathom, a man of mysterious parentage armed with an extraordinary talent for deception and manipulation. The story sets the stage for themes of vice and virtue, exploring Fathom’s escapades and schemes as he navigates a world ripe for exploitation.  The opening of the novel introduces Fathom in an unusual light—born under strange circumstances to a mother who flitted between roles in military enc"
+    },
+    {
+      "id": "pubdom37683000000000000000000000",
+      "gutenberg_id": 37683,
+      "title": "Chambers's Twentieth Century Dictionary (part 1 of 4: A-D)",
+      "author": null,
+      "genre": "Classics",
+      "era": "Classic",
+      "tags": [
+        "English language -- Dictionaries"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/37683.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Chambers's Twentieth Century Dictionary (part 1 of 4: A-D)\" by Thomas Davidson is a comprehensive reference dictionary written in the early 20th century. This work focuses on the English language, providing definitions, etymologies, technical terms, colloquialisms, and compound phrases that enrich vocabulary and understanding. The dictionary is aimed at users seeking a deeper knowledge of words from various fields, including literature and science, making it a valuable resource for students, writers, and language enthusiasts.  The opening of Chambers's Twentieth Century Dictionary introduces "
+    },
+    {
+      "id": "pubdom40850000000000000000000000",
+      "gutenberg_id": 4085,
+      "title": "The Adventures of Roderick Random",
+      "author": "T. (Tobias) Smollett",
+      "genre": "Adventure",
+      "era": "18th century",
+      "tags": [
+        "England -- Fiction",
+        "Impressment -- Fiction",
+        "Picaresque literature",
+        "Rogues and vagabonds -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/4085.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Adventures of Roderick Random\" by T. Smollett is a picaresque novel published in 1748. Born to a Scottish gentleman and cast out by his family, young Roderick Random must survive by his wits alone in eighteenth-century Britain. From London to the West Indies, he encounters malice, deception, and hypocrisy at every turn while pursuing wealthy women and seeking his rightful place as a gentleman. Drawing on Smollett's own naval experience, this satirical tale exposes the brutality and corruption of its age. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom24500000000000000000000000",
+      "gutenberg_id": 245,
+      "title": "Life on the Mississippi",
+      "author": "Mark Twain",
+      "genre": "Historical",
+      "era": "20th century",
+      "tags": [
+        "Authors, American -- 19th century -- Biography",
+        "Mississippi River -- Description and travel",
+        "Mississippi River Valley -- Social life and customs -- 19th century",
+        "Pilots and pilotage -- Mississippi River"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/245.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Life on the Mississippi\" by Mark Twain is a memoir and travel book published in 1883. It recounts Twain's experiences as a young steamboat pilot's apprentice on the Mississippi River before the Civil War, detailing the art of navigating the ever-changing waters. The second half chronicles his return journey decades later, observing how railroads, growing cities, and time have transformed the river and its culture. Blending personal history with tall tales and social commentary, Twain captures a vanishing era of American river life. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom27558000000000000000000000",
+      "gutenberg_id": 27558,
+      "title": "The 2003 CIA World Factbook",
+      "author": "United States. Central Intelligence Agency",
+      "genre": "Philosophy & Essays",
+      "era": "Classic",
+      "tags": [
+        "Geography -- Handbooks, manuals, etc.",
+        "Political science -- Handbooks, manuals, etc.",
+        "Political statistics -- Handbooks, manuals, etc.",
+        "World politics -- Handbooks, manuals, etc."
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/27558.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The 2003 CIA World Factbook\" by United States Central Intelligence Agency is a reference resource published in 2003. This comprehensive almanac provides concise summaries of demographics, geography, communications, government, economy, and military information for countries and territories worldwide. Produced primarily for U.S. government officials, it draws from numerous federal agencies and public sources. As a public domain work, it has become widely used by researchers and journalists. The Factbook reflects American political perspectives on territorial disputes and sovereignty issues, ma"
+    },
+    {
+      "id": "pubdom24739000000000000000000000",
+      "gutenberg_id": 24739,
+      "title": "Bidwell's Travels, from Wall Street to London Prison: Fifteen Years in Solitude",
+      "author": "Austin Bidwell",
+      "genre": "Mystery & Detective",
+      "era": "Classic",
+      "tags": [
+        "Bank fraud -- England",
+        "Bank of England",
+        "Bidwell, Austin",
+        "Criminals -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/24739.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Bidwell's Travels, from Wall Street to London Prison: Fifteen Years in Solitude\" by George Bidwell is an autobiographical account written in the late 19th century. The narrative follows Bidwell's tumultuous journey from a naïve youth in Brooklyn to a life of crime in Wall Street, ultimately leading to a life sentence in a London prison for grand larceny. The book explores themes of moral failed opportunities and the consequences of one's choices, set against the backdrop of the rapidly changing American society.  The opening of the autobiography paints a vivid picture of Bidwell's early life,"
+    },
+    {
+      "id": "pubdom34413000000000000000000000",
+      "gutenberg_id": 34413,
+      "title": "The Love Letters of Mary Wollstonecraft to Gilbert Imlay",
+      "author": "Mary Wollstonecraft",
+      "genre": "Romance",
+      "era": "18th century",
+      "tags": [
+        "Authors, English -- 18th century -- Correspondence",
+        "Feminists -- Great Britain -- Correspondence",
+        "Imlay, Gilbert, 1754?-1828? -- Correspondence",
+        "Love-letters"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/34413.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Love Letters of Mary Wollstonecraft to Gilbert Imlay\" by Mary Wollstonecraft is a collection of personal correspondence written in the late 18th century. The letters chronicle Wollstonecraft's passionate relationship with Imlay, illustrating her profound emotional struggles and her aspirations for love, family, and personal fulfillment. Wollstonecraft's reflections provide insight into her experiences as a woman navigating the complexities of romance and societal expectations.  The opening of the collection establishes the background of Wollstonecraft's life, offering a glimpse into her u"
+    },
+    {
+      "id": "pubdom26471000000000000000000000",
+      "gutenberg_id": 26471,
+      "title": "Spoon River Anthology",
+      "author": "Edgar Lee Masters",
+      "genre": "Poetry",
+      "era": "20th century",
+      "tags": [
+        "American poetry"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/cache/epub/26471/pg26471.epub",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": null
+    },
+    {
+      "id": "pubdom32960000000000000000000000",
+      "gutenberg_id": 3296,
+      "title": "The Confessions of St. Augustine",
+      "author": "of Hippo, Saint Augustine",
+      "genre": "Philosophy & Essays",
+      "era": "Antiquity",
+      "tags": [
+        "Augustine, of Hippo, Saint, 354-430",
+        "Bishops -- Algeria -- Hippo (Extinct city) -- Biography",
+        "Catholic Church -- Bishops -- Biography",
+        "Christian saints -- Algeria -- Hippo (Extinct city) -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/3296.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Confessions of St. Augustine\" by Bishop of Hippo Saint Augustine is an autobiographical work written between AD 397 and 400. In thirteen books composed as prayers to God, Augustine recounts his turbulent journey from a sinful youth to Christian conversion. He reflects on his immoral past, his time following Manichaeism, and the influential figures who guided him toward faith. Considered the first Western autobiography, this intimate spiritual memoir explores themes of sin, redemption, and humanity's restless search for divine truth. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom27509000000000000000000000",
+      "gutenberg_id": 27509,
+      "title": "The 2006 CIA World Factbook",
+      "author": "United States. Central Intelligence Agency",
+      "genre": "Philosophy & Essays",
+      "era": "Classic",
+      "tags": [
+        "Geography -- Handbooks, manuals, etc.",
+        "Political science -- Handbooks, manuals, etc.",
+        "Political statistics -- Handbooks, manuals, etc.",
+        "World politics -- Handbooks, manuals, etc."
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/27509.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The 2006 CIA World Factbook\" by the United States Central Intelligence Agency is a comprehensive reference guide published in the early 21st century. This factual document provides detailed information about countries and locations around the world, including updates on geopolitical changes, economic statistics, and demographic data. The Factbook serves as an essential resource for understanding global issues and the status of nations.  The opening of the Factbook outlines its structure, including sections on countries, field listings, rank orders, and appendices. It highlights new features f"
+    },
+    {
+      "id": "pubdom51252000000000000000000000",
+      "gutenberg_id": 51252,
+      "title": "The Book of the Thousand Nights and a Night — Volume 01 (of 10)",
+      "author": null,
+      "genre": "Adventure",
+      "era": "Classic",
+      "tags": [
+        "Fairy tales -- Arab countries",
+        "Folklore -- Arab countries"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/51252.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Plain and Literal Translation of the Arabian Nights Entertainments, Now Entitled The Book of the Thousand Nights and a Night\" by Richard F. Burton is a comprehensive collection of Middle Eastern folk tales that dates back to the late 19th century. This volume offers an unabridged version of the classic \"Arabian Nights,\" aiming to provide readers with a faithful rendering of the original texts, complete with poetic elements and rich cultural details. The general theme revolves around enchanting stories filled with adventure, romance, and moral lessons, notably featuring the iconic character "
+    },
+    {
+      "id": "pubdom25851000000000000000000000",
+      "gutenberg_id": 25851,
+      "title": "The Life of Charles Dickens, Vol. I-III, Complete",
+      "author": "John Forster",
+      "genre": "Classics",
+      "era": "19th century",
+      "tags": [
+        "Dickens, Charles, 1812-1870",
+        "Novelists, English -- 19th century -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/25851.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Life of Charles Dickens, Vol. I-III, Complete\" by John Forster is a biographical work written in the late 19th century. This comprehensive biography chronicles the life of Charles Dickens, focusing particularly on his formative years and the experiences that shaped him as one of the greatest novelists of the era. It captures his childhood, early hardships, and the early influences that would later permeate his literary career.  The opening of the biography delves into Dickens's early life, beginning with his birth in 1812 and unfolding his childhood years through vivid recollections of fa"
+    },
+    {
+      "id": "pubdom84400000000000000000000000",
+      "gutenberg_id": 844,
+      "title": "The Importance of Being Earnest: A Trivial Comedy for Serious People",
+      "author": "Oscar Wilde",
+      "genre": "Drama",
+      "era": "19th century",
+      "tags": [
+        "Comedy plays",
+        "England -- Drama",
+        "Foundlings -- Drama",
+        "Identity (Psychology) -- Drama"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/844.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Importance of Being Earnest: A Trivial Comedy for Serious People\" by Oscar Wilde is a play first performed in 1895. Two young gentlemen lead double lives, each pretending to be named Ernest to escape social duties and win the hearts of their beloveds. Filled with sharp wit and clever wordplay, the farcical comedy gently mocks Victorian society through memorable characters including the formidable Lady Bracknell. The play parodies theatrical conventions while exploring themes of identity, deception, and the absurdities of proper society. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom23784000000000000000000000",
+      "gutenberg_id": 23784,
+      "title": "The History of Sir Richard Calmady: A Romance",
+      "author": "Lucas Malet",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Cousins -- Fiction",
+        "Lesbians -- Fiction",
+        "Mothers and sons -- Fiction",
+        "People with disabilities -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/23784.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The History of Sir Richard Calmady: A Romance\" by Lucas Malet is a novel written in the late 19th century. The story is set against the backdrop of a family lineage and revolves around the experiences of Sir Richard Calmady, exploring themes of love, social relations, and the legacies of family history.\"   \"The opening of the story introduces the setting of Brockhurst, a grand estate built by Denzil Calmady, and highlights the beauty of the landscape and the weight of familial legacy. The narrative hints at a family curse affecting the male descendants of Denzil Calmady, suggesting an ominous"
+    },
+    {
+      "id": "pubdom32680000000000000000000000",
+      "gutenberg_id": 3268,
+      "title": "The Mysteries of Udolpho",
+      "author": "Ann Ward Radcliffe",
+      "genre": "Gothic & Horror",
+      "era": "19th century",
+      "tags": [
+        "Castles -- Fiction",
+        "Gothic fiction",
+        "Guardian and ward -- Fiction",
+        "Horror tales"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/3268.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Mysteries of Udolpho\" by Ann Radcliffe is a Gothic novel published in 1794. Young Emily St. Aubert endures a cascade of misfortunes after her parents' deaths, finding herself trapped in a sinister Italian castle controlled by the menacing Montoni. Surrounded by mysterious terrors, hidden secrets, and supernatural phenomena, Emily must navigate perilous intrigues while separated from her beloved Valancourt. This archetypal Gothic tale weaves romance, suspense, and dark mysteries through remote castles and haunted landscapes. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom45839000000000000000000000",
+      "gutenberg_id": 45839,
+      "title": "Dracula",
+      "author": "Bram Stoker",
+      "genre": "Gothic & Horror",
+      "era": "20th century",
+      "tags": [
+        "Dracula, Count (Fictitious character) -- Fiction",
+        "Epistolary fiction",
+        "Gothic fiction",
+        "Horror tales"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/45839.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Dracula\" by Bram Stoker is a Gothic horror novel published in 1897. Told through letters, diary entries, and newspaper articles, the story follows solicitor Jonathan Harker's terrifying encounter with Count Dracula in Transylvania. When the vampire Count flees to England and begins stalking victims in Whitby, a small group led by Professor Abraham Van Helsing must hunt him down. Drawing from folklore and history, Stoker created what became the seminal work of vampire fiction and the most portrayed literary character in history. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom42671000000000000000000000",
+      "gutenberg_id": 42671,
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Courtship -- Fiction",
+        "Domestic fiction",
+        "England -- Fiction",
+        "Love stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/42671.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Pride and Prejudice\" by Jane Austen is a novel published in 1813. It follows Elizabeth Bennet, who must learn to see beyond hasty judgments and superficial appearances. With five daughters and an estate that can only pass to a male heir, the Bennet family faces financial uncertainty. Marriage becomes essential for survival. When wealthy Mr. Darcy arrives in their neighborhood, his pride and Elizabeth's prejudice ignite a conflict that will challenge everything she believes about goodness, character, and love. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom65238000000000000000000000",
+      "gutenberg_id": 65238,
+      "title": "The Secret of Chimneys",
+      "author": "Agatha Christie",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Battle, Superintendent (Fictitious character) -- Fiction",
+        "Detective and mystery stories",
+        "Police -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/65238.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Secret of Chimneys\" by Agatha Christie is a suspenseful detective novel written in the early 20th century. The story introduces the charming Anthony Cade, who finds himself embroiled in a web of intrigue involving royal secrets and political machinations in a fictional Balkan nation known as Herzoslovakia. As he sets off on a journey to deliver a manuscript of memoirs, he stumbles into a world of blackmail, missing persons, and a potential restoration of a monarchy.  At the start of the novel, we meet Anthony Cade while he is working as a tour guide in Africa, where he encounters an old f"
+    },
+    {
+      "id": "pubdom24650000000000000000000000",
+      "gutenberg_id": 2465,
+      "title": "Carmen",
+      "author": "Prosper Mérimée",
+      "genre": "Mystery & Detective",
+      "era": "19th century",
+      "tags": [
+        "Carmen (Fictitious character) -- Fiction",
+        "Spain -- Social life and customs -- 19th century -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2465.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Carmen\" by Prosper Mérimée is a novella written and first published in 1845. In the lonely hills of Andalusia, a scholar meets a notorious outlaw named Don José, who tells the tale of his tragic downfall. His story revolves around Carmen, a captivating Romani woman whose fierce independence and refusal to be tamed leads to jealousy, violence, and death. This dark narrative of passion and fate later inspired Bizet's famous opera. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom19771000000000000000000000",
+      "gutenberg_id": 19771,
+      "title": "Henrietta Temple: A Love Story",
+      "author": "Benjamin, Earl of Beaconsfield Disraeli",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Aristocracy (Social class) -- Fiction",
+        "Autobiographical fiction",
+        "Dandies -- Fiction",
+        "London (England) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/19771.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Henrietta Temple: A Love Story\" by Earl of Beaconsfield Benjamin Disraeli is a novel written between 1833 and 1836. Ferdinand Armine, heir to a debt-ridden aristocratic family, becomes engaged to his wealthy cousin Katherine to escape financial ruin. But when he meets the captivating Henrietta Temple, he falls instantly and passionately in love. Torn between duty and desire, Ferdinand's choices set off a chain of heartbreak, secret engagements, and unexpected complications that entangle multiple lives in a web of conflicting promises and obligations. (This is an automatically generated summar"
+    },
+    {
+      "id": "pubdom47530000000000000000000000",
+      "gutenberg_id": 47530,
+      "title": "Oliver Twist, Vol. 2 (of 3)",
+      "author": "Charles Dickens",
+      "genre": "Mystery & Detective",
+      "era": "19th century",
+      "tags": [
+        "Bildungsromans",
+        "Boys -- Fiction",
+        "Criminals -- Fiction",
+        "Kidnapping victims -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/47530.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Oliver Twist, Vol. 2 (of 3)\" by Charles Dickens is a novel originally published serially from 1837 to 1839. This second volume continues the journey of orphan Oliver Twist through London's criminal underworld. After escaping a workhouse, Oliver falls into the hands of Fagin's gang of pickpockets but finds refuge with the kind Mr. Brownlow. As mysterious forces conspire to hide Oliver's true parentage, he becomes entangled in robbery, betrayal, and violence that will determine his fate and uncover long-buried family secrets. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom26225000000000000000000000",
+      "gutenberg_id": 26225,
+      "title": "Fifteen Thousand Useful Phrases",
+      "author": "Grenville Kleiser",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "English language -- Terms and phrases"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/cache/epub/26225/pg26225.epub",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": null
+    },
+    {
+      "id": "pubdom28680000000000000000000000",
+      "gutenberg_id": 2868,
+      "title": "The Green Mummy",
+      "author": "Fergus Hume",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories",
+        "Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2868.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Green Mummy\" by Fergus Hume is a novel likely written during the late 19th century. The story revolves around a young couple, Archie Hope and Lucy Kendal, as they navigate romance against a backdrop filled with mystery and intrigue, particularly centering on a rare mummy that Lucy's archaeologist stepfather, Professor Braddock, is eager to acquire.  At the start of the novel, readers are introduced to Archie and Lucy, who share a playful yet serious conversation about their engagement. Archie reveals the lengths he has gone to in order to gain Professor Braddock’s consent to marry Lucy, i"
+    },
+    {
+      "id": "pubdom25910000000000000000000000",
+      "gutenberg_id": 2591,
+      "title": "Grimms' Fairy Tales",
+      "author": "Jacob Grimm",
+      "genre": "Children's",
+      "era": "19th century",
+      "tags": [
+        "Fairy tales -- Germany"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2591.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Grimms' Fairy Tales\" by Jacob Grimm and Wilhelm Grimm is a German collection of fairy tales first published in 1812. Beginning with 86 stories and eventually expanding to 210 tales across seven editions, this seminal work transformed oral folklore into written literature. The brothers collected stories from friends, acquaintances, and old books to preserve German cultural history. What started as a scholarly project evolved through decades of revisions, with tales added and removed, content adjusted for young readers, and illustrations incorporated to become a cornerstone of Western children'"
+    },
+    {
+      "id": "pubdom31100000000000000000000000",
+      "gutenberg_id": 31100,
+      "title": "The Complete Project Gutenberg Works of Jane Austen: A Linked Index of all PG Editions of Jane Austen",
+      "author": "Jane Austen",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "England -- Social life and customs -- Fiction",
+        "Love stories, English"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/31100.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Complete Project Gutenberg Works of Jane Austen\" by Jane Austen is a comprehensive collection of her literary works compiled in the early 21st century. This anthology features beloved novels such as \"Pride and Prejudice,\" \"Emma,\" and \"Sense and Sensibility,\" among others. The texts center around societal norms, manners, and romantic entanglements in the early 19th-century British gentry, often highlighting the lives and struggles of strong female protagonists.  At the start of \"Persuasion,\" one of the novels included in this collection, readers are introduced to Sir Walter Elliot, a preen"
+    },
+    {
+      "id": "pubdom61330000000000000000000000",
+      "gutenberg_id": 6133,
+      "title": "The Extraordinary Adventures of Arsène Lupin, Gentleman-Burglar",
+      "author": "Maurice Leblanc",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Adventure stories, French -- Translations into English",
+        "Burglars -- Fiction",
+        "Lupin, Arsène (Fictitious character) -- Fiction",
+        "Mystery and detective stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/6133.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Extraordinary Adventures of Arsène Lupin, Gentleman-Burglar\" by Maurice Leblanc is a collection of stories published in 1907. This debut collection introduces the charming and cunning Arsène Lupin, a master thief who outsmarts police and high society alike. Through nine tales of daring heists, clever disguises, and audacious escapes, Lupin proves himself an unmatched criminal genius. From shipboard robberies to prison breaks, he taunts authorities—including a famous English detective—while stealing priceless treasures with impeccable style and wit. (This is an automatically generated summ"
+    },
+    {
+      "id": "pubdom21839000000000000000000000",
+      "gutenberg_id": 21839,
+      "title": "Sense and Sensibility",
+      "author": "Jane Austen",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Domestic fiction",
+        "England -- Fiction",
+        "England -- Social life and customs -- 19th century -- Fiction",
+        "Gentry -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/21839.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Sense and Sensibility\" by Jane Austen is a novel published in 1811. When the Dashwood sisters are forced from their family estate into reduced circumstances, two very different personalities face the trials of love and heartbreak. Elinor embodies prudent sense while Marianne follows passionate sensibility. As romantic attachments form and unravel, both sisters must navigate social expectations, financial realities, and the painful gap between appearance and truth in matters of the heart. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom19980000000000000000000000",
+      "gutenberg_id": 1998,
+      "title": "Thus Spake Zarathustra: A Book for All and None",
+      "author": "Friedrich Wilhelm Nietzsche",
+      "genre": "Philosophy & Essays",
+      "era": "19th century",
+      "tags": [
+        "Philosophy, German",
+        "Superman (Philosophical concept)"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1998.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Thus Spake Zarathustra: A Book for All and None\" by Friedrich Wilhelm Nietzsche is a work of philosophical fiction published between 1883 and 1885. Through the voice of the ancient prophet Zarathustra, Nietzsche delivers discourses on subjects ranging from the mundane to the metaphysical. The work introduces core Nietzschean concepts including the Übermensch, the death of God, the will to power, and eternal recurrence. Written in analogical and figurative language, it emerged from decades of accumulated insight during solitary mountain walks. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom52190000000000000000000000",
+      "gutenberg_id": 52190,
+      "title": "Ecce Homo: Complete Works, Volume Seventeen",
+      "author": "Friedrich Wilhelm Nietzsche",
+      "genre": "Philosophy & Essays",
+      "era": "19th century",
+      "tags": [
+        "Nietzsche, Friedrich Wilhelm, 1844-1900",
+        "Philosophers -- Germany -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/52190.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Ecce Homo\" by Friedrich Wilhelm Nietzsche is a philosophical autobiography written in 1888. In this provocative final work, Nietzsche offers his own interpretation of his life, philosophy, and significance through boldly titled chapters like \"Why I Am So Wise\" and \"Why I Write Such Good Books.\" He reviews his major works, presents a new image of the Dionysian philosopher, and challenges Christianity's morality. Written with characteristic hyperbole and self-conscious irony, the book puts Nietzsche himself on trial while declaring his vision for humanity's future. (This is an automatically gen"
+    },
+    {
+      "id": "pubdom22541000000000000000000000",
+      "gutenberg_id": 22541,
+      "title": "The Misplaced Battleship",
+      "author": "Harry Harrison",
+      "genre": "Science Fiction",
+      "era": "21st century",
+      "tags": [
+        "Criminals -- Fiction",
+        "DiGriz, James Bolivar (Fictitious character) -- Fiction",
+        "Police -- Fiction",
+        "Science fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/22541.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Misplaced Battleship\" by Harry Harrison is a science fiction novel written in the early 1960s. The story revolves around interstellar intrigue and crime, specifically the implications of a powerful battleship being secretly built in a peaceful sector of the galaxy. It addresses themes of deception, adventure, and the moral complexities faced by characters navigating both lawful and unlawful pursuits in a futuristic setting.  The narrative follows the protagonist, Slippery Jim diGriz, a master thief turned agent for the Special Corps, as he uncovers a plot involving the covert construction"
+    },
+    {
+      "id": "pubdom53874000000000000000000000",
+      "gutenberg_id": 53874,
+      "title": "Under the Red Dragon: A Novel",
+      "author": "James Grant",
+      "genre": "Mystery & Detective",
+      "era": "19th century",
+      "tags": [
+        "Crimean War, 1853-1856 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/53874.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Under the Red Dragon\" by James Grant is a historical novel written in the late 19th century. Set against the backdrop of military life during a time of conflict, the story centers on Lieutenant Harry Hardinge, who navigates his feelings for Lady Estelle Cressingham while juggling his duties as a soldier. The narrative unfolds in a period filled with romance, social dynamics, and the looming specter of war, specifically the Crimean War.  The opening of the novel introduces Lieutenant Harry Hardinge and his fellow officers as they lament their stagnant lives at barracks while anticipating possi"
+    },
+    {
+      "id": "pubdom27827000000000000000000000",
+      "gutenberg_id": 27827,
+      "title": "The Kama Sutra of Vatsyayana: Translated From the Sanscrit in Seven Parts With Preface, Introduction and Concluding Remarks",
+      "author": "Vatsyayana",
+      "genre": "Philosophy & Essays",
+      "era": "Classic",
+      "tags": [
+        "Love",
+        "Sex"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/27827.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Kama Sutra of Vatsyayana\" by Vatsyayana is an ancient Sanskrit text composed between the 3rd and 5th century CE. Rather than simply a manual on sexual positions, this Hindu work explores the art of living well, encompassing courtship, emotional fulfillment, maintaining relationships, and the philosophy of desire. Part of the broader Hindu concept of life's proper goals, it addresses when desire sustains happiness and how pleasure fits within a meaningful existence. The text combines terse aphoristic verses with prose, offering guidance on love's nature and the pursuit of satisfaction. (Th"
+    },
+    {
+      "id": "pubdom46976000000000000000000000",
+      "gutenberg_id": 46976,
+      "title": "The Anabasis of Alexander : $b or, The history of the wars and conquests of Alexander the Great",
+      "author": "Arrian",
+      "genre": "Historical",
+      "era": "Antiquity",
+      "tags": [
+        "Alexander, the Great, 356 B.C.-323 B.C.",
+        "India -- History -- To 324 B.C.",
+        "Iran -- History -- To 640"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/46976.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Anabasis of Alexander\" by Arrian of Nicomedia is a military history composed in the second century AD. This seven-book account chronicles Alexander the Great's conquest of the Persian Empire between 336 and 323 BC, from his accession to the Macedonian throne through his death. Drawing on lost sources from Alexander's companions, Arrian presents the fullest surviving narrative of these legendary campaigns, including famous battles at Granicus, Issus, and Gaugamela, sieges across Asia, and the ambitious push into India that ultimately ended at the Hyphasis river. (This is an automatically g"
+    },
+    {
+      "id": "pubdom33283000000000000000000000",
+      "gutenberg_id": 33283,
+      "title": "Calculus Made Easy: Being a very-simplest introduction to those beautiful methods which are generally called by the terrifying names of the Differential Calculus and the Integral Calculus",
+      "author": "Silvanus P. (Silvanus Phillips) Thompson",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "Calculus"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/cache/epub/33283/pg33283.epub",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Calculus Made Easy\" by Silvanus P. Thompson is a book on infinitesimal calculus originally published in 1910. Rather than relying on the traditional epsilon-delta definition of limits, Thompson takes a revolutionary approach by using direct approximation methods in the spirit of Leibniz. The book aims to demystify what are often considered terrifying mathematical concepts, making differential and integral calculus accessible through simplified explanations. Its enduring popularity is evidenced by multiple editions and numerous reprints spanning over half a century. (This is an automatically g"
+    },
+    {
+      "id": "pubdom30110000000000000000000000",
+      "gutenberg_id": 3011,
+      "title": "The Lady of the Lake",
+      "author": "Walter Scott",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "Arthurian romances",
+        "Lady of the Lake (Legendary character) -- Romances"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/3011.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Lady of the Lake\" by Walter Scott is a narrative poem first published in 1810. Set in the Scottish Highlands, it weaves together three dramatic plots: a romantic rivalry among three men vying for Ellen Douglas's love, a conflict between an exiled noble and King James V of Scotland, and a brewing war between Lowland and Highland forces. This influential work unfolds across six cantos, each capturing a single day's action in the wild Trossachs region, where love, loyalty, and ancient feuds collide. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom40284000000000000000000000",
+      "gutenberg_id": 40284,
+      "title": "The Sex Life of the Gods",
+      "author": "M. E. (Michael E.) Knerr",
+      "genre": "Science Fiction",
+      "era": "20th century",
+      "tags": [
+        "Extraterrestrial beings -- Fiction",
+        "Science fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/40284.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Sex Life of the Gods\" by M. E. Knerr is a science fiction novel written in the early 1960s. The story intricately weaves themes of amnesia, mystery, and romance, centering around the protagonist, Nick Danson, who awakens near the wreckage of a mysterious aircraft with no memory of his past. As Nick navigates the complexities of his relationship with his wife, Beth, he is also pursued by unknown figures and burdened with the task of uncovering the truth about his identity and the circumstances surrounding his disappearance.  At the start of the narrative, Nick regains consciousness in a fo"
+    },
+    {
+      "id": "pubdom27475000000000000000000000",
+      "gutenberg_id": 27475,
+      "title": "That Girl Montana",
+      "author": "Marah Ellis Ryan",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Montana -- Fiction",
+        "Western stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/27475.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"That Girl Montana\" by Marah Ellis Ryan is a novel written in the early 20th century. The story is set against the backdrop of the untamed American West, situated primarily in the Kootenai River area, and revolves around a young girl named 'Tana, who comes to be connected with a murder mystery and the complexities of her interactions with the local community, including both Native Americans and white settlers.   The opening portion introduces a cast of characters engaged in discussions about 'Tana, who is presumed to be linked to the murder of Lee Holly, a notorious man in the area. The narrat"
+    },
+    {
+      "id": "pubdom12082000000000000000000000",
+      "gutenberg_id": 12082,
+      "title": "Color Images from Mars Rovers: Spirit and Opportunity",
+      "author": "Bob Webster",
+      "genre": "Classics",
+      "era": "Classic",
+      "tags": [
+        "Mars (Planet) -- Pictorial works"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/12082.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Color Images from Mars Rovers\" by Bob Webster is a scientific publication created in the early 21st century. The book showcases a collection of color-enhanced images taken by NASA's Mars rovers, Opportunity and Spirit, providing readers with a vibrant visual experience of the Martian landscape. The primary topic of the book is the presentation of these reconstructed images alongside explanations of the methods used to create them, shedding light on the workings of the rovers and the complexities involved in capturing color data from Mars.  In this publication, Bob Webster recounts his efforts"
+    },
+    {
+      "id": "pubdom55000000000000000000000000",
+      "gutenberg_id": 55,
+      "title": "The Wonderful Wizard of Oz",
+      "author": "L. Frank (Lyman Frank) Baum",
+      "genre": "Fantasy",
+      "era": "20th century",
+      "tags": [
+        "Courage -- Juvenile fiction",
+        "Cowardly Lion (Fictitious character) -- Juvenile fiction",
+        "Cyclones -- Juvenile fiction",
+        "Dreams -- Juvenile fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/55.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Wonderful Wizard of Oz\" by L. Frank Baum is a children's novel written in 1900. When a cyclone sweeps young Dorothy and her dog Toto from Kansas to the magical Land of Oz, she discovers only one way home: she must destroy the Wicked Witch of the West. Joined by a Scarecrow seeking brains, a Tin Woodman wanting a heart, and a Cowardly Lion desiring courage, Dorothy follows the yellow brick road to seek help from the mysterious Wizard of Oz. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom61262000000000000000000000",
+      "gutenberg_id": 61262,
+      "title": "Poirot Investigates",
+      "author": "Agatha Christie",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Belgians -- England -- Fiction",
+        "Detective and mystery stories, English",
+        "Poirot, Hercule (Fictitious character) -- Fiction",
+        "Private investigators -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/61262.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Poirot Investigates\" by Agatha Christie is a short story collection first published in 1924. The eleven tales follow the eccentric Belgian detective Hercule Poirot as he unravels mysteries driven by greed, jealousy, and revenge. From stolen diamonds and suspicious deaths to international espionage, each case challenges Poirot's brilliant deductive mind. With his friend Hastings by his side, Poirot employs psychological insight and theatrical flair to expose criminals and reveal the truth behind seemingly impossible crimes. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom60979000000000000000000000",
+      "gutenberg_id": 60979,
+      "title": "Reminiscences of a Stock Operator",
+      "author": "Edwin Lefevre",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "Investments",
+        "New York Stock Exchange",
+        "Speculation"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/60979.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Reminiscences of a Stock Operator\" by Edwin Lefèvre is a roman à clef published in 1923. Told through the fictional Larry Livingston—inspired by legendary trader Jesse Livermore—the book chronicles decades of Wall Street triumphs and disasters. From exploiting bucket shops with massive leverage to navigating boom-and-bust cycles on the New York Stock Exchange, it reveals the psychological warfare of speculation. Called \"a font of investing wisdom\" by Alan Greenspan, this enduring classic captures an era when market manipulation was legal and fortunes vanished overnight. (This is an automatica"
+    },
+    {
+      "id": "pubdom27997000000000000000000000",
+      "gutenberg_id": 27997,
+      "title": "Robert Orange: Being a Continuation of the History of Robert Orange",
+      "author": "John Oliver Hobbes",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Religious fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/27997.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Robert Orange\" by John Oliver Hobbes is a novel written in the late 19th century. The story centers around Robert Orange, a character navigating love, ambition, and social expectations amid the complexities and constraints of Victorian society. The narrative takes the reader into his world, exploring relationships with significant characters such as Lady Sara De Treverell and Lord Reckage, each contributing to the themes of romance, societal pressures, and personal ambition.  At the start of the book, the reader is introduced to Lady Sara, the daughter of the Earl of Garrow, who is caught in "
+    },
+    {
+      "id": "pubdom16950000000000000000000000",
+      "gutenberg_id": 1695,
+      "title": "The Man Who Was Thursday: A Nightmare",
+      "author": "G. K. (Gilbert Keith) Chesterton",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Allegories",
+        "Anarchists -- Fiction",
+        "Detective and mystery stories",
+        "Fantasy fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/1695.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Man Who Was Thursday: A Nightmare\" by G. K. Chesterton is a philosophical novel with elements of adventure and satire, written in the late 19th century. The story revolves around the enigmatic character Gabriel Syme, a police detective who infiltrates a group of anarchists in London to uncover their plans and identities. As the narrative unfolds, it explores complex themes of order, chaos, and the nature of evil, often through witty dialogue and absurd situations that challenge conventional thinking.  At the start of the novel, readers are introduced to the suburb of Saffron Park, with it"
+    },
+    {
+      "id": "pubdom51428000000000000000000000",
+      "gutenberg_id": 51428,
+      "title": "That Which Hath Wings: A Novel of the Day",
+      "author": "Richard Dehan",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "World War, 1914-1918 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/51428.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"That Which Hath Wings: A Novel of the Day\" by Richard Dehan is a novel written in the early 20th century. The story centers around the lives of Francis, Viscount Norwater, and his wife Margot, who navigate the trials and tribulations of their newlywed life just before the onset of World War I. Their passionate romance is juxtaposed against societal expectations and Miss Margot's struggle with the idea of motherhood which complicates their relationship.  At the start of the novel, we are introduced to Franky and Margot on the occasion of their wedding in January 1914. The narrative captures th"
+    },
+    {
+      "id": "pubdom20203000000000000000000000",
+      "gutenberg_id": 20203,
+      "title": "Autobiography of Benjamin Franklin",
+      "author": "Benjamin Franklin",
+      "genre": "Historical",
+      "era": "18th century",
+      "tags": [
+        "Franklin, Benjamin, 1706-1790",
+        "Statesmen -- United States -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/20203.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Autobiography of Benjamin Franklin\" by Benjamin Franklin is an unfinished memoir written between 1771 and 1790. Franklin recounts his journey from a young apprentice fleeing Boston to becoming a successful printer and civic leader in Philadelphia. The work famously details his \"Project of arriving at moral Perfection\" through thirteen virtues, revealing his struggles and philosophies. Written across four parts over nearly two decades, this influential autobiography ends when Franklin was 52, leaving three decades of his remarkable life unrecorded. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom75201000000000000000000000",
+      "gutenberg_id": 75201,
+      "title": "A farewell to arms",
+      "author": "Ernest Hemingway",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Man-woman relationships -- Fiction",
+        "Military deserters -- Fiction",
+        "Military hospitals -- Fiction",
+        "Soldiers -- United States -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/75201.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A farewell to arms\" by Ernest Hemingway is a novel first published in 1929. Set during World War I's Italian campaign, it follows American lieutenant Frederic Henry, who serves in the Italian ambulance corps. When he meets English nurse Catherine Barkley, a passionate love affair develops against the brutal backdrop of war. As battle intensifies and their relationship deepens, the lovers face devastating choices that will test whether their bond can survive the chaos surrounding them. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom19476000000000000000000000",
+      "gutenberg_id": 19476,
+      "title": "A Honeymoon in Space",
+      "author": "George Chetwynd Griffith",
+      "genre": "Science Fiction",
+      "era": "20th century",
+      "tags": [
+        "Science fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/19476.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Honeymoon in Space\" by George Chetwynd Griffith is a novel published in 1901. When British aristocrat Lord Redgrave kidnaps the woman he loves aboard his anti-gravity spaceship, their marriage becomes the strangest honeymoon imaginable—a grand tour of the Solar System. From the Moon's desolate ruins to Mars's intellectual giants, Venus's sinless angels, and Saturn's bizarre creatures, the newlyweds encounter civilizations at every stage of evolution, each stop revealing unsettling truths about humanity's place in the cosmos. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom16328000000000000000000000",
+      "gutenberg_id": 16328,
+      "title": "Beowulf: An Anglo-Saxon Epic Poem",
+      "author": null,
+      "genre": "Poetry",
+      "era": "Classic",
+      "tags": [
+        "Dragons -- Poetry",
+        "Epic poetry, English (Old)",
+        "Monsters -- Poetry"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/16328.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Beowulf: An Anglo-Saxon Epic Poem\" by J. Lesslie Hall is an epic poem written in the late 19th century. The narrative focuses on the heroic figure Beowulf, a warrior from Geatland, who seeks to help Hrothgar, the Danish king, rid his land of the monstrous creature Grendel that has been terrorizing his mead-hall. This tale weaves themes of heroism, loyalty, and the struggle between good and evil, set against the backdrop of the early medieval period.  The opening of the poem introduces the legacy of Scyld, the founding king of the Danes, and his great lineage, leading up to Hrothgar's reign. A"
+    },
+    {
+      "id": "pubdom22091000000000000000000000",
+      "gutenberg_id": 22091,
+      "title": "The best short stories of 1920, and the yearbook of the American short story",
+      "author": null,
+      "genre": "Classics",
+      "era": "Classic",
+      "tags": [
+        "American fiction -- 20th century",
+        "Short stories -- 20th century -- Bibliography",
+        "Short stories -- 20th century -- Indexes",
+        "Short stories, American"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/22091.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Best Short Stories of 1920\" edited by Edward J. O'Brien is a collection of short stories that reflects the literary landscape of the early 20th century. This compilation includes diverse narratives that capture the essence of human experience and societal changes, making it a rich resource for readers interested in American fiction during this period. Among the featured stories are works by notable authors such as Sherwood Anderson and Edwina Stanton Babcock, showcasing a variety of themes and writing styles.  At the start of this anthology, the introduction conveys the editor's explorati"
+    },
+    {
+      "id": "pubdom61168000000000000000000000",
+      "gutenberg_id": 61168,
+      "title": "The Man in the Brown Suit",
+      "author": "Agatha Christie",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories",
+        "London (England) -- Fiction",
+        "Murder -- Investigation -- Fiction",
+        "South Africa -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/61168.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Man in the Brown Suit\" by Agatha Christie is a detective novel published in 1924. When Anne Beddingfeld witnesses a man's death at a London tube station, she picks up a mysterious note that launches her into a dangerous adventure. Following clues across continents to South Africa, Anne pursues the truth about murder, stolen diamonds, and a shadowy international criminal known only as \"the Colonel.\" With danger at every turn, she must uncover the real identity of the elusive man in the brown suit. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom73260000000000000000000000",
+      "gutenberg_id": 7326,
+      "title": "The Yeoman Adventurer",
+      "author": "George W. Gough",
+      "genre": "Adventure",
+      "era": "Classic",
+      "tags": [
+        "Adventure stories",
+        "Farmers -- Fiction",
+        "Jacobite Rebellion, 1745-1746 -- Fiction",
+        "Staffordshire (England) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/7326.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Yeoman Adventurer\" by George W. Gough is a historical novel likely written in the early 20th century. The story unfolds through the experiences of Oliver Wheatman, a yeoman, as he navigates life in a tumultuous period marked by the Jacobite uprisings, personal ambition, and romantic entanglements. The novel delves into themes of bravery, identity, and the quest for adventure against a backdrop of deep social and political upheaval.  The opening of the book introduces Oliver Wheatman as he reflects on his life in a rural setting, immediately exposing his longing for adventure and the compl"
+    },
+    {
+      "id": "pubdom26849000000000000000000000",
+      "gutenberg_id": 26849,
+      "title": "The Works of Mr. George Gillespie (Vol. 1 of 2)",
+      "author": "George Gillespie",
+      "genre": "Historical",
+      "era": "17th century",
+      "tags": [
+        "Church of Scotland -- History",
+        "Gillespie, George, 1613-1648"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/26849.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Works of Mr. George Gillespie (Vol. 1 of 2)\" by George Gillespie is a collection of theological writings and controversial discourses written in the mid-17th century. This work encapsulates Gillespie's staunch defense of Presbyterian governance over Episcopal practices in the Church of Scotland, focusing on the arguments against the imposition of what he terms \"English Popish Ceremonies.\"   The opening of the text introduces readers to Georges Gillespie's significant role in ecclesiastical debates of his time. It details his early life, education, and his determined fight against prelacy "
+    },
+    {
+      "id": "pubdom24855000000000000000000000",
+      "gutenberg_id": 24855,
+      "title": "Concrete Construction: Methods and Costs",
+      "author": "Halbert Powers Gillette",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "Concrete construction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/24855.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Concrete Construction: Methods and Costs\" by Halbert P. Gillette and Charles S. Hill is a technical guide focused on the industry of concrete construction, written in the early 20th century. This publication provides in-depth insights into various construction methods, materials, and the costs associated with concrete construction, offering a practical resource for engineers and contractors involved in building concrete structures.  The opening of the book presents a preface that highlights its intent to assist professionals in understanding concrete construction methods and associated costs."
+    },
+    {
+      "id": "pubdom53416000000000000000000000",
+      "gutenberg_id": 53416,
+      "title": "Only a girl's love",
+      "author": "Charles Garvice",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Dime novels",
+        "English fiction",
+        "Love stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/53416.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Only a Girl's Love\" by Charles Garvice is a novel likely written in the late 19th century. The story centers around a young girl named Stella, who seeks refuge with her uncle, James Etheridge, after running away from a strict and unhappy school in Florence. As Stella integrates into her uncle's world, the novel hints at her struggles and a potentially deepening relationship with James, while introducing themes of love, family, and personal fulfillment.  The opening of the novel paints a serene picture of early summer in the English countryside, contrasting the tranquility of nature with Stell"
+    },
+    {
+      "id": "pubdom53154000000000000000000000",
+      "gutenberg_id": 53154,
+      "title": "Cameron of Lochiel",
+      "author": "Philippe Aubert de Gaspé",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Canada -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/53154.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Cameron of Lochiel\" by Philippe Aubert de Gaspé is a historical romance written in the mid-19th century. The narrative centers around Archibald Cameron of Lochiel, a young Scotch exile in Canada, and his friendship with Jules D'Haberville, a Canadian seigneur's son. The story explores themes of identity, loyalty, and the cultural interplay between French and English Canadian societies during a time of political tension.  At the start of the novel, readers are introduced to the vibrant life in Quebec as two young men, Jules D'Haberville and Archibald Cameron, prepare to part ways after their s"
+    },
+    {
+      "id": "pubdom58866000000000000000000000",
+      "gutenberg_id": 58866,
+      "title": "The Murder on the Links",
+      "author": "Agatha Christie",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories",
+        "Poirot, Hercule (Fictitious character) -- Fiction",
+        "Private investigators -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/58866.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Murder on the Links\" by Agatha Christie is a detective novel published in 1923. Hercule Poirot and Captain Hastings travel to northern France to meet a client, only to discover he's been murdered and buried beside a golf course. Facing a hostile rival from the Paris Sûreté, Poirot must untangle a web of blackmail, false identities, and a decades-old crime. As Hastings falls unexpectedly in love, the case reveals that nothing is as it seems. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom55179000000000000000000000",
+      "gutenberg_id": 55179,
+      "title": "One of the Six Hundred: A Novel",
+      "author": "James Grant",
+      "genre": "Mystery & Detective",
+      "era": "19th century",
+      "tags": [
+        "Crimean War, 1853-1856 -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/55179.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"One of the Six Hundred: A Novel\" by James Grant is a historical fiction written in the late 19th century. The narrative follows a young British cavalry officer, Lieutenant Newton Norcliff, who provides a glimpse into his life as he embarks on a journey home after serving in various military campaigns. The story vividly explores themes of duty, love, and the complexities of family relationships during a period when the British military was actively involved in overseas conflicts.  The opening of the novel introduces Lieutenant Norcliff as he prepares to leave the barracks for a month-long leav"
+    },
+    {
+      "id": "pubdom48296000000000000000000000",
+      "gutenberg_id": 48296,
+      "title": "Linnet: A Romance",
+      "author": "Grant Allen",
+      "genre": "Romance",
+      "era": "19th century",
+      "tags": [
+        "Alps -- Fiction",
+        "London (England) -- Fiction",
+        "Tyrol (Austria) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/48296.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Linnet: A Romance\" by Grant Allen is a novel written in the late 19th century. The story follows the character of Florian Wood and his companion Will Deverill as they travel through the picturesque Tyrol region, encountering local culture and characters, including a talented singer named Linnet.   The opening of the book introduces us to Florian Wood, a man with a romanticized view of the Tyrolese landscape and its people. He and Will arrive in Zell, eager to explore, but quickly find that their expectations of an idyllic Alpine paradise are met with a more commercialized reality. As they tre"
+    },
+    {
+      "id": "pubdom28942000000000000000000000",
+      "gutenberg_id": 28942,
+      "title": "The Junior Classics, Volume 1: Fairy and wonder tales",
+      "author": "William Allan Neilson",
+      "genre": "Children's",
+      "era": "20th century",
+      "tags": [
+        "Children's literature"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/cache/epub/28942/pg28942.epub",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": null
+    },
+    {
+      "id": "pubdom49987000000000000000000000",
+      "gutenberg_id": 49987,
+      "title": "Forest Days: A Romance of Old Times",
+      "author": "G. P. R. (George Payne Rainsford) James",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "Adventure stories",
+        "Great Britain -- History -- Richard I, 1189-1199 -- Fiction",
+        "Historical fiction",
+        "Outlaws -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/49987.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Forest Days: A Romance of Old Times\" by G. P. R. James is a historical novel written in the mid-19th century. The story is set in medieval England and revolves around the life of the peasantry, particularly focusing on the character of Hardy the Hunchback, who is depicted as a resilient and clever figure. The novel explores themes of class struggle, love, and conflict during the reign of Henry III, bringing to life the vibrant culture and challenges of that era.  At the start of the story, readers are introduced to a quaint village and the comfortable inn that serves as a central gathering pl"
+    },
+    {
+      "id": "pubdom43453000000000000000000000",
+      "gutenberg_id": 43453,
+      "title": "A Pickle for the Knowing Ones",
+      "author": "Timothy Dexter",
+      "genre": "Philosophy & Essays",
+      "era": "19th century",
+      "tags": [
+        "Dexter, Timothy, 1747-1806",
+        "Newburyport (Mass.) -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/43453.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Pickle for the Knowing Ones\" by Timothy Dexter is an autobiographical book published in 1802. This eccentric work contains almost no punctuation, unorthodox spelling, and chaotic grammar throughout its pages. The wealthy American businessman rants about politicians and clergy while praising his own glory and suggesting he should be emperor of the United States. After complaints about missing punctuation, Dexter added a second edition with pages of punctuation marks in the appendix, inviting readers to use them as they pleased. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom57641000000000000000000000",
+      "gutenberg_id": 57641,
+      "title": "One Woman: Being the Second Part of a Romance of Sussex",
+      "author": "Alfred Ollivant",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Sussex (England) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/57641.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"One Woman: Being the Second Part of a Romance of Sussex\" by Alfred Ollivant is a novel written in the early 20th century. The book explores the lives and relationships of Ruth Boam and Ernie Caspar, a young couple recently married, as they navigate the challenges of love, family, and societal expectations in Sussex. Central to the story is their joy as newlyweds, contrasted with the complexities of their pasts and the shadowy figures that linger in their lives.  The opening of the novel paints a vivid picture of Ruth and Ernie's quiet wedding day and the simple journey they undertake in a car"
+    },
+    {
+      "id": "pubdom36462000000000000000000000",
+      "gutenberg_id": 36462,
+      "title": "King Arthur and the Knights of the Round Table",
+      "author": "Thomas, Sir Malory",
+      "genre": "Adventure",
+      "era": "Medieval",
+      "tags": [
+        "Arthurian romances"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/36462.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"King Arthur and the Knights of the Round Table\" by Sir Thomas Malory is a prose compilation written around 1470. This Middle English work weaves together legendary tales of King Arthur, Guinevere, Lancelot, Merlin, and the Knights of the Round Table. Malory assembled and reworked material from various French and English sources to create a complete narrative spanning Arthur's conception to his death. The compilation includes the quest for the Holy Grail and the legend of Tristan and Iseult, creating one of the most influential works of Arthurian literature. (This is an automatically generated"
+    },
+    {
+      "id": "pubdom48438000000000000000000000",
+      "gutenberg_id": 48438,
+      "title": "Rizal's own story of his life",
+      "author": "José Rizal",
+      "genre": "Historical",
+      "era": "19th century",
+      "tags": [
+        "Philippines -- Biography",
+        "Rizal, José, 1861-1896"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/48438.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Rizal's Own Story of His Life\" by José Rizal is a biography written in the early 20th century, specifically in the years right after 1918. The book presents the life and experiences of José Rizal, a prominent Filipino nationalist and revolutionary whose writings and ideas played a pivotal role in the fight for Philippine independence from Spanish colonial rule. Through his own narration, Rizal delves into his childhood, education, and the societal issues of his time, showcasing his intellectual growth and aspirations.  The narrative unfolds with a blend of personal anecdotes and historical co"
+    },
+    {
+      "id": "pubdom51143000000000000000000000",
+      "gutenberg_id": 51143,
+      "title": "The Waterloo Roll Call: With Biographical Notes and Anecdotes",
+      "author": "Charles Dalton",
+      "genre": "Historical",
+      "era": "20th century",
+      "tags": [
+        "Great Britain. Army -- Registers",
+        "Waterloo, Battle of, Waterloo, Belgium, 1815"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/51143.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Waterloo Roll Call\" by Charles Dalton is a historical account written in the late 19th century. This work recounts the contributions and backgrounds of officers and soldiers in the British Army who participated in the Battle of Waterloo, highlighting their ranks, achievements, and biographical notes. The text serves as a tribute to the valiant efforts of those who fought in this pivotal battle against Napoleon.  At the start of the book, Dalton introduces the concept of the Waterloo Roll Call, explaining that it compiles annotated lists of the military personnel involved in the battle alo"
+    },
+    {
+      "id": "pubdom23000000000000000000000000",
+      "gutenberg_id": 23,
+      "title": "Narrative of the Life of Frederick Douglass, an American Slave",
+      "author": "Frederick Douglass",
+      "genre": "Historical",
+      "era": "19th century",
+      "tags": [
+        "Abolitionists -- United States -- Biography",
+        "African American abolitionists -- Biography",
+        "Douglass, Frederick, 1818-1895",
+        "Enslaved persons -- United States -- Biography"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/23.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Narrative of the Life of Frederick Douglass, an American Slave\" by Frederick Douglass is a memoir written in 1845. This powerful firsthand account chronicles Douglass's experiences in bondage and his determination to gain freedom. From his early separation from his mother to brutal physical abuse under various masters, Douglass recounts the dehumanizing realities of slavery. His secret pursuit of literacy becomes a turning point, opening his mind to the possibility of escape and fueling his journey toward liberation and self-determination. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom15399000000000000000000000",
+      "gutenberg_id": 15399,
+      "title": "The Interesting Narrative of the Life of Olaudah Equiano, Or Gustavus Vassa, The African: Written By Himself",
+      "author": "Olaudah Equiano",
+      "genre": "Historical",
+      "era": "18th century",
+      "tags": [
+        "Enslaved persons -- Great Britain -- Biography",
+        "Enslaved persons -- United States -- Biography",
+        "Equiano, Olaudah, 1745-1797"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/15399.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Interesting Narrative of the Life of Olaudah Equiano, Or Gustavus Vassa, The African\" by Olaudah Equiano is an autobiography first published in 1789. Born in present-day Nigeria around 1745, Equiano recounts his kidnapping into slavery as a child and his journey across continents. The narrative blends slavery account, travel story, and spiritual testimony as Equiano chronicles his struggle for freedom through Bible study and determination, ultimately achieving independence and becoming an abolitionist voice in England. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom86000000000000000000000000",
+      "gutenberg_id": 86,
+      "title": "A Connecticut Yankee in King Arthur's Court",
+      "author": "Mark Twain",
+      "genre": "Science Fiction",
+      "era": "20th century",
+      "tags": [
+        "Americans -- Great Britain -- Fiction",
+        "Arthurian romances -- Adaptations",
+        "Britons -- Fiction",
+        "Fantasy fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/86.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"A Connecticut Yankee in King Arthur's Court\" by Mark Twain is a novel published in 1889. When Hank Morgan, a Connecticut engineer, receives a blow to the head, he awakens in medieval England during King Arthur's reign. Using his modern knowledge, he poses as a powerful magician and becomes the king's chief adviser. Hank attempts to modernize the past and implement democratic reforms, but faces opposition from Merlin, the nobility, and the Church in this satirical tale about progress, power, and conflicting eras. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom46276000000000000000000000",
+      "gutenberg_id": 46276,
+      "title": "The Treasure of Pearls: A Romance of Adventures in California",
+      "author": "Gustave Aimard",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "California -- Fiction",
+        "Western stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/46276.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Treasure of Pearls: A Romance of Adventures in California\" by Gustave Aimard is a historical novel written in the mid-19th century. Set against the backdrop of the expansive and often perilous landscapes of California and Mexico, the story revolves around themes of adventure, romance, and survival. The narrative features key characters including Benito Vázquez de Bustamente, a young man skilled in hunting and pearl diving, and Dolores, the beautiful daughter of Captain Miranda, as they navigate numerous treacherous encounters.  The opening of the novel introduces readers to the vivid and "
+    },
+    {
+      "id": "pubdom25789000000000000000000000",
+      "gutenberg_id": 25789,
+      "title": "Emily Brontë",
+      "author": "A. Mary F. (Agnes Mary Frances) Robinson",
+      "genre": "Historical",
+      "era": "20th century",
+      "tags": [
+        "Authors, English -- 19th century -- Biography",
+        "Brontë, Emily, 1818-1848",
+        "Women and literature -- England -- History -- 19th century"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/25789.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Emily Brontë\" by A. Mary F. Robinson is a biographical account written in the late 19th century. This work explores the life of the renowned author, delving into her parentage, childhood, and the influences that shaped her literary career. The book focuses on significant aspects of Brontë's life, including her complex relationships with her siblings, particularly with her brother Branwell, and the impact of her early environment on her writing.  The opening of the text introduces Emily Brontë's lineage and family background, emphasizing that her literary talents were not inherited from her pa"
+    },
+    {
+      "id": "pubdom48320000000000000000000000",
+      "gutenberg_id": 48320,
+      "title": "Adventures of Sherlock Holmes: Illustrated",
+      "author": "Arthur Conan Doyle",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories, English",
+        "Holmes, Sherlock (Fictitious character) -- Fiction",
+        "Private investigators -- England -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/48320.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Adventures of Sherlock Holmes\" by Arthur Conan Doyle is a collection of short stories published in 1892. Originally appearing in The Strand Magazine, these twelve tales feature consulting detective Sherlock Holmes and his companion Dr. Watson confronting social injustices and mysteries across Victorian England. Narrated by Watson, the stories showcase Holmes's revolutionary methods of detection—from royal scandals to peculiar crimes—offering fresh justice in a world of incompetence and privilege. The collection boosted the magazine's circulation and established Holmes as an enduring literary "
+    },
+    {
+      "id": "pubdom60100000000000000000000000",
+      "gutenberg_id": 601,
+      "title": "The Monk: A Romance",
+      "author": "M. G. (Matthew Gregory) Lewis",
+      "genre": "Gothic & Horror",
+      "era": "19th century",
+      "tags": [
+        "Gothic fiction",
+        "Horror tales",
+        "Madrid (Spain) -- Fiction",
+        "Monks -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/601.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Monk: A Romance\" by M. G. Lewis is a Gothic novel published in 1796. It follows Ambrosio, a virtuous monk who succumbs to forbidden desires when a mysterious figure infiltrates his monastery. His fall from grace spirals into a dark tale of lust, murder, and demonic pacts. Scandalous for its sexually explicit content and themes of rape and incest, it became the most controversial Gothic novel of the 18th century, shocking readers while achieving immense popularity and influencing the horror genre. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom55059000000000000000000000",
+      "gutenberg_id": 55059,
+      "title": "Modern English biography, volume 1 (of 4), A-H",
+      "author": "Frederic Boase",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "Great Britain -- Biography -- Dictionaries"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/55059.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Modern English Biography, Volume 1 (of 4), A-H\" by Frederic Boase is a biographical reference work written in the late 19th century. This volume contains concise memoirs of notable individuals who have died since 1850, including various public figures such as politicians, artists, and professionals from a wide range of fields. The purpose of the book is to provide a comprehensive overview of these individuals, offering factual accounts and significant details that may not be found in other biographical works.  The opening portion of the book introduces the author’s motivation for compiling th"
+    },
+    {
+      "id": "pubdom43000000000000000000000000",
+      "gutenberg_id": 4300,
+      "title": "Ulysses",
+      "author": "James Joyce",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "Alienation (Social psychology) -- Fiction",
+        "Artists -- Fiction",
+        "City and town life -- Fiction",
+        "Domestic fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/4300.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Ulysses\" by James Joyce is a modernist novel published in 1922. It chronicles one day in Dublin—June 16, 1904—following three characters whose experiences mirror Homer's Odyssey. Leopold Bloom parallels Odysseus, his wife Molly echoes Penelope, and Stephen Dedalus reflects Telemachus. Through experimental prose styles and stream of consciousness technique, Joyce explores themes of identity, Irish life, and human consciousness. The novel's complexity, literary allusions, and revolutionary approach to depicting thought have made it one of modernism's most celebrated and debated works. (This is "
+    },
+    {
+      "id": "pubdom21480000000000000000000000",
+      "gutenberg_id": 2148,
+      "title": "The Works of Edgar Allan Poe — Volume 2",
+      "author": "Edgar Allan Poe",
+      "genre": "Gothic & Horror",
+      "era": "19th century",
+      "tags": [
+        "American fiction -- 19th century",
+        "Fantasy fiction",
+        "Horror tales, American",
+        "Short stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/2148.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Works of Edgar Allan Poe — Volume 2\" by Edgar Allan Poe is a collection of literary works, including short stories and essays, written during the early to mid-19th century. This volume contains a range of tales that delve into themes of mystery, horror, and the uncanny, showcasing Poe's mastery of suspenseful and psychological storytelling. Notable pieces include \"The Purloined Letter,\" which features the brilliant detective C. Auguste Dupin as he solves a complex crime involving a stolen letter of great importance, highlighting both the ingenuity of the detective and the folly of the aut"
+    },
+    {
+      "id": "pubdom83100000000000000000000000",
+      "gutenberg_id": 831,
+      "title": "Four Arthurian Romances",
+      "author": "de Troyes, active 12th century Chrétien",
+      "genre": "Fantasy",
+      "era": "Classic",
+      "tags": [
+        "Arthurian romances",
+        "Chrétien, de Troyes, active 12th century",
+        "Romances -- Translations into English",
+        "Tales, Medieval"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/831.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Four Arthurian Romances\" by Chrétien de Troyes is a collection of medieval narratives written in the latter part of the 12th century. This work encompasses the stories of four heroes: Erec, Cligés, Yvain, and Lancelot, each exploring the themes of chivalry, romance, and adventure intertwined with the sophisticated ideals of courtly love. The romances reflect the rich tapestry of Arthurian legend, showcasing knights undertaking noble quests and engaging in battles for honor and love.  The opening of \"Four Arthurian Romances\" introduces the tale of Erec and Enide, beginning with King Arthur's c"
+    },
+    {
+      "id": "pubdom72000000000000000000000000",
+      "gutenberg_id": 72,
+      "title": "Thuvia, maid of Mars",
+      "author": "Edgar Rice Burroughs",
+      "genre": "Science Fiction",
+      "era": "20th century",
+      "tags": [
+        "Mars (Planet) -- Fiction",
+        "Martians -- Fiction",
+        "Science fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/72.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Thuvia, Maid of Mars\" by Edgar Rice Burroughs is a science fantasy novel published in 1916. The fourth book in the Barsoom series shifts focus to Carthoris, son of John Carter, who loves Princess Thuvia of Ptarth—a woman promised to another. When Thuvia is kidnapped and Carthoris is framed, war threatens to erupt between Martian nations. His desperate rescue mission leads him to ancient Lothar, where a mysterious race creates deadly illusions from pure thought. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom43630000000000000000000000",
+      "gutenberg_id": 4363,
+      "title": "Beyond Good and Evil",
+      "author": "Friedrich Wilhelm Nietzsche",
+      "genre": "Philosophy & Essays",
+      "era": "19th century",
+      "tags": [
+        "Ethics",
+        "Philosophy, German"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/4363.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Beyond Good and Evil\" by Friedrich Wilhelm Nietzsche is a philosophical work published in 1886. Nietzsche launches a fierce attack on traditional philosophy, accusing past thinkers of disguising moral prejudices as objective truth. He challenges fundamental concepts like good versus evil, knowledge, and free will, proposing instead his theory of \"will to power.\" The book calls for new philosophers who will move beyond conventional morality to embrace a more dangerous, perspectival understanding of existence and create new values for the future. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom32070000000000000000000000",
+      "gutenberg_id": 3207,
+      "title": "Leviathan",
+      "author": "Thomas Hobbes",
+      "genre": "Philosophy & Essays",
+      "era": "17th century",
+      "tags": [
+        "Political science -- Early works to 1800",
+        "State, The -- Early works to 1800"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/3207.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Leviathan\" by Thomas Hobbes is a philosophical treatise published in 1651. Written during the English Civil War, it explores the structure of society and legitimate government through social contract theory. Hobbes argues that humanity's natural state is a brutal \"war of all against all,\" driven by individual appetites and the fear of violent death. Only a strong, absolute sovereign can prevent civil war and chaos by uniting both secular and spiritual power. This influential work presents a materialistic view of human nature and political order. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom76178000000000000000000000",
+      "gutenberg_id": 76178,
+      "title": "I am a woman",
+      "author": "Ann Bannon",
+      "genre": "Romance",
+      "era": "20th century",
+      "tags": [
+        "Lesbians -- Fiction",
+        "Love stories",
+        "New York (N.Y.) -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/76178.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"I Am a Woman\" by Ann Bannon is a lesbian pulp fiction novel written in 1959. Laura Landon flees her harsh father and college failure to start fresh in New York City's Greenwich Village. Living with vivacious roommate Marcie, Laura discovers unexpected feelings and navigates the underground gay bar scene with new friends Jack and Beebo Brinker. As attraction, longing, and self-discovery collide, Laura must confront the truth about herself, her relationships, and her painful past in this groundbreaking story. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom53419000000000000000000000",
+      "gutenberg_id": 53419,
+      "title": "Twenty-Five Ghost Stories",
+      "author": null,
+      "genre": "Gothic & Horror",
+      "era": "Classic",
+      "tags": [
+        "Fiction",
+        "Ghost stories"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/53419.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Twenty-Five Ghost Stories\" by W. Bob Holland is a collection of supernatural tales compiled and edited in the early 20th century. This anthology captures the essence of ghostly encounters, eerie experiences, and the enigmatic presence of spirits. It showcases renowned stories such as Edgar Allan Poe's \"The Black Cat,\" exploring themes of guilt, madness, and the consequences of one's actions involving supernatural influences.  At the start of the collection, the preface reveals the editor's longstanding fascination with supernatural tales, noting that both young and old are captivated by eerie"
+    },
+    {
+      "id": "pubdom71046000000000000000000000",
+      "gutenberg_id": 71046,
+      "title": "Modern English biography, volume 2 (of 4), I-Q",
+      "author": "Frederic Boase",
+      "genre": "Classics",
+      "era": "20th century",
+      "tags": [
+        "Great Britain -- Biography -- Dictionaries"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/71046.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Modern English Biography, Volume 2 (of 4), I-Q\" by Frederic Boase is a comprehensive collection of biographical entries written in the late 19th century. This work contains numerous concise memoirs of notable individuals who passed away after the year 1850, providing an extensive overview of their lives and contributions. The likely topic of the volume centers around documenting the achievements and impacts of prominent figures from various fields, including arts, politics, science, and literature.  The opening of this volume presents an organized format, listing individual biographies with s"
+    },
+    {
+      "id": "pubdom64000000000000000000000000",
+      "gutenberg_id": 6400,
+      "title": "The Lives of the Twelve Caesars, Complete",
+      "author": "Suetonius",
+      "genre": "Historical",
+      "era": "Classic",
+      "tags": [
+        "Emperors -- Rome -- Biography -- Early works to 1800",
+        "Rome -- History -- Empire, 30 B.C.-284 A.D."
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/6400.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Lives of the Twelve Caesars, Complete\" by Suetonius is a set of twelve biographies written in 121 CE. This ancient work chronicles the lives of Julius Caesar and the first eleven Roman emperors, from Augustus through Domitian. Suetonius served as personal secretary to Emperor Hadrian when he composed these intimate portraits. Drawing on official archives, personal letters, and contemporary accounts, he reveals the heritage, physical appearance, personal habits, and political careers of Rome's most powerful rulers during the Principate era. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom42389000000000000000000000",
+      "gutenberg_id": 42389,
+      "title": "The Pirate: Andrew Lang Edition",
+      "author": "Walter Scott",
+      "genre": "Adventure",
+      "era": "19th century",
+      "tags": [
+        "Domestic fiction",
+        "Historical fiction",
+        "Kidnapping -- Fiction",
+        "Landlord and tenant -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/42389.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Pirate\" by Walter Scott is a novel published in 1821. Set in the Shetland Islands at the end of the 17th century, it tells the story of young Mordaunt, whose friendship with the Troil sisters is shattered by the arrival of a mysterious shipwrecked captain named Cleveland. As rivalry grows between the two men, Minna falls for the charismatic stranger, unaware of his dark secret. When pirates capture the Troils, hidden identities are revealed and loyalties tested in this tale of romance and adventure. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom58820000000000000000000000",
+      "gutenberg_id": 58820,
+      "title": "Whose Body? A Lord Peter Wimsey Novel",
+      "author": "Dorothy L. (Dorothy Leigh) Sayers",
+      "genre": "Mystery & Detective",
+      "era": "20th century",
+      "tags": [
+        "Detective and mystery stories",
+        "Murder -- Investigation -- Fiction",
+        "Private investigators -- England -- Fiction",
+        "Wimsey, Peter, Lord (Fictitious character), 1890- -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/58820.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Whose Body? A Lord Peter Wimsey Novel\" by Dorothy L. Sayers is a mystery novel published in 1923. When an architect discovers a naked corpse wearing only pince-nez spectacles in his London bathtub, the amateur detective Lord Peter Wimsey takes on the puzzling case. The body appears connected to the mysterious disappearance of financier Sir Reuben Levy, but evidence suggests otherwise. As Wimsey investigates alongside Inspector Parker, the trail leads to a teaching hospital and a respected surgeon, where secrets darker than anyone imagined await discovery. (This is an automatically generated s"
+    },
+    {
+      "id": "pubdom20900000000000000000000000",
+      "gutenberg_id": 209,
+      "title": "The Turn of the Screw",
+      "author": "Henry James",
+      "genre": "Gothic & Horror",
+      "era": "20th century",
+      "tags": [
+        "Children -- Fiction",
+        "England -- Fiction",
+        "Ghost stories",
+        "Governesses -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/209.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"The Turn of the Screw\" by Henry James is a gothic horror novella published in 1898. A young governess arrives at a remote country estate to care for two children, only to become convinced that supernatural forces haunt the grounds. As she witnesses mysterious figures and grows increasingly alarmed by the children's behavior, the line between reality and imagination blurs. This unsettling tale has captivated readers for over a century with its deliberate ambiguity, leaving the true nature of the horror chillingly uncertain. (This is an automatically generated summary.)"
+    },
+    {
+      "id": "pubdom82900000000000000000000000",
+      "gutenberg_id": 829,
+      "title": "Gulliver's Travels into Several Remote Nations of the World",
+      "author": "Jonathan Swift",
+      "genre": "Fantasy",
+      "era": "18th century",
+      "tags": [
+        "Fantasy fiction",
+        "Gulliver, Lemuel (Fictitious character) -- Fiction",
+        "Satire",
+        "Travelers -- Fiction"
+      ],
+      "language": "en",
+      "source": "gutenberg",
+      "epub_url": "https://www.gutenberg.org/ebooks/829.epub3.images",
+      "cover_source": "",
+      "cover_id": null,
+      "summary": "\"Gulliver's Travels into Several Remote Nations of the World\" by Jonathan Swift is a satirical prose novel published in 1726. Ship surgeon Lemuel Gulliver embarks on extraordinary voyages to bizarre lands—encountering tiny people obsessed with trivial disputes, giants who mock European society, impractical intellectuals, and rational horses living among savage human-like creatures. Through these strange encounters, Swift crafts a biting satire of human nature and civilization's flaws. Originally written as political commentary rather than children's fare, this enduring classic continues to cha"
+    }
+  ]
+}

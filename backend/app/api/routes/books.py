@@ -242,6 +242,10 @@ async def _book_response(container: Container, book: Book) -> BookResponse:
         stage = progress.get("stage")
     elif book.status is BookStatus.READY:
         pct = 1.0
+    # Project the durable cover_key as an ephemeral presigned URL (Agent 05).
+    cover_url = (
+        container.object_store.presigned_get_url(book.cover_key) if book.cover_key else None
+    )
     return BookResponse(
         id=book.id,
         title=book.title,
@@ -252,6 +256,7 @@ async def _book_response(container: Container, book: Book) -> BookResponse:
         created_at=book.created_at.isoformat() if book.created_at else None,
         progress=pct,
         stage=stage,
+        cover_url=cover_url,
     )
 
 
