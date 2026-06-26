@@ -7,13 +7,20 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
+  const isMac = process.platform === "darwin";
+  const isWin = process.platform === "win32";
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     frame: true,
-    backgroundColor: "#1A1615",
+    // Native OS glass: real macOS vibrancy + Windows 11 acrylic. A transparent
+    // backdrop lets the material show through the translucent web UI; Linux (no
+    // native material) keeps the solid background.
+    backgroundColor: isMac || isWin ? "#00000000" : "#1A1615",
+    ...(isMac ? { vibrancy: "under-window" as const, visualEffectState: "active" as const } : {}),
+    ...(isWin ? { backgroundMaterial: "acrylic" as const } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,

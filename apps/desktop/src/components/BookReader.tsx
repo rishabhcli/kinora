@@ -64,8 +64,6 @@ export default function BookReader({ book, onClose }: BookReaderProps) {
     "/generated/film-02.mp4",
     "/generated/film-03.mp4",
     "/generated/film-04.mp4",
-    "/generated/film-05.mp4",
-    "/generated/film-06.mp4",
   ];
   const film = FILMS[(book ? [...book.id].reduce((a, c) => a + c.charCodeAt(0), 0) : 0) % FILMS.length];
 
@@ -124,12 +122,15 @@ export default function BookReader({ book, onClose }: BookReaderProps) {
               </div>
             </div>
 
-            {/* Reading content */}
+            {/* Reading room — vertical AI film beside the page text. */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-[900px] mx-auto px-6 py-8 flex gap-8">
-                <div className="flex-shrink-0 w-[380px]">
-                  {/* The generated film — real AI video (Wan), playing in-app. */}
-                  <div className="glass-card rounded-xl overflow-hidden relative" style={{ aspectRatio: "16 / 9", boxShadow: "0 18px 50px rgba(0,0,0,0.55)" }}>
+              <div className="mx-auto flex max-w-[1080px] items-start justify-center gap-10 px-6 py-10">
+                <div className="flex-shrink-0">
+                  {/* The generated film — real vertical AI short (Wan), playing in-app. */}
+                  <div
+                    className="glass-card relative overflow-hidden rounded-[24px]"
+                    style={{ width: 320, aspectRatio: "9 / 16", boxShadow: "0 28px 70px -18px rgba(0,0,0,0.7)" }}
+                  >
                     <video
                       key={clipUrl ?? film}
                       src={clipUrl ?? film}
@@ -139,31 +140,25 @@ export default function BookReader({ book, onClose }: BookReaderProps) {
                       loop
                       playsInline
                       controls
-                      className="absolute inset-0 h-full w-full object-cover bg-black"
+                      className="absolute inset-0 h-full w-full bg-black object-cover"
                     />
-                    <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full px-2 py-1" style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}>
+                    <div
+                      className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                      style={{ background: "rgba(0,0,0,0.42)", backdropFilter: "blur(10px)" }}
+                    >
                       <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
-                      <span className="text-[9px] font-medium tracking-wide text-white/90">AI FILM</span>
+                      <span className="text-[9px] font-semibold tracking-wide text-white/90">AI FILM</span>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="relative flex-shrink-0 overflow-hidden rounded-md" style={{ width: 52, height: 78, background: book.coverGradient }}>
-                      <img src={book.coverImage} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-serif text-[13px] leading-tight text-kinora-text">{book.title}</p>
-                      <p className="truncate text-[11px] text-kinora-muted">{book.author}</p>
-                      <p className="mt-1 text-[10px] text-kinora-muted/70">Generated with Wan · page-synced</p>
-                    </div>
-                  </div>
+                  <p className="mt-2.5 text-center text-[10px] text-kinora-muted">Generated with Wan · vertical short film</p>
                 </div>
 
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 max-w-[480px] flex-1">
                   <p className="text-[10px] text-kinora-muted uppercase tracking-widest mb-2">Now Reading</p>
                   <h1 className="font-serif text-2xl font-semibold text-kinora-text mb-1">{book.title}</h1>
                   <p className="text-[13px] text-kinora-muted mb-6">by {book.author}</p>
 
-                  <div className="rounded-xl p-6 mb-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div className="glass-card rounded-2xl p-6 mb-4">
                     <AnimatePresence mode="wait">
                       <motion.p
                         key={page}
