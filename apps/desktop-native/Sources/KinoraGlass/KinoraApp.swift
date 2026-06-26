@@ -62,7 +62,8 @@ struct RootView: View {
                 GlassTopBar()
                 Group {
                     switch screen {
-                    case .home, .library: HomeView(openBook: $openBook)
+                    case .home: HomeView(openBook: $openBook)
+                    case .library: LibraryView(openBook: $openBook)
                     case .watch: WatchView(openBook: $openBook)
                     case .favorites: PlaceholderView(title: "Favorites", systemImage: "heart.fill")
                     case .settings: SettingsView()
@@ -107,14 +108,19 @@ struct KinoraBackground: View {
 // MARK: - Glass top bar
 
 struct GlassTopBar: View {
+    @State private var query = ""
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "book.pages.fill").foregroundStyle(Color(red: 0.83, green: 0.64, blue: 0.31))
             Text("Kinora").font(.system(.title3, design: .serif).weight(.semibold)).foregroundStyle(.white)
             Spacer()
-            Button { } label: { Image(systemName: "magnifyingglass").font(.system(size: 14, weight: .semibold)).frame(width: 30, height: 30) }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
-            Button { } label: { Image(systemName: "person.crop.circle").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 30) }
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
+                TextField("Search", text: $query).textFieldStyle(.plain).font(.system(size: 12.5)).foregroundStyle(.white).frame(width: 130)
+            }
+            .padding(.horizontal, 13).frame(height: 32)
+            .glassEffect(.regular, in: .capsule)
+            Button { } label: { Image(systemName: "person.crop.circle").font(.system(size: 15, weight: .semibold)).frame(width: 32, height: 32) }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
         }
         .padding(.horizontal, 24)
@@ -194,6 +200,7 @@ struct HomeView: View {
 struct BookCard: View {
     let book: KBook
     var onOpen: () -> Void
+    @State private var hover = false
 
     var body: some View {
         Button(action: onOpen) {
@@ -216,6 +223,9 @@ struct BookCard: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .scaleEffect(hover ? 1.035 : 1)
+        .animation(.smooth(duration: 0.25), value: hover)
+        .onHover { hover = $0 }
     }
 }
 
