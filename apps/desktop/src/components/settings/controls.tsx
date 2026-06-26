@@ -1,7 +1,8 @@
 import { Children, type ReactNode, useId } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Icon } from "../icons";
 import type { IconName } from "../icons";
+import { useReducedMotionPref } from "../../a11y/useReducedMotionPref";
 
 /* ── Section header ─────────────────────────────────────────────────────── */
 export function SectionTitle({
@@ -100,7 +101,7 @@ export function Switch({
   label: string;
   id?: string;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionPref();
   return (
     <button
       id={id}
@@ -143,7 +144,7 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   ariaLabel: string;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionPref();
   const groupId = useId();
   return (
     <div

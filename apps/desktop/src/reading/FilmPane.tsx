@@ -35,6 +35,7 @@ interface Layer {
 }
 
 const SEEK_EPSILON = 1 / 30; // don't re-seek within ~1 frame — avoids seek thrash
+const SCRUB_SEEK_INTERVAL_MS = 34; // cap live scrub seeks to roughly 30Hz
 const FADE_S = 0.5; // event/scene crossfade when settling (not while scrubbing)
 
 /** The vertical AI film. Holds ≤2 `<video>` layers and crossfades (opacity only)
@@ -56,6 +57,7 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
   layersRef.current = layers;
   const targetSrc = useRef("");
   const pendingTime = useRef(0);
+  const lastSeekAt = useRef(0);
 
   const activeEl = useCallback((): HTMLVideoElement | undefined => {
     const ls = layersRef.current;
@@ -74,7 +76,11 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
     if (!el) return;
     if (scrub) {
       if (!el.paused) el.pause();
-      if (Number.isFinite(time)) seek(el, time);
+      const now = performance.now();
+      if (Number.isFinite(time) && now - lastSeekAt.current >= SCRUB_SEEK_INTERVAL_MS) {
+        lastSeekAt.current = now;
+        seek(el, time);
+      }
     } else if (el.paused) {
       void el.play().catch(() => {}); // muted autoplay; ignore policy rejections
     }
@@ -99,6 +105,7 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
         // The film changed (event/scene boundary).
         targetSrc.current = src;
         pendingTime.current = time;
+        lastSeekAt.current = 0;
         const key = ++keySeq.current;
         const top = layersRef.current[layersRef.current.length - 1];
         if (reducedMotion || scrub || !top) {

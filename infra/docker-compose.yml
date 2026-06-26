@@ -50,7 +50,7 @@ x-backend: &backend
     #   * CORS_ORIGINS:   the local frontend origin(s) as JSON (no wildcard).
     #   * JWT_SECRET:     dev signing key (APP_ENV stays "local" so any value is ok).
     MCP_AUTH_TOKEN: kinora-local-dev-mcp-token
-    CORS_ORIGINS: '["http://localhost:5173"]'
+    CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
     JWT_SECRET: kinora-local-dev-jwt-secret
   networks:
     - kinora

@@ -2,15 +2,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ReadingControls } from "./ReadingControls";
 import { DEFAULT_READING_PREFS, type ReadingPrefs } from "@/a11y/readingPrefs";
-import {
-  setReducedTransparencyOverride,
-  getReducedTransparencySnapshot,
-} from "@/a11y/displayPrefs";
 
 // jsdom has no speechSynthesis; the panel must degrade gracefully.
 beforeEach(() => {
   localStorage.clear();
-  setReducedTransparencyOverride(null);
   delete (window as unknown as { matchMedia?: unknown }).matchMedia;
 });
 
@@ -69,12 +64,5 @@ describe("ReadingControls", () => {
     const select = screen.getByRole("combobox", { name: /voice/i });
     expect(select).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /system default/i })).toBeInTheDocument();
-  });
-
-  it("the accessibility section toggles a global display preference", () => {
-    renderControls();
-    expect(getReducedTransparencySnapshot()).toBe(false);
-    fireEvent.click(screen.getByRole("switch", { name: /reduce transparency/i }));
-    expect(getReducedTransparencySnapshot()).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import AmbientBackdrop from "./auth/AmbientBackdrop";
 import BrandLockup from "./auth/BrandLockup";
 import Field from "./auth/Field";
@@ -10,6 +10,7 @@ import { validateEmail, validatePassword, type AuthMode } from "./auth/validatio
 import { pickBackdropVariant } from "./auth/backdrop";
 import { warmLibraryCovers } from "./auth/coverCache";
 import { api, ApiError } from "../lib/api";
+import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 
 const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 const INTRO_KEY = "kinora.auth.introPlayed";
@@ -19,7 +20,7 @@ type Status = "idle" | "submitting" | "success" | "error";
 type Phase = "ready" | "leaving";
 
 export default function LoginPage({ onEnter }: { onEnter: () => void }) {
-  const prefersReduced = useReducedMotion() ?? false;
+  const prefersReduced = useReducedMotionPref();
 
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState<string>(DEMO.email);
@@ -97,13 +98,16 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
       await api.loginOrRegister(useEmail, usePassword);
       leave(mode === "login" ? "Welcome back. Opening your library…" : "Welcome to Kinora. Opening your library…");
     } catch (e) {
-      if (e instanceof ApiError && validate) {
-        // Primary submit, backend reachable but refused — real, recoverable feedback.
+      if (validate) {
+        // Primary submit is the real backend path. Surface failures instead of
+        // silently entering the offline demo, or connection bugs look like auth.
         setStatus("error");
         const text =
-          e.status === 429
+          e instanceof ApiError && e.status === 429
             ? "Too many attempts. Give it a moment and try again."
-            : "We couldn't sign you in. Check your email and password.";
+            : e instanceof ApiError
+              ? "We couldn't sign you in. Check your email and password."
+              : "Kinora couldn't reach the local backend. Check that the API is running.";
         setFormMsg({ kind: "error", text });
         setAnnounce(text);
         pwRef.current?.focus();

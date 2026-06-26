@@ -10,14 +10,48 @@ export const BASE: string =
   (import.meta.env.VITE_KINORA_API_URL as string | undefined) ?? "http://localhost:8000";
 
 const TOKEN_KEY = "kinora.token";
+let memoryToken: string | null = null;
+
+function storageCandidates(): Storage[] {
+  const stores: Storage[] = [];
+  for (const get of [
+    () => (typeof window !== "undefined" ? window.localStorage : null),
+    () => (typeof window !== "undefined" ? window.sessionStorage : null),
+    () => globalThis.localStorage,
+    () => globalThis.sessionStorage,
+  ]) {
+    try {
+      const store = get();
+      if (store && !stores.includes(store)) stores.push(store);
+    } catch {
+      /* storage unavailable in this renderer */
+    }
+  }
+  return stores;
+}
 
 export const auth = {
   get token(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    for (const storage of storageCandidates()) {
+      try {
+        const token = storage.getItem(TOKEN_KEY);
+        if (token) return token;
+      } catch {
+        /* storage read blocked */
+      }
+    }
+    return memoryToken;
   },
   set token(t: string | null) {
-    if (t) localStorage.setItem(TOKEN_KEY, t);
-    else localStorage.removeItem(TOKEN_KEY);
+    memoryToken = t;
+    for (const storage of storageCandidates()) {
+      try {
+        if (t) storage.setItem(TOKEN_KEY, t);
+        else storage.removeItem(TOKEN_KEY);
+      } catch {
+        /* storage write blocked */
+      }
+    }
   },
 };
 
@@ -36,13 +70,70 @@ export function toBrowserUrl(u: string | null | undefined): string {
   return u.replace("://minio:9000/", "://localhost:9000/").split("?")[0];
 }
 
+function headerMap(input: HeadersInit | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!input) return out;
+  if (typeof Headers !== "undefined" && input instanceof Headers) {
+    input.forEach((value, key) => {
+      out[key] = value;
+    });
+    return out;
+  }
+  if (Array.isArray(input)) {
+    input.forEach(([key, value]) => {
+      out[key] = value;
+    });
+    return out;
+  }
+  Object.entries(input).forEach(([key, value]) => {
+    out[key] = value;
+  });
+  return out;
+}
+
+function parseBody<T>(status: number, text: string): T {
+  if (status === 204 || text.length === 0) return null as T;
+  return JSON.parse(text) as T;
+}
+
+function xhrReq<T>(url: string, method: string, headers: Record<string, string>, body: BodyInit | null | undefined): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const Xhr = globalThis.XMLHttpRequest;
+    if (!Xhr) {
+      reject(new Error("No browser HTTP transport is available."));
+      return;
+    }
+    const xhr = new Xhr();
+    xhr.open(method, url, true);
+    Object.entries(headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new ApiError(xhr.status, xhr.responseText || xhr.statusText));
+        return;
+      }
+      try {
+        resolve(parseBody<T>(xhr.status, xhr.responseText || ""));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    xhr.onerror = () => reject(new Error(`Network request failed: ${method} ${url}`));
+    xhr.send((body ?? null) as XMLHttpRequestBodyInit | null);
+  });
+}
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const headers = new Headers(opts.headers);
-  if (auth.token) headers.set("Authorization", `Bearer ${auth.token}`);
-  if (opts.body && !(opts.body instanceof FormData)) headers.set("Content-Type", "application/json");
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
-  if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => res.statusText));
-  return res.status === 204 ? (null as T) : ((await res.json()) as T);
+  const headers = headerMap(opts.headers);
+  const token = auth.token;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (opts.body && !(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
+  const url = `${BASE}${path}`;
+  if (typeof globalThis.fetch === "function") {
+    const res = await globalThis.fetch(url, { ...opts, headers });
+    if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => res.statusText));
+    return parseBody<T>(res.status, await res.text());
+  }
+  return xhrReq<T>(url, opts.method ?? "GET", headers, opts.body);
 }
 
 /** Shared fetch primitive (seam, owned by Agent 12). Prefixes BASE, attaches the

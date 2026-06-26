@@ -40,17 +40,23 @@ export default function AmbientBackdrop({
   useEffect(() => {
     if (reducedMotion) return;
     if (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches) return;
+    if (document.documentElement.classList.contains("kinora-balanced")) return;
     const el = ref.current;
     if (!el) return;
     let raf = 0;
     let tx = 0;
     let ty = 0;
+    let lastX = 0;
+    let lastY = 0;
     const onMove = (e: PointerEvent) => {
       tx = (e.clientX / window.innerWidth) * 2 - 1;
       ty = (e.clientY / window.innerHeight) * 2 - 1;
+      if (Math.abs(tx - lastX) < 0.015 && Math.abs(ty - lastY) < 0.015) return;
       if (!raf) {
         raf = requestAnimationFrame(() => {
           raf = 0;
+          lastX = tx;
+          lastY = ty;
           el.style.setProperty("--mx", tx.toFixed(3));
           el.style.setProperty("--my", ty.toFixed(3));
         });

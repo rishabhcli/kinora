@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
-import { useReducedMotion } from "framer-motion";
 import type { Book } from "../data/books";
 import { api, toBrowserUrl, type ShotResponse } from "../lib/api";
 import {
+  READING_FONTS,
   READING_THEMES,
   READING_SPACINGS,
+  resolveEffectiveTheme,
   type ReadingPrefs,
   type ReadingTheme,
 } from "../lib/readingPrefs";
 import { buildTimeline, type SegmentInput, type Timeline } from "./timeline";
 import { FilmPane, type FilmPaneHandle } from "./FilmPane";
 import { useScrollFilm, type ScrollFrame } from "./useScrollFilm";
+import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 
 const FILM_W = 320;
 const PARALLAX_PX = 12; // film drift over the full scroll (GPU translate; off when reduced)
@@ -28,7 +30,7 @@ export interface ScrollFilmEngineProps {
   fallbackFilm?: string;
   prefs: ReadingPrefs;
   effectiveTheme?: ReadingTheme;
-  /** default: framer-motion useReducedMotion(). Agent 6 → useReducedMotionPref(). */
+  /** default: Kinora's app-wide reduced-motion preference. */
   reducedMotion?: boolean;
   bufferAhead?: number | null;
   bursting?: boolean;
@@ -93,8 +95,8 @@ export function ScrollFilmEngine({
   bursting = false,
   onProgress,
 }: ScrollFilmEngineProps) {
-  const autoReduce = useReducedMotion();
-  const reduce = reducedMotionProp ?? !!autoReduce;
+  const autoReduce = useReducedMotionPref();
+  const reduce = reducedMotionProp ?? autoReduce;
 
   const film =
     fallbackFilm ??
@@ -105,9 +107,10 @@ export function ScrollFilmEngine({
     [shots, clips, live, film],
   );
 
-  const themeKey = effectiveTheme ?? prefs.theme;
+  const themeKey = effectiveTheme ?? resolveEffectiveTheme(prefs);
   const theme = READING_THEMES[themeKey];
   const sp = READING_SPACINGS[prefs.spacing];
+  const font = READING_FONTS[prefs.fontFamily];
   // Show whatever text we were given; only fall back to placeholder copy when the
   // shell has none (mock books with no backend). `live` gates session behaviour,
   // not text rendering.
@@ -201,7 +204,85 @@ export function ScrollFilmEngine({
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-[1180px] flex-1 items-stretch gap-10 overflow-hidden px-8 py-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-[1180px] flex-1 items-stretch gap-10 overflow-hidden px-8 py-8">
+      {/* Scrolling book text + reading-progress rail */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          ref={scrollRef}
+          tabIndex={0}
+          data-reading-scroll
+          data-testid="reading-scroll"
+          aria-label="Reading text — use arrow keys, space, or Page Up/Down to scroll"
+          className="scrollbar-slim min-h-0 flex-1 overflow-y-auto pr-6 focus:outline-none"
+        >
+          <p className="mb-2 text-[10px] uppercase tracking-widest text-kinora-muted">Now Reading</p>
+          <h1 className="mb-1 font-serif text-2xl font-semibold text-kinora-text">{book.title}</h1>
+          <p className="mb-7 text-[13px] text-kinora-muted">by {book.author}</p>
+          <div className="pb-[40vh]">
+            <div
+              className="mx-auto"
+              style={{
+                maxWidth: `${prefs.measure}ch`,
+                background: theme.pageBg,
+                color: `rgb(${theme.ink})`,
+                borderRadius: theme.panel ? 16 : 0,
+                padding: theme.panel ? "30px 34px" : 0,
+                boxShadow: theme.panel && themeKey !== "night" ? "0 24px 70px -28px rgba(0,0,0,0.7)" : undefined,
+                filter: prefs.brightness < 0.99 ? `brightness(${prefs.brightness})` : undefined,
+                transition: reduce ? "none" : "background 0.3s ease, color 0.3s ease, filter 0.2s ease",
+              }}
+            >
+              <div className="space-y-5" style={{ fontFamily: font.cssFamily }}>
+                {paragraphs.map((para, i) => (
+                  <p
+                    key={i}
+                    data-para={i}
+                    className={font.className}
+                    style={{
+                      color: `rgba(${theme.ink}, ${i === 0 ? 1 : 0.62})`,
+                      borderLeft: `2px solid ${i === 0 ? "rgba(212,164,78,0.7)" : "transparent"}`,
+                      paddingLeft: 14,
+                      fontSize: `${15 * prefs.fontScale}px`,
+                      lineHeight: prefs.leading,
+                      letterSpacing: sp.letter,
+                      wordSpacing: sp.word,
+                      transition: reduce ? "none" : "color 0.4s ease, border-color 0.4s ease",
+                    }}
+                  >
+                    {para}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Read-so-far + committed-ahead rail; ticks = shots, dot = your place. */}
+        <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-1 rounded-full" aria-hidden style={{ background: "rgba(255,255,255,0.06)" }}>
+          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "rgba(212,164,78,0.55)" }} />
+          {live && (
+            <div
+              ref={railLeadRef}
+              className="absolute inset-x-0 rounded-full"
+              style={{
+                top: "0%",
+                height: `${Math.min(0.18, Math.max(0, (bufferAhead ?? 0) / 30)) * 100}%`,
+                background: `linear-gradient(180deg, ${bursting ? "rgba(251,191,36,0.85)" : "rgba(52,211,153,0.75)"}, transparent)`,
+                boxShadow: `0 0 8px ${bursting ? "rgba(251,191,36,0.55)" : "rgba(52,211,153,0.45)"}`,
+              }}
+            />
+          )}
+          {timeline.segments.map((s) => (
+            <div
+              key={s.id}
+              className="absolute left-1/2 h-[2px] w-[7px] -translate-x-1/2 rounded-full"
+              style={{ top: `${(s.wordStart / Math.max(1, timeline.totalWords)) * 100}%`, background: "rgba(255,255,255,0.22)" }}
+            />
+          ))}
+          <div ref={railDotRef} className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ top: "0%", background: "#e8e2d8", boxShadow: "0 0 6px rgba(232,226,216,0.7)" }} />
+        </div>
+      </div>
+
       {/* Pinned vertical film (720×1280 / 9:16) */}
       <div className="flex-shrink-0 self-start">
         <div
@@ -251,82 +332,6 @@ export function ScrollFilmEngine({
         <p className="mt-2.5 text-center text-[10px] text-kinora-muted">
           {live ? "Generated as you read · Wan" : "Generated with Wan · vertical short film"}
         </p>
-      </div>
-
-      {/* Scrolling book text + reading-progress rail */}
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <div
-          ref={scrollRef}
-          tabIndex={0}
-          data-testid="reading-scroll"
-          aria-label="Reading text — use arrow keys, space, or Page Up/Down to scroll"
-          className="hide-scrollbar min-h-0 flex-1 overflow-y-auto pr-6 focus:outline-none"
-        >
-          <p className="mb-2 text-[10px] uppercase tracking-widest text-kinora-muted">Now Reading</p>
-          <h1 className="mb-1 font-serif text-2xl font-semibold text-kinora-text">{book.title}</h1>
-          <p className="mb-7 text-[13px] text-kinora-muted">by {book.author}</p>
-          <div className="pb-[40vh]">
-            <div
-              className="mx-auto"
-              style={{
-                maxWidth: `${prefs.measure}ch`,
-                background: theme.pageBg,
-                color: `rgb(${theme.ink})`,
-                borderRadius: theme.panel ? 16 : 0,
-                padding: theme.panel ? "30px 34px" : 0,
-                boxShadow: theme.panel && themeKey !== "night" ? "0 24px 70px -28px rgba(0,0,0,0.7)" : undefined,
-                transition: reduce ? "none" : "background 0.3s ease, color 0.3s ease",
-              }}
-            >
-              <div className="space-y-5">
-                {paragraphs.map((para, i) => (
-                  <p
-                    key={i}
-                    data-para={i}
-                    className="font-serif"
-                    style={{
-                      color: `rgba(${theme.ink}, ${i === 0 ? 1 : 0.62})`,
-                      borderLeft: `2px solid ${i === 0 ? "rgba(212,164,78,0.7)" : "transparent"}`,
-                      paddingLeft: 14,
-                      fontSize: `${15 * prefs.fontScale}px`,
-                      lineHeight: prefs.leading,
-                      letterSpacing: sp.letter,
-                      wordSpacing: sp.word,
-                      transition: reduce ? "none" : "color 0.4s ease, border-color 0.4s ease",
-                    }}
-                  >
-                    {para}
-                  </p>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Read-so-far + committed-ahead rail; ticks = shots, dot = your place. */}
-        <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-1 rounded-full" aria-hidden style={{ background: "rgba(255,255,255,0.06)" }}>
-          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "rgba(212,164,78,0.55)" }} />
-          {live && (
-            <div
-              ref={railLeadRef}
-              className="absolute inset-x-0 rounded-full"
-              style={{
-                top: "0%",
-                height: `${Math.min(0.18, Math.max(0, (bufferAhead ?? 0) / 30)) * 100}%`,
-                background: `linear-gradient(180deg, ${bursting ? "rgba(251,191,36,0.85)" : "rgba(52,211,153,0.75)"}, transparent)`,
-                boxShadow: `0 0 8px ${bursting ? "rgba(251,191,36,0.55)" : "rgba(52,211,153,0.45)"}`,
-              }}
-            />
-          )}
-          {timeline.segments.map((s) => (
-            <div
-              key={s.id}
-              className="absolute left-1/2 h-[2px] w-[7px] -translate-x-1/2 rounded-full"
-              style={{ top: `${(s.wordStart / Math.max(1, timeline.totalWords)) * 100}%`, background: "rgba(255,255,255,0.22)" }}
-            />
-          ))}
-          <div ref={railDotRef} className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ top: "0%", background: "#e8e2d8", boxShadow: "0 0 6px rgba(232,226,216,0.7)" }} />
-        </div>
       </div>
     </div>
   );

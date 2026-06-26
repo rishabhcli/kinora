@@ -1,15 +1,16 @@
 import { useState, lazy, Suspense } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import LoginPage from "./components/LoginPage";
 import { api } from "./lib/api";
+import { useReducedMotionPref } from "./a11y/useReducedMotionPref";
 
 const HomePage = lazy(() => import("./components/HomePage"));
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export default function App() {
-  const [entered, setEntered] = useState(false);
-  const prefersReduced = useReducedMotion() ?? false;
+  const [entered, setEntered] = useState(() => api.isAuthed());
+  const prefersReduced = useReducedMotionPref();
 
   // Crossing the threshold into the app. LoginPage runs its own cinematic exit
   // (the card recedes, the wall blooms) and then calls onEnter; here we keep the

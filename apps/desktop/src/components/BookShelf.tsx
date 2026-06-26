@@ -1,7 +1,8 @@
 import { useRef, useCallback, useState, useEffect } from "react";
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import BookCard from "./BookCard";
 import type { Book } from "../data/books";
+import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 
 interface BookShelfProps {
   title: string;
@@ -27,7 +28,9 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionPref();
+  const edgeState = useRef({ left: false, right: true });
+  const scrollRaf = useRef(0);
 
   // Drag-to-scroll state
   const isDragging = useRef(false);
@@ -50,16 +53,34 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
         show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
       };
 
-  const updateScrollButtons = useCallback(() => {
+  const applyScrollButtons = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+    const left = el.scrollLeft > 4;
+    const right = el.scrollLeft < el.scrollWidth - el.clientWidth - 4;
+    if (edgeState.current.left !== left) setCanScrollLeft(left);
+    if (edgeState.current.right !== right) setCanScrollRight(right);
+    edgeState.current = { left, right };
   }, []);
 
+  const scheduleScrollButtons = useCallback(() => {
+    if (scrollRaf.current) return;
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = 0;
+      applyScrollButtons();
+    });
+  }, [applyScrollButtons]);
+
   useEffect(() => {
-    updateScrollButtons();
-  }, [books, updateScrollButtons]);
+    applyScrollButtons();
+  }, [books, applyScrollButtons]);
+
+  useEffect(
+    () => () => {
+      if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current);
+    },
+    [],
+  );
 
   const scrollByAmount = (dir: "left" | "right") => {
     const el = scrollRef.current;
@@ -178,7 +199,7 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
           className="flex gap-4 overflow-x-auto hide-scrollbar px-1 pb-3 select-none"
           style={{ cursor: "grab" }}
           onMouseDown={handleMouseDown}
-          onScroll={updateScrollButtons}
+          onScroll={scheduleScrollButtons}
           onClickCapture={handleClickCapture}
           variants={container}
           initial="hidden"

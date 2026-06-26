@@ -3,10 +3,8 @@
 // <html> and maintain a single managed <style> element. The CSS lives here (our
 // lane) and overrides via `!important` + specificity.
 //
-// Reach: `startAppearanceSync()` should be called once at app startup (main.tsx —
-// requested via Agent 12) so overrides apply on first paint. Until then the
-// Settings page calls it on mount; we intentionally do NOT remove the <html>
-// classes on unmount, so a chosen override stays live for the whole session.
+// Reach: kept for tests/imperative consumers. The mounted A11yProvider is the
+// runtime owner of <html> classes so Settings changes apply from first paint.
 import { resolveAppearance, settingsStore, type AppSettings } from "./settings.ts";
 
 const STYLE_ID = "kinora-settings-overrides";

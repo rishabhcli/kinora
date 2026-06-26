@@ -1,5 +1,5 @@
-import { useRef, ReactNode } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useEffect, useRef, ReactNode } from "react";
+import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 
 export function CometCard({
   children,
@@ -17,21 +17,39 @@ export function CometCard({
   const ref = useRef<HTMLDivElement>(null);
   const childRef = useRef<HTMLDivElement>(null);
   const glareRef = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion();
+  const rectRef = useRef<DOMRect | null>(null);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef(0);
+  const resetTimerRef = useRef(0);
+  const reduce = useReducedMotionPref();
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
+    },
+    [],
+  );
+
+  const applyTilt = () => {
+    rafRef.current = 0;
     const el = ref.current;
     if (!el || reduce) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    const rect = rectRef.current ?? el.getBoundingClientRect();
+    rectRef.current = rect;
+    const px = (pointerRef.current.x - rect.left) / rect.width - 0.5;
+    const py = (pointerRef.current.y - rect.top) / rect.height - 0.5;
     el.style.setProperty("--rx", `${-py * rotateDepth}deg`);
     el.style.setProperty("--ry", `${px * rotateDepth}deg`);
     el.style.setProperty("--tz", `${translateDepth}px`);
-    // Feed the cursor position (as %) to the glare overlay so the highlight
-    // tracks the pointer across the cover.
     el.style.setProperty("--mx", `${(px + 0.5) * 100}%`);
     el.style.setProperty("--my", `${(py + 0.5) * 100}%`);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (reduce) return;
+    pointerRef.current = { x: e.clientX, y: e.clientY };
+    if (!rafRef.current) rafRef.current = requestAnimationFrame(applyTilt);
   };
 
   return (
@@ -40,6 +58,8 @@ export function CometCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={() => {
         if (reduce) return;
+        if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
+        rectRef.current = ref.current?.getBoundingClientRect() ?? null;
         if (ref.current) {
           ref.current.style.transformStyle = "preserve-3d";
           ref.current.style.transition = "transform 0.2s ease-out";
@@ -55,6 +75,11 @@ export function CometCard({
       onMouseLeave={() => {
         const el = ref.current;
         if (!el) return;
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        }
+        rectRef.current = null;
         if (glareRef.current) glareRef.current.style.opacity = "0";
         el.style.setProperty("--rx", "0deg");
         el.style.setProperty("--ry", "0deg");
@@ -66,7 +91,7 @@ export function CometCard({
           childRef.current.style.transition = "transform 0.2s ease-out";
         }
         // Remove transform and transition after animation completes
-        setTimeout(() => {
+        resetTimerRef.current = window.setTimeout(() => {
           if (ref.current) {
             ref.current.style.transition = "";
             ref.current.style.transform = "";

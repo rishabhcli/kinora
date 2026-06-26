@@ -3,13 +3,14 @@
 // film engine, and Agent 6's reading controls (all via producers.tsx) into one
 // flawless open→read→close whole that is fully functional every time, even with
 // KINORA_LIVE_VIDEO OFF. See coordination/CONTRACTS.md.
-import { AnimatePresence, useReducedMotion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { Book } from "../data/books";
 import { BookOpenTransition } from "./producers";
 import { ReadingRoomShell } from "./ReadingRoomShell";
 import { useFilmSession } from "./useFilmSession";
 import { canReveal, initialState, reduce as machineReduce } from "./machine";
+import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 
 export default function ReadingRoom({
   book,
@@ -21,7 +22,7 @@ export default function ReadingRoom({
   originRect?: DOMRect | null;
 }) {
   const [state, dispatch] = useReducer(machineReduce, initialState);
-  const reduceMotion = !!useReducedMotion();
+  const reduceMotion = useReducedMotionPref();
   const prevId = useRef<string | null>(null);
 
   // OPEN on a new book; CLOSE when it goes away (handles rapid open/close).

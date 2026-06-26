@@ -9,21 +9,10 @@ import {
   type ReadingFontFamily,
   type ReadingSpacing,
 } from "@/a11y/readingPrefs";
-import {
-  useReducedMotionPref,
-  setReducedMotionOverride,
-} from "@/a11y/useReducedMotionPref";
-import {
-  useHighContrastPref,
-  setHighContrastOverride,
-  useReducedTransparencyPref,
-  setReducedTransparencyOverride,
-} from "@/a11y/displayPrefs";
 
 // The Apple-Books reading-controls panel. Controlled: the host (ReadingRoom via
 // useReadingPrefs) passes `prefs` + `onChange`. App-wide display a11y toggles
-// (motion/contrast/transparency) read/write the global stores directly. Every
-// control is a real, labelled, keyboard- and VoiceOver-operable native input.
+// live in Settings; every control here is book-text/read-aloud specific.
 
 const s: Record<string, CSSProperties> = {
   panel: { display: "flex", flexDirection: "column", gap: "1.1rem", minWidth: 280, color: "inherit" },
@@ -167,9 +156,6 @@ export interface ReadingControlsProps {
 
 export function ReadingControls({ prefs, onChange, voices: providedVoices }: ReadingControlsProps) {
   const voices = useVoices(providedVoices);
-  const reduceMotion = useReducedMotionPref();
-  const highContrast = useHighContrastPref();
-  const reduceTransparency = useReducedTransparencyPref();
   const voiceId = useId();
 
   const themeOptions = (Object.keys(READING_THEMES) as ReadingTheme[]).map((t) => ({
@@ -250,13 +236,6 @@ export function ReadingControls({ prefs, onChange, voices: providedVoices }: Rea
           </select>
         </div>
         <Slider label="Read-aloud speed" value={prefs.ttsRate} min={b.ttsRate.min} max={b.ttsRate.max} step={b.ttsRate.step} format={(v) => `${v.toFixed(1)}×`} onChange={(ttsRate) => onChange({ ttsRate })} />
-      </fieldset>
-
-      <fieldset style={s.section}>
-        <legend style={s.legend}>Accessibility</legend>
-        <Switch label="Reduce motion" checked={reduceMotion} onChange={(v) => setReducedMotionOverride(v)} />
-        <Switch label="High contrast" checked={highContrast} onChange={(v) => setHighContrastOverride(v)} />
-        <Switch label="Reduce transparency" checked={reduceTransparency} onChange={(v) => setReducedTransparencyOverride(v)} />
       </fieldset>
     </div>
   );

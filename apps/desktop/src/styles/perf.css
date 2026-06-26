@@ -1,0 +1,77 @@
+/* Balanced desktop profile.
+   The Electron app runs on one GPU process, so expensive decorative filters and
+   permanent compositor hints add up quickly. Keep the Kinora mood, but make the
+   default profile quieter; `?cinematic=1` restores the older full-effects path. */
+
+html.kinora-balanced .home-aurora-blob {
+  filter: blur(56px);
+  opacity: 0.28;
+  animation: none;
+  will-change: auto;
+}
+
+html.kinora-balanced .ambient-mote,
+html.kinora-balanced .auth-mote,
+html.kinora-balanced .dust-mote {
+  display: none;
+}
+
+html.kinora-balanced .auth-backdrop-parallax {
+  transform: none !important;
+  transition: none;
+  will-change: auto;
+}
+
+html.kinora-balanced .auth-beam {
+  animation: none;
+  opacity: 0.75;
+}
+
+html.kinora-balanced .shelf-rail {
+  will-change: auto;
+}
+
+html.kinora-balanced .shelf-rail--left,
+html.kinora-balanced .shelf-rail--right {
+  animation-duration: calc(var(--dur, 130s) * 1.8);
+}
+
+html.kinora-balanced .auth-card,
+html.kinora-balanced .login-form-enter {
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+html.kinora-balanced .glass-card,
+html.kinora-balanced .glass-input,
+html.kinora-balanced .liquid-glass-dock,
+html.kinora-balanced .footer-glass,
+html.kinora-balanced .surface-frosted {
+  -webkit-backdrop-filter: blur(8px) saturate(140%) brightness(1.03);
+  backdrop-filter: blur(8px) saturate(140%) brightness(1.03);
+}
+
+html.kinora-balanced .glass-control,
+html.kinora-balanced button:not([class*="from-"]):not([class*="gradient"]),
+html.kinora-balanced [role="button"],
+html.kinora-balanced a[class*="rounded"],
+html.kinora-balanced input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+html.kinora-balanced select,
+html.kinora-balanced [class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(img):not(video) {
+  -webkit-backdrop-filter: blur(6px) saturate(135%) brightness(1.02);
+  backdrop-filter: blur(6px) saturate(135%) brightness(1.02);
+}
+
+html.kinora-balanced .comet-glare {
+  mix-blend-mode: normal;
+  background: radial-gradient(
+    180px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(232, 200, 120, 0.08) 35%,
+    transparent 62%
+  );
+}
+
+html.kinora-balanced .auth-grain {
+  display: none;
+}

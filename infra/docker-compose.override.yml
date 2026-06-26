@@ -1,9 +1,6 @@
-# Local override: the committed compose binds postgres to host :5432, which on
-# this machine collides with an unrelated `admitly-postgres` container. Replace
-# the mapping with :55432 (the port the kinora stack was already running on) so
-# the data plane comes back up without touching the committed file. Internal
-# networking still uses postgres:5432, so the app containers are unaffected.
+# Local override kept aligned with the committed local-dev contract: host
+# Postgres listens on :5433 while in-cluster services use postgres:5432.
 services:
   postgres:
     ports: !override
-      - "55432:5432"
+      - "5433:5432"

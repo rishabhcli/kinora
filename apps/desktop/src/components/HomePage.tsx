@@ -116,7 +116,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         </div>
       </main>
     ),
-    Library: <Suspense fallback={<PageFallback />}><LibraryPage /></Suspense>,
+    Library: <Suspense fallback={<PageFallback />}><LibraryPage onOpenBook={handleOpen} /></Suspense>,
     Watch: <Suspense fallback={<PageFallback />}><WatchPage /></Suspense>,
     Favorites: <Suspense fallback={<PageFallback />}><FavoritesPage /></Suspense>,
     Notes: <Suspense fallback={<PageFallback />}><NotesPage /></Suspense>,

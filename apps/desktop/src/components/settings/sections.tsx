@@ -1,12 +1,15 @@
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useEffect, useId, useState } from "react";
 import { useSettings } from "../../lib/useSettings";
 import {
   useReadingPrefs,
   READING_THEMES,
   READING_SPACINGS,
+  READING_FONTS,
+  READING_BOUNDS,
   clampPref,
   type ReadingTheme,
   type ReadingSpacing,
+  type ReadingFontFamily,
 } from "../../lib/readingPrefs";
 import { api } from "../../lib/api";
 import { diffFromDefaults, type SystemOverride } from "../../lib/settings";
@@ -20,6 +23,18 @@ const OVERRIDE_OPTS: { value: SystemOverride; label: string }[] = [
   { value: "on", label: "On" },
   { value: "off", label: "Off" },
 ];
+
+function useVoices(): SpeechSynthesisVoice[] {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const read = () => setVoices(window.speechSynthesis.getVoices());
+    read();
+    window.speechSynthesis.addEventListener?.("voiceschanged", read);
+    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", read);
+  }, []);
+  return voices;
+}
 
 /* ── General ────────────────────────────────────────────────────────────── */
 function GeneralSection() {
@@ -86,9 +101,12 @@ function AppearanceSection() {
 /* ── Reading — composes Agent 6's useReadingPrefs (shared, not duplicated) ── */
 function ReadingSection() {
   const { prefs, update } = useReadingPrefs();
+  const voices = useVoices();
+  const voiceId = useId();
+  const bounds = READING_BOUNDS;
   return (
     <div>
-      <SectionTitle icon="textformat" title="Reading" subtitle="The same preferences you tune in the reading room." />
+      <SectionTitle icon="textformat" title="Reading" subtitle="Book text, comfort, and read-aloud preferences." />
       <SettingsGroup title="Theme">
         <div className="px-3.5 py-3 flex flex-wrap gap-2">
           {(Object.entries(READING_THEMES) as [ReadingTheme, (typeof READING_THEMES)[ReadingTheme]][]).map(
@@ -119,15 +137,26 @@ function ReadingSection() {
         </div>
       </SettingsGroup>
       <SettingsGroup title="Text">
+        <Row icon="textformat" label="Reading font">
+          <Segmented
+            value={prefs.fontFamily}
+            options={(Object.keys(READING_FONTS) as ReadingFontFamily[]).map((f) => ({
+              value: f,
+              label: READING_FONTS[f].label,
+            }))}
+            onChange={(v) => update({ fontFamily: v })}
+            ariaLabel="Reading font"
+          />
+        </Row>
         <Row icon="textformat.size" label="Font size" htmlFor="rd-font">
           <Slider
             id="rd-font"
             label="Font size"
-            min={0.85}
-            max={1.5}
-            step={0.05}
+            min={bounds.fontScale.min}
+            max={bounds.fontScale.max}
+            step={bounds.fontScale.step}
             value={prefs.fontScale}
-            onChange={(v) => update({ fontScale: clampPref(v, 0.85, 1.5) })}
+            onChange={(v) => update({ fontScale: clampPref(v, bounds.fontScale.min, bounds.fontScale.max) })}
             format={(v) => `${Math.round(v * 100)}%`}
           />
         </Row>
@@ -135,11 +164,11 @@ function ReadingSection() {
           <Slider
             id="rd-lead"
             label="Line spacing"
-            min={1.4}
-            max={2.2}
-            step={0.05}
+            min={bounds.leading.min}
+            max={bounds.leading.max}
+            step={bounds.leading.step}
             value={prefs.leading}
-            onChange={(v) => update({ leading: clampPref(v, 1.4, 2.2) })}
+            onChange={(v) => update({ leading: clampPref(v, bounds.leading.min, bounds.leading.max) })}
             format={(v) => v.toFixed(2)}
           />
         </Row>
@@ -147,11 +176,11 @@ function ReadingSection() {
           <Slider
             id="rd-measure"
             label="Line width"
-            min={48}
-            max={80}
-            step={1}
+            min={bounds.measure.min}
+            max={bounds.measure.max}
+            step={bounds.measure.step}
             value={prefs.measure}
-            onChange={(v) => update({ measure: clampPref(Math.round(v), 48, 80) })}
+            onChange={(v) => update({ measure: clampPref(Math.round(v), bounds.measure.min, bounds.measure.max) })}
             format={(v) => `${Math.round(v)}ch`}
           />
         </Row>
@@ -167,9 +196,50 @@ function ReadingSection() {
           />
         </Row>
       </SettingsGroup>
-      <SettingsGroup>
+      <SettingsGroup title="Display">
+        <Row icon="sun.max" label="Brightness" htmlFor="rd-brightness">
+          <Slider
+            id="rd-brightness"
+            label="Brightness"
+            min={bounds.brightness.min}
+            max={bounds.brightness.max}
+            step={bounds.brightness.step}
+            value={prefs.brightness}
+            onChange={(v) => update({ brightness: clampPref(v, bounds.brightness.min, bounds.brightness.max) })}
+            format={(v) => `${Math.round(v * 100)}%`}
+          />
+        </Row>
         <Row icon="moon.stars" label="Auto Night" description="Switch to the Night theme between 7 PM and 7 AM.">
           <Switch checked={prefs.autoNight} onChange={(v) => update({ autoNight: v })} label="Auto Night" />
+        </Row>
+      </SettingsGroup>
+      <SettingsGroup title="Read aloud">
+        <Row icon="speaker.wave.2.fill" label="Voice" htmlFor={voiceId}>
+          <select
+            id={voiceId}
+            value={prefs.ttsVoiceURI ?? ""}
+            onChange={(e) => update({ ttsVoiceURI: e.target.value || null })}
+            className="kn-set-focusable min-h-9 max-w-[220px] rounded-lg border border-white/10 bg-[#191511] px-2.5 py-1.5 text-sm text-kinora-text outline-none"
+          >
+            <option value="">System default</option>
+            {voices.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <Row icon="speaker.wave.2.fill" label="Read-aloud speed" htmlFor="rd-tts-rate">
+          <Slider
+            id="rd-tts-rate"
+            label="Read-aloud speed"
+            min={bounds.ttsRate.min}
+            max={bounds.ttsRate.max}
+            step={bounds.ttsRate.step}
+            value={prefs.ttsRate}
+            onChange={(v) => update({ ttsRate: clampPref(v, bounds.ttsRate.min, bounds.ttsRate.max) })}
+            format={(v) => `${v.toFixed(1)}×`}
+          />
         </Row>
       </SettingsGroup>
     </div>
@@ -393,7 +463,7 @@ export interface SettingsSectionDef {
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   { id: "general", label: "General", icon: "gearshape", activeIcon: "gearshape.fill", keywords: "launch startup sound effects reset defaults", Component: GeneralSection },
   { id: "appearance", label: "Appearance", icon: "paintbrush", activeIcon: "paintbrush", keywords: "motion transparency contrast accessibility glass", Component: AppearanceSection },
-  { id: "reading", label: "Reading", icon: "textformat", activeIcon: "textformat", keywords: "theme dark sepia paper font size spacing line width night dyslexia", Component: ReadingSection },
+  { id: "reading", label: "Reading", icon: "textformat", activeIcon: "textformat", keywords: "theme dark sepia paper font size spacing line width night dyslexia brightness voice read aloud", Component: ReadingSection },
   { id: "playback", label: "Playback", icon: "film", activeIcon: "film.fill", keywords: "film autoplay captions scrub sensitivity video player", Component: PlaybackSection },
   { id: "notifications", label: "Notifications", icon: "bell", activeIcon: "bell.fill", keywords: "reminders digest alerts push test", Component: NotificationsSection },
   { id: "privacy", label: "Privacy", icon: "lock.shield", activeIcon: "lock.shield", keywords: "analytics crash reports clear data tracking", Component: PrivacySection },

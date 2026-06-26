@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { startAppearanceSync } from "../lib/appearance";
+import { AnimatePresence, motion } from "framer-motion";
 import { Icon } from "./icons";
 import { SETTINGS_SECTIONS } from "./settings/sections";
+import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 import "./settings/settings.css";
 
 export default function SettingsPage() {
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionPref();
   const [activeId, setActiveId] = useState(SETTINGS_SECTIONS[0].id);
   const [query, setQuery] = useState("");
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
-  // Appearance overrides (reduce motion / transparency / contrast) go live and
-  // stay synced with the store + OS while Settings is mounted (and after).
-  useEffect(() => startAppearanceSync(), []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

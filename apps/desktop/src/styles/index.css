@@ -23,4 +23,5 @@
 @import "./motion.css"; /* A4 — generic chrome animations */
 @import "./login.css"; /* A11 — login + bookwall + hero */
 @import "./reading.css"; /* A10 — reading-room loaders */
+@import "./perf.css"; /* balanced desktop performance overrides */
 @import "./a11y.css"; /* A6 — accessibility overrides (LAST) */
