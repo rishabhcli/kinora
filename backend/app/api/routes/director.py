@@ -20,7 +20,7 @@ import asyncio
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
 from app.api.deps import ContainerDep, CurrentUser, write_rate_limit
 from app.api.errors import APIError
@@ -37,7 +37,7 @@ from app.api.schemas import (
 )
 from app.composition import Container
 from app.core.logging import get_logger
-from app.db.hashing import compute_shot_hash
+from app.db.hashing import compute_shot_hash, rotate_seed
 from app.db.models.enums import EntityType, ShotStatus
 from app.db.models.shot import Shot
 from app.db.repositories.beat import BeatRepo
@@ -59,17 +59,9 @@ logger = get_logger("app.api.director")
 
 router = APIRouter(tags=["director"])
 
-# Golden-ratio seed step: a Director regen re-rolls to a genuinely new variation.
-_SEED_STEP = 0x9E3779B1
-_SEED_MASK = 0x7FFFFFFF
-
 # Beat between staged crew lines while a conflict resolves, so the §5.4 feed
 # streams the §7.2 resolution as the crew works rather than in one jump (§16 demo).
 _STAGE_DELAY_S = 0.3
-
-
-def _rotate_seed(seed: int | None) -> int:
-    return (int(seed or 0) + _SEED_STEP) & _SEED_MASK
 
 
 def _references_entity(reference_image_ids: list[str] | None, entity_key: str) -> bool:
@@ -116,7 +108,7 @@ async def comment(
     route = await container.classify_comment(body.note, shot_context=shot_context)
 
     # Re-roll the seed so the targeted regen is a real new variation (not a cache hit).
-    new_seed = _rotate_seed(shot.seed)
+    new_seed = rotate_seed(shot.seed)
     ref_hash = CacheService.reference_set_hash(list(shot.reference_image_ids or []))
     new_hash = compute_shot_hash(
         book_id=shot.book_id,
@@ -225,15 +217,47 @@ async def canon_edit(
 
     # 2. Find the dependent shots; recompute their shot_hash; enqueue ONLY those.
     regenerated: list[str] = []
-    skipped = 0
     async with container.session_factory() as session:
         repo = ShotRepo(session)
+        # Filter to shots whose reference set includes the edited entity at the DB
+        # layer (any version) instead of loading every shot in the book. A ref is
+        # stored as "key" or "key@version"; split_part mirrors _references_entity.
+        ref = func.jsonb_array_elements_text(Shot.reference_image_ids).table_valued(
+            "value", name="ref"
+        )
+        references_entity = (
+            select(1)
+            .select_from(ref)
+            .where(
+                or_(
+                    ref.c.value == body.entity_key,
+                    func.split_part(ref.c.value, "@", 1) == body.entity_key,
+                )
+            )
+            .exists()
+        )
+        # Total shots in the book — lets us report ``skipped`` (the cache-hit count)
+        # without materialising every non-dependent shot. skipped = total - regenerated.
+        total_shots = int(
+            (
+                await session.execute(
+                    select(func.count()).select_from(Shot).where(Shot.book_id == book_id)
+                )
+            ).scalar_one()
+        )
         rows = list(
-            (await session.execute(select(Shot).where(Shot.book_id == book_id))).scalars().all()
+            (
+                await session.execute(
+                    select(Shot).where(Shot.book_id == book_id, references_entity)
+                )
+            )
+            .scalars()
+            .all()
         )
         for shot in rows:
+            # Defensive guard: the DB filter already narrowed the set; this keeps
+            # behaviour identical for any null/format edge case.
             if not _references_entity(shot.reference_image_ids, body.entity_key):
-                skipped += 1
                 continue
             ref_hash = CacheService.reference_set_hash(list(shot.reference_image_ids or []))
             new_hash = compute_shot_hash(
@@ -254,6 +278,9 @@ async def canon_edit(
             spec = _spec_from_shot(shot, shot_hash=new_hash, ref_hash=ref_hash)
             await container.enqueue_regen(spec)
             regenerated.append(shot.id)
+
+    # Everything in the book that wasn't regenerated stayed a cache hit (§8.7).
+    skipped = total_shots - len(regenerated)
 
     # 3. Fan out the regens; announce regen_done per shot as each completes (§5.6).
     if regenerated:

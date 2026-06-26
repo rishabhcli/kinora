@@ -214,12 +214,10 @@ class CanonService:
     async def _resolve_present(
         self, book_id: str, entity_keys: list[str], ordinal: int
     ) -> list[Entity]:
-        resolved: list[Entity] = []
-        for key in entity_keys:
-            entity = await self._entities.get_as_of_beat(book_id, key, ordinal)
-            if entity is not None:
-                resolved.append(entity)
-        return resolved
+        # One batched query instead of an N+1 over the beat's entities (§8.4).
+        present = await self._entities.get_present_as_of_beat(book_id, entity_keys, ordinal)
+        # Preserve the input order of ``entity_keys`` (skip those with no active version).
+        return [present[key] for key in entity_keys if key in present]
 
     def _slices(
         self,

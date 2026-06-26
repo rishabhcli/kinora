@@ -56,6 +56,10 @@ export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) =>
   const [zone, setZone] = useState<string | null>(null);
   const [crew, setCrew] = useState<CrewActivity[]>([]);
   const crewId = useRef(0);
+  // Coalesce bursty clip_ready events into one state commit per frame, so the
+  // timeline (rebuilt from clipByShot) recomputes at most once per frame [D6].
+  const pendingClips = useRef<Record<string, string>>({});
+  const clipFlush = useRef<number | null>(null);
 
   const fallbackFilm = fallbackFilmFor(book?.id ?? "");
 
@@ -141,7 +145,17 @@ export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) =>
           switch (e.event) {
             case "clip_ready": {
               const c = e as unknown as { shot_id: string; oss_url: string };
-              if (c.oss_url) setClipByShot((m) => ({ ...m, [c.shot_id]: toBrowserUrl(c.oss_url) }));
+              if (c.oss_url) {
+                pendingClips.current[c.shot_id] = toBrowserUrl(c.oss_url);
+                if (clipFlush.current == null) {
+                  clipFlush.current = requestAnimationFrame(() => {
+                    clipFlush.current = null;
+                    const batch = pendingClips.current;
+                    pendingClips.current = {};
+                    setClipByShot((m) => ({ ...m, ...batch }));
+                  });
+                }
+              }
               break;
             }
             case "buffer_state": {
@@ -182,6 +196,11 @@ export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) =>
     return () => {
       alive = false;
       closeEvents?.();
+      if (clipFlush.current != null) {
+        cancelAnimationFrame(clipFlush.current);
+        clipFlush.current = null;
+      }
+      pendingClips.current = {};
       setSessionId(null);
     };
   }, [book, dispatch]);

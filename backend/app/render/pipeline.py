@@ -49,6 +49,7 @@ from app.agents.contracts import (
 from app.agents.generator import GeneratorOutput
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
+from app.db.hashing import rotate_seed
 from app.db.models.enums import ShotStatus
 from app.memory.budget_service import BudgetExceeded, Reservation
 from app.memory.interfaces import BlobStore, CanonSlice, Embedder
@@ -74,10 +75,6 @@ from app.render.sync_map import build_sync_segment
 from app.storage.object_store import keys
 
 logger = get_logger("app.render.pipeline")
-
-#: A coarse golden-ratio step so a repair "new seed" is deterministic yet distinct.
-_SEED_STEP = 0x9E3779B1
-_SEED_MASK = 0x7FFFFFFF
 
 
 # --------------------------------------------------------------------------- #
@@ -399,11 +396,6 @@ class RenderResult(BaseModel):
 
 class UnknownShotError(LookupError):
     """Raised when ``render_shot`` is asked about a shot/beat that does not exist."""
-
-
-def _rotate_seed(seed: int) -> int:
-    """A deterministic, distinct next seed so a regen actually re-rolls (§9.5)."""
-    return (int(seed) + _SEED_STEP) & _SEED_MASK
 
 
 def _mean_vector(vectors: list[list[float]]) -> list[float]:
@@ -746,7 +738,7 @@ class RenderPipeline:
         """Route a non-conflict repair to an adjusted spec for the next attempt (§9.5)."""
         if action is RepairAction.REGEN_NEW_SEED:
             logger.info("repair.new_seed", shot_id=ctx.shot_id)
-            return spec.model_copy(update={"seed": _rotate_seed(spec.seed)}), notes
+            return spec.model_copy(update={"seed": rotate_seed(spec.seed)}), notes
         if action is RepairAction.REGEN_TIGHTEN_REFS:
             directive = (
                 "Identity drift: re-lock the character to the reference set; tighten the face."
@@ -824,7 +816,7 @@ class RenderPipeline:
             target_duration_s=ctx.target_duration,
             priors=ctx.priors,
         )
-        return spec.model_copy(update={"seed": _rotate_seed(prev_seed)})
+        return spec.model_copy(update={"seed": rotate_seed(prev_seed)})
 
     # -- accept (§9.6: write outputs, log episodic, cache, anchor canon) ----- #
 

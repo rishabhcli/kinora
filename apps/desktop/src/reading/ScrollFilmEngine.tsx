@@ -126,6 +126,13 @@ export function ScrollFilmEngine({
   const scrubRef = useRef<HTMLDivElement>(null);
   const paraAt = useRef(0);
   const restored = useRef(false);
+  // Cached paragraph metrics for the scroll-paint hot path [D1]: content-relative
+  // tops measured once (and on resize / layout-pref change), so a fast flick never
+  // reads layout (getBoundingClientRect) per node per frame.
+  const paraNodes = useRef<HTMLElement[]>([]);
+  const paraTops = useRef<number[]>([]);
+  const lastActive = useRef(-1);
+  const lastInk = useRef("");
 
   // Resume where the reader left off, once the column is tall enough to scroll.
   useEffect(() => {
@@ -143,20 +150,65 @@ export function ScrollFilmEngine({
 
   // Paint the centred paragraph bright (others dimmed) — imperatively, so a fast
   // flick doesn't trigger a React re-render of the whole column.
-  const paintParagraph = (el: HTMLElement) => {
-    const cRect = el.getBoundingClientRect();
-    const focusY = cRect.top + cRect.height * 0.4;
-    const nodes = el.querySelectorAll<HTMLElement>("[data-para]");
-    let bestIndex = 0;
-    nodes.forEach((p, i) => {
-      if (p.getBoundingClientRect().top <= focusY) bestIndex = i;
-    });
-    nodes.forEach((p, i) => {
-      const active = i === bestIndex;
-      p.style.color = `rgba(${theme.ink}, ${active ? 1 : 0.62})`;
-      p.style.borderLeftColor = active ? "rgba(212,164,78,0.7)" : "transparent";
-    });
+  const setParaStyle = (p: HTMLElement, active: boolean) => {
+    p.style.color = `rgba(${theme.ink}, ${active ? 1 : 0.62})`;
+    p.style.borderLeftColor = active ? "rgba(212,164,78,0.7)" : "transparent";
   };
+
+  const paintParagraph = () => {
+    const sc = scrollRef.current;
+    const nodes = paraNodes.current;
+    const tops = paraTops.current;
+    if (!sc || nodes.length === 0) return;
+    // Active paragraph = last one whose top has crossed the 40% focus line, using
+    // cached content offsets + the current scroll position (no layout reads here).
+    const focusContentY = sc.scrollTop + sc.clientHeight * 0.4;
+    let bestIndex = 0;
+    for (let i = 0; i < tops.length; i++) {
+      if (tops[i] <= focusContentY) bestIndex = i;
+      else break; // paragraphs are in document order, so tops ascend
+    }
+    if (lastInk.current !== theme.ink) {
+      // Theme changed → every paragraph needs the new ink.
+      for (let i = 0; i < nodes.length; i++) setParaStyle(nodes[i], i === bestIndex);
+      lastInk.current = theme.ink;
+    } else if (bestIndex !== lastActive.current) {
+      // Only the de-/re-activated paragraphs change.
+      const prev = nodes[lastActive.current];
+      if (prev) setParaStyle(prev, false);
+      setParaStyle(nodes[bestIndex], true);
+    }
+    lastActive.current = bestIndex;
+  };
+
+  // Measure paragraph offsets after layout and whenever the text or a layout-
+  // affecting reading pref changes; a ResizeObserver keeps them fresh on resize.
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const measure = () => {
+      const nodes = Array.from(sc.querySelectorAll<HTMLElement>("[data-para]"));
+      paraNodes.current = nodes;
+      const contentTop = sc.getBoundingClientRect().top - sc.scrollTop;
+      paraTops.current = nodes.map((n) => n.getBoundingClientRect().top - contentTop);
+      lastActive.current = -1; // force a repaint against the fresh geometry
+      lastInk.current = "";
+      paintParagraph();
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(sc);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    paragraphs.length,
+    prefs.fontScale,
+    prefs.leading,
+    prefs.spacing,
+    prefs.measure,
+    prefs.fontFamily,
+    themeKey,
+  ]);
 
   const onFrame = (frame: ScrollFrame) => {
     const pct = frame.fraction * 100;
@@ -171,13 +223,10 @@ export function ScrollFilmEngine({
     if (scrubRef.current) {
       scrubRef.current.style.opacity = frame.mode === "scrub" && !reduce ? "1" : "0";
     }
-    const sc = scrollRef.current;
-    if (sc) {
-      const now = performance.now();
-      if (now - paraAt.current >= PARA_THROTTLE_MS) {
-        paraAt.current = now;
-        paintParagraph(sc);
-      }
+    const now = performance.now();
+    if (now - paraAt.current >= PARA_THROTTLE_MS) {
+      paraAt.current = now;
+      paintParagraph();
     }
   };
 

@@ -148,6 +148,22 @@ function useVoices(provided?: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
   return voices;
 }
 
+// Derived purely from the static reading-pref maps — computed once at module load
+// rather than re-allocated on every ReadingControls render.
+const themeOptions = (Object.keys(READING_THEMES) as ReadingTheme[]).map((t) => ({
+  value: t,
+  label: READING_THEMES[t].label,
+  swatch: READING_THEMES[t].swatch,
+}));
+const fontOptions = (Object.keys(READING_FONTS) as ReadingFontFamily[]).map((f) => ({
+  value: f,
+  label: READING_FONTS[f].label,
+}));
+const spacingOptions = (Object.keys(READING_SPACINGS) as ReadingSpacing[]).map((sp) => ({
+  value: sp,
+  label: READING_SPACINGS[sp].label,
+}));
+
 export interface ReadingControlsProps {
   prefs: ReadingPrefs;
   onChange: (partial: Partial<ReadingPrefs>) => void;
@@ -157,20 +173,6 @@ export interface ReadingControlsProps {
 export function ReadingControls({ prefs, onChange, voices: providedVoices }: ReadingControlsProps) {
   const voices = useVoices(providedVoices);
   const voiceId = useId();
-
-  const themeOptions = (Object.keys(READING_THEMES) as ReadingTheme[]).map((t) => ({
-    value: t,
-    label: READING_THEMES[t].label,
-    swatch: READING_THEMES[t].swatch,
-  }));
-  const fontOptions = (Object.keys(READING_FONTS) as ReadingFontFamily[]).map((f) => ({
-    value: f,
-    label: READING_FONTS[f].label,
-  }));
-  const spacingOptions = (Object.keys(READING_SPACINGS) as ReadingSpacing[]).map((sp) => ({
-    value: sp,
-    label: READING_SPACINGS[sp].label,
-  }));
 
   const b = READING_BOUNDS;
   const pct = (v: number) => `${Math.round(v * 100)}%`;

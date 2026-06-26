@@ -24,6 +24,16 @@ import hashlib
 
 _SEP = "\x1f"
 
+# Golden-ratio seed step: a regen re-rolls to a genuinely new variation while
+# staying deterministic. Masked to a non-negative 31-bit int.
+_SEED_STEP = 0x9E3779B1
+_SEED_MASK = 0x7FFFFFFF
+
+
+def rotate_seed(seed: int | None) -> int:
+    """Advance a render seed to the next deterministic variation (§8.7)."""
+    return (int(seed or 0) + _SEED_STEP) & _SEED_MASK
+
 
 def compute_shot_hash(
     *,

@@ -101,6 +101,32 @@ class EntityRepo(BaseRepository):
         )
         return (await self.session.execute(stmt)).scalars().first()
 
+    async def get_present_as_of_beat(
+        self, book_id: str, entity_keys: Sequence[str], beat: int
+    ) -> dict[str, Entity]:
+        """Batch ``get_as_of_beat`` for many keys in one round-trip.
+
+        Returns a ``{entity_key: active version}`` map (highest version wins per
+        key). Equivalent to calling :meth:`get_as_of_beat` once per key, but a
+        single query — used by the canon read path to avoid an N+1 over a beat's
+        entities (§8.4).
+        """
+        if not entity_keys:
+            return {}
+        stmt = (
+            select(Entity)
+            .where(
+                Entity.book_id == book_id,
+                Entity.entity_key.in_(list(entity_keys)),
+                Entity.valid_from_beat <= beat,
+                or_(Entity.valid_to_beat.is_(None), Entity.valid_to_beat >= beat),
+            )
+            .order_by(Entity.entity_key, Entity.version.desc())
+            .distinct(Entity.entity_key)
+        )
+        rows = (await self.session.execute(stmt)).scalars().all()
+        return {e.entity_key: e for e in rows}
+
     async def list_active_at_beat(
         self, book_id: str, beat: int, kinds: Iterable[EntityType] | None = None
     ) -> list[Entity]:

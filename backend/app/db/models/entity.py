@@ -33,6 +33,15 @@ class Entity(TimestampMixin, Base):
         UniqueConstraint("book_id", "entity_key", "version"),
         Index("ix_entities_book_key", "book_id", "entity_key"),
         Index("ix_entities_book_type", "book_id", "type"),
+        # Covers the time-travel read filter (book_id, entity_key, validity interval),
+        # so get_as_of_beat / get_present_as_of_beat don't scan all versions of a key.
+        Index(
+            "ix_entities_key_valid",
+            "book_id",
+            "entity_key",
+            "valid_from_beat",
+            "valid_to_beat",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
