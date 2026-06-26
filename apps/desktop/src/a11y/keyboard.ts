@@ -185,3 +185,37 @@ export function clearAllShortcuts(): void {
   entries.length = 0;
   stopListening();
 }
+
+// ---- Pretty-printing (cheat-sheet / tooltips) --------------------------------
+
+const NAMED_KEY_LABELS: Record<string, string> = {
+  escape: "Esc",
+  " ": "Space",
+  arrowup: "↑",
+  arrowdown: "↓",
+  arrowleft: "←",
+  arrowright: "→",
+  enter: "Enter",
+  tab: "Tab",
+  backspace: "⌫",
+  delete: "Del",
+};
+
+function prettyKey(key: string): string {
+  if (NAMED_KEY_LABELS[key]) return NAMED_KEY_LABELS[key];
+  if (key.length === 1) return key.toUpperCase();
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** Human-readable combo for the cheat-sheet, e.g. "mod+," → "⌘ ," on macOS. */
+export function prettyCombo(combo: string, isMac: boolean = isMacPlatform()): string {
+  const p = parseCombo(combo);
+  const parts: string[] = [];
+  if (p.mod) parts.push(isMac ? "⌘" : "Ctrl");
+  if (p.meta && !p.mod) parts.push(isMac ? "⌘" : "Meta");
+  if (p.ctrl) parts.push(isMac ? "⌃" : "Ctrl");
+  if (p.alt) parts.push(isMac ? "⌥" : "Alt");
+  if (p.shift) parts.push(isMac ? "⇧" : "Shift");
+  parts.push(prettyKey(p.key));
+  return parts.join(" ");
+}

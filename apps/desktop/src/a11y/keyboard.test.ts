@@ -5,6 +5,7 @@ import {
   registerShortcut,
   getRegisteredShortcuts,
   clearAllShortcuts,
+  prettyCombo,
   type KeyState,
 } from "./keyboard";
 
@@ -149,5 +150,24 @@ describe("registerShortcut", () => {
     const e = new KeyboardEvent("keydown", { key: "f", bubbles: true, cancelable: true });
     document.body.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(true);
+  });
+});
+
+describe("prettyCombo", () => {
+  it("uses Apple glyphs on macOS", () => {
+    expect(prettyCombo("mod+,", true)).toBe("⌘ ,");
+    expect(prettyCombo("shift+?", true)).toBe("⇧ ?");
+    expect(prettyCombo("mod+shift+p", true)).toBe("⌘ ⇧ P");
+  });
+
+  it("uses word modifiers off macOS", () => {
+    expect(prettyCombo("mod+,", false)).toBe("Ctrl ,");
+    expect(prettyCombo("alt+k", false)).toBe("Alt K");
+  });
+
+  it("titles named keys and upper-cases single letters", () => {
+    expect(prettyCombo("esc", true)).toBe("Esc");
+    expect(prettyCombo("?", true)).toBe("?");
+    expect(prettyCombo("r", true)).toBe("R");
   });
 });

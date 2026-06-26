@@ -1,7 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { A11yProvider } from "./a11y/A11yProvider";
 import "./index.css";
+// Accessibility layer styles — imported AFTER index.css so the global focus ring
+// and reduced-motion rules win on equal specificity. (Agent 06)
+import "./styles/a11y.css";
 
 // In the native macOS shell (apps/desktop-native) the window is a real
 // NSGlassEffectView; flag the document so the UI goes translucent and the
@@ -19,6 +23,8 @@ if (/Chrome\//.test(navigator.userAgent) && !/Edg\//.test(navigator.userAgent)) 
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <A11yProvider>
+      <App />
+    </A11yProvider>
   </React.StrictMode>
 );
