@@ -1,0 +1,133 @@
+/* ============================================================================
+   KINORA — BASE  (Agent 08 · reset · body · scrollbar · base typography)
+   Consumes tokens.css. Loaded after index.css so it wins on equal specificity.
+   Scope is deliberately light: it sets the typographic + colour foundation and
+   leaves component-controlled type/geometry alone (no blanket heading restyle,
+   no button changes).
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  font-family: var(--k-font-ui);
+  font-size: var(--k-text-base);
+  font-weight: var(--k-weight-normal);
+  line-height: var(--k-leading-normal);
+  color: var(--k-text);
+  background: var(--k-bg-deep);
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+}
+
+/* Variable-font niceties where supported (Fraunces/Newsreader carry opsz). */
+@supports (font-variation-settings: normal) {
+  body {
+    font-optical-sizing: auto;
+  }
+}
+
+/* Selection — a warm lamplight wash rather than the OS blue. */
+::selection {
+  background: rgb(var(--k-accent-rgb) / 0.28);
+  color: var(--k-text);
+}
+
+/* Focus — visible, on-brand, and only for keyboard users. */
+:focus-visible {
+  outline: 2px solid rgb(var(--k-accent-rgb) / 0.75);
+  outline-offset: 2px;
+  border-radius: var(--k-radius-xs);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── Scrollbars — hidden by default (matches the existing chrome), with an
+      opt-in slim warm scrollbar for scroll regions that want one. ── */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--k-text-rgb) / 0.18) transparent;
+}
+.scrollbar-slim::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background: rgb(var(--k-text-rgb) / 0.16);
+  border-radius: var(--k-radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--k-text-rgb) / 0.28);
+  background-clip: content-box;
+}
+
+/* ── Base typographic helpers (opt-in classes; components keep their own type) ──
+
+   .font-display / .font-reading mirror the Tailwind font tokens for plain CSS. */
+.font-display {
+  font-family: var(--k-font-display);
+  letter-spacing: var(--k-tracking-display);
+}
+.font-reading {
+  font-family: var(--k-font-reading);
+}
+
+/* Eyebrow / kicker label — small tracked caps, the "title card" voice. */
+.text-eyebrow {
+  font-family: var(--k-font-ui);
+  font-size: var(--k-text-xs);
+  font-weight: var(--k-weight-semibold);
+  letter-spacing: var(--k-tracking-caps);
+  text-transform: uppercase;
+  color: var(--k-text-subtle);
+}
+
+/* Book-quality reading column. Agent 06's reading pane can layer its
+   theme/scale on top; this sets the measure, leading and optical defaults. */
+.prose-reading {
+  font-family: var(--k-font-reading);
+  font-size: var(--k-text-md);
+  line-height: var(--k-leading-reading);
+  letter-spacing: 0.001em;
+  max-width: var(--k-measure);
+  font-feature-settings: "liga" 1, "calt" 1, "onum" 1, "kern" 1;
+  text-wrap: pretty;
+  hyphens: auto;
+}
+.prose-reading p + p {
+  margin-top: 0.9em;
+}
+
+/* Tabular numerals for counts/progress so figures don't jitter. */
+.nums-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}

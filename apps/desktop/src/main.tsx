@@ -2,6 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+// Agent-08 design system — loaded AFTER index.css so the token-driven base +
+// material partials win on equal specificity. tokens.css must come first
+// (it defines the --k-* custom properties the others, and tailwind, consume).
+import "./styles/tokens.css";
+import "./styles/base.css";
+import "./styles/glass.css";
 
 // In the native macOS shell (apps/desktop-native) the window is a real
 // NSGlassEffectView; flag the document so the UI goes translucent and the
