@@ -55,6 +55,11 @@ from app.render.degrade import (
     ken_burns_over_image,
     zoom_for_camera,
 )
+from app.render.shot_grammar import (
+    is_motion_reversal,
+    resolve_screen_directions,
+    shot_size_for,
+)
 from app.render.stitch import (
     SceneSyncMap,
     concat_clips,
@@ -119,6 +124,10 @@ class ContinuityDirective(BaseModel):
     lighting: str | None = None
     time_of_day: str | None = None
     camera_logic: str = ""
+    #: The shot's resolved screen direction + whether this beat motivated a reversal
+    #: (a motivated line-cross is *not* a 180° error). Read by the continuity QA.
+    screen_direction: str = "neutral"
+    motion_reversal: bool = False
     hand_off: str = ""
     continues_from_shot_id: str | None = None
     last_frame_key: str | None = None
@@ -194,13 +203,12 @@ def wants_exact_pose(beat: Beat) -> bool:
     return any(cue in text for cue in _POSE_CUES)
 
 
-def camera_for_ordinal(ordinal: int, total: int, beat: Beat) -> Camera:
-    """A first-pass shot-grammar camera: establish wide, then push in (§9.3/§10).
+def camera_for_ordinal(ordinal: int, beat: Beat) -> Camera:
+    """The shot's camera: shot size from the §10 grammar, move/speed from the beat.
 
-    Shot 0 of an event establishes (wide, slow); interior shots play medium; a
-    shot that lands a pose tightens to a close. Pacing follows the beat mood. This
-    is the deterministic seed the richer shot-grammar (screen-direction, the 180°
-    rule) refines.
+    Shot size is owned by :func:`app.render.shot_grammar.shot_size_for` (establish
+    wide → medium → close insert) so the grammar is authoritative; the move/speed
+    follow the beat's pacing (a static hold for a landed pose, a push/pan else).
     """
     mood = f"{_lower(beat.mood)} {_lower(beat.summary)}"
     speed = (
@@ -208,11 +216,14 @@ def camera_for_ordinal(ordinal: int, total: int, beat: Beat) -> Camera:
         if any(c in mood for c in _FAST_CUES)
         else ("slow" if any(c in mood for c in _SLOW_CUES) else "medium")
     )
+    size = shot_size_for(ordinal, beat)
     if ordinal == 0:
-        return Camera(move="push_in", speed=speed, shot_size="wide")
-    if wants_exact_pose(beat):
-        return Camera(move="static", speed=speed, shot_size="close")
-    return Camera(move="pan", speed=speed, shot_size="medium")
+        move = "push_in"
+    elif wants_exact_pose(beat):
+        move = "static"
+    else:
+        move = "pan"
+    return Camera(move=move, speed=speed, shot_size=size)
 
 
 def _has_locked_character(canon: CanonSlice | None) -> bool:
@@ -298,6 +309,10 @@ def plan_event_script(
     has_characters = bool(canon and canon.characters)
     prev_endpoint = canon.previous_endpoint if canon is not None else None
 
+    # Screen direction is resolved across the whole event (§10 / the 180° rule):
+    # held consistent shot-to-shot, flipping only where a beat motivates a reversal.
+    directions = resolve_screen_directions(chosen)
+
     shots: list[EventShot] = []
     for ordinal, beat in enumerate(chosen):
         shot_id = f"{event_id}_shot_{ordinal:02d}"
@@ -331,6 +346,8 @@ def plan_event_script(
             lighting=_lighting_from(canon, beat),
             time_of_day=_time_of_day_from(canon, beat),
             camera_logic=("establishing" if ordinal == 0 else "continuation"),
+            screen_direction=directions[ordinal].value,
+            motion_reversal=is_motion_reversal(beat),
             hand_off=_hand_off_for(beat),
             continues_from_shot_id=continues_from,
             last_frame_key=last_frame_key,
@@ -342,7 +359,7 @@ def plan_event_script(
                 ordinal=ordinal,
                 render_mode=mode,
                 summary=beat.summary,
-                camera=camera_for_ordinal(ordinal, len(chosen), beat),
+                camera=camera_for_ordinal(ordinal, beat),
                 duration_s=shot_duration_for_beat(beat, base_s=base_duration_s),
                 source_span=beat.source_span,
                 directive=directive,
@@ -537,9 +554,7 @@ class EventDirector:
         overlap = effective_crossfade(durations, self._crossfade_s)
         clips = [r.clip_bytes for r in rendered]
         clip_bytes = await anyio.to_thread.run_sync(
-            lambda: concat_clips(
-                clips, size=self._film_size, fps=self._fps, crossfade_s=overlap
-            )
+            lambda: concat_clips(clips, size=self._film_size, fps=self._fps, crossfade_s=overlap)
         )
         sync_map = merge_sync_segments(
             segments, scene_id=script.event_id, durations=durations, overlap_s=overlap

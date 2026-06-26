@@ -28,6 +28,7 @@ from app.render.event_director import (
     EventScript,
     EventShot,
 )
+from app.render.shot_grammar import ScreenDirection, violates_180
 from app.storage.object_store import keys
 
 logger = get_logger("app.render.continuity_qa")
@@ -38,8 +39,8 @@ _CHAINED_MODES = frozenset(
 )
 #: How close a clip's aspect must be to the film aspect to count as "no jump".
 _ASPECT_TOL = 0.02
-#: Seam-score weights (sum to 1.0); all four must hold for the seam to pass.
-_W_GEOMETRY, _W_ASPECT, _W_MODE, _W_HANDOFF = 0.30, 0.30, 0.20, 0.20
+#: Seam-score weights (sum to 1.0); all five must hold for the seam to pass.
+_W_GEOMETRY, _W_ASPECT, _W_MODE, _W_HANDOFF, _W_DIRECTION = 0.25, 0.25, 0.20, 0.15, 0.15
 
 
 class SeamRepair(StrEnum):
@@ -83,6 +84,7 @@ class SeamQuality:
     aspect_ok: bool
     mode_chained: bool
     has_handoff: bool
+    direction_ok: bool
     score: float
     ok: bool
 
@@ -112,7 +114,7 @@ def score_seam(
     *,
     film_size: tuple[int, int],
 ) -> SeamQuality:
-    """Score the join ``prev → cur`` against the four continuity checks (pure)."""
+    """Score the join ``prev → cur`` against the five continuity checks (pure)."""
     film_aspect = film_size[0] / film_size[1]
     geometry_match = (prev_geom.width, prev_geom.height) == (cur_geom.width, cur_geom.height)
     aspect_ok = (
@@ -121,14 +123,19 @@ def score_seam(
     )
     mode_chained = cur_shot.render_mode in _CHAINED_MODES
     has_handoff = cur_shot.directive.continues_from_shot_id == prev_shot.shot_id
+    # The 180° rule: screen direction may only flip where the beat motivated it.
+    prev_dir = ScreenDirection(prev_shot.directive.screen_direction)
+    cur_dir = ScreenDirection(cur_shot.directive.screen_direction)
+    direction_ok = not violates_180(prev_dir, cur_dir, reversal=cur_shot.directive.motion_reversal)
 
     score = (
         _W_GEOMETRY * geometry_match
         + _W_ASPECT * aspect_ok
         + _W_MODE * mode_chained
         + _W_HANDOFF * has_handoff
+        + _W_DIRECTION * direction_ok
     )
-    ok = geometry_match and aspect_ok and mode_chained and has_handoff
+    ok = geometry_match and aspect_ok and mode_chained and has_handoff and direction_ok
     return SeamQuality(
         from_shot_id=prev_shot.shot_id,
         to_shot_id=cur_shot.shot_id,
@@ -136,6 +143,7 @@ def score_seam(
         aspect_ok=aspect_ok,
         mode_chained=mode_chained,
         has_handoff=has_handoff,
+        direction_ok=direction_ok,
         score=round(score, 4),
         ok=ok,
     )
@@ -151,7 +159,8 @@ def route_event_continuity(seam: SeamQuality) -> SeamRepair:
         return SeamRepair.DEGRADE  # everything wrong — fall to the Ken-Burns hold
     if geometry_fail:
         return SeamRepair.REGEN_CONTINUATION  # a resolution/aspect jump
-    return SeamRepair.INSERT_SUPPLEMENTAL  # a hard, unanchored cut
+    # A hard/unanchored cut or a 180° line cross → bridge with an insert/cutaway.
+    return SeamRepair.INSERT_SUPPLEMENTAL
 
 
 def score_event_continuity(

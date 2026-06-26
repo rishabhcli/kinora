@@ -133,6 +133,26 @@ def test_plan_event_script_chains_render_modes_and_handoff() -> None:
     assert all(s.directive.hand_off for s in script.shots)
 
 
+def test_plan_event_script_assigns_shot_grammar_and_screen_direction() -> None:
+    """The plan carries §10 production grammar: an establishing wide, a pose insert,
+    and screen direction held then flipped only on the motivated reversal."""
+    script = plan_event_script(
+        event_id="evt_001",
+        book_id="book_demo",
+        scene_id="scene_005",
+        beats=_bridge_beats(),
+        canon=make_slice(),
+    )
+    sizes = [s.camera.shot_size for s in script.shots]
+    assert sizes[0] == "wide"  # establishing
+    assert sizes[-1] == "close"  # "turns to face" pose → close insert
+    assert len(set(sizes)) > 1  # a real grammar, not one size repeated
+    # b1 sprints across (L2R); b2 "turns to face" is a motivated reversal (R2L).
+    assert script.shots[1].directive.screen_direction == "left_to_right"
+    assert script.shots[2].directive.screen_direction == "right_to_left"
+    assert script.shots[2].directive.motion_reversal is True
+
+
 def test_plan_event_script_establishing_with_no_character_is_text_to_video() -> None:
     script = plan_event_script(
         event_id="evt_x", book_id="book_demo", scene_id="scene_005", beats=_bridge_beats()

@@ -102,6 +102,31 @@ def test_broken_chain_routes_to_insert_supplemental() -> None:
     assert route_event_continuity(seam) == SeamRepair.INSERT_SUPPLEMENTAL
 
 
+def test_unmotivated_180_flip_fails_seam_and_routes_to_insert() -> None:
+    """Screen direction flips L→R to R→L with no reversal in the text — a 180° line
+    cross. Geometry/chain are fine, so the fix is a bridging insert/cutaway."""
+    script = _script()
+    prev = script.shots[0].model_copy(
+        update={
+            "directive": script.shots[0].directive.model_copy(
+                update={"screen_direction": "left_to_right", "motion_reversal": False}
+            )
+        }
+    )
+    cur = script.shots[1].model_copy(
+        update={
+            "directive": script.shots[1].directive.model_copy(
+                update={"screen_direction": "right_to_left", "motion_reversal": False}
+            )
+        }
+    )
+    seam = score_seam(_vertical(prev.shot_id), _vertical(cur.shot_id), prev, cur, film_size=FILM)
+    assert seam.geometry_match is True and seam.mode_chained is True and seam.has_handoff is True
+    assert seam.direction_ok is False
+    assert seam.ok is False
+    assert route_event_continuity(seam) == SeamRepair.INSERT_SUPPLEMENTAL
+
+
 def test_score_event_continuity_clean_event_is_ok() -> None:
     script = _script()
     geoms = [_vertical(s.shot_id, s.duration_s) for s in script.shots]
