@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { Book } from "../data/books";
 import { CometCard } from "./CometCard";
 import { BookCoverImage } from "./SkeletonShimmer";
@@ -41,7 +42,9 @@ function ProgressRing({ progress }: { progress: number }) {
   );
 }
 
-export default function BookCard({ book, onOpen }: BookCardProps) {
+// Memoized: cards sit in long, staggered shelves that re-render on scroll /
+// drag — skip re-rendering a card whose book + handler are unchanged.
+const BookCard = memo(function BookCard({ book, onOpen }: BookCardProps) {
   return (
     <div
       className="flex-shrink-0 w-[150px] group cursor-pointer"
@@ -115,4 +118,6 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
       )}
     </div>
   );
-}
+});
+
+export default BookCard;

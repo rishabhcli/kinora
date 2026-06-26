@@ -208,6 +208,12 @@ export type SessionEvent = BufferState | ClipReady | ({ event: string } & Record
 
 interface TokenResponse { access_token: string; token_type: string; expires_in: number }
 
+// Memoize page (cover) fetches so the same book across multiple shelves — or a
+// re-mounted HomePage — doesn't re-request page 1. Keyed by `${id}:${n}`; the
+// in-flight promise is cached, so concurrent callers share one request. Cleared
+// on logout so a new user never sees a previous user's covers.
+const pageCache = new Map<string, Promise<PageResponse>>();
+
 export const api = {
   base: BASE,
   isAuthed: () => Boolean(auth.token),
@@ -232,11 +238,24 @@ export const api = {
       } else throw e;
     }
   },
-  logout: () => { auth.token = null; },
+  logout: () => { auth.token = null; pageCache.clear(); },
   listBooks: () => req<BookResponse[]>("/api/books"),
   getBook: (id: string) => req<BookResponse>(`/api/books/${id}`),
   getShots: (id: string) => req<ShotResponse[]>(`/api/books/${id}/shots`),
   getPage: (id: string, n: number) => req<PageResponse>(`/api/books/${id}/pages/${n}`),
+  /** Deduplicated/cached `getPage` — for covers fetched repeatedly across shelves. */
+  getPageCached(id: string, n: number): Promise<PageResponse> {
+    const key = `${id}:${n}`;
+    let p = pageCache.get(key);
+    if (!p) {
+      p = req<PageResponse>(`/api/books/${id}/pages/${n}`).catch((e) => {
+        pageCache.delete(key); // don't cache failures — allow a retry
+        throw e;
+      });
+      pageCache.set(key, p);
+    }
+    return p;
+  },
   createSession: (bookId: string, focusWord = 0) =>
     req<SessionResponse>("/api/sessions", {
       method: "POST",

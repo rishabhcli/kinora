@@ -5,7 +5,6 @@ import Navbar, { navItems } from "./Navbar";
 import Greeting from "./Greeting";
 import BookShelf from "./BookShelf";
 import HeroBanner from "./HeroBanner";
-import ReadingRoom from "./ReadingRoom";
 import AmbientBackground from "./AmbientBackground";
 import {
   MotionProvider,
@@ -26,6 +25,9 @@ import {
 } from "../data/books";
 import type { Book } from "../data/books";
 
+// The reading room (ScrollFilmEngine, FilmPane, …) is the heaviest screen and most
+// sessions browse without opening a book — defer its chunk until the first open.
+const ReadingRoom = lazy(() => import("./ReadingRoom"));
 const LibraryPage = lazy(() => import("./LibraryPage"));
 const WatchPage = lazy(() => import("./WatchPage"));
 const FavoritesPage = lazy(() => import("./FavoritesPage"));
@@ -99,7 +101,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           books.filter((b) => b.status === "ready").map(async (b) => {
             let cover = "";
             try {
-              cover = toBrowserUrl((await api.getPage(b.id, 1)).image_url);
+              cover = toBrowserUrl((await api.getPageCached(b.id, 1)).image_url);
             } catch {
               /* no page image yet */
             }
@@ -237,9 +239,13 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           setOriginRect(null);
         }}
       >
-        {(opened) => (
-          <ReadingRoom book={opened ? selectedBook : null} onClose={handleCloseRoom} />
-        )}
+        {(opened) =>
+          selectedBook ? (
+            <Suspense fallback={null}>
+              <ReadingRoom book={opened ? selectedBook : null} onClose={handleCloseRoom} />
+            </Suspense>
+          ) : null
+        }
       </BookOpenTransition>
     </div>
     )}
