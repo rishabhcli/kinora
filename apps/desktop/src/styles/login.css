@@ -1086,6 +1086,25 @@ html.kinora-native .auth-root {
   }
 }
 
+/* ====================== FORCED COLORS (Windows High Contrast) ====================== */
+/* When the OS forces its own palette, the decorative room's gradients drop out
+   anyway — hide it for a clean solid canvas, and give every surface a system
+   border so the card, fields and buttons stay clearly delineated. */
+@media (forced-colors: active) {
+  .auth-backdrop-layer,
+  .auth-bloom,
+  .auth-enter-flash {
+    display: none;
+  }
+  .auth-card,
+  .auth-input,
+  .auth-submit,
+  .auth-social,
+  .auth-check-box {
+    border: 1px solid CanvasText;
+  }
+}
+
 /* ====================== INCREASED CONTRAST ====================== */
 /* Honour the OS "increase contrast" setting: lift secondary text and firm up
    hairlines/borders so every edge and label clears AA with headroom. */

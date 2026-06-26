@@ -15,6 +15,7 @@ downscaled to JPEG for the repo. The enter transition is a video.
 | `08-enter-transition.webm` | The login→home hand-off: card recedes + wall blooms → warm flash → home cross-fades in. |
 | `09-caps-lock.jpg` | Caps Lock hint on the password field (announced via `role="status"`). |
 | `10-increased-contrast.jpg` | `prefers-contrast: more` — lifted secondary text + firmer borders (verified the media query applies). Also honours `prefers-reduced-transparency` (solid card, no frost). |
+| `11-forced-colors.jpg` | Windows High Contrast (`forced-colors: active`) — decorative room hidden, every surface system-bordered, text fully legible. Verified the media query applies. |
 | `a11y-report.txt` | Accessibility probe (labels, ARIA, tab order, contrast, console). |
 
 ## A11y summary (from `a11y-report.txt`)
