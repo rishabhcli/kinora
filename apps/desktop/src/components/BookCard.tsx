@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import type { Book } from "../data/books";
 import { CometCard } from "./CometCard";
@@ -57,7 +57,10 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
   return (
     <div
       className="flex-shrink-0 w-[150px] group cursor-pointer"
-      style={{ perspective: 1400 }}
+      // `--bt` is the book's thickness (depth of the page block); the 3D body
+      // faces in index.css read it. A bit of headroom around the row keeps the
+      // tilted spine/pages from being clipped by neighbours.
+      style={{ perspective: 1400, "--bt": "18px" } as CSSProperties}
       onClick={handleClick}
     >
       <CometCard rotateDepth={12} translateDepth={15}>
@@ -65,9 +68,21 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
           className="book-3d-wrapper relative mb-1.5"
           animate={{ scale: opening ? 1.12 : 1 }}
           transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+          // Rests flat, facing the viewer (like before). The 3D thickness /
+          // spine / page edges reveal as CometCard tilts the book on mouse-move.
           style={{ transformStyle: "preserve-3d" }}
         >
-          {/* Page layers — visible underneath when cover opens */}
+          {/* Static 3D body — page block, spine, back cover. Does NOT open with
+              the cover, so the book stays a solid object. */}
+          <div className="book-body" aria-hidden>
+            <div className="book-back" />
+            <div className="book-spine-face" style={{ background: book.spineColor }} />
+            <div className="book-edge-top" />
+            <div className="book-edge-bottom" />
+            <div className="book-edge-right" />
+          </div>
+
+          {/* Page layers — visible underneath when the cover opens */}
           {opening && (
             <div
               className="absolute inset-0 rounded-[3px] overflow-hidden"
@@ -104,7 +119,7 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
             </div>
           )}
 
-          {/* Book cover — opens on left hinge with 3D depth */}
+          {/* Front cover — opens on left hinge with 3D depth */}
           <motion.div
             className="book-cover w-[150px] relative"
             style={{

@@ -171,6 +171,35 @@ body {
   color: rgba(232, 226, 216, 0.3);
 }
 
+/* Glass control — the shared liquid-glass material for buttons and pills:
+   translucent, blurred, with a top specular highlight and a soft lift on hover. */
+.glass-control {
+  position: relative;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 226, 216, 0.92);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.18),
+    0 6px 18px -8px rgba(0, 0, 0, 0.5);
+  transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.12s ease, border-color 0.22s ease;
+}
+
+.glass-control:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2),
+    0 10px 24px -10px rgba(0, 0, 0, 0.55);
+}
+
+.glass-control:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.985);
+}
+
 .nav-btn-active {
   background: rgba(255, 255, 255, 0.1);
   box-shadow:
@@ -209,10 +238,11 @@ body {
 
 .book-cover {
   aspect-ratio: 2 / 3;
-  border-radius: 3px;
+  /* Bound (flat) left corners, rounded outer right corners — like a real book. */
+  border-radius: 2px 5px 5px 2px;
   position: relative;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
-  transition: box-shadow 0.3s ease, border-radius 0.3s ease;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), 0 3px 8px rgba(0, 0, 0, 0.28);
+  transition: box-shadow 0.3s ease;
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -226,49 +256,99 @@ body {
   backface-visibility: hidden;
 }
 
-/* 3D book thickness — right edge (pages side) */
-.book-cover::before {
-  content: "";
+/* ===== Physical 3D book body — page block, spine, back cover =====
+   These faces sit on the static body (not the cover), so the book reads as a
+   solid object that tilts with the mouse, while the cover still swings open on
+   its spine without taking the pages with it. Depth = --bt (set per card). */
+.book-body {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  right: -8px;
-  width: 8px;
-  background: repeating-linear-gradient(
-    180deg,
-    #e8e2d8 0px,
-    #d4cec4 1px,
-    #e8e2d8 2px,
-    #d8d2c8 3px
-  );
-  border-radius: 0 2px 2px 0;
-  transform: rotateY(90deg);
-  transform-origin: left center;
+  inset: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
 }
 
-/* 3D book thickness — bottom edge */
-.book-cover::after {
+/* Fore-edge — stacked page edges on the right. Fine, low-contrast lines over
+   a solid cream base + soft shading so it reads as a page block, not stripes. */
+.book-edge-right {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: calc(-1 * var(--bt, 18px));
+  width: var(--bt, 18px);
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  border-radius: 0 2px 2px 0;
+  background-color: #e7dcc4;
+  background-image:
+    linear-gradient(90deg, rgba(35, 26, 12, 0.30), rgba(35, 26, 12, 0) 24%, rgba(35, 26, 12, 0) 72%, rgba(35, 26, 12, 0.20) 100%),
+    repeating-linear-gradient(90deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.18) 1.4px, rgba(120, 98, 60, 0.18) 1.7px);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), inset 0 -1px 2px rgba(120, 100, 70, 0.20);
+}
+
+/* Head — top edge. In shadow under the cover, so kept dark + subtle. */
+.book-edge-top {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: calc(-1 * var(--bt, 18px));
+  height: var(--bt, 18px);
+  transform-origin: bottom center;
+  transform: rotateX(-90deg);
+  background-color: #d8ccb3;
+  background-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.05) 60%),
+    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.14) 1.4px, rgba(120, 98, 60, 0.14) 1.7px);
+}
+
+/* Tail — bottom edge. The underside sits in shadow, so it stays darkest. */
+.book-edge-bottom {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: calc(-1 * var(--bt, 18px));
+  height: var(--bt, 18px);
+  transform-origin: top center;
+  transform: rotateX(90deg);
+  background-color: #cdc1a7;
+  background-image:
+    linear-gradient(0deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.08) 60%),
+    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.12) 1.4px, rgba(120, 98, 60, 0.12) 1.7px);
+}
+
+/* Spine — bound left edge (colour set per book via inline style) */
+.book-spine-face {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--bt, 18px));
+  width: var(--bt, 18px);
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 4px 0 8px rgba(0, 0, 0, 0.45), inset -2px 0 5px rgba(255, 255, 255, 0.06);
+}
+
+/* Spine sheen + a hint of raised binding bands */
+.book-spine-face::after {
   content: "";
   position: absolute;
-  left: 2px;
-  right: 2px;
-  bottom: -8px;
-  height: 8px;
-  background: repeating-linear-gradient(
-    90deg,
-    #e8e2d8 0px,
-    #d4cec4 1px,
-    #e8e2d8 2px,
-    #d8d2c8 3px
-  );
-  border-radius: 0 0 2px 2px;
-  transform: rotateX(90deg);
-  transform-origin: top center;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.40) 0%, transparent 24%, transparent 76%, rgba(255, 255, 255, 0.12) 100%);
+}
+
+/* Back cover */
+.book-back {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(-1 * var(--bt, 18px)));
+  border-radius: 2px 5px 5px 2px;
+  background: linear-gradient(135deg, #2c2722 0%, #16130f 100%);
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.55);
 }
 
 .book-3d-wrapper:hover .book-cover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5), 0 5px 12px rgba(0, 0, 0, 0.3);
 }
 
 .book-spine {
@@ -339,30 +419,283 @@ body {
   contain-intrinsic-size: 1px 240px;
 }
 
-/* ===== Login book wall — scrolling cover columns ===== */
-@keyframes kinoraWallUp {
-  from { transform: translateY(0); }
-  to   { transform: translateY(-50%); }
+/* ===== Login book shelves — books gliding on glass ===== */
+.bookwall {
+  background:
+    radial-gradient(120% 80% at 50% -12%, rgba(40, 33, 24, 0.55), transparent 60%),
+    linear-gradient(180deg, #0c0b0a 0%, #131110 52%, #0a0908 100%);
 }
 
-@keyframes kinoraWallDown {
-  from { transform: translateY(-50%); }
-  to   { transform: translateY(0); }
+.bookwall-shelves {
+  position: absolute;
+  inset: -3% 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
 }
 
-.bookwall-col-up {
-  animation: kinoraWallUp var(--dur, 80s) linear infinite;
+.shelf {
+  position: relative;
+  height: 23vh;
+  min-height: 188px;
+}
+
+/* The moving rail of books rests on top of the glass plank. */
+.shelf-rail {
+  position: absolute;
+  left: 0;
+  bottom: 13px;
+  display: flex;
+  align-items: flex-end;
+  gap: 30px;
+  padding: 0 30px;
+  width: max-content;
   will-change: transform;
 }
 
-.bookwall-col-down {
-  animation: kinoraWallDown var(--dur, 80s) linear infinite;
-  will-change: transform;
+.shelf-rail--left {
+  animation: shelfSlideLeft var(--dur, 130s) linear infinite;
+}
+.shelf-rail--right {
+  animation: shelfSlideRight var(--dur, 130s) linear infinite;
+}
+
+@keyframes shelfSlideLeft {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes shelfSlideRight {
+  from { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+/* Glass plank the books stand on: a bright catching front edge, a translucent
+   frosted body, and a soft shadow that grounds the shelf. */
+.shelf-glass {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 13px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(255, 255, 255, 0.015) 72%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  backdrop-filter: blur(7px) saturate(118%);
+  -webkit-backdrop-filter: blur(7px) saturate(118%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 16px 30px -16px rgba(0, 0, 0, 0.8);
+}
+
+.shelf-glass::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 16%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.5) 84%,
+    transparent 100%
+  );
+}
+
+/* Each book on the shelf is a real 3D object (spine + cream page block + slight
+   turn) that reflects in the glass below. Thickness = --bt. */
+.wallbook {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(96px, 8.4vw, 122px);
+  aspect-ratio: 2 / 3;
+  perspective: 1100px;
+  --bt: 14px;
+  /* Short, faint reflection cast down onto the glass pane. */
+  -webkit-box-reflect: below 2px linear-gradient(to bottom, rgba(0, 0, 0, 0.30) 0%, rgba(0, 0, 0, 0) 24%);
+}
+
+.wallbook-3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  /* Turned so the spine slab reads; rotation point pulled back so the whole
+     book sits inside its column rather than swinging off-centre. `--tilt` is
+     set per column so adjacent columns face opposite directions. */
+  transform: translateZ(calc(-0.5 * var(--bt, 20px))) rotateY(var(--tilt, 23deg));
+}
+
+/* Front cover — image + sheen */
+.wallbook-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px 5px 5px 2px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  box-shadow:
+    0 26px 46px -20px rgba(0, 0, 0, 0.92),
+    0 8px 18px -8px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.wallbook-img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.wallbook-gloss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Two layers: a soft directional sheen, plus the binding — the cover dips
+     into a dark hinge at the spine and catches a little light at the fore-edge,
+     so it reads as a bound cover rather than a flat panel. */
+  background:
+    linear-gradient(103deg, rgba(255, 255, 255, 0.20) 0%, transparent 32%, transparent 70%, rgba(0, 0, 0, 0.30) 100%),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.42) 0%,
+      rgba(0, 0, 0, 0) 6%,
+      rgba(255, 255, 255, 0.06) 11%,
+      rgba(0, 0, 0, 0) 16%,
+      rgba(0, 0, 0, 0) 90%,
+      rgba(0, 0, 0, 0.16) 100%
+    );
+}
+
+/* Spine — bound left edge (colour set per book via inline style) */
+.wallbook-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--bt, 22px));
+  width: var(--bt, 22px);
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset 5px 0 10px rgba(0, 0, 0, 0.5), inset -2px 0 5px rgba(255, 255, 255, 0.06);
+}
+
+.wallbook-spine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45) 0%, transparent 22%, transparent 74%, rgba(255, 255, 255, 0.14) 100%);
+}
+
+/* Fore-edge — stacked page edges on the right */
+.wallbook-fore {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: calc(-1 * var(--bt, 22px));
+  width: var(--bt, 22px);
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  border-radius: 0 2px 2px 0;
+  background-color: #e7dcc4;
+  background-image:
+    linear-gradient(90deg, rgba(35, 26, 12, 0.30), rgba(35, 26, 12, 0) 24%, rgba(35, 26, 12, 0) 72%, rgba(35, 26, 12, 0.20) 100%),
+    repeating-linear-gradient(90deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.18) 1.4px, rgba(120, 98, 60, 0.18) 1.7px);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), inset 0 -1px 2px rgba(120, 100, 70, 0.20);
+}
+
+/* Head — top edge */
+.wallbook-head {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: calc(-1 * var(--bt, 22px));
+  height: var(--bt, 22px);
+  transform-origin: bottom center;
+  transform: rotateX(-90deg);
+  background-color: #d8ccb3;
+  background-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.05) 60%),
+    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.14) 1.4px, rgba(120, 98, 60, 0.14) 1.7px);
+}
+
+/* Tail — bottom edge */
+.wallbook-tail {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: calc(-1 * var(--bt, 22px));
+  height: var(--bt, 22px);
+  transform-origin: top center;
+  transform: rotateX(90deg);
+  background-color: #cdc1a7;
+  background-image:
+    linear-gradient(0deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.08) 60%),
+    repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.12) 1.4px, rgba(120, 98, 60, 0.12) 1.7px);
+}
+
+/* Back cover */
+.wallbook-back {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(-1 * var(--bt, 22px)));
+  border-radius: 2px 5px 5px 2px;
+  background: linear-gradient(135deg, #2c2722 0%, #16130f 100%);
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.55);
+}
+
+/* Mirrored books (odd columns): the bound spine moves to the right and the
+   page block to the left, so adjacent columns face opposite ways while the
+   spine stays on one consistent side within each column. The cover image is
+   not mirrored — only the body — so titles stay upright. */
+.wallbook--flip .wallbook-face,
+.wallbook--flip .wallbook-back {
+  border-radius: 5px 2px 2px 5px;
+}
+
+.wallbook--flip .wallbook-spine {
+  left: auto;
+  right: calc(-1 * var(--bt, 18px));
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  border-radius: 0 2px 2px 0;
+}
+
+.wallbook--flip .wallbook-spine::after {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.14) 0%, transparent 26%, transparent 78%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+.wallbook--flip .wallbook-fore {
+  right: auto;
+  left: calc(-1 * var(--bt, 18px));
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  border-radius: 2px 0 0 2px;
+}
+
+.wallbook--flip .wallbook-gloss {
+  background:
+    linear-gradient(257deg, rgba(255, 255, 255, 0.20) 0%, transparent 32%, transparent 70%, rgba(0, 0, 0, 0.30) 100%),
+    linear-gradient(
+      270deg,
+      rgba(0, 0, 0, 0.42) 0%,
+      rgba(0, 0, 0, 0) 6%,
+      rgba(255, 255, 255, 0.06) 11%,
+      rgba(0, 0, 0, 0) 16%,
+      rgba(0, 0, 0, 0) 90%,
+      rgba(0, 0, 0, 0.16) 100%
+    );
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bookwall-col-up,
-  .bookwall-col-down {
+  .shelf-rail--left,
+  .shelf-rail--right {
     animation: none;
   }
 }

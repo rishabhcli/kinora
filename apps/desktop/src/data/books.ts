@@ -16,8 +16,10 @@ export const currentUser = {
   avatar: "https://i.pravatar.cc/150?img=47",
 };
 
+// `-L` is OpenLibrary's full-size cover (the original upload, typically
+// 500–1000px tall) — far sharper than `-M` (~180px) on the larger 3D books.
 const cover = (isbn: string) =>
-  `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+  `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
 
 export const currentlyReading: Book = {
   id: "midnight-library",

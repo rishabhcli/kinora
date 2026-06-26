@@ -28,7 +28,7 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-kinora-bg-deep font-sans text-kinora-text">
-      <BookWall columns={5} />
+      <BookWall rows={4} />
 
       <main className="relative z-20 flex h-full items-center justify-center px-6">
         <motion.section

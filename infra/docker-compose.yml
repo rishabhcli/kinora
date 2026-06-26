@@ -63,7 +63,9 @@ services:
       POSTGRES_PASSWORD: kinora
       POSTGRES_DB: kinora
     ports:
-      - "5432:5432"
+      # Host 5432 is often taken by another local postgres; expose on 5433 to
+      # avoid the clash. In-cluster services still reach it at postgres:5432.
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
