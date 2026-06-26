@@ -1,6 +1,10 @@
 # --- Secrets (never commit real keys) ---
 .env
 **/.env
+.env.local
+.env.*.local
+**/.env.local
+**/.env.*.local
 # .env.example IS committed (it only contains placeholders)
 
 # --- Python ---
