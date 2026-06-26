@@ -11,6 +11,10 @@ export interface Book {
   spineColor: string;
   /** A backend book that drives a live, generate-the-film-as-you-read session. */
   live?: boolean;
+  /** Catalogue genre/era (library shelves + the card's genre tag). Absent for
+   *  user uploads and any book missing from the public-domain manifest. */
+  genre?: string;
+  era?: string;
 }
 
 export const currentUser = {

@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-"""Build several **public-domain books DIRECTLY** through the real repositories
-(exactly like :mod:`scripts.seed_e2e`) — each ``status=ready`` with real pages +
-per-word boxes, a populated ``source_span_index``, a shot grid, and one playable
-Ken-Burns clip — in a couple of seconds each and with **zero model spend**.
+"""Build public-domain books **directly** through the real repositories — each
+``status=ready`` with real pages + per-word boxes, a populated source-span index,
+a (bounded) shot grid, and one playable Ken-Burns clip — in a couple of seconds
+each and with **zero model spend** (Agent 05).
 
 This sidesteps the slow, 429-prone *real* ingest (which stalls full novels at the
-canon stage), so the desktop "Read Live · Public Domain" shelf is reliably
-populated and every book is scroll-session drivable the moment it appears.
+canon stage), so the desktop library shelf is reliably populated and every book is
+openable the moment it appears. It is the shared build engine
+``scripts/seed_library_100.py`` drives over the 100+ book catalogue; run directly
+it (re)seeds the original five demo public-domain titles.
 
     backend/.venv/bin/python backend/scripts/seed_public_domain_direct.py
 
-The books land in the demo user's library (``demo@kinora.local``). Re-running is
-idempotent: each book has a fixed id that is wiped and rebuilt.
+Re-running is idempotent: each book has a fixed id (``pubdom{gid}``) that is wiped
+and rebuilt. Agent 05 additions over the original: the cover is the per-title
+designed cover from :mod:`app.library.covers`, stored at ``covers/{book_id}`` and
+recorded on the new ``Book.cover_key`` (a real shelf cover, not just "page 1"); the
+shot grid is bounded so a 130-book seed stays fast.
 """
+
 from __future__ import annotations
 
 import asyncio
-import io
+import contextlib
 import sys
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +34,9 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from seed_e2e import RenderedPage  # noqa: E402
 
+from app.library.catalog import book_id_for  # noqa: E402
+from app.library.covers import make_typographic_cover  # noqa: E402
+
 _REPO = Path(__file__).resolve().parents[2]
 DEST = _REPO / "assets" / "books" / "public-domain"
 EMAIL = "demo@kinora.local"
@@ -36,8 +44,10 @@ PASSWORD = "demo-password-123"
 
 WORD_STEP = 12          # words per shot (the §4.2 source-span grid step)
 SHOT_DURATION_S = 5.0
+MAX_SHOTS = 48          # bound per-book shot rows so a 130-book seed stays fast
 
-# (gutenberg_id, title, author, art_direction, pages_to_rasterise)
+# (gutenberg_id, title, author, art_direction, pages_to_rasterise) — the original
+# five demo titles, kept so this script is useful standalone.
 BOOKS: list[tuple[int, str, str, str, int]] = [
     (1952, "The Yellow Wallpaper", "Charlotte Perkins Gilman",
      "painterly gothic, muted candlelight, unsettling stillness", 8),
@@ -51,45 +61,37 @@ BOOKS: list[tuple[int, str, str, str, int]] = [
      "whimsical storybook, dreamlike, richly saturated", 8),
 ]
 
-
-def book_id_for(gid: int) -> str:
-    """A stable 32-char book id per Gutenberg work (matches the repo's id width)."""
-    return f"pubdom{gid}".ljust(32, "0")[:32]
-
-
-def download(gid: int) -> Path | None:
-    DEST.mkdir(parents=True, exist_ok=True)
-    out = DEST / f"pg{gid}.epub"
-    if out.exists() and out.stat().st_size > 20000:
-        return out
-    for url in (
-        f"https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.epub",
-        f"https://www.gutenberg.org/ebooks/{gid}.epub3.images",
-        f"https://www.gutenberg.org/ebooks/{gid}.epub.images",
-    ):
-        try:
-            with httpx.Client(follow_redirects=True, timeout=180.0,
-                              headers={"User-Agent": "Mozilla/5.0 (Kinora seed)"}) as dc:
-                r = dc.get(url)
-                r.raise_for_status()
-            if len(r.content) < 20000:
-                continue
-            out.write_bytes(r.content)
-            print(f"  downloaded {url} ({len(r.content) // 1024} KiB)", flush=True)
-            return out
-        except Exception as e:  # noqa: BLE001
-            print(f"  dl fail {url}: {e}", flush=True)
-    return None
-
-
-# --------------------------------------------------------------------------- #
-# Story extraction (skip Gutenberg front matter) + a designed typographic cover
-# --------------------------------------------------------------------------- #
-
 _FRONT_MATTER = (
     "project gutenberg", "gutenberg-tm", "ebook is for the use", "this ebook",
     "start of the project", "produced by", "character set encoding", "*** start",
 )
+
+
+def download(gid: int, url: str | None = None) -> Path | None:
+    """Download (and cache) a Gutenberg EPUB; idempotent (skips a good cached file)."""
+    DEST.mkdir(parents=True, exist_ok=True)
+    out = DEST / f"pg{gid}.epub"
+    if out.exists() and out.stat().st_size > 20000:
+        return out
+    urls = [u for u in (
+        url,
+        f"https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.epub",
+        f"https://www.gutenberg.org/ebooks/{gid}.epub3.images",
+        f"https://www.gutenberg.org/ebooks/{gid}.epub.images",
+    ) if u]
+    for u in urls:
+        try:
+            with httpx.Client(follow_redirects=True, timeout=120.0,
+                              headers={"User-Agent": "Mozilla/5.0 (Kinora seed)"}) as dc:
+                r = dc.get(u)
+                r.raise_for_status()
+            if len(r.content) < 20000:
+                continue
+            out.write_bytes(r.content)
+            return out
+        except Exception:  # noqa: BLE001 - try the next mirror
+            continue
+    return None
 
 
 def extract_story_pages(epub: Path, num_pages: int) -> list[RenderedPage]:
@@ -127,8 +129,6 @@ def extract_story_pages(epub: Path, num_pages: int) -> list[RenderedPage]:
                 })
                 parts.append(txt)
                 global_word += 1
-            # No raster needed: only page 1's image is used (the cover), and the
-            # reading room renders page TEXT. png stays empty.
             pages.append(RenderedPage(page_number=offset + 1, png=b"",
                                       text=" ".join(parts), word_boxes=boxes))
         return pages
@@ -136,92 +136,16 @@ def extract_story_pages(epub: Path, num_pages: int) -> list[RenderedPage]:
         doc.close()
 
 
-# Mood-matched cover gradients (accent top → dark bottom) per Gutenberg id.
-_COVER_PALETTES: dict[int, tuple[tuple[int, int, int], tuple[int, int, int]]] = {
-    1952: ((120, 104, 52), (22, 19, 8)),    # The Yellow Wallpaper — sickly gold-green
-    5200: ((58, 70, 86), (12, 16, 22)),     # The Metamorphosis — cold grey-blue
-    43:   ((40, 60, 64), (8, 13, 14)),       # Jekyll & Hyde — noir teal
-    46:   ((112, 44, 38), (24, 10, 8)),      # A Christmas Carol — warm crimson
-    11:   ((78, 60, 112), (16, 11, 28)),     # Alice — whimsical violet
-}
-_CREAM = (242, 234, 216)
-_GOLD = (212, 164, 78)
-_FONT_PATHS = (
-    "/System/Library/Fonts/Supplemental/Georgia.ttf",
-    "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
-    "/Library/Fonts/Georgia.ttf",
-    "/System/Library/Fonts/Supplemental/Baskerville.ttc",
-    "/System/Library/Fonts/Supplemental/Hoefler Text.ttc",
-)
+async def build_book(
+    *, book_id: str, tag: str, title: str, author: str, art: str, epub: Path,
+    num_pages: int, cover_png: bytes | None = None, cover_source: str = "generated",
+    max_shots: int = MAX_SHOTS,
+) -> dict[str, Any] | None:
+    """Write one ready, span-indexed, playable book directly (no model spend).
 
-
-@lru_cache(maxsize=24)
-def _font(size: int):
-    from PIL import ImageFont
-    for p in _FONT_PATHS:
-        try:
-            return ImageFont.truetype(p, size)
-        except Exception:  # noqa: BLE001
-            continue
-    return ImageFont.load_default()
-
-
-def _wrap(draw, text: str, font, max_w: float) -> list[str]:
-    lines: list[str] = []
-    cur = ""
-    for word in text.split():
-        trial = (cur + " " + word).strip()
-        if not cur or draw.textlength(trial, font=font) <= max_w:
-            cur = trial
-        else:
-            lines.append(cur)
-            cur = word
-    if cur:
-        lines.append(cur)
-    return lines
-
-
-def make_cover_png(title: str, author: str, gid: int, W: int = 720, H: int = 1080) -> bytes:
-    """A clean, designed book cover (gradient + serif title) — these EPUBs ship
-    no art, so a plain page scan would look like a document on the shelf."""
-    from PIL import Image, ImageDraw
-
-    top, bot = _COVER_PALETTES.get(gid, ((54, 60, 72), (12, 14, 20)))
-    img = Image.new("RGB", (W, H), bot)
-    draw = ImageDraw.Draw(img, "RGBA")
-    for y in range(H):  # vertical gradient, accent weighted to the upper third
-        f = (y / (H - 1)) ** 1.15
-        col = (int(top[0] + (bot[0] - top[0]) * f),
-               int(top[1] + (bot[1] - top[1]) * f),
-               int(top[2] + (bot[2] - top[2]) * f))
-        draw.line([(0, y), (W, y)], fill=col)
-    m = 46
-    draw.rectangle([m, m, W - m, H - m], outline=(*_GOLD, 90), width=2)
-
-    tf = _font(74)
-    lines = _wrap(draw, title, tf, W - 2 * m - 56)
-    while len(lines) > 4 and tf.size > 40:
-        tf = _font(tf.size - 6)
-        lines = _wrap(draw, title, tf, W - 2 * m - 56)
-    y = int(H * 0.30)
-    for ln in lines:
-        w = draw.textlength(ln, font=tf)
-        draw.text(((W - w) / 2, y), ln, font=tf, fill=_CREAM)
-        y += int(tf.size * 1.16)
-    ry = y + 24
-    draw.line([(W / 2 - 70, ry), (W / 2 + 70, ry)], fill=_GOLD, width=2)
-    af = _font(34)
-    aw = draw.textlength(author, font=af)
-    draw.text(((W - aw) / 2, ry + 28), author, font=af, fill=(*_CREAM, 220))
-
-    out = io.BytesIO()
-    img.save(out, "PNG")
-    return out.getvalue()
-
-
-async def build_book(*, book_id: str, tag: str, gid: int, title: str, author: str,
-                     art: str, epub: Path, num_pages: int) -> dict[str, Any] | None:
-    """Write one ready, span-indexed, playable book directly (no model spend)."""
+    Sets ``Book.cover_key`` to ``covers/{book_id}`` (a real shelf cover) in addition
+    to seeding page 1's image, so the library shelf renders a designed/HD cover.
+    """
     from app.api.security import hash_password
     from app.core.config import get_settings
     from app.db.hashing import compute_shot_hash
@@ -241,22 +165,16 @@ async def build_book(*, book_id: str, tag: str, gid: int, title: str, author: st
     settings = get_settings()
     store = ObjectStore.from_settings(settings)
     redis = RedisClient.from_url(settings.redis_url)
-    try:
+    with contextlib.suppress(Exception):
         store.ensure_bucket()
-    except Exception:  # noqa: BLE001
-        pass
 
     rendered = extract_story_pages(epub, num_pages)
     words: list[str] = [wb["text"] for p in rendered for wb in p.word_boxes]
-    # A designed typographic cover (these text EPUBs carry no art) — reused as the
-    # shelf cover, the film poster, the Ken-Burns source, and the locked char ref.
-    cover_png = make_cover_png(title, author, gid)
     total_words = len(words)
     if total_words < WORD_STEP * 2:
-        print(f"  too few words ({total_words}); skipping {title}", flush=True)
         return None
+    cover = cover_png or make_typographic_cover(title, author)
 
-    # ----- user (demo, real bcrypt path) ----------------------------------- #
     async with get_session() as session:
         users = UserRepo(session)
         user = await users.get_by_email(EMAIL)
@@ -264,37 +182,37 @@ async def build_book(*, book_id: str, tag: str, gid: int, title: str, author: st
             user = await users.create(email=EMAIL, hashed_password=hash_password(PASSWORD))
         user_id = user.id
 
-    # ----- wipe any prior build of THIS book (cascade) --------------------- #
     async with get_session() as session:
         existing = await BookRepo(session).get(book_id)
         if existing is not None:
             await session.delete(existing)
 
-    # Store the cover once; every page's image points at it. The reading room
-    # renders page TEXT, and only page 1's image is consumed (cover + poster).
-    cover_key = f"pages/{book_id}/1.png"
-    store.put_bytes(cover_key, cover_png, "image/png")
+    # The designed/HD cover: a real shelf cover (covers/{book_id}, Book.cover_key),
+    # also reused as page 1's image, the film poster, and the locked char ref.
+    cover_key = keys.cover(book_id)
+    page_image_key = f"pages/{book_id}/1.png"
+    store.put_bytes(cover_key, cover, "image/png")
+    store.put_bytes(page_image_key, cover, "image/png")
 
-    STYLE, CHAR, LOC = "style_main", "char_lead", "loc_main"
+    STYLE, CHAR, LOC = "style_main", "char_lead", "loc_main"  # noqa: N806
 
-    # ----- book + pages ---------------------------------------------------- #
     async with get_session() as session:
         await BookRepo(session).create(
             title=title, author=author, user_id=user_id,
             source_pdf_key=keys.pdf(book_id), status=BookStatus.READY,
-            num_pages=len(rendered), art_direction=art, book_id=book_id,
+            num_pages=len(rendered), art_direction=art, cover_key=cover_key,
+            book_id=book_id,
         )
         page_repo = PageRepo(session)
         for page in rendered:
             await page_repo.create(
                 book_id=book_id, page_number=page.page_number,
-                image_key=cover_key, text=page.text, word_boxes=page.word_boxes,
+                image_key=page_image_key, text=page.text, word_boxes=page.word_boxes,
             )
     store.put_bytes(keys.pdf(book_id), epub.read_bytes(), "application/epub+zip")
 
-    # ----- canon: a Style node (drives the look) + a lead char + location -- #
     ref_key = keys.ref(book_id, CHAR, "ref_front.png")
-    store.put_bytes(ref_key, cover_png, "image/png")
+    store.put_bytes(ref_key, cover, "image/png")
     async with get_session() as session:
         entities = EntityRepo(session)
         await entities.upsert_new_version(
@@ -319,7 +237,6 @@ async def build_book(*, book_id: str, tag: str, gid: int, title: str, author: st
             style_tokens={"art_direction": art, "lens": "35mm"},
         )
 
-    # ----- scenes (one per page) + beats ----------------------------------- #
     num_scenes = len(rendered)
     scene_ids = [f"{tag}sc{i:03d}" for i in range(num_scenes)]
     beat_ids: list[str] = []
@@ -345,27 +262,30 @@ async def build_book(*, book_id: str, tag: str, gid: int, title: str, author: st
                 beat_ids.append(bid)
                 beat_index += 1
 
-    # ----- one accepted shot with a real, playable vertical Ken-Burns clip -- #
-    clip_bytes = ken_burns_over_image(cover_png, duration_s=2.5, size=(540, 960), fps=24)
+    clip_bytes = ken_burns_over_image(cover, duration_s=2.5, size=(540, 960), fps=24)
     accepted = f"{tag}sh0000"
     clip_key = keys.clip(book_id, accepted)
     store.put_bytes(clip_key, clip_bytes, "video/mp4")
     last_frame_key = keys.lastframe(book_id, accepted)
-    store.put_bytes(last_frame_key, cover_png, "image/png")
+    store.put_bytes(last_frame_key, cover, "image/png")
 
-    num_shots = max(2, (total_words + WORD_STEP - 1) // WORD_STEP)
+    # Bounded shot grid: at most ``max_shots`` shots, contiguous spans covering
+    # every word (coarser than 1-shot-per-12-words, but the index stays complete).
+    num_shots = min(max_shots, max(2, (total_words + WORD_STEP - 1) // WORD_STEP))
+    step = max(WORD_STEP, (total_words + num_shots - 1) // num_shots)
     accepted_refs = [f"{CHAR}@v1", f"{STYLE}@v1"]
     ref_hash = CacheService.reference_set_hash(accepted_refs)
 
-    # ----- shot grid + source-span index (covers every word) --------------- #
     spans: list[dict[str, Any]] = []
     async with get_session() as session:
         shot_repo = ShotRepo(session)
         cache = ShotCacheRepo(session)
         for i in range(num_shots):
             sid = f"{tag}sh{i:04d}"
-            start = i * WORD_STEP
-            end = min(total_words - 1, start + WORD_STEP - 1)
+            start = i * step
+            if start > total_words - 1:
+                break
+            end = min(total_words - 1, start + step - 1)
             page_no = min(len(rendered), 1 + (i // max(1, num_shots // len(rendered))))
             beat_id = beat_ids[i % len(beat_ids)]
             scene_id = scene_ids[i % len(scene_ids)]
@@ -414,14 +334,13 @@ async def build_book(*, book_id: str, tag: str, gid: int, title: str, author: st
             })
         await SourceSpanRepo(session).bulk_insert(spans)
 
-    # ----- ownership (Redis) — ADD only (never wipe the user's set) -------- #
     owner_key = f"kinora:user:{user_id}:books"
     await redis.raw.sadd(owner_key, book_id)
     await redis.set_json(f"kinora:book:progress:{book_id}", {"stage": "ready", "pct": 1.0})
     await redis.close()
 
     return {"book_id": book_id, "title": title, "pages": len(rendered),
-            "words": total_words, "shots": num_shots, "spans": len(spans)}
+            "words": total_words, "shots": len(spans), "cover_source": cover_source}
 
 
 async def amain() -> int:
@@ -435,22 +354,19 @@ async def amain() -> int:
         if not epub:
             print(f"SKIP {title}: download failed", flush=True)
             continue
-        print(f"building {title} from {epub.name} ({epub.stat().st_size // 1024} KiB)…", flush=True)
         try:
-            res = await build_book(book_id=book_id_for(gid), tag=f"pd{gid}", gid=gid,
+            res = await build_book(book_id=book_id_for(gid), tag=f"pd{gid}",
                                    title=title, author=author, art=art, epub=epub,
                                    num_pages=pages)
             if res:
                 out.append(res)
-                print(f"  OK {res}", flush=True)
+                print(f"  OK {res['title']} pages={res['pages']} shots={res['shots']}", flush=True)
         except Exception as e:  # noqa: BLE001
             import traceback
             traceback.print_exc()
             print(f"  FAIL {title}: {e}", flush=True)
 
-    print("\n=== DIRECT SEED SUMMARY ===", flush=True)
-    for r in out:
-        print(f"  ready  {r['title']:34s} pages={r['pages']} words={r['words']} shots={r['shots']}", flush=True)
+    print(f"\n=== DIRECT SEED: {len(out)} books ===", flush=True)
     return 0
 
 
