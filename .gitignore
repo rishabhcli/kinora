@@ -42,3 +42,11 @@ apps/desktop/dist-electron/
 
 # --- OS ---
 .DS_Store
+
+# --- Claude Code local state ---
+# Per-worktree Ralph loop state + local session files must never be committed:
+# each agent worktree has its own .claude/ralph-loop.local.md and committing it
+# would clobber sibling agents' state on merge. (agent-prompts/ mission MD is
+# tracked; only the .claude/ inside any tree is ignored.)
+.claude/
+**/.claude/

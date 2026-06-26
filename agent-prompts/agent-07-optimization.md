@@ -1,0 +1,1 @@
+/ralph-loop:ralph-loop "Kinora Agent 07. Run bash agent-prompts/arm-ralph.sh 07 from repo root, then read agent-prompts/.missions/agent-07-optimization.md and execute fully in worktree ../kinora-a07." --completion-promise "AGENT 07 COMPLETE" --max-iterations 500
