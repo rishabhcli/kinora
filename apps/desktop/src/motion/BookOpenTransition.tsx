@@ -76,7 +76,10 @@ export function BookOpenTransition({
 
   // Drive the phase machine off the `open` boolean.
   useEffect(() => {
-    if (open && phase === "idle") {
+    // Start (or RESTART from a close-in-flight, so re-tapping a book mid-close
+    // isn't dropped — otherwise `open` stays true, the effect never re-fires,
+    // and the room is stuck blank).
+    if (open && (phase === "idle" || phase === "close")) {
       origin.current = originRect ?? heroCoverRect();
       hero.current = heroCoverRect();
       if (reduced) {

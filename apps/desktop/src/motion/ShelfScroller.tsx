@@ -300,8 +300,11 @@ export function ShelfScroller({
     glideTo(rail.scrollLeft + dir * rail.clientWidth * 0.8);
   };
 
+  // Attach listeners once (re-attach only if a handler identity changes,
+  // e.g. reduced-motion toggles). NOT keyed on `children` — a parent that
+  // builds children inline would otherwise thrash the listeners and clear
+  // the pending wheel-snap timer on every render.
   useEffect(() => {
-    updateEdges();
     const rail = railRef.current;
     if (!rail) return;
     const onScroll = () => updateEdges();
@@ -316,7 +319,12 @@ export function ShelfScroller({
       cancelRaf();
       if (wheelStop.current) window.clearTimeout(wheelStop.current);
     };
-  }, [updateEdges, handleWheel, children]);
+  }, [updateEdges, handleWheel]);
+
+  // Recompute edge state when the content changes (no listener churn).
+  useEffect(() => {
+    updateEdges();
+  }, [children, updateEdges]);
 
   return (
     <div className={`relative ${className ?? ""}`} style={style}>

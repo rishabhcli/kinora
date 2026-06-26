@@ -98,7 +98,11 @@ export function Reveal({
     );
   }
 
-  const single = fadeIn(transition, direction, distance ?? 14);
+  // Bake `delay` into the variant's own transition: framer-motion lets a
+  // variant's `transition` override the component-level `transition` prop, so
+  // a delay passed via the prop would be silently dropped in single mode.
+  const delayed = delay && !reduced ? { ...transition, delay } : transition;
+  const single = fadeIn(delayed, direction, distance ?? 14);
   return (
     <Container
       ref={ref as never}
@@ -107,7 +111,6 @@ export function Reveal({
       variants={single}
       initial="hidden"
       animate={inView ? "show" : "hidden"}
-      transition={delay && !reduced ? { ...transition, delay } : undefined}
     >
       {children}
     </Container>

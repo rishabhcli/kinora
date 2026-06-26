@@ -23,7 +23,9 @@ export interface TiltOptions {
   perspective?: number;
 }
 
-const SETTLE = "transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)";
+// Tokenised so the global speed knob + reduced-motion law reach the tilt
+// settle (--mo-t-fast collapses to ~0 under prefers-reduced-motion).
+const SETTLE = "transform var(--mo-t-fast) var(--mo-ease-standard)";
 
 /**
  * useTilt — refs + handlers for a tilt surface. Spread `bind` on the
