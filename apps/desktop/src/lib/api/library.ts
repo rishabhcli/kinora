@@ -27,7 +27,12 @@ export interface LibraryBook extends Book {
 export function toLibraryBook(b: LibraryBookResponse): LibraryBook {
   const ui = toUiBook(b, toBrowserUrl(b.cover_url ?? ""));
   const meta = CATALOG_META[b.id];
-  return { ...ui, genre: meta?.genre, era: meta?.era };
+  // `b.progress` is ingest/generation progress (1.0 once READY), NOT reading
+  // progress — the shelf must not paint a "100% read" ring on an unread book.
+  // Reading position comes from sessions (Agent 2/10); until a READY book has a
+  // distinct reading-progress field, the shelf shows it as unread (0).
+  const progress = b.status === "ready" ? 0 : ui.progress;
+  return { ...ui, progress, genre: meta?.genre, era: meta?.era };
 }
 
 /** The current user's full library (newest first), enriched. */
@@ -105,7 +110,7 @@ export interface Shelf {
  *  one shelf per genre (catalogue order), then a catch-all for uploads/unknowns. */
 export function shelvesFor(books: LibraryBook[]): Shelf[] {
   const shelves: Shelf[] = [];
-  const continueReading = books.filter((b) => b.progress > 0);
+  const continueReading = books.filter((b) => b.progress > 0 && b.progress < 100);
   if (continueReading.length) shelves.push({ title: "Continue Reading", books: continueReading });
 
   const byGenre = new Map<string, LibraryBook[]>();
