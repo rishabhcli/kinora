@@ -53,10 +53,12 @@ scrolling text column, and scroll→focus-word→`api.postIntent`/`api.seek` wir
 ```
 
 ### Slot — Agent 6 `<ReadingControls>` (`src/reading/ReadingControls.tsx`)
-Self-contained; reads/writes `useReadingPrefs()` (`lib/readingPrefs`). Mounted in
-the top bar. Consumes Agent 6 focus/announce utils where available.
+**Controlled** — the shell owns the single `useReadingPrefs()` instance and passes
+`prefs` + `onChange` down to BOTH the controls and the film engine, so a theme/size
+change reflects live in the text. (Separate `useReadingPrefs()` instances would NOT
+sync, since it is local state.) Mounted in the top bar.
 ```tsx
-<ReadingControls />
+<ReadingControls prefs={ReadingPrefs} onChange={(p: Partial<ReadingPrefs>) => void} reduce={boolean} />
 ```
 
 ### Wrapper — Agent 4 `<BookOpenTransition>` (`src/motion/BookOpenTransition.tsx`)
