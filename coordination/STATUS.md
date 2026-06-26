@@ -28,6 +28,11 @@
   — 3 Ken-Burns shots render concurrently → ONE 720×1280 mp4; last segment `video_end_s`
   == film duration ±1 frame; film + last-frame anchors persisted.
 - Live artifact in `coordination/artifacts/agent-01/` (regenerable offline, zero spend).
+- **Baseline lint fixes (heads-up for Agent 12):** `make lint` was already red on the
+  base commit — `test_api_director.py` used `record_conflict_history` without importing
+  it (F821) + typed a `pubsub` param as `object`; `test_prefs_learning.py` did
+  `"x" in grade_filter(...)` on a `str | None`. Fixed (trivial, test-only) so the suite
+  is green; none touch a DO-NOT-TOUCH file.
 
 ### Contracts published
 
