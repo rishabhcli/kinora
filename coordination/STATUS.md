@@ -1,61 +1,61 @@
 # STATUS — overnight/integration live board
 
 **Captain:** Agent 12 · **Branch:** `overnight/integration` · **Base:** `4863a0c` (main)
-**HEAD:** `b2f9709` · **Last updated:** 2026-06-26 (Captain — integration cycle 1)
+**HEAD:** `aa2b406` · **Last updated:** 2026-06-26 (Captain — integration cycle 1 complete)
+
+## 🏁 MILESTONE: all 11 agents first-merged · gate GREEN
+Every agent branch has been integrated at least once and the tree is green both ends.
 
 ## 🚦 GATE: GREEN ✅
-- Frontend: `pnpm --filter @kinora/desktop typecheck && build` → **green** (CSS 57 kB).
-- Backend: `make test` → **325 passed, 125 skipped, 0 failures**.
-- Bonus: desktop `vitest` → 64 tests pass; 3 A9 test files report "no test suite" (see requests/agent-09.md — not a gate blocker).
+- Frontend: `pnpm --filter @kinora/desktop typecheck && build` → **green** (CSS 73 kB).
+- Backend: `make test` → **408 passed, 139 skipped, 0 failures**.
+- Bonus (NOT in hard gate): desktop `vitest` → **64 tests pass**; **7 test files fail to load**
+  ("No test suite found" / non-vitest style) — A9 (settings, glyphs, symbol), A10 (crossfade,
+  fallback, machine), A2 (timeline). Tracked in each agent's request queue; not a blocker.
 
-## 📣 GO — rails are live; integration has begun
-The t0 rails are committed and green. **Agents: pull them.** Your branch was cut from
-`main@4863a0c` *before* the rails existed, so to stop re-creating seams and to drop your
-conflicts to ~zero:
+## 📣 Agents: pull the rails + keep your tests vitest-shaped
+`git merge overnight/integration` (clean tree) to get: the **`src/styles/` split** (edit *your*
+partial; aggregator + `main.tsx` are the Captain's), the **`api.ts` `http`/`BASE`** primitives
+(CONTRACTS §7 — A3: drop your private `lib/api/http.ts`, import `{ http } from "../api"`), and
+**`coordination/`**. Write `*.test.ts` with vitest `describe/it/expect` so they register.
 
-```bash
-# in your worktree, with a clean tree:
-git merge overnight/integration
-```
+## Per-agent board (cycle 1)
+| Agent | Branch | Integrated | Pending re-merge | Notes |
+|---|---|---|---|---|
+| A1 | `agent/01-event-director` | ✅ `b2f9709` | +4 | render pipeline (backend) |
+| A2 | `agent/02-scroll-film` | ✅ `49b6cf6` | 0 | timeline + scroll engine; Captain fixed demo prefs drift |
+| A3 | `agent/03-film-api` | ✅ `fb7d6d0` | +1 | films router registered; uses own http.ts (converge to §7) |
+| A4 | `agent/04-motion` | ✅ `c4b13c1` | +3 | motion system |
+| A5 | `agent/05-library` | ✅ `3190158` | 0 | library+covers+migration (single head); frontend pending |
+| A6 | `agent/06-a11y` | ✅ `a123564` | +5 | a11y layer + vitest infra |
+| A7 | `agent/07-optim` | ✅ `7614f84` | +1 | optim modules (default-off); patch proposals pending |
+| A8 | `agent/08-design` | ✅ `d7825ea` | +1 | design tokens (keystone) |
+| A9 | `agent/09-settings-icons` | ✅ `7d5afad` | +3 | icons + settings |
+| A10 | `agent/10-reading-room` | ✅ `20a359e` | 0 | reading shell + state machine |
+| A11 | `agent/11-login` | ✅ `aa2b406` | 0 | login/auth + BookWall |
 
-You will get: the **`src/styles/` split** (edit *your* partial — `tokens/base/glass.css`=A8,
-`motion.css`=A4, `a11y.css`=A6, `login.css`=A11, `reading.css`=A10; the aggregator
-`styles/index.css` is the Captain's — don't re-import partials in `main.tsx`), the
-**`api.ts` `http`/`BASE` primitives** (CONTRACTS §7), and **`coordination/`**. Keeping the
-monolithic `index.css` or importing partials in `main.tsx` creates conflicts the Captain
-then has to unwind — please converge on the split.
+**Steady state:** agents keep committing; the Captain re-merges (git rerere auto-applies the
+seam resolutions). "Pending" = commits on the branch not yet in integration → next re-merge sweep.
 
-## Per-agent board
-| Agent | Lane | Branch | Commits | Pending re-merge | Integrated | Notes |
-|---|---|---|---|---|---|---|
-| A1 | event-director/stitch | `agent/01-event-director` | 7 | 1 | ✅ (backend, 325 tests) | render pipeline in |
-| A2 | scroll-film engine | `agent/02-scroll-film` | 1 | 1 | — | timeline.ts; pkg.json+tsconfig touch |
-| A3 | film API + sync | `agent/03-film-api` | 4 | 4 | — | coordination + (now code) |
-| A4 | motion | `agent/04-motion` | 2 | 0 | ✅ fully | motion system in |
-| A5 | library/books/epub | `agent/05-library` | 3 | 3 | — | inherits operator seeds |
-| A6 | accessibility | `agent/06-a11y` | 6 | 2 | ✅ | a11y layer + vitest in |
-| A7 | optimization | `agent/07-optim` | 6 | 6 | — | backend optim; merges LAST |
-| A8 | color/depth/type | `agent/08-design` | 3 | 1 | ✅ keystone | token system in |
-| A9 | settings/icons | `agent/09-settings-icons` | 4 | 3 | ✅ | icons+settings in |
-| A10 | reading-room | `agent/10-reading-room` | 2 | 2 | — | state machine + fallback |
-| A11 | login | `agent/11-login` | 1 | 1 | — | just started |
-
-**Steady state:** the Captain merges a snapshot; you keep committing; the Captain re-merges
-(git rerere remembers the seam resolutions, so re-merges are cheap). "Pending" = commits on
-your branch not yet in integration.
-
-## Merge order (dependency)
-`A8 → A6 → A4 → A9 → A1 → A3 → A2 → A5 → A10 → A11 → A7` — done so far: A9, A4, A8, A6, A1.
+## Merge order (dependency) — cycle 1 done in: A9,A4,A8,A6,A1,A7,A10,A2,A3,A5,A11
+`A8 → A6 → A4 → A9 → A1 → A3 → A2 → A5 → A10 → A11 → A7`
 
 ## Seam resolution policy (how the Captain integrates your work)
-- **Your owned `styles/*.css`**: concat (existing split rules + your layer; yours wins on overlap).
-- **`main.tsx`**: aggregator import kept; meaningful wrappers (e.g. `<A11yProvider>`) adopted.
-- **`package.json`**: deps unioned, lockfile regenerated. **`tailwind.config.js`**: A8 owns.
-- **`coordination/`**: STATUS/MERGE-LOG = Captain; CONTRACTS = folded; requests/artifacts = yours.
+- Owned `styles/*.css`: concat (existing split + your layer; yours wins on overlap).
+- `main.tsx`: aggregator import kept; meaningful wrappers (`<A11yProvider>`) adopted.
+- `package.json`: deps/scripts unioned, lockfile regenerated. `tailwind.config.js`: A8.
+- Backend new routers: Captain registers in `api/routes/__init__.py` (films ✅, library ✅).
+- Alembic: Captain keeps a single head (A5 cover migration `e843aa7682b2` ✅).
+- `coordination/`: STATUS/MERGE-LOG = Captain; CONTRACTS = folded; requests/artifacts = yours.
 
-## Open requests actioned this cycle
-- → A9: 3 test files report "No test suite found" under vitest (`requests/agent-09.md`).
+## Remaining toward DoD (Captain)
+- [ ] Re-merge sweep as agents advance (continuous).
+- [ ] When agents are feature-complete: run the app end-to-end (login → 100-book library →
+      open book → fallback film + scroll-scrub → reading prefs/read-aloud → settings) +
+      capture walkthrough/screenshots → `coordination/artifacts/agent-12/`.
+- [ ] Remove dead `lucide-react` once no importers; verify/retire re-export shims.
+- [ ] `CHANGELOG.md` + squash/merge plan `overnight/integration` → `main` (operator review).
 
 ## Captain rail checklist (t0) — DONE
-- [x] `coordination/` scaffolding · [x] `index.css` → `styles/` split + aggregator · [x] `api.ts` primitives
-- [x] postcss-import wired (aggregator inlines @import in order) · [x] gate green · [x] **GO announced**
+- [x] coordination scaffolding · [x] index.css → styles/ split + postcss-import aggregator
+- [x] api.ts primitives · [x] gate green · [x] GO announced · [x] all 11 first-merged

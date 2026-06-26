@@ -20,6 +20,15 @@ Captain-only file.
 | 8 | 2026-06-26 | **A8** design tokens (keystone) | `d7825ea` | tokens/base/glass.css (concat), main.tsx (ours), tailwind (theirs), CONTRACTS (fold) | tc+build green; CSS→57 kB |
 | 9 | 2026-06-26 | **A6** a11y | `a123564` | a11y.css (concat), main.tsx (`<A11yProvider>`+aggregator), pkg.json (deps union), CONTRACTS/requests | tc+build green; lockfile regen |
 | 10 | 2026-06-26 | **A1** event-director (backend) | `b2f9709` | none (disjoint) | `make test` 325 pass / 125 skip / 0 fail |
+| 11 | 2026-06-26 | **A7** optim (backend) | `7614f84` | coordination only | `make test` 384 pass / 0 fail |
+| 12 | 2026-06-26 | **A10** reading-room | `20a359e` | coordination only | tc+build green |
+| 13 | 2026-06-26 | **A2** scroll-film | `49b6cf6` | pkg.json scripts union; **Captain fixed A2 `__demo__` ReadingPrefs drift** (a11y contract grew) | tc+build green |
+| 14 | 2026-06-26 | **A3** film-api | `fb7d6d0` | coordination; **Captain registered `films.router`** | tc+build + `make test` 391 pass |
+| 15 | 2026-06-26 | **A5** library | `3190158` | **Captain unioned ROUTERS (films+library)**; alembic single head `e843aa7682b2` | tc+build + `make test` 408 pass |
+| 16 | 2026-06-26 | **A11** login | `aa2b406` | `index.css` kept deleted (A11 also split login out); `login.css` concat | tc+build green; CSS→73 kB |
 
-**Pending re-merges** (agents advanced after first merge): A1 +1, A6 +2, A8 +1, A9 +3 — cheap via `git rerere`.
-**Not yet merged:** A2, A3, A5, A7, A10, A11.
+### 🏁 Cycle 1 complete — ALL 11 agents first-merged; full gate GREEN
+`tc+build` green · `make test` 408/0 · vitest 64 pass (7 files non-vitest, tracked).
+
+**Pending re-merges** (agents advanced after first merge): A1+4, A3+1, A4+3, A6+5, A7+1, A8+1, A9+3.
+A2/A5/A10/A11 current (0 pending). Re-merge sweep is the next cycle (git rerere auto-applies seam resolutions).
