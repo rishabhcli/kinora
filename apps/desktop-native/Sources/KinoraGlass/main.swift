@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let web = WKWebView(frame: frame, configuration: config)
         web.autoresizingMask = [.width, .height]
         web.setValue(false, forKey: "drawsBackground") // KVC: let the glass show through
+        web.underPageBackgroundColor = .clear           // belt-and-suspenders transparency
         web.load(URLRequest(url: url))
 
         let container = makeGlassContainer(frame: frame, content: web)
