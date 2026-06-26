@@ -24,6 +24,14 @@
 
 Evidence: `coordination/artifacts/agent-03/verification.md`. Examples: `…/example-responses.json`.
 
+### Code review (senior-reviewer subagent) — passed with fixes applied
+No Critical issues. Important findings all addressed: (1) corrected the SSE builder signature +
+two-step `film_sync_map_from_merged` recipe in CONTRACTS.md §5 / requests (the emit itself is
+Agent 1's worker — flagged); (2) ordered shots by `Beat.beat_index` to match the stitcher exactly
+(+ adversarial test pinning it); (3) documented restore's nearest-preceding-shot semantics. Minor
+items (clamp note, key-namespace note, duration_s vs sync_map.duration_s) documented in code/types.
+17 film tests green (10 route + 7 contract).
+
 ### Design decisions (rationale in CONTRACTS.md)
 - **event ≡ scene (1:1)** today; `EventFilm.scenes[]` is forward-compatible for grouping.
 - Own API/wire models in `app/films/contract.py` (render's `SyncSegment` is `extra="forbid"`,

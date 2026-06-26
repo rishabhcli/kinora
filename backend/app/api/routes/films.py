@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import ContainerDep, CurrentUser
 from app.api.errors import APIError
 from app.composition import Container
+from app.db.models.beat import Beat
 from app.db.models.enums import ShotStatus
 from app.db.models.scene import Scene
 from app.db.models.session import Session as SessionModel
@@ -143,16 +144,31 @@ async def _assert_owner(session: AsyncSession, user: User, book_id: str) -> None
 
 
 async def _accepted_shots_by_scene(session: AsyncSession, book_id: str) -> dict[str, list[Shot]]:
-    """A book's ACCEPTED shots grouped by scene, each in reading (word) order (§9.6)."""
-    stmt = select(Shot).where(Shot.book_id == book_id, Shot.status == ShotStatus.ACCEPTED)
-    rows = list((await session.execute(stmt)).scalars().all())
-    by_scene: dict[str, list[Shot]] = {}
-    for shot in rows:
+    """A book's ACCEPTED shots grouped by scene, each in narrative order (§9.6).
+
+    Ordered by ``Beat.beat_index`` to match the stitcher exactly
+    (``SceneStitcher._accepted_shots_in_order``) — the cumulative film timeline
+    is built in this order, so it must agree with the concatenated mp4. A LEFT
+    join keeps beat-less accepted shots in the view (the stitcher inner-joins);
+    they sort last, by ``word_range`` start, as a deterministic fallback.
+    """
+    stmt = (
+        select(Shot, Beat.beat_index)
+        .join(Beat, Beat.id == Shot.beat_id, isouter=True)
+        .where(Shot.book_id == book_id, Shot.status == ShotStatus.ACCEPTED)
+    )
+    rows = list((await session.execute(stmt)).all())
+    by_scene: dict[str, list[tuple[Shot, int | None]]] = {}
+    for shot, beat_index in rows:
         if shot.scene_id:
-            by_scene.setdefault(shot.scene_id, []).append(shot)
-    for shots in by_scene.values():
-        shots.sort(key=_span_start)
-    return by_scene
+            by_scene.setdefault(shot.scene_id, []).append((shot, beat_index))
+    ordered: dict[str, list[Shot]] = {}
+    for scene_id, pairs in by_scene.items():
+        pairs.sort(
+            key=lambda p: (p[1] is None, p[1] if p[1] is not None else 0, _span_start(p[0]))
+        )
+        ordered[scene_id] = [shot for shot, _ in pairs]
+    return ordered
 
 
 async def _restore_state(
@@ -170,6 +186,10 @@ async def _restore_state(
         return None
     current_index: int | None = None
     current_scene: str | None = None
+    # Nearest-preceding-shot semantics: resolve_word_to_shot picks the greatest
+    # word_index_start <= focus_word (it does not bound on word_index_end), so a
+    # focus word in a trailing gap resolves to the last scene the reader reached —
+    # the right "reopen where they left off" anchor. None only when before shot 1.
     shot = await SourceSpanRepo(session).resolve_word_to_shot(book_id, row.focus_word)
     if shot is not None and shot.scene_id:
         scene = await SceneRepo(session).get(shot.scene_id)
@@ -203,6 +223,9 @@ async def _film_fields(
     container: Container, book_id: str, scene_id: str, ttl: int
 ) -> tuple[bool, str | None, str | None]:
     """``(stitched, oss_url, url_expires_at)`` for a scene's stitched mp4."""
+    # The stitched-scene mp4 reuses keys.clip with the scene_id (matches
+    # SceneStitcher in render/stitch.py); per-shot clips use it with a shot_id.
+    # The id prefixes differ, so the namespaces never collide.
     clip_key = keys.clip(book_id, scene_id)
     stitched = await anyio.to_thread.run_sync(container.object_store.exists, clip_key)
     if not stitched:

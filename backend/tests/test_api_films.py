@@ -17,6 +17,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.composition import Container
 from app.db.models.enums import SessionMode, ShotStatus
+from app.db.repositories.beat import BeatRepo
 from app.db.repositories.scene import SceneRepo
 from app.db.repositories.session import SessionRepo
 from app.db.repositories.shot import ShotRepo, SourceSpanRepo
@@ -273,3 +274,51 @@ async def test_shot_without_sync_segment_is_synthesized(
     assert seg["page_turn_at_s"] == 3.8
     assert seg["word_range"] == [10, 20]
     assert seg["words"] == []
+
+
+async def test_events_order_shots_by_beat_index_not_word_span(
+    films_client: AsyncClient, container: Container
+) -> None:
+    """Shot order follows Beat.beat_index (matching the stitcher), not word-span start."""
+    headers = await register_login(films_client, "films9@example.com")
+    book_id = await seed_owned_book(films_client, container, headers)
+    async with container.session_factory() as session:
+        await SceneRepo(session).create(
+            book_id=book_id, scene_index=0, page_start=1, page_end=1, scene_id="scene_b"
+        )
+        beats = BeatRepo(session)
+        shots = ShotRepo(session)
+        # Adversarial: the shot with the LATER word span has the EARLIER beat_index.
+        # The stitcher concatenates by beat_index, so the film API must too.
+        await beats.create(
+            book_id=book_id, scene_id="scene_b", beat_index=0, summary="b0", beat_id="beat_first"
+        )
+        await beats.create(
+            book_id=book_id, scene_id="scene_b", beat_index=1, summary="b1", beat_id="beat_second"
+        )
+        await shots.create(
+            id="shot_late_word",
+            book_id=book_id,
+            scene_id="scene_b",
+            beat_id="beat_first",
+            status=ShotStatus.ACCEPTED,
+            duration_s=5.0,
+            source_span={"page": 1, "word_range": [900, 950]},
+            narration={"sync_segment": _segment("shot_late_word", 1, 900)},
+        )
+        await shots.create(
+            id="shot_early_word",
+            book_id=book_id,
+            scene_id="scene_b",
+            beat_id="beat_second",
+            status=ShotStatus.ACCEPTED,
+            duration_s=5.0,
+            source_span={"page": 1, "word_range": [100, 150]},
+            narration={"sync_segment": _segment("shot_early_word", 1, 100)},
+        )
+
+    body = (await films_client.get(f"/api/books/{book_id}/events", headers=headers)).json()
+    segs = body["events"][0]["sync_map"]["segments"]
+    # beat_index 0 (shot_late_word) comes first despite its larger word span.
+    assert [s["shot_id"] for s in segs] == ["shot_late_word", "shot_early_word"]
+    assert (segs[0]["t_start_s"], segs[1]["t_start_s"]) == (0.0, 5.0)

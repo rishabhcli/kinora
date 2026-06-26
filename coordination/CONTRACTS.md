@@ -168,10 +168,25 @@ Event names match §5.6. `sync_map` is a `FilmSyncMap` (canonical shape above).
 { event: "event_stitched", event_id: string, oss_url: string, sync_map: FilmSyncMap }
 ```
 
-Builders live in `backend/app/films/contract.py`:
-`scene_stitched_event(stitch_result, shot_spans)` and `event_stitched_event(...)` →
-the canonical payload dicts. Producers (Agent 1 worker / Agent 12) should emit via these so
-SSE and REST are byte-compatible (no client adapter). See `requests/agent-03.md`.
+Builders live in `backend/app/films/contract.py`. **Exact signatures:**
+`scene_stitched_event(*, scene_id, oss_url, sync_map: FilmSyncMap)` and
+`event_stitched_event(*, event_id, oss_url, sync_map: FilmSyncMap)`. A producer emits in two
+steps — convert the merged render map to a `FilmSyncMap`, then build the frame:
+
+```python
+from app.films.contract import film_sync_map_from_merged, scene_stitched_event
+
+# spans: {shot_id: [word_start, word_end]} from each shot's source_span.word_range
+fsm = film_sync_map_from_merged(stitched.sync_map, scene_id=stitched.scene_id, spans=spans)
+await redis.publish(channel, scene_stitched_event(
+    scene_id=stitched.scene_id, oss_url=stitched.clip_url, sync_map=fsm))
+```
+
+Emitting via these keeps SSE byte-compatible with REST (no client adapter). **Current state:** the
+worker (`app/queue/worker.py`, Agent 1) still emits render-shaped `scene_stitched`
+(`video_start_s`/no `word_range`) and nothing emits `event_stitched` yet — so until a producer
+adopts the builders the SSE frames do **not** match this `FilmSyncMap` shape on the wire. Wiring
+is a cross-seam item in `requests/agent-03.md`.
 
 ### 6. Client (films.ts) — Agent 2 consumes this, no adapter
 
