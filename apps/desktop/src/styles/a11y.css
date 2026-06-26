@@ -1,0 +1,178 @@
+/*
+ * Kinora accessibility layer (Agent 06). Imported once from main.tsx AFTER
+ * index.css so its focus + motion rules win on equal specificity.
+ *
+ * Owns: screen-reader-only text, the global keyboard focus ring, skip-link,
+ * reduced-motion / reduced-transparency / high-contrast handling (both the OS
+ * media queries AND the in-app override classes set on <html> by A11yProvider),
+ * and the bundled dyslexia reading font.
+ */
+
+:root {
+  /* Bright, high-contrast focus colour; Agent 8 may override --kinora-a11y-focus. */
+  --kinora-a11y-focus: #f4c97a;
+  --kinora-a11y-focus-contrast: #ffffff;
+}
+
+/* ---- Screen-reader-only ----------------------------------------------------- */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* A visually-hidden element that becomes visible on focus (skip links). */
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-within {
+  position: fixed !important;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 9999;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0.6rem 1rem !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
+  background: #15120e;
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Skip link -------------------------------------------------------------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 9999;
+  padding: 0.6rem 1rem;
+  background: #15120e;
+  color: #fff;
+  border-radius: 10px;
+  outline: 2px solid var(--kinora-a11y-focus);
+}
+
+/* ---- Keyboard focus ring (the app otherwise strips outlines) ---------------- */
+:focus-visible {
+  outline: 2px solid var(--kinora-a11y-focus) !important;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* Don't show the ring for pointer interactions, only keyboard. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ---- Reduced motion --------------------------------------------------------- */
+/* OS preference (covers SSR / no-JS), migrated from index.css to here. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* In-app override: A11yProvider toggles this when useReducedMotionPref() is true
+   (so the in-app switch reduces CSS motion even when the OS pref is off). */
+html.kinora-reduce-motion *,
+html.kinora-reduce-motion *::before,
+html.kinora-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---- Reduced transparency --------------------------------------------------- */
+@media (prefers-reduced-transparency: reduce) {
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+html.kinora-reduce-transparency * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Solidify the known frosted surfaces so text stays readable without blur.
+   (Class names per the current index.css; if Agent 8 renames, these no-op and
+   the audit request to agent-08 covers it.) */
+html.kinora-reduce-transparency .glass-card,
+html.kinora-reduce-transparency .glass-input,
+html.kinora-reduce-transparency .glass-control,
+html.kinora-reduce-transparency .liquid-glass-dock {
+  background-color: rgba(21, 18, 14, 0.96) !important;
+}
+
+/* ---- High contrast ---------------------------------------------------------- */
+@media (prefers-contrast: more) {
+  :focus-visible {
+    outline-width: 3px !important;
+  }
+  a {
+    text-decoration: underline;
+  }
+}
+html.kinora-high-contrast {
+  /* Push text to the brightest token + force opaque surfaces. */
+  --kinora-text: #ffffff;
+  --kinora-muted: #e6e0d6;
+}
+html.kinora-high-contrast a {
+  text-decoration: underline;
+}
+html.kinora-high-contrast :focus-visible {
+  outline: 3px solid var(--kinora-a11y-focus-contrast) !important;
+  outline-offset: 2px;
+}
+html.kinora-high-contrast button,
+html.kinora-high-contrast [role="button"],
+html.kinora-high-contrast input,
+html.kinora-high-contrast select,
+html.kinora-high-contrast textarea {
+  outline: 1px solid currentColor;
+}
+html.kinora-high-contrast .glass-card,
+html.kinora-high-contrast .glass-input,
+html.kinora-high-contrast .glass-control,
+html.kinora-high-contrast .liquid-glass-dock {
+  background-color: rgba(12, 11, 10, 0.98) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ---- Windows / forced-colors mode ------------------------------------------- */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText !important;
+  }
+  /* Make sure decorative gradient text remains legible. */
+  * {
+    forced-color-adjust: auto;
+  }
+}
+
+/* ---- Dyslexia reading font -------------------------------------------------- */
+/* The @font-face for the bundled OpenDyslexic binary is appended in WS2; until
+   then this stack falls back to widely-available dyslexia-friendlier faces so
+   the option is functional and the build never breaks on a missing asset. */
+.reading-font-dyslexic {
+  font-family: "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
