@@ -169,9 +169,22 @@ html.kinora-high-contrast .liquid-glass-dock {
 }
 
 /* ---- Dyslexia reading font -------------------------------------------------- */
-/* The @font-face for the bundled OpenDyslexic binary is appended in WS2; until
-   then this stack falls back to widely-available dyslexia-friendlier faces so
-   the option is functional and the build never breaks on a missing asset. */
+/* OpenDyslexic (SIL OFL 1.1) bundled under src/assets/fonts and loaded here
+   (Agent 06 owns the dyslexia face; Agent 8 owns UI/reading display fonts). */
+@font-face {
+  font-family: "OpenDyslexic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+}
 .reading-font-dyslexic {
   font-family: "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", system-ui, sans-serif;
   letter-spacing: 0.01em;
