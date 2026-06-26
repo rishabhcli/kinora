@@ -170,7 +170,12 @@ def effective_crossfade(durations: Sequence[float], requested_s: float) -> float
 
 
 def _xfade_concat(
-    normalized: Sequence[bytes], *, size: tuple[int, int], fps: int, crossfade_s: float
+    normalized: Sequence[bytes],
+    durs: Sequence[float],
+    *,
+    size: tuple[int, int],
+    fps: int,
+    crossfade_s: float,
 ) -> bytes:
     """Concatenate with a video xfade + audio acrossfade at every seam (§9.6).
 
@@ -179,9 +184,11 @@ def _xfade_concat(
     lockstep, and the final mix is level-normalised (``dynaudnorm``) so a quiet
     clip never jumps a loud one. The total length is the sum of the clips minus
     the ``(n-1)`` overlaps — the same timeline :func:`merge_sync_segments` builds.
+
+    ``durs`` are the probed (positive) clip durations the caller already measured,
+    used to advance each xfade offset.
     """
     ffmpeg = get_ffmpeg_exe()
-    durs = [_safe_duration(c) for c in normalized]
     n = len(normalized)
     with tempfile.TemporaryDirectory(prefix="kinora_xfade_") as tmp:
         tmp_dir = Path(tmp)
@@ -348,9 +355,12 @@ def concat_clips(
     if len(normalized) == 1:
         return normalized[0]
 
-    crossfade = effective_crossfade([_safe_duration(c) for c in normalized], crossfade_s)
-    if crossfade > 0:
-        return _xfade_concat(normalized, size=out_size, fps=fps, crossfade_s=crossfade)
+    durs = [_safe_duration(c) for c in normalized]
+    crossfade = effective_crossfade(durs, crossfade_s)
+    # Only dissolve when every clip's duration probed cleanly; a 0 (probe failure)
+    # would mis-place the xfade offsets, so fall back to the robust hard concat.
+    if crossfade > 0 and all(d > 0 for d in durs):
+        return _xfade_concat(normalized, durs, size=out_size, fps=fps, crossfade_s=crossfade)
 
     ffmpeg = get_ffmpeg_exe()
     with tempfile.TemporaryDirectory(prefix="kinora_concat_") as tmp:
