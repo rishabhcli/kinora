@@ -6,25 +6,34 @@ Each agent keeps its own section current. Newest note on top of each section.
 
 ## Agent 06 — Accessibility (`agent/06-a11y`)
 
-**Now:** Setup complete. Worktree `../kinora-a06` on `agent/06-a11y` (base
-`overnight/integration`). Coordination scaffolding + contract signatures published.
-Mapping the renderer; starting WS1 (a11y foundation) with TDD.
+**Status: WS1–WS4 COMPLETE.** 92 unit tests + 5 Playwright e2e; `typecheck` +
+production `build` green; axe-core scan of owned surfaces = **0 serious/critical**.
 
-**Plan:**
-- WS1 — `src/a11y/`: `useReducedMotionPref` (OS + in-app override, single source),
-  `keyboard.ts` (registerShortcut + `?` cheat-sheet), `focus.ts` (trap/restore),
-  `announce.ts` (live region), `VisuallyHidden.tsx`, `a11y.css` (reduced-motion /
-  -transparency / -contrast, focus rings, high-contrast theme, `.sr-only`).
-- WS2 — move `readingPrefs.ts` → `a11y/` (+ `lib/` shim); extend prefs (dyslexia
-  font, brightness, scroll/paged, TTS); build `ReadingControls.tsx`.
-- WS3 — `tts.ts` read-aloud with word-synced highlighting (Web Speech API).
-- WS4 — SR/keyboard pass on owned surfaces; full-app axe + manual audit; file
-  per-agent findings in `coordination/requests/agent-XX.md`.
+- **WS1 — foundation** (`src/a11y/`): `useReducedMotionPref` (OS-or-override single
+  source, via `createMediaPref`), `displayPrefs` (high-contrast + reduced-transparency),
+  `keyboard` (registerShortcut + `?` cheat-sheet + prettyCombo), `focus` (trap/restore/
+  getFocusable), `announce` (polite/assertive live regions), `VisuallyHidden`,
+  `A11yProvider` (mounts everything; reflects prefs onto `<html>`; skip link),
+  `styles/a11y.css` (.sr-only, global `:focus-visible`, reduced-motion/-transparency/
+  -contrast + forced-colors). Wired in `main.tsx`.
+- **WS2 — ReadingControls**: `readingPrefs` moved to `a11y/` (+ `lib/` shim), extended
+  (dyslexia font, brightness, scroll/paged, TTS). OpenDyslexic bundled. Apple-Books
+  `reading/ReadingControls.tsx` — fully keyboard + VoiceOver operable.
+- **WS3 — read-aloud**: `tts.ts` (Web Speech API, word-sync via boundary events) +
+  `ReadAloudView` (highlights spoken word in lockstep). Marquee feature.
+- **WS4 — audit**: Playwright + axe (`e2e/`), keyboard walkthrough + word-sync
+  recordings, per-agent findings filed. Fixed 2 real issues the scan caught.
 
-**Needs from others (stubbed against contracts until merged):**
-- Agent 8: theme/color tokens (contrast, high-contrast theme, dyslexia-safe defaults).
-- Agent 1: playhead / `focusWord` for read-aloud word-sync.
-- Agent 10: reading-room shell slot where `<ReadingControls>` mounts.
+**Published (CONTRACTS.md):** `useReducedMotionPref`, `useReadingPrefs`,
+`<ReadingControls>`, `useTts`/`<ReadAloudView>`, `announce`/`<VisuallyHidden>`/
+`trapFocus`/`registerShortcut`, `a11y-checklist.md`.
 
-**Seam requests filed:** see `coordination/requests/` (package.json devDeps for
-testing/a11y libs; `index.html` font; `lib/readingPrefs.ts` shim; `main.tsx` providers).
+**Findings filed (`coordination/requests/`):** agent-01 (optional playhead sync),
+agent-04 (reduced-motion adoption), agent-05 (library landmarks), agent-08 (tokens/
+contrast), agent-09 (nav/settings), agent-10 (mount ReadingControls + ReadAloudView,
+focus trap), agent-11 (login — already clean), agent-12 (seams).
+
+**Remaining (needs the real app on macOS / other agents merged):** live-voice
+read-aloud audio (headless Chromium has no voices — word-sync logic proven by tests +
+scripted-engine recording); axe on the *live* library/reading-room (need backend data +
+Agents 5/10 merged — owned surfaces covered via `e2e/harness`).
