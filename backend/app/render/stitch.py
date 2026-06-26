@@ -35,7 +35,7 @@ from app.db.models.shot import Shot
 from app.db.repositories.scene import SceneRepo
 from app.render.degrade import (
     DEFAULT_FPS,
-    DEFAULT_SIZE,
+    FILM_SIZE,
     FfmpegError,
     get_ffmpeg_exe,
     inspect,
@@ -86,6 +86,7 @@ def merge_sync_segments(
     *,
     scene_id: str,
     durations: Sequence[float] | None = None,
+    overlap_s: float = 0.0,
 ) -> SceneSyncMap:
     """Merge per-shot segments into one scene map with cumulative timestamps.
 
@@ -93,9 +94,14 @@ def merge_sync_segments(
     durations of the shots before it. ``durations`` (e.g. probed clip lengths)
     overrides each segment's own ``video_end_s - video_start_s`` when the
     concatenated length is known precisely.
+
+    ``overlap_s`` is the crossfade applied at each seam (§9.6 cinematic stitch):
+    every shot after the first overlaps the prior shot's tail by that much, so it
+    starts ``overlap_s`` *earlier* and the whole timeline shrinks by
+    ``(n-1)·overlap_s`` — exactly matching the xfade'd clip the client plays.
     """
     merged: list[SyncSegment] = []
-    offset = 0.0
+    start = 0.0
     for i, raw in enumerate(segments):
         seg = _as_segment(raw)
         local_dur = (
@@ -103,12 +109,13 @@ def merge_sync_segments(
             if durations is not None and i < len(durations)
             else seg.video_end_s - seg.video_start_s
         )
-        shift = offset - seg.video_start_s
+        shift = start - seg.video_start_s
+        end = start + local_dur
         merged.append(
             SyncSegment(
                 shot_id=seg.shot_id,
-                video_start_s=round(offset, 3),
-                video_end_s=round(offset + local_dur, 3),
+                video_start_s=round(start, 3),
+                video_end_s=round(end, 3),
                 page=seg.page,
                 page_turn_at_s=round(seg.page_turn_at_s + shift, 3),
                 words=[
@@ -122,8 +129,10 @@ def merge_sync_segments(
                 ],
             )
         )
-        offset += local_dur
-    return SceneSyncMap(scene_id=scene_id, duration_s=round(offset, 3), segments=merged)
+        # The next shot crossfades into this one's tail (overlap), so it begins early.
+        start = end - overlap_s
+    duration = round(merged[-1].video_end_s, 3) if merged else 0.0
+    return SceneSyncMap(scene_id=scene_id, duration_s=duration, segments=merged)
 
 
 # --------------------------------------------------------------------------- #
@@ -138,14 +147,107 @@ def _safe_has_audio(clip: bytes) -> bool:
         return False
 
 
-def _probe_size(clip: bytes) -> tuple[int, int] | None:
+def _safe_duration(clip: bytes) -> float:
     try:
-        info = inspect(clip)
+        return inspect(clip).duration_s
     except FfmpegError:
-        return None
-    if info.width and info.height:
-        return (info.width, info.height)
-    return None
+        return 0.0
+
+
+def effective_crossfade(durations: Sequence[float], requested_s: float) -> float:
+    """Clamp a requested crossfade so it never swallows a whole (short) shot.
+
+    A crossfade longer than ~half the shortest clip would push the xfade offset
+    negative / leave no clean frames, so the request is capped at 45 % of the
+    shortest clip. Returns 0 when there is nothing to fade (one clip / no request).
+    """
+    if requested_s <= 0:
+        return 0.0
+    positive = [d for d in durations if d > 0]
+    if len(positive) < 2:
+        return 0.0
+    return round(min(requested_s, 0.45 * min(positive)), 3)
+
+
+def _xfade_concat(
+    normalized: Sequence[bytes], *, size: tuple[int, int], fps: int, crossfade_s: float
+) -> bytes:
+    """Concatenate with a video xfade + audio acrossfade at every seam (§9.6).
+
+    Each clip dissolves into the next over ``crossfade_s`` (so the film is one
+    continuous event with no hard cuts / black frames), the audio crossfades in
+    lockstep, and the final mix is level-normalised (``dynaudnorm``) so a quiet
+    clip never jumps a loud one. The total length is the sum of the clips minus
+    the ``(n-1)`` overlaps — the same timeline :func:`merge_sync_segments` builds.
+    """
+    ffmpeg = get_ffmpeg_exe()
+    durs = [_safe_duration(c) for c in normalized]
+    n = len(normalized)
+    with tempfile.TemporaryDirectory(prefix="kinora_xfade_") as tmp:
+        tmp_dir = Path(tmp)
+        args: list[str] = [ffmpeg, "-y"]
+        for i, clip in enumerate(normalized):
+            seg_path = tmp_dir / f"seg_{i}.mp4"
+            seg_path.write_bytes(clip)
+            args += ["-i", str(seg_path)]
+
+        parts: list[str] = []
+        # Video: chain pairwise xfades, advancing the offset by the running length.
+        prev_v = "[0:v]"
+        running = durs[0]
+        for k in range(1, n):
+            offset = max(0.0, running - crossfade_s)
+            out_v = "[vout]" if k == n - 1 else f"[vx{k}]"
+            parts.append(
+                f"{prev_v}[{k}:v]xfade=transition=fade:"
+                f"duration={crossfade_s:.3f}:offset={offset:.3f}{out_v}"
+            )
+            prev_v = out_v
+            running = running + durs[k] - crossfade_s
+        # Audio: matching acrossfades, then a single loudness normalisation pass.
+        prev_a = "[0:a]"
+        for k in range(1, n):
+            out_a = "[araw]" if k == n - 1 else f"[ax{k}]"
+            parts.append(f"{prev_a}[{k}:a]acrossfade=d={crossfade_s:.3f}{out_a}")
+            prev_a = out_a
+        parts.append("[araw]dynaudnorm[aout]")
+
+        out_path = tmp_dir / "scene.mp4"
+        args += [
+            "-filter_complex",
+            ";".join(parts),
+            "-map",
+            "[vout]",
+            "-map",
+            "[aout]",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            str(fps),
+            "-c:a",
+            "aac",
+            "-ar",
+            str(_AUDIO_SR),
+            "-ac",
+            "2",
+            "-movflags",
+            "+faststart",
+            str(out_path),
+        ]
+        run_ffmpeg(args)
+        scene = out_path.read_bytes()
+    logger.info(
+        "stitch.xfade",
+        clips=n,
+        bytes=len(scene),
+        size=f"{size[0]}x{size[1]}",
+        crossfade_s=round(crossfade_s, 3),
+    )
+    return scene
 
 
 def _normalize_segment(clip: bytes, *, size: tuple[int, int], fps: int) -> bytes:
@@ -219,13 +321,21 @@ def concat_clips(
     *,
     size: tuple[int, int] | None = None,
     fps: int = DEFAULT_FPS,
+    crossfade_s: float = 0.0,
 ) -> bytes:
     """Concatenate clips into one mp4, normalising then re-encoding (§9.6).
 
     Args:
         clips: the ordered clip byte-strings (full Wan and/or degraded rungs).
-        size: output geometry; inferred from the first clip when ``None``.
+        size: output geometry; defaults to the vertical :data:`FILM_SIZE`
+            (720×1280) so the stitch *enforces* the film aspect rather than
+            inheriting whatever the first clip happened to be — a landscape or
+            mismatched source is scaled+padded into vertical, never leaked.
         fps: output frame rate.
+        crossfade_s: when > 0, dissolve each seam with a video xfade + audio
+            acrossfade of this length (clamped to 45 % of the shortest clip) for a
+            continuous event film with no hard cuts; 0 is a straight (hard-cut)
+            concat. Either way the audio is level-normalised.
 
     Raises:
         ValueError: when ``clips`` is empty.
@@ -233,10 +343,14 @@ def concat_clips(
     """
     if not clips:
         raise ValueError("concat_clips requires at least one clip")
-    out_size = size or _probe_size(clips[0]) or DEFAULT_SIZE
+    out_size = size or FILM_SIZE
     normalized = [_normalize_segment(clip, size=out_size, fps=fps) for clip in clips]
     if len(normalized) == 1:
         return normalized[0]
+
+    crossfade = effective_crossfade([_safe_duration(c) for c in normalized], crossfade_s)
+    if crossfade > 0:
+        return _xfade_concat(normalized, size=out_size, fps=fps, crossfade_s=crossfade)
 
     ffmpeg = get_ffmpeg_exe()
     with tempfile.TemporaryDirectory(prefix="kinora_concat_") as tmp:
@@ -247,7 +361,8 @@ def concat_clips(
             seg_path.write_bytes(clip)
             args += ["-i", str(seg_path)]
         streams = "".join(f"[{i}:v:0][{i}:a:0]" for i in range(len(normalized)))
-        graph = f"{streams}concat=n={len(normalized)}:v=1:a=1[v][a]"
+        # Level-normalise the concatenated audio so a quiet clip never jumps a loud one.
+        graph = f"{streams}concat=n={len(normalized)}:v=1:a=1[v][araw];[araw]dynaudnorm[a]"
         out_path = tmp_dir / "scene.mp4"
         args += [
             "-filter_complex",
@@ -397,5 +512,6 @@ __all__ = [
     "SceneSyncMap",
     "StitchResult",
     "concat_clips",
+    "effective_crossfade",
     "merge_sync_segments",
 ]

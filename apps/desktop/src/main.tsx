@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./index.css";
+import { A11yProvider } from "./a11y/A11yProvider";
+// Single CSS aggregator (Captain seam) — imports tailwind + all owned partials,
+// incl. a11y.css last so A6's focus-ring / reduced-motion overrides win.
+import "./styles/index.css";
 
 // In the native macOS shell (apps/desktop-native) the window is a real
 // NSGlassEffectView; flag the document so the UI goes translucent and the
@@ -19,6 +22,8 @@ if (/Chrome\//.test(navigator.userAgent) && !/Edg\//.test(navigator.userAgent)) 
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <A11yProvider>
+      <App />
+    </A11yProvider>
   </React.StrictMode>
 );

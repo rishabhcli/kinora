@@ -4,8 +4,10 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
+  type MotionValue,
 } from "framer-motion";
 import { useRef, useState, ReactNode } from "react";
+import { useMotion } from "../motion";
 
 interface DockItem {
   title: string;
@@ -18,7 +20,7 @@ export function FloatingDock({
   items,
   className,
 }: {
-  items: DockItem[]; 
+  items: DockItem[];
   className?: string;
 }) {
   const mouseX = useMotionValue(Infinity);
@@ -40,16 +42,22 @@ export function FloatingDock({
   );
 }
 
-function DockIcon({ item, mouseX }: { item: DockItem; mouseX: any }) {
+function DockIcon({ item, mouseX }: { item: DockItem; mouseX: MotionValue<number> }) {
   const ref = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
+  const { reduced } = useMotion();
 
   const distance = useTransform(mouseX, (val: number) => {
     const bounds = ref.current?.getBoundingClientRect() ?? { x: 0, width: 0 };
     return val - bounds.x - bounds.width / 2;
   });
 
-  const sizeT = useTransform(distance, [-120, 0, 120], [36, 52, 36]);
+  // Reduced motion: a fixed-size dock (no cursor magnification).
+  const sizeT = useTransform(
+    distance,
+    [-120, 0, 120],
+    reduced ? [42, 42, 42] : [36, 52, 36],
+  );
   const size = useSpring(sizeT, { mass: 0.1, stiffness: 150, damping: 12 });
 
   return (
@@ -73,10 +81,10 @@ function DockIcon({ item, mouseX }: { item: DockItem; mouseX: any }) {
       <AnimatePresence>
         {hovered && (
           <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.9 }}
-            transition={{ duration: 0.15 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.9 }}
+            animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.9 }}
+            transition={{ duration: reduced ? 0 : 0.15 }}
             className="absolute -top-9 whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-medium"
             style={{
               background: "rgba(22, 20, 18, 0.95)",

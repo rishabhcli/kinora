@@ -7,8 +7,10 @@ from app.api.routes import (
     books,
     director,
     events,
+    films,
     library,
     metrics,
+    optim,
     prefs,
     sessions,
 )
@@ -17,12 +19,14 @@ from app.api.routes import (
 ROUTERS = [
     auth.router,
     books.router,
-    library.router,
+    films.router,  # A3: /books/{id}/events + /scenes/{id}/film (Captain-registered)
+    library.router,  # A5: library catalog (Captain-registered on merge)
     sessions.router,
     director.router,
     prefs.router,
     events.router,
     metrics.router,
+    optim.router,
 ]
 
 __all__ = ["ROUTERS"]

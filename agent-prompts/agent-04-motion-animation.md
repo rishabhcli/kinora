@@ -1,0 +1,1 @@
+/ralph-loop:ralph-loop "Kinora Agent 04. Run bash agent-prompts/arm-ralph.sh 04 from repo root, then read agent-prompts/.missions/agent-04-motion-animation.md and execute fully in worktree ../kinora-a04." --completion-promise "AGENT 04 COMPLETE" --max-iterations 500

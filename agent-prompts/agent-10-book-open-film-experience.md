@@ -1,0 +1,1 @@
+/ralph-loop:ralph-loop "Kinora Agent 10. Run bash agent-prompts/arm-ralph.sh 10 from repo root, then read agent-prompts/.missions/agent-10-book-open-film-experience.md and execute fully in worktree ../kinora-a10." --completion-promise "AGENT 10 COMPLETE" --max-iterations 500

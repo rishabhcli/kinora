@@ -7,6 +7,7 @@
 // (coordination/requests/agent-05.md). Drag-drop + the in-app picker below need
 // no Electron change and cover the flow end-to-end today.
 import { useCallback, useId, useRef, useState } from "react";
+import { announce } from "../a11y/announce";
 import { ApiError } from "../lib/api";
 import {
   pollBookUntilReady,
@@ -99,10 +100,13 @@ export default function UploadBook({ onUploadsChange, onReady }: UploadBookProps
           patch(key, { status: "importing", stage: "still importing — large book" });
         } else {
           patch(key, { status: "ready", progress: 100, stage: "ready", book: ready });
+          announce(`${ready.title} is ready in your library`, "polite");
           onReady?.(ready);
         }
       } catch (e) {
-        patch(key, { status: "error", error: friendlyError(e) });
+        const msg = friendlyError(e);
+        patch(key, { status: "error", error: msg });
+        announce(`Upload of ${title} failed: ${msg}`, "assertive");
       }
     },
     [onReady, onUploadsChange, patch],
@@ -114,6 +118,7 @@ export default function UploadBook({ onUploadsChange, onReady }: UploadBookProps
       for (const file of Array.from(files)) {
         const err = validate(file);
         if (err) {
+          announce(`Can't add ${file.name}: ${err}`, "assertive");
           const key = `${file.name}-${Date.now()}-err`;
           setItems((prev) => {
             const next = [{ key, title: file.name, status: "error" as const, progress: 0, error: err }, ...prev];

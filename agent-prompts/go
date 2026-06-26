@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Zero-paste Agent start — arms Ralph + launches Claude Code with the ralph one-liner.
+#
+# Usage (from kinora repo root):
+#   bash agent-prompts/go 01
+#
+# Do NOT paste .missions/*.md — those are loaded automatically.
+
+set -euo pipefail
+
+AGENT="${1:?usage: go 01-12}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+LAUNCHER="$(ls "$SCRIPT_DIR"/agent-${AGENT}-*.md 2>/dev/null | head -1)"
+[[ -f "$LAUNCHER" ]] || { echo "no launcher for agent $AGENT" >&2; exit 1; }
+
+case "$AGENT" in
+  01|02|03|04|05|06|07|08|09|10|11)
+    TARGET="$(cd "$REPO/../kinora-a$AGENT" 2>/dev/null && pwd)" || true
+    ;;
+  12) TARGET="$REPO" ;;
+  *) echo "unknown agent: $AGENT" >&2; exit 1 ;;
+esac
+
+if [[ -z "${TARGET:-}" || ! -d "$TARGET" ]]; then
+  echo "Worktree missing for agent $AGENT." >&2
+  echo "Create it first (see agent-prompts/.missions/ GIT WORKTREE section)." >&2
+  exit 1
+fi
+
+(cd "$TARGET" && bash "$SCRIPT_DIR/arm-ralph.sh" "$AGENT")
+
+BYTES="$(wc -c < "$TARGET/.claude/ralph-loop.local.md" | tr -d ' ')"
+if [[ "$BYTES" -lt 5000 ]]; then
+  echo "ERROR: ralph state only $BYTES bytes — mission truncated. Aborting." >&2
+  exit 1
+fi
+
+RALPH_LINE="$(head -1 "$LAUNCHER")"
+
+echo "Agent $AGENT ready ($BYTES bytes) in $TARGET"
+echo "Launching Claude Code…"
+
+cd "$TARGET"
+exec claude --dangerously-skip-permissions --effort max "$RALPH_LINE"

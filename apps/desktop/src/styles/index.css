@@ -1,0 +1,26 @@
+/* ============================================================
+   styles/index.css — CSS AGGREGATOR — OWNER: Agent 12 (Captain)
+   The single stylesheet main.tsx imports. postcss-import (see
+   postcss.config.js) inlines every @import below in order, so the
+   cascade is: Tailwind base → components → utilities → the owned
+   partials. Custom partials therefore win over Tailwind utilities
+   by source order (preserving the pre-split behaviour exactly).
+
+   Each partial has ONE owner (coordination/OWNERSHIP.md). Agents edit
+   their partial, never this aggregator — request a new @import via the
+   request queue. Order is cascade-critical:
+   - tokens first (CSS vars used everywhere)
+   - glass holds Liquid Glass v1 then macOS-26 v2 (v2 must win)
+   - a11y LAST so reduced-motion / focus overrides win
+   ============================================================ */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+@import "./tokens.css"; /* A8 — design tokens / :root vars */
+@import "./base.css"; /* A8 — resets, background, components, ambient layer */
+@import "./glass.css"; /* A8 — Liquid Glass material (v1 then v2) */
+@import "./motion.css"; /* A4 — generic chrome animations */
+@import "./login.css"; /* A11 — login + bookwall + hero */
+@import "./reading.css"; /* A10 — reading-room loaders */
+@import "./a11y.css"; /* A6 — accessibility overrides (LAST) */

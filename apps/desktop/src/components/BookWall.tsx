@@ -67,26 +67,42 @@ function ShelfBook({ book, flip = false }: { book: Book; flip?: boolean }) {
   );
 }
 
-/** The login backdrop: stacked glass shelves of books. Each shelf glides
- *  horizontally, alternating direction top-to-bottom, with the books reflected
- *  in the glass beneath them. */
-export default function BookWall({ rows = 4 }: { rows?: number }) {
+/** The login backdrop: stacked glass shelves of books receding into the dark.
+ *  Each shelf glides horizontally (alternating direction), and a per-row depth
+ *  (top shelves further back: smaller, dimmer, slower) gives the wall real
+ *  parallax depth — pure transform/opacity, so it stays cheap and 60fps. The
+ *  ambient lighting (projector beam, dust, vignette) is layered by AmbientBackdrop. */
+export default function BookWall({
+  rows = 4,
+  parallax = 1,
+}: {
+  rows?: number;
+  parallax?: number;
+}) {
   return (
     <div aria-hidden className="bookwall pointer-events-none absolute inset-0 overflow-hidden">
       <div className="bookwall-shelves">
         {Array.from({ length: rows }).map((_, r) => {
           const slideRight = r % 2 === 1; // alternate direction every shelf
+          // depth 0 = nearest (bottom), 1 = furthest (top). Far shelves are
+          // smaller, dimmer and drift slower → the wall reads as deep.
+          const depth = rows > 1 ? (rows - 1 - r) / (rows - 1) : 0;
           // Offset the pool per shelf so rows never line up, take enough to
           // overflow the viewport, then duplicate for a seamless loop.
           const start = (r * 5) % POOL.length;
           const rowBooks = POOL.slice(start).concat(POOL.slice(0, start)).slice(0, 14);
           const loop = rowBooks.concat(rowBooks);
-          // Slow, unhurried glide — staggered so shelves don't march in lock-step.
-          const duration = 130 + (r % 3) * 26;
+          // Far shelves glide slower (longer duration) for a parallax feel; the
+          // variant's `parallax` multiplier widens or tightens that spread.
+          const duration = (118 + depth * 70 * parallax) | 0;
           // Whole shelf faces one way; shelves alternate, echoing the slide.
           const tilt = slideRight ? "-12deg" : "12deg";
           return (
-            <div className="shelf" key={r}>
+            <div
+              className="shelf"
+              key={r}
+              style={{ "--depth": depth.toFixed(3) } as CSSProperties}
+            >
               <div
                 className={`shelf-rail ${slideRight ? "shelf-rail--right" : "shelf-rail--left"}`}
                 style={{ "--dur": `${duration}s`, "--tilt": tilt } as CSSProperties}
@@ -101,26 +117,12 @@ export default function BookWall({ rows = 4 }: { rows?: number }) {
         })}
       </div>
 
-      {/* Warm key light from above, a soft vignette, and edge fades so the
-          login card stays legible and books glide off-screen smoothly. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(85% 55% at 50% -8%, rgba(212,164,78,0.18), transparent 58%)",
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(120% 95% at 50% 50%, transparent 40%, rgba(11,10,9,0.66))",
-        }}
-      />
-      <div className="absolute inset-y-0 left-0 w-[12%] bg-gradient-to-r from-kinora-bg-deep to-transparent" />
-      <div className="absolute inset-y-0 right-0 w-[12%] bg-gradient-to-l from-kinora-bg-deep to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-1/5 bg-gradient-to-b from-kinora-bg-deep/70 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-kinora-bg-deep/85 to-transparent" />
+      {/* Edge fades so books glide off-screen smoothly and the rail never shows a
+          hard seam. The key light + vignette live in AmbientBackdrop. */}
+      <div className="bookwall-edge bookwall-edge--l" />
+      <div className="bookwall-edge bookwall-edge--r" />
+      <div className="bookwall-edge bookwall-edge--t" />
+      <div className="bookwall-edge bookwall-edge--b" />
     </div>
   );
 }

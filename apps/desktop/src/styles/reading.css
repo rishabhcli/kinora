@@ -1,0 +1,21 @@
+/* ============================================================
+   styles/reading.css — OWNER: Agent 10 (book-open / film experience)
+   Reading-room loaders (SkeletonShimmer). Scroll/film engine CSS may join here.
+   Split verbatim from the monolithic index.css by the Captain (A12)
+   at t0 so owners stop colliding on one file. Rules are byte-exact;
+   edit only within your lane (see coordination/OWNERSHIP.md).
+   ============================================================ */
+
+/* ===== Skeleton shimmer ===== */
+.skeleton-shimmer {
+  position: relative;
+}
+
+.skeleton-shimmer-overlay {
+  animation: shimmer-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer-slide {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}

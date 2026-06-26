@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from httpx import AsyncClient
 
@@ -10,6 +11,7 @@ from app.composition import Container
 from app.db.models.enums import EntityType, RenderPriority, ShotStatus
 from app.db.repositories.shot import ShotRepo
 from app.memory.canon_service import CanonService
+from app.memory.conflict_log import record_conflict_history
 from app.memory.interfaces import ShotSpec
 from app.queue.redis_queue import book_channel, conflict_object_key, session_channel
 from tests.conftest import seed_owned_book
@@ -195,7 +197,7 @@ async def test_conflict_choice_records_and_announces(
 
 
 async def _collect(
-    container: Container, pubsub: object, *, until: str, limit: int = 6
+    container: Container, pubsub: Any, *, until: str, limit: int = 6
 ) -> list[dict]:
     """Read up to ``limit`` session events, stopping once ``until`` is seen."""
     events: list[dict] = []

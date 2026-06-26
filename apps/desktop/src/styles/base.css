@@ -1,0 +1,475 @@
+/* ============================================================
+   styles/base.css — OWNER: Agent 8 (color/depth/typography)
+   Base resets, background, native-shell glass, shelf/book/footer components, ambient magic layer.
+   Split verbatim from the monolithic index.css by the Captain (A12)
+   at t0 so owners stop colliding on one file. Rules are byte-exact;
+   edit only within your lane (see coordination/OWNERSHIP.md).
+   ============================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-height: 100vh;
+}
+
+body {
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "Segoe UI", Roboto, sans-serif;
+  font-weight: 500;
+  color: #e8e2d8;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar { width: 0; height: 0; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ===== Background ===== */
+.kinora-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(120, 90, 50, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 80% 100%, rgba(60, 50, 40, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #1a1816 0%, #141210 35%, #0f0e0c 100%);
+  position: relative;
+}
+
+/* ===== Native macOS shell — let the real NSGlassEffectView show through =====
+   Only active inside apps/desktop-native (which sets window.__KINORA_NATIVE__);
+   Electron and the browser are untouched. The opaque canvas becomes a
+   translucent frosted layer so the system Liquid Glass reads behind the UI. */
+html.kinora-native,
+html.kinora-native body,
+html.kinora-native #root {
+  background: transparent !important;
+}
+
+html.kinora-native .kinora-bg {
+  background: linear-gradient(180deg, rgba(24, 22, 20, 0.34) 0%, rgba(14, 13, 11, 0.42) 100%) !important;
+}
+
+/* The full-screen content canvas (home/pages) stays solid for a strong, coherent
+   dark UI — only the chrome reads as glass. The login's inset-0 scrim keeps the
+   lighter translucency above so the shelf shows behind the sign-in card. */
+html.kinora-native .kinora-bg.min-h-screen {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(120, 90, 50, 0.08) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(20, 18, 16, 0.97) 0%, rgba(13, 12, 10, 0.99) 100%) !important;
+}
+
+html.kinora-native .bookwall {
+  background: linear-gradient(180deg, rgba(14, 12, 11, 0.32) 0%, rgba(10, 9, 8, 0.42) 100%) !important;
+}
+
+/* Drop heavy header/footer fills so the Liquid Glass reads behind the chrome. */
+html.kinora-native .footer-glass,
+html.kinora-native header {
+  background: rgba(20, 18, 16, 0.28) !important;
+}
+
+/* Blanket the native shell: every control / rounded panel / input picks up the
+   glass blur so it reads as Liquid Glass. Blur only shows through translucent
+   fills, so opaque CTAs (the gold buttons) are untouched. !important beats the
+   components' inline backgrounds. */
+html.kinora-native button,
+html.kinora-native input,
+html.kinora-native [class*="rounded"] {
+  backdrop-filter: blur(16px) saturate(160%) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) brightness(1.05) !important;
+}
+
+/* Give flat dark inline panels a faint translucent skin so the blur has
+   something to refract (covers the ad-hoc rgba(255,255,255,0.02–0.06) surfaces). */
+html.kinora-native [class*="rounded-xl"],
+html.kinora-native [class*="rounded-2xl"],
+html.kinora-native [class*="rounded-3xl"] {
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 26px -10px rgba(0, 0, 0, 0.5);
+}
+
+.refraction-left, .refraction-right { display: none; }
+
+/* ===== Shelf — minimal floating ===== */
+.shelf-container { position: relative; }
+
+.shelf-shadow-line {
+  height: 1px;
+  margin: 0 4px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 10%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.06) 90%,
+    transparent 100%);
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== Books ===== */
+.book-3d-wrapper {
+  position: relative;
+  transition: box-shadow 0.3s ease, border-radius 0.3s ease;
+  transform-style: preserve-3d;
+}
+
+.book-cover {
+  aspect-ratio: 2 / 3;
+  border-radius: 3px;
+  position: relative;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.3s ease, border-radius 0.3s ease;
+  transform-style: preserve-3d;
+}
+
+.book-cover-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/* 3D book thickness — right edge (pages side) */
+.book-cover::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  right: -8px;
+  width: 8px;
+  background: repeating-linear-gradient(
+    180deg,
+    #e8e2d8 0px,
+    #d4cec4 1px,
+    #e8e2d8 2px,
+    #d8d2c8 3px
+  );
+  border-radius: 0 2px 2px 0;
+  transform: rotateY(90deg);
+  transform-origin: left center;
+}
+
+/* 3D book thickness — bottom edge */
+.book-cover::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -8px;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    #e8e2d8 0px,
+    #d4cec4 1px,
+    #e8e2d8 2px,
+    #d8d2c8 3px
+  );
+  border-radius: 0 0 2px 2px;
+  transform: rotateX(90deg);
+  transform-origin: top center;
+}
+
+.book-3d-wrapper:hover .book-cover {
+  box-shadow:
+    0 14px 30px -6px rgba(0, 0, 0, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.28),
+    0 10px 38px -8px rgba(212, 164, 78, 0.34); /* warm gold lift on hover */
+  border-radius: 4px;
+}
+
+.book-spine {
+  background: linear-gradient(90deg,
+    rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.08) 6%,
+    transparent 12%, transparent 88%,
+    rgba(0, 0, 0, 0.06) 94%, rgba(0, 0, 0, 0.15) 100%);
+}
+
+.book-gloss {
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.1) 0%, transparent 25%,
+    transparent 75%, rgba(255, 255, 255, 0.04) 100%);
+  transition: opacity 0.3s ease;
+}
+
+.book-3d-wrapper:hover .book-gloss {
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.18) 0%, transparent 30%,
+    transparent 70%, rgba(255, 255, 255, 0.08) 100%);
+}
+
+/* ===== Progress Ring ===== */
+.progress-ring-bg {
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-ring-track {
+  stroke: rgba(255, 255, 255, 0.25);
+  fill: none;
+}
+
+.progress-ring-fill {
+  stroke: #ffffff;
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+/* ===== Badge ===== */
+.badge-new-gold {
+  background: linear-gradient(135deg, rgba(212, 164, 78, 0.9) 0%, rgba(180, 140, 60, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(212, 164, 78, 0.25);
+}
+
+/* ===== Footer ===== */
+.footer-glass {
+  background: rgba(20, 18, 16, 0.45);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.1);
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 80px;
+}
+
+/* ===== Animations ===== */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* ===== Performance: skip rendering off-screen sections ===== */
+.shelf-container {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 240px;
+}
+
+/* ============================================================
+   MAGIC LAYER — a living ambient backdrop, drifting light motes,
+   cursor-tracking glare on cards, and a shimmer for the greeting.
+   Everything here is GPU-only (transform/opacity) and fully
+   reduced-motion aware. Defined last so it wins.
+   ============================================================ */
+
+/* Ambient home backdrop: two slow auroras + faint rising embers that sit behind
+   all content (z-0) to give the app a warm, candle-lit, "stories breathing" feel. */
+.home-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+
+.home-aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(95px);
+  will-change: transform;
+}
+
+.home-aurora-blob--gold {
+  width: 620px;
+  height: 620px;
+  top: -20%;
+  left: -10%;
+  opacity: 0.5;
+  background: radial-gradient(circle, rgba(212, 164, 78, 0.6), transparent 70%);
+  animation: aurora-drift-1 40s ease-in-out infinite;
+}
+
+.home-aurora-blob--amber {
+  width: 540px;
+  height: 540px;
+  bottom: -18%;
+  right: -12%;
+  opacity: 0.42;
+  background: radial-gradient(circle, rgba(168, 104, 44, 0.6), transparent 70%);
+  animation: aurora-drift-2 52s ease-in-out infinite;
+}
+
+/* Slow rising "embers" — tiny warm sparks that drift up and fade, like dust in a
+   sunbeam. Count is small and opacity tiny so it reads as atmosphere, not noise. */
+.ambient-mote {
+  position: absolute;
+  bottom: -2vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 200, 120, 0.9), rgba(232, 200, 120, 0) 70%);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: ambient-rise linear infinite;
+}
+
+@keyframes ambient-rise {
+  0%   { transform: translate3d(0, 0, 0) scale(0.5); opacity: 0; }
+  12%  { opacity: var(--mote-opacity, 0.45); }
+  88%  { opacity: var(--mote-opacity, 0.45); }
+  100% { transform: translate3d(var(--mote-dx, 24px), -100vh, 0) scale(1.05); opacity: 0; }
+}
+
+/* Cursor-tracking specular glare for CometCard covers — a soft highlight that
+   slides under the pointer, so each cover catches the light as you hover. */
+.comet-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    220px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(232, 200, 120, 0.14) 32%,
+    transparent 62%
+  );
+  z-index: 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-aurora-blob,
+  .ambient-mote { animation: none; }
+  .ambient-mote { opacity: 0; }
+}
+
+/* ── Below: Agent 8 design-system layer (merged; token-driven, wins on overlap) ── */
+/* ============================================================================
+   KINORA — BASE  (Agent 08 · reset · body · scrollbar · base typography)
+   Consumes tokens.css. Loaded after index.css so it wins on equal specificity.
+   Scope is deliberately light: it sets the typographic + colour foundation and
+   leaves component-controlled type/geometry alone (no blanket heading restyle,
+   no button changes).
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  font-family: var(--k-font-ui);
+  font-size: var(--k-text-base);
+  font-weight: var(--k-weight-normal);
+  line-height: var(--k-leading-normal);
+  color: var(--k-text);
+  background: var(--k-bg-deep);
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+}
+
+/* Variable-font niceties where supported (Fraunces/Newsreader carry opsz). */
+@supports (font-variation-settings: normal) {
+  body {
+    font-optical-sizing: auto;
+  }
+}
+
+/* Selection — a warm lamplight wash rather than the OS blue. */
+::selection {
+  background: rgb(var(--k-accent-rgb) / 0.28);
+  color: var(--k-text);
+}
+
+/* Focus — visible, on-brand, and only for keyboard users. */
+:focus-visible {
+  outline: 2px solid rgb(var(--k-accent-rgb) / 0.75);
+  outline-offset: 2px;
+  border-radius: var(--k-radius-xs);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── Scrollbars — hidden by default (matches the existing chrome), with an
+      opt-in slim warm scrollbar for scroll regions that want one. ── */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--k-text-rgb) / 0.18) transparent;
+}
+.scrollbar-slim::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background: rgb(var(--k-text-rgb) / 0.16);
+  border-radius: var(--k-radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--k-text-rgb) / 0.28);
+  background-clip: content-box;
+}
+
+/* ── Base typographic helpers (opt-in classes; components keep their own type) ──
+
+   .font-display / .font-reading mirror the Tailwind font tokens for plain CSS. */
+.font-display {
+  font-family: var(--k-font-display);
+  letter-spacing: var(--k-tracking-display);
+}
+.font-reading {
+  font-family: var(--k-font-reading);
+}
+
+/* Eyebrow / kicker label — small tracked caps, the "title card" voice. */
+.text-eyebrow {
+  font-family: var(--k-font-ui);
+  font-size: var(--k-text-xs);
+  font-weight: var(--k-weight-semibold);
+  letter-spacing: var(--k-tracking-caps);
+  text-transform: uppercase;
+  color: var(--k-text-subtle);
+}
+
+/* Book-quality reading column. Agent 06's reading pane can layer its
+   theme/scale on top; this sets the measure, leading and optical defaults. */
+.prose-reading {
+  font-family: var(--k-font-reading);
+  font-size: var(--k-text-md);
+  line-height: var(--k-leading-reading);
+  letter-spacing: 0.001em;
+  max-width: var(--k-measure);
+  font-feature-settings: "liga" 1, "calt" 1, "onum" 1, "kern" 1;
+  text-wrap: pretty;
+  hyphens: auto;
+}
+.prose-reading p + p {
+  margin-top: 0.9em;
+}
+
+/* Tabular numerals for counts/progress so figures don't jitter. */
+.nums-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
