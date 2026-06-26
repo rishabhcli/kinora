@@ -8,11 +8,18 @@
   _REDIS_URL=redis://localhost:6379/15, _S3_ENDPOINT_URL=http://localhost:9000.
 - Alembic head e843aa7682b2 (cover_key). Captain (A12) continuously merges agents.
 
-## Gate status (after re-merging overnight/integration @ 6a39e6c)
-- `make lint` → **GREEN** ✅ (ruff + mypy 234 files; captain fixed the sibling errors).
-- `make test` → 533 passed pre-merge; re-running post-merge to reconfirm.
+## Gate status (after re-merging overnight/integration @ 6a39e6c) — ALL GREEN
+- `make lint` → **GREEN** ✅ (ruff + mypy 234 files).
+- `make test` → **534 passed, 0 failed** ✅ (post-merge).
 - `pnpm --filter @kinora/desktop typecheck && build` → ✅ (incl. a11y fixes).
+- `make migrate` clean (cover_key e843aa7682b2, round-trips). ✅
 - a11y: 2 serious axe violations (chip contrast + scrollable shelf) FIXED.
+
+## ONLY remaining DoD gate: seed ≥100 books
+- Seed running with **concurrent prefetch** (3x faster, ~50 books, climbing fast).
+- Watcher `bi9imavlv` fires when pubdom count ≥100 (or seed exits).
+- WHEN ≥100: re-shoot 01-library.png (services on 8010 + vite + `node _a05_capture.mjs`),
+  commit final artifacts, then output `<promise>AGENT 05 COMPLETE</promise>`.
 
 ## Seed (the remaining gate for ≥100 books)
 - Running in background (nohup): `backend/scripts/seed_library_100.py` → live kinora DB.
