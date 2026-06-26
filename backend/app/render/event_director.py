@@ -74,7 +74,10 @@ if TYPE_CHECKING:
 
 logger = get_logger("app.render.event_director")
 
-#: An event bundles this many shots into one continuous film (the spec's 3–6).
+#: The recommended shot band for an event (the spec's 3–6). ``MAX_EVENT_SHOTS`` is
+#: a hard cap (extra beats are not crammed into one event); ``MIN_EVENT_SHOTS`` is
+#: a *recommended* floor, not enforced — a genuinely sparse beat-cluster yields
+#: fewer shots rather than inventing beats to pad it (logged as ``below_recommended_min``).
 MIN_EVENT_SHOTS = 3
 MAX_EVENT_SHOTS = 6
 #: The per-shot duration band the event director chooses within (seconds).
@@ -299,10 +302,14 @@ def plan_event_script(
 ) -> EventScript:
     """Cluster ``beats`` into an ordered event shot list (pure, deterministic).
 
-    One beat → one shot (the §4.2 default), capped at ``max_shots``. Each shot gets
-    a per-beat duration, a §9.3 render mode chained off the previous shot, a
-    shot-grammar camera, and a :class:`ContinuityDirective` carrying the canon's
-    wardrobe/setting/lighting/time-of-day plus the explicit last-frame hand-off.
+    One beat → one shot (the §4.2 default), capped at ``max_shots`` (extra beats
+    belong to the next event, not crammed in here). ``beats`` is expected to be a
+    pre-clustered group of ~:data:`MIN_EVENT_SHOTS`–:data:`MAX_EVENT_SHOTS`; a
+    sparser cluster simply yields fewer shots (beats are never invented to pad).
+    Each shot gets a per-beat duration, a §9.3 render mode chained off the previous
+    shot, a shot-grammar camera, and a :class:`ContinuityDirective` carrying the
+    canon's wardrobe/setting/lighting/time-of-day plus the explicit last-frame
+    hand-off.
     """
     chosen = list(beats[:max_shots])
     has_locked = _has_locked_character(canon)
@@ -371,6 +378,7 @@ def plan_event_script(
         event_id=event_id,
         scene_id=scene_id,
         shots=len(shots),
+        below_recommended_min=len(shots) < MIN_EVENT_SHOTS,
         modes=[s.render_mode.value for s in shots],
     )
     return EventScript(event_id=event_id, book_id=book_id, scene_id=scene_id, shots=shots)
