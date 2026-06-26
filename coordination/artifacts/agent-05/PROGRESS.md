@@ -8,12 +8,11 @@
   _REDIS_URL=redis://localhost:6379/15, _S3_ENDPOINT_URL=http://localhost:9000.
 - Alembic head e843aa7682b2 (cover_key). Captain (A12) continuously merges agents.
 
-## Gate status
-- `make test` → **533 passed, 0 failed** ✅
-- `pnpm --filter @kinora/desktop typecheck && build` → ✅
-- My lane `ruff` + `mypy` → CLEAN ✅
-- `make lint` → ❌ blocked by 3 **sibling** mypy errors (A7 test_optim_cache, A1 test_render_continuity_qa),
-  pre-existing on integration. Flagged: coordination/requests/agent-12-from-05.md. NOT my lane — captain to clear.
+## Gate status (after re-merging overnight/integration @ 6a39e6c)
+- `make lint` → **GREEN** ✅ (ruff + mypy 234 files; captain fixed the sibling errors).
+- `make test` → 533 passed pre-merge; re-running post-merge to reconfirm.
+- `pnpm --filter @kinora/desktop typecheck && build` → ✅ (incl. a11y fixes).
+- a11y: 2 serious axe violations (chip contrast + scrollable shelf) FIXED.
 
 ## Seed (the remaining gate for ≥100 books)
 - Running in background (nohup): `backend/scripts/seed_library_100.py` → live kinora DB.
