@@ -10,6 +10,7 @@ from app.composition import Container
 from app.db.models.enums import EntityType, RenderPriority, ShotStatus
 from app.db.repositories.shot import ShotRepo
 from app.memory.canon_service import CanonService
+from app.memory.conflict_log import record_conflict_history
 from app.memory.interfaces import ShotSpec
 from app.queue.redis_queue import book_channel, conflict_object_key, session_channel
 from tests.conftest import seed_owned_book
