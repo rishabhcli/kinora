@@ -116,3 +116,48 @@ def test_merge_uses_segment_length_when_durations_omitted() -> None:
     merged = merge_sync_segments([seg, seg], scene_id="s")
     assert merged.duration_s == 8.0
     assert merged.segments[1].video_start_s == 4.0
+
+
+def test_merge_sync_segments_accounts_for_crossfade_overlap() -> None:
+    """When the stitch crossfades by ``overlap_s`` per seam, each shot starts that
+    much *earlier* (it overlaps the prior shot's tail), so the merged timeline
+    shrinks by ``(n-1)·overlap`` and the timecodes stay exact across the join."""
+
+    def seg(shot_id: str) -> SyncSegment:
+        return SyncSegment(
+            shot_id=shot_id,
+            video_start_s=0.0,
+            video_end_s=3.0,
+            page=1,
+            page_turn_at_s=2.8,
+            words=[SyncWord(word_index=1, text="x", t_start=0.5, t_end=1.0, bbox=None)],
+        )
+
+    merged = merge_sync_segments(
+        [seg("a"), seg("b"), seg("c")], scene_id="s", durations=[3.0, 3.0, 3.0], overlap_s=0.5
+    )
+    assert merged.duration_s == 8.0  # 9 − 2×0.5
+    assert merged.segments[0].video_start_s == 0.0
+    assert merged.segments[1].video_start_s == 2.5  # 3.0 − 0.5
+    assert merged.segments[2].video_start_s == 5.0  # 5.5 − 0.5
+    assert merged.segments[-1].video_end_s == 8.0
+    # Word timings ride the same overlap-aware shift as their segment.
+    assert merged.segments[1].words[0].t_start == pytest.approx(3.0)  # 2.5 + 0.5
+
+
+def test_concat_with_crossfade_overlaps_and_stays_vertical() -> None:
+    """The cinematic event stitch crossfades video + audio between shots: ONE
+    vertical 720×1280 mp4, playable, whose length is the sum minus the overlaps
+    (no black frames, no aspect jump)."""
+    clips = [
+        degrade.ken_burns_over_image(
+            png_bytes(720, 1280), 3.0, audio_bytes=wav_bytes(3.0), size=(720, 1280)
+        )
+        for _ in range(3)
+    ]
+    scene = concat_clips(clips, crossfade_s=0.5)
+    info = degrade.probe(scene)
+    assert (info.width, info.height) == (720, 1280)
+    assert info.has_video is True and info.has_audio is True
+    assert abs(info.duration_s - 8.0) < 0.5  # 9s − 2×0.5s crossfade
+    assert degrade.verify_playable(scene) is True

@@ -55,7 +55,12 @@ from app.render.degrade import (
     ken_burns_over_image,
     zoom_for_camera,
 )
-from app.render.stitch import SceneSyncMap, concat_clips, merge_sync_segments
+from app.render.stitch import (
+    SceneSyncMap,
+    concat_clips,
+    effective_crossfade,
+    merge_sync_segments,
+)
 from app.render.sync_map import SyncSegment, build_sync_segment
 from app.storage.object_store import keys
 
@@ -71,6 +76,8 @@ MAX_EVENT_SHOTS = 6
 MIN_SHOT_S = 3.0
 MAX_SHOT_S = 8.0
 BASE_SHOT_S = 5.0
+#: Default seam dissolve for the cinematic event stitch (clamped per shot length).
+DEFAULT_CROSSFADE_S = 0.4
 
 #: Beat cues that mark a shot which must *land* on an exact pose/composition — the
 #: §9.3 ``first_last_frame`` branch (storyboard → storyboard, no drift-to-generic).
@@ -469,12 +476,14 @@ class EventDirector:
         store: BlobStore | None = None,
         film_size: tuple[int, int] = FILM_SIZE,
         fps: int = DEFAULT_FPS,
+        crossfade_s: float = DEFAULT_CROSSFADE_S,
         url_ttl: int = 3600,
     ) -> None:
         self._renderer = renderer or KenBurnsEventRenderer(film_size=film_size, fps=fps)
         self._store = store
         self._film_size = film_size
         self._fps = fps
+        self._crossfade_s = crossfade_s
         self._ttl = url_ttl
 
     async def render_event(
@@ -523,11 +532,18 @@ class EventDirector:
             )
             durations.append(shot_result.duration_s)
 
+        # Cinematic stitch: dissolve each seam (video xfade + audio crossfade); the
+        # sync map merges on the SAME overlap so its timecodes match the played film.
+        overlap = effective_crossfade(durations, self._crossfade_s)
         clips = [r.clip_bytes for r in rendered]
         clip_bytes = await anyio.to_thread.run_sync(
-            lambda: concat_clips(clips, size=self._film_size, fps=self._fps)
+            lambda: concat_clips(
+                clips, size=self._film_size, fps=self._fps, crossfade_s=overlap
+            )
         )
-        sync_map = merge_sync_segments(segments, scene_id=script.event_id, durations=durations)
+        sync_map = merge_sync_segments(
+            segments, scene_id=script.event_id, durations=durations, overlap_s=overlap
+        )
         continuity = await self._score_continuity(script, rendered)
 
         clip_key, clip_url, last_frame_keys = await self._persist(script, clip_bytes, rendered)
@@ -602,6 +618,7 @@ class EventDirector:
 
 __all__ = [
     "BASE_SHOT_S",
+    "DEFAULT_CROSSFADE_S",
     "MAX_EVENT_SHOTS",
     "MAX_SHOT_S",
     "MIN_EVENT_SHOTS",
