@@ -25,6 +25,7 @@ import asyncio
 import json
 import sys
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,24 @@ _REPO = Path(__file__).resolve().parents[2]
 CATALOG = _REPO / "assets" / "books" / "catalog.json"
 REPORT = _REPO / "assets" / "books" / "seed-report.json"
 PAGES_TO_RASTERISE = 8
+#: Concurrent EPUB prefetch fan-out — one book per mirror (pglaf/aleph/www) so no
+#: single host sees concurrency (Gutenberg drops concurrent transfers per host).
+PREFETCH_WORKERS = 3
+
+
+def _prefetch(entries: list[CatalogEntry]) -> None:
+    """Fetch missing EPUBs concurrently across mirrors (cached ones return fast)."""
+    print(f"prefetching {len(entries)} EPUBs (×{PREFETCH_WORKERS} mirrors)…", flush=True)
+    done = 0
+    with ThreadPoolExecutor(max_workers=PREFETCH_WORKERS) as pool:
+        futures = [
+            pool.submit(download, e.gutenberg_id, e.epub_url, mirror_start=i % PREFETCH_WORKERS)
+            for i, e in enumerate(entries)
+        ]
+        for _ in as_completed(futures):
+            done += 1
+            if done % 15 == 0:
+                print(f"  prefetched {done}/{len(entries)}", flush=True)
 
 #: A cinematic art-direction per genre (drives the STYLE entity + shot prompts).
 _ART_BY_GENRE: dict[str, str] = {
@@ -98,6 +117,8 @@ async def amain(argv: list[str] | None = None) -> int:
         entries = entries[: args.limit]
     use_hd = not args.no_hd
     print(f"seeding {len(entries)} books (hd_covers={use_hd}, force={args.force})…", flush=True)
+
+    _prefetch(entries)
 
     report: list[dict[str, Any]] = []
     sources: Counter[str] = Counter()
