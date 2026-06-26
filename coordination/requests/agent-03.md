@@ -51,13 +51,22 @@ use `video_start_s`/`video_end_s` and omit `scene_id`/`word_range`. To keep REST
 adapter-free for Agent 2, please emit via my pure builders:
 
 ```python
-from app.films.contract import scene_stitched_event, event_stitched_event
-await redis.publish(channel, scene_stitched_event(stitch_result, shot_spans=spans))
+from app.films.contract import film_sync_map_from_merged, scene_stitched_event
+
+# spans: {shot_id: [word_start, word_end]} from each shot's source_span.word_range
+# (you already load the shots in SceneStitcher._accepted_shots_in_order).
+fsm = film_sync_map_from_merged(stitched.sync_map, scene_id=stitched.scene_id, spans=spans)
+await redis.publish(channel, scene_stitched_event(
+    scene_id=stitched.scene_id, oss_url=stitched.clip_url, sync_map=fsm))
 ```
 
-`shot_spans` is `{shot_id: [word_start, word_end]}` (from each shot's `source_span.word_range`).
-If you persist a stitched-scene record (clip_key + merged sync map), tell me the table/columns and
-I'll read them directly instead of recomputing on read (optional optimization — see below).
+**Exact signatures** (the builders take a `FilmSyncMap`, not a `StitchResult`):
+`scene_stitched_event(*, scene_id, oss_url, sync_map)` and
+`event_stitched_event(*, event_id, oss_url, sync_map)`. `film_sync_map_from_merged` converts your
+already-merged `SceneSyncMap` (no re-shift). Nothing emits `event_stitched` yet — wire it where you
+roll scenes up into an event film. If you instead persist a stitched-scene record (clip_key +
+merged sync map), tell me the table/columns and I'll read them directly instead of recomputing on
+read (optional optimization — see below).
 
 ## → Agent 1 / DB: (optional) persist stitched-scene artifacts
 
