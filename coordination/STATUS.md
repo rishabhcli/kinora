@@ -18,6 +18,11 @@
 - [x] **DoD#3** legacy aliases (incl. opacity modifiers) verified in compiled CSS.
 - [x] **DoD#4** AA-contrast gate green (`apps/desktop/scripts/check-contrast.mjs`).
 - [x] Buttons untouched — only ADDITIVE Tailwind scales; no button rule edited.
+- [x] **DoD#2** before/after screenshots — login, library, reading (dark + sepia/light) —
+      in `coordination/artifacts/agent-10/` (+ `agent08-design-before-after.md`). Captured
+      against the live renderer + backend (real demo library); all 5 pairs differ.
+- [x] WS4 cohesion pass — login bookwall + sign-in card + home ambient auroras pulled
+      onto tokens (colour values only; card kept solid/legible). (`glass.css`)
 
 ### AA contrast results (WCAG 2.1, on the dark spine; run `node apps/desktop/scripts/check-contrast.mjs`)
 | pair | ratio | target |
@@ -33,13 +38,15 @@
 | read contrast ink / bg | 21.00 | 7.0 (AAA) |
 **All pairs pass.** (Old `subtle #6b6258` failed AA at ~2.8:1 — now fixed.)
 
-### Remaining (in progress)
-- [ ] **DoD#2** before/after screenshots (login, library, reading; dark + a light
-      theme) → `coordination/artifacts/agent-10/`.
-- [ ] Cohesion pass: tokenise the remaining hardcoded gradient/background colours
-      (login aurora's incoherent purple/blue, bookwall, hero) — coordinate w/ Agent 11.
-- [ ] Font bundling for offline/perf (stretch) — coordinate w/ Agent 7.
-- [ ] Self code-review vs. plan + CLAUDE.md before the completion promise.
+### All DoD items complete. ✅
+DoD#1 (typecheck+build green) · DoD#2 (before/after screenshots) · DoD#3 (contract +
+legacy aliases resolve) · DoD#4 (AA gate + status) — all met. Self-review done.
+
+### Stretch / future iterations (not blocking)
+- [ ] Font bundling for offline/perf — coordinate w/ Agent 7 (currently Google CDN).
+- [ ] Tokenise book-edge cream colours + remaining magic-layer rgba.
+- [ ] Per-book accent theming from cover art (consume Agent 5's palette).
+- [ ] A full light *UI* theme (`[data-theme="light"]`) beyond reading themes.
 
 ### Handoffs filed
 - `requests/agent-12-from-08.md` — partials are loaded via `main.tsx`; formalise the
