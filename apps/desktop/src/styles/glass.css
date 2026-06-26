@@ -400,9 +400,9 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
   background: none;
   box-shadow: var(--k-ring-top);
 }
-.glass-card::after,
-.glass-control::after {
-  background: linear-gradient(125deg, rgb(255 255 255 / 0.16) 0%, transparent 34%, transparent 100%);
+/* Card glint only — NOT .glass-control (buttons are frozen; their sheen stays). */
+.glass-card::after {
+  background: linear-gradient(125deg, var(--k-specular-soft) 0%, transparent 34%, transparent 100%);
   opacity: 0.5;
 }
 
@@ -414,6 +414,37 @@ html.lg-refract-on .liquid-glass-dock,
 html.lg-refract-on .glass-input {
   -webkit-backdrop-filter: url(#lg-refract) blur(var(--k-blur)) saturate(var(--k-saturate)) brightness(var(--k-material-bright));
   backdrop-filter: url(#lg-refract) blur(var(--k-blur)) saturate(var(--k-saturate)) brightness(var(--k-material-bright));
+}
+
+/* ── CROSS-SURFACE COLOUR COHESION ───────────────────────────────────────
+   Pull the remaining hardcoded surfaces onto the palette so the WHOLE app
+   shifts with the tokens. COLOUR VALUES ONLY (Agent 08's mandate over
+   backgrounds/surfaces/gradients) — geometry/behaviour/structure untouched.
+   Coordinate w/ Agent 11 (login). NOTE: `.login-aurora*`, `.login-hero`,
+   `.login-tagline`, `.login-card`, `.login-netflix-bg` are dead code (no
+   component renders them) — left for Agent 11 to delete. */
+
+/* Login backdrop "bookwall" — warm lamplit vellum-dark, not flat near-black. */
+.bookwall {
+  background:
+    radial-gradient(120% 80% at 50% -12%, rgb(var(--k-accent-deep-rgb) / 0.22), transparent 60%),
+    linear-gradient(180deg, rgb(var(--k-bg-deep-rgb)) 0%, rgb(var(--k-bg-rgb)) 52%, rgb(var(--k-bg-deep-rgb)) 100%);
+}
+
+/* Sign-in card joins the token system. Kept solid (0.92) + the existing blur for
+   legibility (per the prior "solid frosted card" fix); only colour/depth change. */
+.login-form-enter {
+  background: rgb(var(--k-surface-rgb) / 0.92);
+  border: 0.5px solid var(--k-border-strong);
+  box-shadow: var(--k-ring-top), var(--k-elev-5);
+}
+
+/* Home ambient auroras track the accent token (were hardcoded gold/amber). */
+.home-aurora-blob--gold {
+  background: radial-gradient(circle, rgb(var(--k-accent-rgb) / 0.55), transparent 70%);
+}
+.home-aurora-blob--amber {
+  background: radial-gradient(circle, rgb(var(--k-accent-deep-rgb) / 0.6), transparent 70%);
 }
 
 /* Honour reduced transparency: drop blur and lean on the solid token fills
