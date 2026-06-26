@@ -46,7 +46,16 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
     <div
       className="flex-shrink-0 w-[150px] group cursor-pointer"
       style={{ perspective: 600 }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${book.title} by ${book.author}${book.genre ? `, ${book.genre}` : ""}${book.progress > 0 ? `, ${book.progress}% read` : ""}`}
       onClick={() => onOpen?.(book)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen?.(book);
+        }
+      }}
     >
       <CometCard rotateDepth={12} translateDepth={15}>
         <div className="book-3d-wrapper relative mb-1.5">
@@ -96,6 +105,14 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
         {book.title}
       </h3>
       <p className="text-[10px] text-kinora-muted truncate">{book.author}</p>
+      {book.genre && (
+        <span
+          className="inline-block mt-1 rounded px-1.5 py-px text-[8px] font-semibold tracking-wide uppercase"
+          style={{ background: "rgba(212,164,78,0.15)", color: "rgba(212,164,78,0.92)" }}
+        >
+          {book.genre}
+        </span>
+      )}
     </div>
   );
 }

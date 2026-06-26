@@ -23,7 +23,24 @@
 
 ### Desktop client (`apps/desktop/src/lib/api/library.ts`)
 
-- `listLibrary()` → `Book[]` (real backend, cover_url-bearing) — to be published.
-- `uploadBook(file, opts)` → upload + ingest-status polling — to be published.
+Built on the shared base client (`lib/api.ts`) without modifying it:
+
+- `listLibrary(): Promise<LibraryBook[]>` — the user's shelf, newest first, with
+  HD `coverImage` (from `cover_url`) and catalogue `genre`/`era` joined by id.
+- `uploadBook(file, fields?): Promise<LibraryBook>` — POST a PDF/EPUB.
+- `pollBookUntilReady(id, onUpdate, opts?)` — poll ingest status to ready.
+- `LibraryBook = Book & { genre?, era? }` (the optional fields are additive on the
+  shared `Book`; the reading room ignores them).
+- Pure helpers: `searchBooks`, `sortBooks(key)`, `shelvesFor` (Continue Reading +
+  genre shelves + "Your Library"), plus `CATALOG_GENRES`.
+
+`<BookCard>` is keyboard-openable (role=button, Enter/Space, aria-label) and shows
+a genre tag. `<UploadBook>` is drag-drop + click, validating type/size/page-cap
+with friendly errors and surfacing optimistic placeholders via `onUploadsChange`.
+
+### Catalogue (renderer)
+
+- `apps/desktop/src/data/catalog.ts` — `CATALOG_META` (id → genre/era/tags) +
+  `CATALOG_GENRES`, auto-generated from `assets/books/catalog.json`.
 
 _Statuses/shapes finalize as the work lands; this section is updated per commit._

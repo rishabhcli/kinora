@@ -25,5 +25,17 @@
   Both are shared seams. Change is additive and minimal (one field + one presign).
   Agent 10 (reading) and Agent 11 (login backdrop) consume `cover_url`.
 
-## 4. (none yet) Electron file-picker / package.json
-- No changes needed so far; the existing `main.ts` PDF/EPUB filter is sufficient.
+## 4. Electron Cmd+O → upload bridge (LOW, optional)
+- `main.ts` already filters PDF/EPUB and sends the picked file **path** on the
+  `kinora:add-book` channel, but `preload.ts` exposes no `ipcRenderer` bridge, and
+  the renderer needs the file **bytes** to `POST /api/books`. WS3 drag-drop + the
+  in-app `<input type=file>` cover the flow today (no Electron change). To also
+  light up Cmd+O: expose `window.kinora.onAddBook(cb)` + a `readFileBytes(path)`
+  (or send bytes directly) from preload. Non-blocking.
+
+## 5. Nav shell → `LibraryPage` book-open wiring (MEDIUM, for Agent 10)
+- `LibraryPage` now accepts `onOpenBook?: (book: Book) => void` and threads it to
+  every `BookCard`. `HomePage` currently renders `<LibraryPage />` with no props.
+  Please pass `onOpenBook` from the nav shell so a card click opens the reading
+  room. The `Book` shape is unchanged except two **optional** additive fields
+  (`genre?`, `era?`) the reading room can ignore.
