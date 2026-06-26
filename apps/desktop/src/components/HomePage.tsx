@@ -16,6 +16,7 @@ import {
   useSharedElement,
   type Rect,
 } from "../motion";
+import MotionShowcase from "../motion/MotionShowcase";
 import logoImg from "../assets/logo-transparent.png";
 import {
   continueReading,
@@ -124,8 +125,17 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
     Pricing: <Suspense fallback={<PageFallback />}><PricingPage /></Suspense>,
   };
 
+  // Dev-only motion showcase (gated behind ?motiondemo) — demonstrates the
+  // primitives (ShelfScroller/Tilt) the product wires at integration.
+  const motionDemo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("motiondemo");
+
   return (
     <MotionProvider>
+    {motionDemo ? (
+      <MotionShowcase />
+    ) : (
     <div className="kinora-bg min-h-screen flex flex-col relative">
       <AmbientBackground />
       <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />
@@ -199,6 +209,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         )}
       </BookOpenTransition>
     </div>
+    )}
     <MotionDebugOverlay />
     </MotionProvider>
   );
