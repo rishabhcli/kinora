@@ -26,6 +26,7 @@ class BookRepo(BaseRepository):
         status: BookStatus = BookStatus.IMPORTING,
         num_pages: int | None = None,
         art_direction: str | None = None,
+        cover_key: str | None = None,
         watermark_low_s: float | None = None,
         watermark_high_s: float | None = None,
         commit_horizon_s: float | None = None,
@@ -38,6 +39,7 @@ class BookRepo(BaseRepository):
             author=author,
             user_id=user_id,
             source_pdf_key=source_pdf_key,
+            cover_key=cover_key,
             status=status,
             num_pages=num_pages,
             art_direction=art_direction,
@@ -81,6 +83,13 @@ class BookRepo(BaseRepository):
         """Record the extracted page count."""
         await self.session.execute(
             update(Book).where(Book.id == book_id).values(num_pages=num_pages)
+        )
+        await self.session.flush()
+
+    async def set_cover_key(self, book_id: str, cover_key: str | None) -> None:
+        """Point a book at its (HD or generated) cover object (§5.1 covers)."""
+        await self.session.execute(
+            update(Book).where(Book.id == book_id).values(cover_key=cover_key)
         )
         await self.session.flush()
 

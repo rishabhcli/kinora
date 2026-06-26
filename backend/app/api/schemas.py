@@ -89,6 +89,10 @@ class BookResponse(BaseModel):
     progress: float | None = None
     #: Current ingest stage label (the frontend reads ``book.stage``).
     stage: str | None = None
+    #: Presigned GET URL for the book's cover (``books.cover_key``), or ``null``
+    #: when none yet. Agent 10 (reading) + Agent 11 (login backdrop) consume this;
+    #: ``GET /books/{id}/cover`` is the stable redirecting accessor (Agent 05).
+    cover_url: str | None = None
 
 
 class PageResponse(BaseModel):
