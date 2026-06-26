@@ -1,0 +1,13 @@
+/* ============================================================
+   styles/tokens.css — OWNER: Agent 8 (color/depth/typography)
+   Design tokens / CSS custom properties (see CONTRACTS §1).
+   Split verbatim from the monolithic index.css by the Captain (A12)
+   at t0 so owners stop colliding on one file. Rules are byte-exact;
+   edit only within your lane (see coordination/OWNERSHIP.md).
+   ============================================================ */
+
+:root {
+  --spring-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --spring-duration: 0.5s;
+}

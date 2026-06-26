@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./index.css";
+import "./styles/index.css";
 
 // In the native macOS shell (apps/desktop-native) the window is a real
 // NSGlassEffectView; flag the document so the UI goes translucent and the

@@ -1,0 +1,276 @@
+/* ============================================================
+   styles/glass.css — OWNER: Agent 8 (color/depth/typography)
+   Liquid Glass material (CONTRACTS §1). v1 then macOS-26 v2 — order preserved so v2 wins.
+   Split verbatim from the monolithic index.css by the Captain (A12)
+   at t0 so owners stop colliding on one file. Rules are byte-exact;
+   edit only within your lane (see coordination/OWNERSHIP.md).
+   ============================================================ */
+
+/* ===== Liquid Glass — Apple-style (max realism) ===== */
+
+/* Layer 1: Primary diagonal sheen — simulates main light source */
+.liquid-glass-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    /* Top-left bright catch light */
+    radial-gradient(ellipse 60% 100% at 0% 0%, rgba(255,255,255,0.18) 0%, transparent 50%),
+    /* Diagonal sheen across surface */
+    linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 25%, transparent 45%, transparent 55%, rgba(255,255,255,0.02) 75%, rgba(255,255,255,0.06) 100%),
+    /* Bottom-right subtle bounce light */
+    radial-gradient(ellipse 50% 80% at 100% 100%, rgba(255,255,255,0.08) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Layer 2: Edge rim lighting + inner glow — simulates light transmission through glass edges */
+.liquid-glass-dock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    /* Top rim — bright light catching the top edge */
+    linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 2%, transparent 8%, transparent 92%, rgba(255,255,255,0.04) 98%, rgba(255,255,255,0.1) 100%),
+    /* Left rim — light catching left edge */
+    linear-gradient(90deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.04) 3%, transparent 8%, transparent 92%, rgba(255,255,255,0.03) 97%, rgba(255,255,255,0.08) 100%);
+  pointer-events: none;
+  z-index: 0;
+  /* Inner glow — light bouncing inside the glass */
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.15),
+    inset 0 -1px 1px rgba(255,255,255,0.06),
+    inset 1px 0 1px rgba(255,255,255,0.08),
+    inset -1px 0 1px rgba(255,255,255,0.04);
+}
+
+/* Base glass — strong blur, high saturation, brightness lift */
+.liquid-glass-dock {
+  position: relative;
+  background: rgba(28, 26, 23, 0.92);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    /* Outer drop shadow — depth */
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    /* Outer rim glow — light leaking through edges */
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    /* Bottom ambient bounce */
+    0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(22px) saturate(170%) brightness(1.06);
+  -webkit-backdrop-filter: blur(22px) saturate(170%) brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 30px -8px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: rgba(232, 226, 216, 0.9);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.glass-input:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 0 0 2px rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.glass-input::placeholder {
+  color: rgba(232, 226, 216, 0.3);
+}
+
+/* Glass control — the shared liquid-glass material for buttons and pills:
+   translucent, blurred, with a top specular highlight and a soft lift on hover. */
+.glass-control {
+  position: relative;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 226, 216, 0.92);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.18),
+    0 6px 18px -8px rgba(0, 0, 0, 0.5);
+  transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.12s ease, border-color 0.22s ease;
+}
+
+.glass-control:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2),
+    0 10px 24px -10px rgba(0, 0, 0, 0.55);
+}
+
+.glass-control:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.985);
+}
+
+.nav-btn-active {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.15),
+    0 4px 12px -4px rgba(0, 0, 0, 0.4);
+}
+
+.nav-btn-hover { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
+.nav-btn-hover:hover {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* ============================================================
+   LIQUID GLASS — macOS 26 "Tahoe" material. Real light-bending
+   refraction in Chromium (html.lg-refract-on) via the #lg-refract
+   SVG filter; vibrant blur + specular rim + sheen + floating
+   concentric capsules + gel interactions everywhere. Defined last
+   so it wins over the earlier glass classes.
+   ============================================================ */
+.glass-card,
+.glass-control,
+.glass-input,
+.liquid-glass-dock {
+  position: relative;
+  isolation: isolate;
+  -webkit-backdrop-filter: blur(13px) saturate(190%) brightness(1.12);
+  backdrop-filter: blur(13px) saturate(190%) brightness(1.12);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),        /* top specular rim */
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1),       /* edge light */
+    inset 0 -12px 26px -20px rgba(0, 0, 0, 0.55),     /* base depth */
+    0 16px 40px -14px rgba(0, 0, 0, 0.5);             /* float */
+}
+
+/* Light refractive tint (inline dark fills, e.g. the login card, still win). */
+.glass-card,
+.glass-control,
+.liquid-glass-dock {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* The signature specular glint — concentrated at the top-left, transparent over
+   content so text stays readable. */
+.glass-card::after,
+.glass-control::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.06) 18%,
+    transparent 40%,
+    transparent 72%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+
+/* Chromium: bend the backdrop like real glass. */
+html.lg-refract-on .glass-card,
+html.lg-refract-on .glass-control,
+html.lg-refract-on .liquid-glass-dock,
+html.lg-refract-on .glass-input {
+  -webkit-backdrop-filter: url(#lg-refract) blur(7px) saturate(190%) brightness(1.12);
+  backdrop-filter: url(#lg-refract) blur(7px) saturate(190%) brightness(1.12);
+  will-change: backdrop-filter;
+}
+
+/* Buttons → concentric glass capsules with a gel press. */
+.glass-control {
+  border-radius: 999px;
+  color: rgba(245, 242, 236, 0.96);
+  transition: transform 0.16s cubic-bezier(0.34, 1.45, 0.5, 1), box-shadow 0.22s ease, background 0.22s ease;
+}
+.glass-control:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.17);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.2),
+    0 20px 46px -16px rgba(0, 0, 0, 0.55);
+}
+.glass-control:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+}
+
+/* The dock is the floating functional layer — Find My's tab capsule. */
+.liquid-glass-dock {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* Nav tabs as bright glass pills. */
+.nav-btn-active {
+  background: rgba(255, 255, 255, 0.18) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(180%) brightness(1.1);
+  backdrop-filter: blur(10px) saturate(180%) brightness(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    0 6px 16px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ---- Blanket glass on EVERY interactive control + rounded surface ----
+   Catches all radii (lg/md/full/[Npx], not just xl), plus buttons, links-as-
+   buttons, inputs and selects. Solid gradient CTAs (`from-*`/`gradient`) and
+   media are excluded so they stay as designed. */
+button:not([class*="from-"]):not([class*="gradient"]),
+[role="button"],
+a[class*="rounded"],
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+select,
+[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(img):not(video) {
+  -webkit-backdrop-filter: blur(11px) saturate(175%) brightness(1.06);
+  backdrop-filter: blur(11px) saturate(175%) brightness(1.06);
+}
+
+/* Give rounded controls a real translucent glass skin + specular rim so even
+   opaque ones read as Liquid Glass (blur alone can't — it needs something to
+   refract). Excludes the gold gradient CTAs and the already-styled nav pill. */
+button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(.nav-btn-active),
+[role="button"][class*="rounded"]:not([class*="from-"]):not([class*="gradient"]),
+a[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 8px 20px -8px rgba(0, 0, 0, 0.45);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.14s ease;
+}
+button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(.nav-btn-active):hover,
+[role="button"][class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
+  transform: scale(0.96);
+}

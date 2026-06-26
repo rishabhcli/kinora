@@ -1,0 +1,15 @@
+/* ============================================================
+   styles/a11y.css — OWNER: Agent 6 (accessibility)
+   Accessibility overrides (CONTRACTS §3). Imported LAST. Feature-local reduced-motion guards stay with their feature.
+   Split verbatim from the monolithic index.css by the Captain (A12)
+   at t0 so owners stop colliding on one file. Rules are byte-exact;
+   edit only within your lane (see coordination/OWNERSHIP.md).
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-page > * > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
