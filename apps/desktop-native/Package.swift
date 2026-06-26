@@ -8,11 +8,12 @@ import PackageDescription
 // Requires the renderer dev server on :5173 (make app-desktop-dev).
 let package = Package(
     name: "KinoraGlass",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     targets: [
         .executableTarget(
             name: "KinoraGlass",
-            path: "Sources/KinoraGlass"
+            path: "Sources/KinoraGlass",
+            resources: [.copy("Resources")]
         )
     ]
 )

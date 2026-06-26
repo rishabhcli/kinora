@@ -115,7 +115,7 @@ app-mobile-start:
 # so run `make app-desktop-dev` in another shell first for live development.
 
 app-native:
-	swift run --package-path apps/desktop-native
+	DEVELOPER_DIR="$(shell ls -d /Applications/Xcode*.app 2>/dev/null | head -1)/Contents/Developer" swift run --package-path apps/desktop-native KinoraGlass
 
 app-native-bundle:
 	bash apps/desktop-native/build-app.sh
