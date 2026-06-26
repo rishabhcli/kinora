@@ -26,7 +26,8 @@ SHOT_A = {
     "page": 12,
     "page_turn_at_s": 4.8,
     "words": [
-        {"word_index": 4501, "text": "She", "t_start": 0.1, "t_end": 0.32, "bbox": [0.12, 0.34, 0.04, 0.02]},
+        {"word_index": 4501, "text": "She", "t_start": 0.1, "t_end": 0.32,
+         "bbox": [0.12, 0.34, 0.04, 0.02]},
         {"word_index": 4502, "text": "stood", "t_start": 0.32, "t_end": 0.61, "bbox": None},
     ],
 }
@@ -111,7 +112,9 @@ def test_scene_stitched_event_payload() -> None:
         [SHOT_A], scene_id="scene_005", spans=SPANS, durations=[5.0]
     )
     payload = scene_stitched_event(
-        scene_id="scene_005", oss_url="http://minio:9000/kinora/clips/b/scene_005.mp4", sync_map=film_map
+        scene_id="scene_005",
+        oss_url="http://minio:9000/kinora/clips/b/scene_005.mp4",
+        sync_map=film_map,
     )
     assert payload["event"] == "scene_stitched"
     assert payload["scene_id"] == "scene_005"

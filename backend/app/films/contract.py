@@ -156,7 +156,8 @@ def _as_mapping(obj: Mapping[str, Any] | Any) -> Mapping[str, Any]:
         return obj
     dump = getattr(obj, "model_dump", None)
     if callable(dump):
-        return dump(mode="python")  # type: ignore[no-any-return]
+        result: Mapping[str, Any] = dump(mode="python")
+        return result
     raise TypeError(f"cannot read sync segment from {type(obj)!r}")
 
 
