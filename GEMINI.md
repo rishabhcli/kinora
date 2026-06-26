@@ -4,6 +4,16 @@ This file provides guidance to the Gemini CLI when working with code in this rep
 
 Kinora turns a book/PDF into a **page-synced film that generates itself a few seconds ahead of the reader** — six AI agents share one versioned "canon" so a long adaptation stays visually consistent. The product is **native apps** (Electron desktop + Expo/React Native mobile) over a cloud **FastAPI** backend. There is no web frontend (the legacy Vite app was retired).
 
+## ⚠️ Current reality & key decisions (read first — supersedes stale notes below)
+
+- **MAIN app = `apps/desktop`** (Electron): the real product (auth, real backend library, vertical AI-video reading room, live API wiring). Native window glass = Electron `vibrancy` (macOS) / `backgroundMaterial: 'acrylic'` (Windows 11).
+- **SECONDARY app = `apps/desktop-native`** (native **SwiftUI**): a separate showcase whose only job is **real Liquid Glass** (`.glassEffect`, macOS 26). Not backend-wired. `make app-native`. Keep separate from Electron.
+- `packages/core` / `apps/mobile` (below) **don't exist on disk**; the API client is the hand-written `apps/desktop/src/lib/api.ts`.
+- **Liquid Glass is native-only** (SwiftUI `.glassEffect` / `NSGlassEffectView`); CSS is an imitation — never call it Liquid Glass. The SwiftUI app needs the **Xcode toolchain** (CLT lacks `SwiftUIMacros`); `make app-native` auto-sets `DEVELOPER_DIR`.
+- **Wan video (DashScope intl):** working ids in `backend/.env` — t2v `wan2.5-t2v-preview`/`wan2.1-t2v-turbo`, i2v `wan2.2-i2v-plus`/`wan2.1-i2v-turbo`; `wan2.7-t2v` (code default) and `wan2.2-t2v-plus` don't work. The `429` is on the image model, not video. Films are **vertical 720×1280**; saved to `~/Documents/Kinora-Generated-Videos/`.
+- **Local infra:** Postgres host port **5433** (5432 clashes with `admitly-postgres`); `S3_PUBLIC_BASE_URL=http://localhost:9000/kinora` + client `minio:9000`→`localhost:9000` rewrite. Demo login `demo@kinora.local` / `demo-password-123`.
+- **UI baseline:** Kinora-aditya @ `567c502` is the design baseline for `apps/desktop` UI reverts.
+
 ## Authoritative docs
 - **`kinora.md`** — the technical design (architecture, agents, pipeline, memory, budget). The backend cites its sections as `§4.5`, `§9.7`, etc. **When a docstring cites a `§`, read that section before changing the code.**
 - **`README.md`** — runnable overview + how to bring up the backend and run the apps.
