@@ -281,10 +281,35 @@ def http_get_bytes(url: str, *, timeout: float = 30.0, min_bytes: int = 1500) ->
         return None
 
 
+def source_hd_cover(title: str, author: str | None) -> tuple[bytes, str] | None:
+    """Best available HD cover bytes + its source label, or ``None`` (network).
+
+    Tries Open Library (``-L``) then Google Books (full-size), up-scaling to
+    :data:`HD_MIN_WIDTH`. The caller supplies the generated fallback when this
+    returns ``None``, so a cover is never blank.
+    """
+    ol = http_get_json(openlibrary_search_url(title, author))
+    if ol is not None:
+        cover_id = pick_openlibrary_cover_id(ol)
+        if cover_id is not None:
+            data = http_get_bytes(openlibrary_cover_url(cover_id))
+            if data is not None:
+                return ensure_min_width(data), "openlibrary"
+    gb = http_get_json(google_books_search_url(title, author))
+    if gb is not None:
+        url = pick_google_cover_url(gb)
+        if url is not None:
+            data = http_get_bytes(url)
+            if data is not None:
+                return ensure_min_width(data), "google"
+    return None
+
+
 __all__ = [
     "COVER_SIZE",
     "HD_MIN_WIDTH",
     "cover_palette",
+    "source_hd_cover",
     "ensure_min_width",
     "google_books_search_url",
     "http_get_bytes",

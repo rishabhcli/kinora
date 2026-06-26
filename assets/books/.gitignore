@@ -1,0 +1,4 @@
+# Downloaded EPUBs + the per-run seed report are reproducible artifacts
+# (re-fetched from catalog.json by seed_library_100.py); keep them out of git.
+public-domain/
+seed-report.json
