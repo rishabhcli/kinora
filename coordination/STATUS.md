@@ -27,6 +27,19 @@
   vs 40 fps (thrash). Dead-weight + lazy-ReadingRoom (−15.3 KB initial chunk) quantified.
 - All numbers + methodology in `coordination/PERF.md`; reproducible scripts in `coordination/benchmarks/`.
 
+### Integration reconciliation (discovered late — important)
+`overnight/integration` advanced **~75 commits during this session** (the parallel multi-agent run +
+Agent 12). It **already contains the Agent-07 optimization modules + `/api/optim` route — byte-identical
+to this branch (0 diff lines)** — merged at `7614f84 merge(A7)`, with `7742054 cycle 1 complete … gate
+green`. This worktree branched from the pre-orchestration base (`4863a0c`) and independently reproduced
+the identical deliverable, which **confirms its correctness**. Compatibility was verified by diff (0
+lines) rather than re-merging the 75-commit-diverged branch (the A7 work is already integrated, so a
+re-merge of a stale duplicate would add churn, not value).
+- **Migration note for Agent 12:** this branch's `d9e2f4a6b8c1` (books `(user_id, created_at)` index)
+  branches from `c8f1a2b3d4e5`; integration added `e843aa7682b2` on the same parent in parallel (siblings).
+  To land it, rebase `d9e2`'s `down_revision` onto `e843` (or add an alembic merge revision). It is an
+  *enabler* for the proposed paginated shelf (R6) — optional; the canonical A7 shipped no migration.
+
 ### Needs other agents / Agent 12 (flag-gated, behavior-preserving — `requests/agent-07.md`)
 - R1 cost-meter sink wiring + config flags (`composition.py`/`config.py`); R2 register `/api/optim`
   (route built + tested; one-line wiring deferred — router registration is Agent 12's seam); R3 routing
