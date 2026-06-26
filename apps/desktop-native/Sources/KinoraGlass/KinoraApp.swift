@@ -208,6 +208,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                FeaturedHero(book: kBooks[0]) { withAnimation(.smooth(duration: 0.4)) { openBook = kBooks[0] } }
                 shelf("Continue Reading", kBooks)
                 shelf("Recently Added", Array(kBooks.reversed()))
                 shelf("Popular on Kinora", kBooks)
@@ -230,6 +231,46 @@ struct HomeView: View {
                 .padding(.vertical, 4)
             }
         }
+    }
+}
+
+struct FeaturedHero: View {
+    let book: KBook
+    var onOpen: () -> Void
+    private let gold = Color(red: 0.83, green: 0.64, blue: 0.31)
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            AsyncImage(url: book.coverURL) { img in
+                img.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle().fill(.white.opacity(0.06))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 250)
+            .clipped()
+
+            // Legibility scrim under the text.
+            LinearGradient(colors: [.clear, .black.opacity(0.35), .black.opacity(0.82)], startPoint: .top, endPoint: .bottom)
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text("FEATURED").font(.system(size: 10, weight: .bold)).tracking(2).foregroundStyle(.white.opacity(0.7))
+                Text(book.title).font(.system(.largeTitle, design: .serif).weight(.bold)).foregroundStyle(.white)
+                Text("by \(book.author)").font(.callout).foregroundStyle(.white.opacity(0.8))
+                HStack(spacing: 10) {
+                    Button(action: onOpen) { Label("Read Now", systemImage: "book.fill").font(.system(size: 13, weight: .semibold)) }
+                        .buttonStyle(.glassProminent).tint(gold)
+                    Button(action: onOpen) { Label("Watch Film", systemImage: "play.fill").font(.system(size: 13, weight: .semibold)) }
+                        .buttonStyle(.glass)
+                }
+                .padding(.top, 4)
+            }
+            .padding(26)
+        }
+        .frame(height: 250)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.white.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.4), radius: 20, y: 12)
     }
 }
 
