@@ -9,7 +9,17 @@
 **Branch:** `agent/07-optim` · **Worktree:** `../kinora-a07` · **Base:** `overnight/integration`
 
 ### State
-- 🟢 Core deliverables landed (all 4 workstreams), gates green. Cross-file wins are flag-gated proposals.
+- ✅ **COMPLETE.** All 4 workstreams landed; every DoD gate verified green (evidence below). Cross-file
+  wins are flag-gated request-queue proposals. Deliverable confirmed byte-identical to the already-
+  integrated, cycle-1-green canonical Agent-07 work.
+
+### DoD evidence (final, command output captured)
+- `make lint` → ruff **All checks passed!** + mypy **Success: no issues found in 216 source files** (exit 0).
+- `make test` → **360 passed, 125 skipped** (exit 0).
+- client `pnpm --filter @kinora/desktop typecheck` exit 0; `build` exit 0.
+- `make migrate` → applies `0426→b7d4→c8f1→d9e2f4a6b8c1` on a fresh DB (reversible).
+- `coordination/PERF.md` — baseline→after real numbers for ingest token/call, render throughput, bundle
+  size, reading-room FPS (reproducible scripts in `coordination/benchmarks/`).
 
 ### Done (all committed, small green commits)
 - **WS0** scaffolding + fixed a pre-existing `make lint` break (`F821` in `tests/test_api_director.py`,
