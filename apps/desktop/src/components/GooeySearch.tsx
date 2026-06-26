@@ -52,7 +52,6 @@ export default function GooeySearch() {
         background: open ? "rgba(40, 38, 34, 0.85)" : "transparent",
         boxShadow: open ? "0 2px 10px rgba(0,0,0,0.2)" : "none",
         overflow: "hidden",
-        willChange: "clip-path",
         clipPath: open
           ? "inset(0 0 0 0 round 999px)"
           : "inset(0 0 0 calc(180px - 28px) round 999px)",

@@ -1,4 +1,5 @@
 import type { Book } from "../data/books";
+import { BookCoverImage } from "./SkeletonShimmer";
 
 interface ContinueReadingCardProps {
   book: Book;
@@ -48,14 +49,11 @@ export default function ContinueReadingCard({ book }: ContinueReadingCardProps) 
           boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
         }}
       >
-        <img
+        <BookCoverImage
           src={book.coverImage}
           alt={book.title}
           className="absolute inset-0 w-full h-full object-cover"
-          loading="lazy"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
+          fallbackBackground={book.coverGradient}
         />
         <div className="absolute inset-0 book-spine" />
       </div>

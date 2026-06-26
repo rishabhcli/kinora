@@ -138,8 +138,8 @@ function TextGenerateEffect({ text, delay = 0 }: { text: string; delay?: number 
           style={{
             display: "inline-block",
             opacity: i < visibleCount ? 1 : 0,
-            filter: i < visibleCount ? "blur(0px)" : "blur(8px)",
-            transition: "opacity 0.4s ease, filter 0.4s ease",
+            transform: i < visibleCount ? "translateY(0)" : "translateY(4px)",
+            transition: "opacity 0.4s ease, transform 0.4s ease",
             marginRight: "0.25em",
           }}
         >
@@ -163,9 +163,8 @@ function AnimatedIcon({ Icon, size, delay }: { Icon: React.FC<{ size?: number }>
       style={{
         display: "inline-flex",
         opacity: show ? 1 : 0,
-        filter: show ? "blur(0px)" : "blur(8px)",
         transform: show ? "scale(1)" : "scale(0.8)",
-        transition: "opacity 0.5s ease, filter 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        transition: "opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
       }}
     >
       <Icon size={size} />

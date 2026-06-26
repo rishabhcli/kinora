@@ -1,9 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { motion, useMotionValue, animate } from "framer-motion";
 
 type Billing = "monthly" | "yearly";
 
+function AnimatedPrice({ value, billing, isPayAsYouGo }: { value: number; billing: Billing; isPayAsYouGo?: boolean }) {
+  const mv = useMotionValue(value);
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    if (value === 0) return;
+    const controls = animate(mv, value, {
+      duration: 0.5,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setDisplay(v),
+    });
+    return () => controls.stop();
+  }, [value, billing, mv]);
+
+  if (value === 0 && isPayAsYouGo) return <span>Custom</span>;
+  if (value === 0) return <span>Free</span>;
+
+  return (
+    <motion.span key={billing}>
+      ${display.toFixed(2)}
+    </motion.span>
+  );
+}
+
 export default function PricingPage() {
   const [billing, setBilling] = useState<Billing>("monthly");
+  const monthlyRef = useRef<HTMLButtonElement>(null);
+  const yearlyRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [pillStyle, setPillStyle] = useState({ left: 4, width: 0 });
+
+  useLayoutEffect(() => {
+    const active = billing === "monthly" ? monthlyRef.current : yearlyRef.current;
+    const container = containerRef.current;
+    if (active && container) {
+      setPillStyle({
+        left: active.offsetLeft,
+        width: active.offsetWidth,
+      });
+    }
+  }, [billing]);
 
   const plans = [
     {
@@ -15,52 +55,68 @@ export default function PricingPage() {
       current: true,
       recommended: false,
       features: [
-        "Up to 10 books in library",
-        "Basic reading tools",
-        "Notes & highlights (limited)",
+        "Unlimited books in library",
+        "100 MB cloud storage",
+        "6 min HD / month",
+        "HD streaming (720p)",
+        "Basic notes & highlights",
         "Community access",
-        "1 device",
       ],
     },
     {
       name: "Kinora Plus",
       tagline: "For avid readers who want more",
-      monthly: 9.99,
-      yearly: 7.99,
+      monthly: 19.99,
+      yearly: 15.99,
       cta: "Upgrade to Plus",
       current: false,
       recommended: true,
       features: [
-        "Unlimited books in library",
-        "AI cinematic mode",
+        "Unlimited books in library & cloud",
+        "50 min HD + 20 min FHD / month",
+        "HD & FHD streaming (1080p)",
         "Advanced notes & highlights",
-        "Priority email support",
-        "3 devices",
+        "Offline downloads",
       ],
     },
     {
       name: "Kinora Pro",
       tagline: "For power users and families",
-      monthly: 19.99,
-      yearly: 15.99,
+      monthly: 79.99,
+      yearly: 63.99,
       cta: "Go Pro",
       current: false,
       recommended: false,
       features: [
-        "FHD cinematic streaming",
+        "Unlimited books in library & cloud",
+        "350 min HD + 200 min FHD / month",
+        "Pay-as-you-go beyond limits",
+        "Priority generation queue",
         "Family sharing (5 members)",
         "Early access to new features",
-        "24/7 priority support",
-        "Unlimited devices",
+      ],
+    },
+    {
+      name: "Enterprise",
+      tagline: "Custom volume for teams & schools",
+      monthly: 0,
+      yearly: 0,
+      cta: "Contact sales",
+      current: false,
+      recommended: false,
+      features: [
+        "Unlimited everything",
+        "Dedicated cloud infrastructure",
+        "SSO & advanced access controls",
+        "Custom generation models",
+        "Analytics & usage dashboard",
+        "24/7 dedicated support",
       ],
     },
   ];
 
-  const formatPrice = (price: number) =>
-    price === 0 ? "Free" : `$${price.toFixed(2)}`;
-
   return (
-    <div className="pt-12 pb-8 px-6 max-w-[1280px] mx-auto relative z-10">
+    <div className="pt-24 pb-8 px-6 max-w-[1280px] mx-auto relative z-10">
       {/* Header */}
       <div className="text-center mb-10 pt-4">
         <p className="text-[11px] font-medium text-kinora-muted mb-3 tracking-wide uppercase">
@@ -77,24 +133,31 @@ export default function PricingPage() {
       {/* Billing toggle */}
       <div className="flex justify-center mb-10">
         <div
-          className="inline-flex items-center rounded-full p-1"
+          ref={containerRef}
+          className="inline-flex items-center rounded-full p-1 relative"
           style={{ background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.06)" }}
         >
+          <motion.div
+            className="absolute top-1 bottom-1 rounded-full"
+            style={{ background: "rgba(255, 255, 255, 0.1)" }}
+            animate={{ left: pillStyle.left, width: pillStyle.width }}
+            transition={{ type: "spring", stiffness: 400, damping: 32 }}
+          />
           <button
+            ref={monthlyRef}
             onClick={() => setBilling("monthly")}
-            className="px-5 py-2 rounded-full text-[12px] font-medium transition-colors"
+            className="relative z-10 px-5 py-2 rounded-full text-[12px] font-medium transition-colors"
             style={{
-              background: billing === "monthly" ? "rgba(255, 255, 255, 0.1)" : "transparent",
               color: billing === "monthly" ? "rgba(232, 226, 216, 0.9)" : "rgba(168, 158, 148, 0.6)",
             }}
           >
             Monthly
           </button>
           <button
+            ref={yearlyRef}
             onClick={() => setBilling("yearly")}
-            className="px-5 py-2 rounded-full text-[12px] font-medium transition-colors flex items-center gap-2"
+            className="relative z-10 px-5 py-2 rounded-full text-[12px] font-medium transition-colors flex items-center gap-2"
             style={{
-              background: billing === "yearly" ? "rgba(255, 255, 255, 0.1)" : "transparent",
               color: billing === "yearly" ? "rgba(232, 226, 216, 0.9)" : "rgba(168, 158, 148, 0.6)",
             }}
           >
@@ -110,7 +173,7 @@ export default function PricingPage() {
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
         {plans.map((plan) => (
           <div
             key={plan.name}
@@ -147,7 +210,7 @@ export default function PricingPage() {
             {/* Price */}
             <div className="flex items-baseline gap-1.5 mb-1">
               <span className="text-4xl font-bold text-kinora-text tracking-tight">
-                {formatPrice(plan[billing])}
+                <AnimatedPrice value={plan[billing]} billing={billing} isPayAsYouGo={plan.name === "Enterprise"} />
               </span>
               {plan[billing] !== 0 && (
                 <span className="text-[13px] text-kinora-muted font-medium">/mo</span>
@@ -158,6 +221,8 @@ export default function PricingPage() {
                 ? "Billed annually"
                 : plan[billing] !== 0
                 ? "Billed monthly"
+                : plan.name === "Enterprise"
+                ? "Volume-based pricing"
                 : "Free forever"}
             </p>
 

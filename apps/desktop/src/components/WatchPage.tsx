@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { continueReading, popularOnKinora } from "../data/books";
+import { BookCoverImage } from "./SkeletonShimmer";
 
 export default function WatchPage() {
   const watchable = [...continueReading.filter((b) => b.progress > 0), ...popularOnKinora];
@@ -61,9 +62,7 @@ export default function WatchPage() {
               onClick={() => setIsPlaying(!isPlaying)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg transition-transform hover:scale-[1.03]"
               style={{
-                background: "rgba(255,255,255,0.12)",
-                backdropFilter: "blur(12px) saturate(160%)",
-                WebkitBackdropFilter: "blur(12px) saturate(160%)",
+                background: "rgba(30, 28, 25, 0.92)",
                 border: "1px solid rgba(255,255,255,0.15)",
                 boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.12)",
               }}
@@ -105,13 +104,11 @@ export default function WatchPage() {
             className="w-8 h-12 rounded overflow-hidden flex-shrink-0"
             style={{ background: selected.coverGradient }}
           >
-            <img
+            <BookCoverImage
               src={selected.coverImage}
               alt=""
               className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
+              fallbackBackground={selected.coverGradient}
             />
           </div>
           <div>
@@ -162,14 +159,11 @@ export default function WatchPage() {
                   className={`relative rounded-md overflow-hidden mb-1.5 transition-shadow duration-200 ${isActive ? "ring-1 ring-kinora-gold/50" : ""}`}
                   style={{ aspectRatio: "2 / 3", background: book.coverGradient }}
                 >
-                  <img
+                  <BookCoverImage
                     src={book.coverImage}
                     alt={book.title}
                     className="absolute inset-0 w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
+                    fallbackBackground={book.coverGradient}
                   />
                   <div className="absolute inset-0 book-spine" />
                   {isActive && (
@@ -177,9 +171,7 @@ export default function WatchPage() {
                       <div
                         className="w-7 h-7 rounded-full flex items-center justify-center"
                         style={{
-                          background: "rgba(0,0,0,0.6)",
-                          backdropFilter: "blur(6px)",
-                          WebkitBackdropFilter: "blur(6px)",
+                          background: "rgba(0,0,0,0.85)",
                         }}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="white">

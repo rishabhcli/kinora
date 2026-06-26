@@ -113,9 +113,7 @@ export default function Navbar({ active, onNavigate }: { active: string; onNavig
     <>
       {/* Top bar — clean, no glass */}
       <header className="fixed top-0 left-0 right-0 z-50" data-profile-dropdown style={{
-        background: "rgba(15, 14, 12, 0.6)",
-        backdropFilter: "blur(12px) saturate(140%)",
-        WebkitBackdropFilter: "blur(12px) saturate(140%)",
+        background: "rgba(15, 14, 12, 0.92)",
       }}>
         <div className="px-6 py-2.5 flex items-center justify-between max-w-[1280px] mx-auto">
           {/* Left: Logo */}

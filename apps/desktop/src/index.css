@@ -171,11 +171,7 @@ html.kinora-native [class*="rounded-3xl"] {
 /* Base glass — strong blur, high saturation, brightness lift */
 .liquid-glass-dock {
   position: relative;
-  background: rgba(38, 36, 32, 0.55);
-  backdrop-filter:
-    blur(24px) saturate(180%) brightness(1.08) contrast(1.02);
-  -webkit-backdrop-filter:
-    blur(24px) saturate(180%) brightness(1.08) contrast(1.02);
+  background: rgba(28, 26, 23, 0.92);
   border: 0.5px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     /* Outer drop shadow — depth */
@@ -284,9 +280,6 @@ html.kinora-native [class*="rounded-3xl"] {
 /* ===== Books ===== */
 .book-3d-wrapper {
   position: relative;
-  transition: box-shadow 0.3s ease, border-radius 0.3s ease;
-  transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .book-cover {
@@ -295,9 +288,6 @@ html.kinora-native [class*="rounded-3xl"] {
   border-radius: 2px 5px 5px 2px;
   position: relative;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), 0 3px 8px rgba(0, 0, 0, 0.28);
-  transition: box-shadow 0.3s ease;
-  transform-style: preserve-3d;
-  will-change: transform;
 }
 
 .book-cover-inner {
@@ -305,7 +295,6 @@ html.kinora-native [class*="rounded-3xl"] {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
-  transform-style: preserve-3d;
   backface-visibility: hidden;
 }
 
@@ -316,20 +305,16 @@ html.kinora-native [class*="rounded-3xl"] {
 .book-body {
   position: absolute;
   inset: 0;
-  transform-style: preserve-3d;
   pointer-events: none;
 }
 
-/* Fore-edge — stacked page edges on the right. Fine, low-contrast lines over
-   a solid cream base + soft shading so it reads as a page block, not stripes. */
+/* Fore-edge — stacked page edges on the right. */
 .book-edge-right {
   position: absolute;
   top: 3px;
   bottom: 3px;
   right: calc(-1 * var(--bt, 18px));
   width: var(--bt, 18px);
-  transform-origin: left center;
-  transform: rotateY(90deg);
   border-radius: 0 2px 2px 0;
   background-color: #e7dcc4;
   background-image:
@@ -338,30 +323,26 @@ html.kinora-native [class*="rounded-3xl"] {
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28), inset 0 -1px 2px rgba(120, 100, 70, 0.20);
 }
 
-/* Head — top edge. In shadow under the cover, so kept dark + subtle. */
+/* Head — top edge. */
 .book-edge-top {
   position: absolute;
   left: 3px;
   right: 3px;
   top: calc(-1 * var(--bt, 18px));
   height: var(--bt, 18px);
-  transform-origin: bottom center;
-  transform: rotateX(-90deg);
   background-color: #d8ccb3;
   background-image:
     linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.05) 60%),
     repeating-linear-gradient(0deg, rgba(120, 98, 60, 0) 0px, rgba(120, 98, 60, 0) 1.4px, rgba(120, 98, 60, 0.14) 1.4px, rgba(120, 98, 60, 0.14) 1.7px);
 }
 
-/* Tail — bottom edge. The underside sits in shadow, so it stays darkest. */
+/* Tail — bottom edge. */
 .book-edge-bottom {
   position: absolute;
   left: 3px;
   right: 3px;
   bottom: calc(-1 * var(--bt, 18px));
   height: var(--bt, 18px);
-  transform-origin: top center;
-  transform: rotateX(90deg);
   background-color: #cdc1a7;
   background-image:
     linear-gradient(0deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.08) 60%),
@@ -375,8 +356,6 @@ html.kinora-native [class*="rounded-3xl"] {
   bottom: 0;
   left: calc(-1 * var(--bt, 18px));
   width: var(--bt, 18px);
-  transform-origin: right center;
-  transform: rotateY(-90deg);
   border-radius: 2px 0 0 2px;
   box-shadow: inset 4px 0 8px rgba(0, 0, 0, 0.45), inset -2px 0 5px rgba(255, 255, 255, 0.06);
 }
@@ -394,10 +373,13 @@ html.kinora-native [class*="rounded-3xl"] {
 .book-back {
   position: absolute;
   inset: 0;
-  transform: translateZ(calc(-1 * var(--bt, 18px)));
   border-radius: 2px 5px 5px 2px;
   background: linear-gradient(135deg, #2c2722 0%, #16130f 100%);
   box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.55);
+}
+
+.book-3d-wrapper:hover {
+  transform: translateY(-4px) scale(1.03);
 }
 
 .book-3d-wrapper:hover .book-cover {
@@ -415,7 +397,6 @@ html.kinora-native [class*="rounded-3xl"] {
   background: linear-gradient(135deg,
     rgba(255, 255, 255, 0.1) 0%, transparent 25%,
     transparent 75%, rgba(255, 255, 255, 0.04) 100%);
-  transition: opacity 0.3s ease;
 }
 
 .book-3d-wrapper:hover .book-gloss {
@@ -465,7 +446,7 @@ html.kinora-native [class*="rounded-3xl"] {
 
 /* ===== Animations ===== */
 .animate-fade-in {
-  animation: fadeIn 0.4s ease-out both;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
 /* ===== Performance: skip rendering off-screen sections ===== */
@@ -888,4 +869,289 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):not(.nav
 }
 button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
   transform: scale(0.96);
+}
+
+/* ===== Login ===== */
+
+@keyframes arrowPulse {
+  0%   { opacity: 0.2; transform: translateX(0); }
+  50%  { opacity: 0.8; }
+  100% { opacity: 0.2; transform: translateX(20px); }
+}
+
+.arrow-pulse {
+  animation: arrowPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes apertureSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes apertureRing {
+  0%, 100% { opacity: 0.08; r: 32; }
+  50%      { opacity: 0.15; r: 28; }
+}
+
+.aperture-blade {
+  animation: apertureSpin 30s linear infinite;
+}
+
+.aperture-ring {
+  animation: apertureRing 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aperture-blade,
+  .aperture-ring { animation: none; }
+}
+
+.login-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.022;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 1;
+}
+
+.login-card {
+  background: rgba(24, 22, 20, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.login-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-input:focus {
+  border-color: rgba(168, 158, 148, 0.25);
+  box-shadow: 0 0 0 2px rgba(168, 158, 148, 0.06);
+  outline: none;
+}
+
+.login-input::placeholder {
+  color: rgba(168, 158, 148, 0.3);
+}
+
+.login-btn {
+  background: #ffffff;
+  color: #0f0e0c;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.login-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.login-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+/* ── Aurora left panel ───────────────────────────────────────────── */
+
+.login-netflix-bg {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(120, 90, 50, 0.04) 0%, transparent 50%),
+    linear-gradient(180deg, #0f0e0c 0%, #141210 50%, #0f0e0c 100%);
+}
+
+.login-aurora {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 20%, rgba(212, 164, 78, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 70% 80%, rgba(120, 90, 50, 0.05) 0%, transparent 60%),
+    linear-gradient(135deg, #0e0d0c 0%, #141210 50%, #0e0d0c 100%);
+}
+
+.login-tagline {
+  background: linear-gradient(135deg, #e8e2d8 0%, #d4a44e 60%, #e8c878 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.login-aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.login-aurora-blob-1 {
+  width: 420px;
+  height: 420px;
+  top: -10%;
+  left: -5%;
+  background: radial-gradient(circle, rgba(212, 164, 78, 0.18), transparent 70%);
+  animation: aurora-drift-1 22s ease-in-out infinite;
+}
+
+.login-aurora-blob-2 {
+  width: 380px;
+  height: 380px;
+  bottom: -5%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(120, 90, 50, 0.14), transparent 70%);
+  animation: aurora-drift-2 28s ease-in-out infinite;
+}
+
+.login-aurora-blob-3 {
+  width: 300px;
+  height: 300px;
+  top: 40%;
+  left: 30%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.18), transparent 70%);
+  animation: aurora-drift-3 20s ease-in-out infinite;
+}
+
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, 40px) scale(1.1); }
+  66% { transform: translate(-30px, 80px) scale(0.95); }
+}
+
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, -60px) scale(1.08); }
+  66% { transform: translate(40px, -30px) scale(0.92); }
+}
+
+@keyframes aurora-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-40px, 50px) scale(1.15); }
+}
+
+.login-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+}
+
+.login-right-gradient {
+  background: linear-gradient(160deg, #0e0d0c 0%, #121110 50%, #0e0d0c 100%);
+}
+
+/* ===== Login Hero ===== */
+/* Static gradient only. No animation. Zero GPU compositor activity. */
+
+.login-hero {
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 40%, rgba(100, 50, 120, 0.4), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 70% 60%, rgba(60, 30, 80, 0.3), transparent 70%),
+    linear-gradient(135deg, #1a1816, #080706);
+  overflow: hidden;
+}
+
+.aurora-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 50%, rgba(5, 4, 3, 0.85) 100%);
+}
+
+.login-form-enter {
+  animation: login-form-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes login-form-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Hero slide transitions (CSS only, no framer-motion) ===== */
+
+.hero-fade-in {
+  animation: hero-fade-in 1.2s ease-in-out;
+}
+
+@keyframes hero-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.hero-slide-up {
+  animation: hero-slide-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hero-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-line-grow {
+  animation: hero-line-grow 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hero-line-grow {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+.hero-cover-in {
+  animation: hero-cover-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hero-cover-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ===== Hero progress bar ===== */
+.hero-progress-active {
+  animation: hero-progress var(--slide-duration, 7s) linear;
+}
+
+@keyframes hero-progress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ===== Hero dust motes and light sweep ===== */
+/* CSS only, no framer-motion. Transform + opacity = compositor only. */
+
+.dust-mote {
+  animation: dust-float ease-in-out infinite;
+}
+
+@keyframes dust-float {
+  0%, 100% { transform: translate(0, 0); opacity: 0; }
+  50% { transform: translate(var(--dx), var(--dy)); opacity: 0.5; }
+}
+
+.light-sweep {
+  animation: light-sweep-move 24s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+@keyframes light-sweep-move {
+  0% { transform: translateX(-100%); }
+  10% { transform: translateX(200%); }
+  100% { transform: translateX(200%); }
+}
+
+/* ===== Skeleton shimmer ===== */
+.skeleton-shimmer {
+  position: relative;
+}
+
+.skeleton-shimmer-overlay {
+  animation: shimmer-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer-slide {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
 }

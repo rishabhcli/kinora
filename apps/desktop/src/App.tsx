@@ -1,6 +1,7 @@
-import { useState } from "react";
-import HomePage from "./components/HomePage";
+import { useState, lazy, Suspense } from "react";
 import LoginPage from "./components/LoginPage";
+
+const HomePage = lazy(() => import("./components/HomePage"));
 
 export default function App() {
   const [entered, setEntered] = useState(false);
@@ -9,5 +10,9 @@ export default function App() {
     return <LoginPage onEnter={() => setEntered(true)} />;
   }
 
-  return <HomePage />;
+  return (
+    <Suspense fallback={<div className="kinora-bg min-h-screen" />}>
+      <HomePage />
+    </Suspense>
+  );
 }

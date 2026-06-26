@@ -29,9 +29,7 @@ export function FloatingDock({
       onMouseLeave={() => mouseX.set(Infinity)}
       className={`flex items-end gap-2 rounded-2xl px-3 py-2 ${className ?? ""}`}
       style={{
-        background: "rgba(15, 14, 12, 0.6)",
-        backdropFilter: "blur(12px) saturate(140%)",
-        WebkitBackdropFilter: "blur(12px) saturate(140%)",
+        background: "rgba(15, 14, 12, 0.92)",
         border: "1px solid rgba(255, 255, 255, 0.08)",
       }}
     >

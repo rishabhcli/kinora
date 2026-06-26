@@ -104,16 +104,16 @@ export const continueReading: Book[] = [
 
 export const recentlyAdded: Book[] = [
   {
-    id: "creative-act",
-    title: "The Creative Act",
-    author: "Rick Rubin",
+    id: "lonely-castle-in-the-mirror",
+    title: "Lonely Castle in the Mirror",
+    author: "Mizuki Tsujimura",
     progress: 0,
     isNew: true,
-    coverColor: "#e8e0d5",
-    coverGradient: "linear-gradient(135deg, #e8e0d5 0%, #d4cfc5 100%)",
-    coverImage: cover("9780593652886"),
-    textColor: "#2d2d2d",
-    spineColor: "#b8b0a4",
+    coverColor: "#4a6fa5",
+    coverGradient: "linear-gradient(135deg, #4a6fa5 0%, #2d4a73 100%)",
+    coverImage: "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1596014992i/54633167.jpg",
+    textColor: "#e8e0d5",
+    spineColor: "#1e3a5f",
   },
   {
     id: "dune",

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState, useEffect, type CSSProperties } from "react";
 import type { Book } from "../data/books";
 import { api, toBrowserUrl } from "../lib/api";
+import { BookCoverImage } from "./SkeletonShimmer";
 
 interface BookReaderProps {
   book: Book | null;

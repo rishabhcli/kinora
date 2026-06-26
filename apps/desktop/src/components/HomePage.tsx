@@ -3,7 +3,6 @@ import type React from "react";
 import { api, toUiBook, toBrowserUrl } from "../lib/api";
 import Navbar, { navItems } from "./Navbar";
 import Greeting from "./Greeting";
-import ContinueReadingCard from "./ContinueReadingCard";
 import BookShelf from "./BookShelf";
 import HeroBanner from "./HeroBanner";
 import BookReader from "./BookReader";
@@ -14,7 +13,6 @@ import {
   recentlyAdded,
   popularOnKinora,
   recommended,
-  currentlyReading,
 } from "../data/books";
 import type { Book } from "../data/books";
 

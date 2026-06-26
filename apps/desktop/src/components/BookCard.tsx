@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
-import { motion } from "framer-motion";
 import type { Book } from "../data/books";
 import { CometCard } from "./CometCard";
+import { BookCoverImage } from "./SkeletonShimmer";
 
 interface BookCardProps {
   book: Book;
@@ -57,20 +57,17 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
   return (
     <div
       className="flex-shrink-0 w-[150px] group cursor-pointer"
-      // `--bt` is the book's thickness (depth of the page block); the 3D body
-      // faces in index.css read it. A bit of headroom around the row keeps the
-      // tilted spine/pages from being clipped by neighbours.
-      style={{ perspective: 1400, "--bt": "18px" } as CSSProperties}
+      style={{ perspective: opening ? 1400 : undefined, "--bt": "18px" } as CSSProperties}
       onClick={handleClick}
     >
       <CometCard rotateDepth={12} translateDepth={15}>
-        <motion.div
+        <div
           className="book-3d-wrapper relative mb-1.5"
-          animate={{ scale: opening ? 1.12 : 1 }}
-          transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-          // Rests flat, facing the viewer (like before). The 3D thickness /
-          // spine / page edges reveal as CometCard tilts the book on mouse-move.
-          style={{ transformStyle: "preserve-3d" }}
+          style={{
+            transformStyle: opening ? "preserve-3d" : "flat",
+            transform: opening ? "scale(1.12)" : undefined,
+            transition: opening ? "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)" : undefined,
+          }}
         >
           {/* Static 3D body — page block, spine, back cover. Does NOT open with
               the cover, so the book stays a solid object. */}
@@ -119,42 +116,27 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
             </div>
           )}
 
-          {/* Front cover — opens on left hinge with 3D depth */}
-          <motion.div
+          {/* Book cover — opens on left hinge with 3D depth */}
+          <div
             className="book-cover w-[150px] relative"
             style={{
               background: book.coverGradient,
               transformOrigin: "left center",
-              transformStyle: "preserve-3d",
+              transformStyle: opening ? "preserve-3d" : "flat",
               boxShadow: opening
                 ? "0 16px 40px rgba(0,0,0,0.5), -8px 0 20px rgba(0,0,0,0.3)"
                 : undefined,
-            }}
-            animate={{
-              rotateY: opening ? -125 : 0,
-              z: opening ? 20 : 0,
-            }}
-            transition={{
-              rotateY: { type: "spring", stiffness: 120, damping: 14, restSpeed: 0.8 },
-              z: { duration: 0.4, ease: "easeOut" },
+              transform: opening ? "rotateY(-125deg) translateZ(20px)" : undefined,
+              transition: opening ? "transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1)" : undefined,
             }}
           >
             {/* Front face — cover image, spine, gloss. Hidden when rotated past 90° */}
             <div className="book-cover-inner">
-              <img
+              <BookCoverImage
                 src={book.coverImage}
                 alt={book.title}
                 className="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-                onLoad={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  if (img.naturalWidth <= 1) {
-                    img.style.display = "none";
-                  }
-                }}
+                fallbackBackground={book.coverGradient}
               />
 
               <div className="absolute inset-0 book-spine" />
@@ -173,7 +155,8 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
               )}
             </div>
 
-            {/* Back face — inside cover. Visible when rotated past 90° */}
+            {/* Back face — inside cover. Only rendered when opening */}
+            {opening && (
             <div
               className="absolute inset-0 rounded-[3px] overflow-hidden"
               style={{
@@ -190,8 +173,9 @@ export default function BookCard({ book, onOpen }: BookCardProps) {
                 <div className="w-[70%] h-[1px] bg-white/10 mt-2" />
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+            )}
+          </div>
+        </div>
       </CometCard>
 
       {/* Title below cover */}
