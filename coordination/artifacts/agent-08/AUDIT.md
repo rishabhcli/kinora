@@ -35,8 +35,13 @@ reading room scan clean. The only serious findings are 2 on the **library** (Age
    suppress single-key shortcuts. (+ regression tests.)
 
 ## Keyboard-only walkthrough (recorded)
-`recordings/keyboard-walkthrough.webm` — Tab → skip link → operate the Text-size slider
-with arrows → open the `?` cheat-sheet (focus trapped) → Escape (focus restored). No mouse.
+- `recordings/keyboard-flow-open-read-close.webm` — the full DoD flow with **no mouse**:
+  Enter on “Open book” → focus-trapped reading dialog → adjust Text size with arrows →
+  start read-aloud (word highlight advances in lockstep) → Escape closes + focus returns
+  to the opener. Composed from Agent 06’s pieces (ReadingControls + ReadAloudView +
+  trapFocus) as Agent 10 will integrate them (`e2e/harness/reading.html`).
+- `recordings/keyboard-walkthrough.webm` — skip link → Text-size slider via arrows →
+  `?` cheat-sheet (focus trapped) → Escape.
 
 ## Read-aloud word-sync (recorded)
 `recordings/readaloud-wordsync.webm` + `wordsync-1/2.png` — the real `useTts` + `ReadAloudView`
