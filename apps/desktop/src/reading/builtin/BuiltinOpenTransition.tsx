@@ -24,19 +24,24 @@ export function BuiltinBookOpenTransition({
 }: BookOpenTransitionProps) {
   const isPresent = useIsPresent();
   const openedRef = useRef(false);
+  // Hold the latest callback in a ref so the open timer depends only on `reduce`
+  // — otherwise an unstable onOpened identity (parent re-renders on every SSE
+  // tick) would reset the timer and the reveal would never fire.
+  const onOpenedRef = useRef(onOpened);
+  onOpenedRef.current = onOpened;
 
   // The open choreography completes at a known time — reveal then, regardless of
-  // whether any frame/animation callback fires. Bulletproof against a hang.
+  // whether any frame/animation callback fires. Fires exactly once.
   useEffect(() => {
     const ms = reduce ? 260 : 1050;
     const t = window.setTimeout(() => {
       if (!openedRef.current) {
         openedRef.current = true;
-        onOpened?.();
+        onOpenedRef.current?.();
       }
     }, ms);
     return () => window.clearTimeout(t);
-  }, [reduce, onOpened]);
+  }, [reduce]);
 
   const noBlur = prefersReducedTransparency();
 

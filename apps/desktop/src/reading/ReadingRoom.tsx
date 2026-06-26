@@ -4,7 +4,7 @@
 // flawless open→read→close whole that is fully functional every time, even with
 // KINORA_LIVE_VIDEO OFF. See coordination/CONTRACTS.md.
 import { AnimatePresence, useReducedMotion } from "framer-motion";
-import { useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { Book } from "../data/books";
 import { BookOpenTransition } from "./producers";
 import { ReadingRoomShell } from "./ReadingRoomShell";
@@ -46,6 +46,20 @@ export default function ReadingRoom({
     return () => window.clearTimeout(t);
   }, [state.phase]);
 
+  // Safety net: a hung load (backend stalls with no error) never freezes — fall
+  // back to the bundled film after a generous beat. Normal ingest progress shows
+  // the warm-up until then.
+  useEffect(() => {
+    if (state.phase !== "opening" && state.phase !== "loading") return;
+    const t = window.setTimeout(() => dispatch({ type: "FALLBACK", message: "Showing a preview film" }), 7000);
+    return () => window.clearTimeout(t);
+  }, [state.phase]);
+
+  // Stable callbacks — an unstable identity would reset the transition's open
+  // timer (and the engine's scroll listener) on every SSE-driven re-render.
+  const onOpened = useCallback(() => dispatch({ type: "ANIM_READY" }), []);
+  const onClosed = useCallback(() => dispatch({ type: "CLOSED" }), []);
+
   return (
     <AnimatePresence onExitComplete={() => dispatch({ type: "CLOSED" })}>
       {book && (
@@ -54,8 +68,8 @@ export default function ReadingRoom({
           originRect={originRect}
           cover={{ image: book.coverImage, gradient: book.coverGradient, title: book.title }}
           reduce={reduceMotion}
-          onOpened={() => dispatch({ type: "ANIM_READY" })}
-          onClosed={() => dispatch({ type: "CLOSED" })}
+          onOpened={onOpened}
+          onClosed={onClosed}
         >
           <ReadingRoomShell book={book} onClose={onClose} state={state} dispatch={dispatch} session={session} reduce={reduceMotion} />
         </BookOpenTransition>
