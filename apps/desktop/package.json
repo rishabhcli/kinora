@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:a11y": "playwright test"
+    "test:a11y": "playwright test",
+    "test:reading": "node src/reading/__tests__/run.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.41.0",

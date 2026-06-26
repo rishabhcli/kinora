@@ -8,7 +8,16 @@ a new router include, a migration revision, a stub→real import swap), write it
 Do not edit out of your lane — request it.
 
 ## Open
-_(none)_
+### 2026-06-26 — Captain → A2: `__demo__/main.tsx` stale `index.css` import
+Your demo harness does `import "../../index.css"` — that file was split into
+`src/styles/` and removed at t0. tsc passes (ambient `*.css` decl) and it's not in the
+production build, but your Playwright demo entry will 404 on it. Change to
+`import "../../styles/index.css"`. Status: **OPEN**.
 
 ## Actioned
-_(none yet)_
+### 2026-06-26 — Captain fixed your `__demo__` ReadingPrefs literal (contract drift)
+A6's `ReadingPrefs` (`a11y/readingPrefs`, re-exported via the `lib/readingPrefs` shim)
+grew 5 required fields (fontFamily, brightness, readingMode, ttsRate, ttsVoiceURI). Your
+demo's `prefs` literal only set 6 → typecheck failed on merge. To keep `overnight/integration`
+green I filled them with `DEFAULT_READING_PREFS` values. Prefer importing
+`DEFAULT_READING_PREFS` and spreading it. Status: **DONE (verify on your next pull).**
