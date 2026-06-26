@@ -16,6 +16,9 @@ from app.optim.cost_meter import (
     Price,
     cost_context,
     cost_of,
+    get_cost_meter,
+    reset_cost_meter,
+    set_cost_meter,
 )
 from app.providers.types import Usage
 
@@ -132,3 +135,27 @@ def test_from_settings_without_override_uses_default_table() -> None:
     meter = CostMeter.from_settings(_S())
     meter(Usage(model="qwen3.7-max", operation="chat", input_tokens=1000, output_tokens=1000))
     assert Decimal(meter.snapshot()["total"]["cost_usd"]) > Decimal("0")
+
+
+def test_priced_models_lists_the_table_keys_sorted() -> None:
+    meter = CostMeter(pricing={"b": Price(), "a": Price()})
+    assert meter.priced_models == ["a", "b"]
+
+
+def test_get_cost_meter_returns_a_process_singleton() -> None:
+    reset_cost_meter()
+    try:
+        first = get_cost_meter()
+        assert get_cost_meter() is first  # same instance across calls
+    finally:
+        reset_cost_meter()
+
+
+def test_set_cost_meter_installs_a_custom_meter() -> None:
+    reset_cost_meter()
+    custom = CostMeter(pricing={"a": Price(input_per_1k=Decimal("0.001"))})
+    try:
+        set_cost_meter(custom)
+        assert get_cost_meter() is custom
+    finally:
+        reset_cost_meter()

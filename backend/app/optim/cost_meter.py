@@ -193,6 +193,11 @@ class CostMeter:
             if session_id:
                 self._by_session.setdefault(session_id, CostRollup()).add(usage, cost)
 
+    @property
+    def priced_models(self) -> list[str]:
+        """Sorted model ids this meter prices (drives the ``/api/optim/cost`` model list)."""
+        return sorted(self._pricing.keys())
+
     def reset(self) -> None:
         with self._lock:
             self._total = CostRollup()
@@ -236,4 +241,40 @@ class CostMeter:
         return cls(pricing=table)
 
 
-__all__ = ["PRICING", "CostMeter", "CostRollup", "Price", "cost_context", "cost_of"]
+# --------------------------------------------------------------------------- #
+# Process-global meter (the seam the API route reads + the usage_sink writes)
+# --------------------------------------------------------------------------- #
+_process_meter: CostMeter | None = None
+
+
+def get_cost_meter() -> CostMeter:
+    """Return the process-wide :class:`CostMeter`, creating a default one on first use."""
+    global _process_meter
+    if _process_meter is None:
+        _process_meter = CostMeter()
+    return _process_meter
+
+
+def set_cost_meter(meter: CostMeter) -> None:
+    """Install the process-wide meter (composition wires this + uses it as the usage sink)."""
+    global _process_meter
+    _process_meter = meter
+
+
+def reset_cost_meter() -> None:
+    """Drop the process-wide meter (test isolation)."""
+    global _process_meter
+    _process_meter = None
+
+
+__all__ = [
+    "PRICING",
+    "CostMeter",
+    "CostRollup",
+    "Price",
+    "cost_context",
+    "cost_of",
+    "get_cost_meter",
+    "reset_cost_meter",
+    "set_cost_meter",
+]
