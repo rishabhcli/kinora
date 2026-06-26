@@ -22,16 +22,21 @@ export default function ReadingRoom({
 }) {
   const [state, dispatch] = useReducer(machineReduce, initialState);
   const reduceMotion = !!useReducedMotion();
-  const session = useFilmSession(book, dispatch);
   const prevId = useRef<string | null>(null);
 
   // OPEN on a new book; CLOSE when it goes away (handles rapid open/close).
+  // MUST be declared before useFilmSession so its effect runs FIRST — otherwise
+  // the loader dispatches FALLBACK/META while the machine is still idle (which it
+  // ignores for teardown safety) and we'd strand in `opening`.
   useEffect(() => {
     const id = book?.id ?? null;
     if (id && id !== prevId.current) dispatch({ type: "OPEN" });
     else if (!id && prevId.current) dispatch({ type: "CLOSE" });
     prevId.current = id;
   }, [book]);
+
+  // The data + live session loader (dispatches META/PAGES/SHOTS/SESSION/FALLBACK).
+  const session = useFilmSession(book, dispatch);
 
   // Reveal once the film frame is painted AND the open animation is ready.
   useEffect(() => {
