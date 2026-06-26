@@ -212,6 +212,27 @@ overrides bind via `[data-contrast="high"]` on `<html>`. See
 Nothing. (Coordinates AA / a11y with Agent 06; coordinates the `index.css` split +
 font/dep tooling with Agent 12 — see `requests/agent-12-from-08.md`.)
 
+---
+
+## Producer finalization — A4 / A9 / A1 / A11 (verified from merged code; STATUS: FINAL)
+These contracts are defined in the registry above (§2 motion, §4 icons, §6 event-film);
+confirming the exact exports now on `overnight/integration`:
+
+- **A4 motion** — `src/motion/index.ts` exports: `MotionProvider`, `useMotion`,
+  `useReducedMotionPref`, `Reveal` (+`RevealProps`), `PageTransition`,
+  `BookOpenTransition` (+`BookOpenTransitionProps`, `CoverArt`), `ShelfScroller`
+  (+`ShelfScrollerProps`), `Tilt`/`useTilt` (+`TiltProps`, `TiltOptions`), `Pressable`,
+  `springs`, variants. All reduced-motion-aware (gate on A6).
+- **A9 icons** — `src/components/icons/index.ts` exports: `Icon` (default +named, `IconProps`),
+  `IconName`/`SymbolWeight`/`RenderingMode`/`GlyphDef`/`GlyphLayer` types, `GLYPHS`,
+  `ICON_NAMES`. Usage `<Icon name weight size mode title />` (§4).
+- **A1 event-film** — produces the §6 stitched mp4 + sync map (`SyncEntry`); exposed by
+  A3's `routes/films.py` + `films/contract.py`, consumed by A2's `ScrollFilmEngine`.
+- **A11 login** — consumer (no published contract); composes A8 tokens + A4 motion +
+  A9 icons + the demo/offline library entry. `App.tsx` gates login↔home.
+
+All producer sections in this registry are now filled.
+
 
 ## Agent 06 — A11Y (folded in on merge)
 
