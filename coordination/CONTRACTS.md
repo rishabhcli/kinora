@@ -217,9 +217,9 @@ font/dep tooling with Agent 12 — see `requests/agent-12-from-08.md`.)
 
 ## Agent 06 — Accessibility (`apps/desktop/src/a11y/`)
 
-> Status: **building** (signatures frozen; implementations landing on `agent/06-a11y`).
-> Import from `@/a11y/*` (alias `@` → `apps/desktop/src`). Until merged, other
-> agents may stub these — the signatures below are the contract.
+> Status: **WS1–WS3 LANDED** on `agent/06-a11y` (foundation + ReadingControls +
+> read-aloud, 90 tests, typecheck + build green). Import from `@/a11y/*`
+> (alias `@` → `apps/desktop/src`). Signatures below are the contract.
 
 ### Reduced motion — the single source of truth
 
@@ -292,22 +292,31 @@ function registerShortcut(
 />
 ```
 
-### Read-aloud engine (Web Speech API)
+### Read-aloud engine + view (Web Speech API) — **LANDED** `cc117b7`
 
 ```ts
 // apps/desktop/src/a11y/tts.ts
+function tokenizeWords(text: string): TtsToken[];                 // pure, char offsets
+function findTokenAtChar(tokens: TtsToken[], charIndex: number): TtsToken | null;
 function useTts(opts: {
-  getText: () => TtsToken[];         // tokens with char offsets for word-sync
+  getText: () => string;
   rate?: number; voiceURI?: string | null;
-  onWord?: (token: TtsToken | null) => void;
+  onError?: (e: string) => void;
+  onActiveWordChange?: (token: TtsToken | null) => void;
 }): {
-  state: 'idle' | 'playing' | 'paused';
-  play(): void; pause(): void; resume(): void; stop(): void;
-  next(): void; prev(): void;        // skip sentence/paragraph
-  activeWordIndex: number;           // -1 when none
   supported: boolean;
+  state: "idle" | "playing" | "paused";
+  activeWordIndex: number;           // -1 when none
+  tokens: TtsToken[];
+  play(): void; pause(): void; resume(): void; toggle(): void; stop(): void;
 };
-interface TtsToken { text: string; start: number; end: number; wordIndex?: number }
+interface TtsToken { text: string; start: number; end: number; index: number }
+```
+
+```tsx
+// apps/desktop/src/a11y/ReadAloudView.tsx — mount inside the text-pane (Agent 10)
+<ReadAloudView text={pageText} rate? voiceURI? showControls? />
+// renders words + highlights the spoken one (aria-current) in lockstep.
 ```
 
 ### Checklist every agent must satisfy

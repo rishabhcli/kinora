@@ -1,0 +1,5 @@
+# Playwright (axe scan + walkthrough) outputs — reports are copied into
+# coordination/artifacts/agent-08/ for the record; the raw run dirs are transient.
+test-results/
+playwright-report/
+.playwright/
