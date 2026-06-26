@@ -74,7 +74,7 @@ export const navItems = [
   { icon: NotesIcon, label: "Notes" },
 ];
 
-export default function Navbar({ active, onNavigate }: { active: string; onNavigate: (page: string) => void }) {
+export default function Navbar({ active, onNavigate, onLogout }: { active: string; onNavigate: (page: string) => void; onLogout?: () => void }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [scrollState, setScrollState] = useState<"top" | "middle" | "bottom">("top");
 
@@ -232,7 +232,10 @@ export default function Navbar({ active, onNavigate }: { active: string; onNavig
             {/* Divider + Log Out */}
             <div className="h-px mx-3" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
             <div className="py-1">
-              <button className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-white/[0.03] transition-colors">
+              <button
+                onClick={() => { setProfileOpen(false); onLogout?.(); }}
+                className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-white/[0.03] transition-colors"
+              >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <path d="M16 17l5-5-5-5M21 12H9" />

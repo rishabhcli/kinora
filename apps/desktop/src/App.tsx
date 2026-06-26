@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from "react";
 import LoginPage from "./components/LoginPage";
+import { api } from "./lib/api";
 
 const HomePage = lazy(() => import("./components/HomePage"));
 
@@ -12,7 +13,12 @@ export default function App() {
 
   return (
     <Suspense fallback={<div className="kinora-bg min-h-screen" />}>
-      <HomePage />
+      <HomePage
+        onLogout={() => {
+          api.logout(); // clear the Bearer token
+          setEntered(false); // back to the login screen
+        }}
+      />
     </Suspense>
   );
 }

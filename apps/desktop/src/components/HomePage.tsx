@@ -30,7 +30,7 @@ const PageFallback = () => (
   </div>
 );
 
-export default function HomePage() {
+export default function HomePage({ onLogout }: { onLogout: () => void }) {
   const [activePage, setActivePageState] = useState("Home");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [myBooks, setMyBooks] = useState<Book[]>([]);
@@ -98,7 +98,7 @@ export default function HomePage() {
 
   return (
     <div className="kinora-bg min-h-screen flex flex-col relative">
-      <Navbar active={activePage} onNavigate={setActivePage} />
+      <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />
 
       <div className="flex-1">
         <AnimatedPageSwitch active={activePage} pages={pages} />
