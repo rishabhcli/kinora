@@ -7,16 +7,24 @@ Shared status board. Each agent owns its own section; append, don't overwrite ot
 ## Agent 11 — Login Experience
 **Branch:** `agent/11-login` · **Worktree:** `../kinora-a11` · **Base:** `overnight/integration`
 
-**State:** in progress.
+**State:** all four workstreams implemented + verified; polishing.
 
 ### Done
-- Worktree + branch bootstrapped; baseline `typecheck` green.
+- Worktree + branch bootstrapped; baseline + current `typecheck` green; `build` green; 16/16 unit
+  tests (node --test).
 - Design plan locked (see `coordination/artifacts/agent-11/DESIGN-NOTES.md`): "private screening
   room for literature" — projector beam + dust signature, warm-theatre/brass/cream tokens.
-
-### In progress
-- WS1 cinematic backdrop · WS2 form perfected · WS3 enter transition · WS4 branding/first-5s.
-- Migrating login + BookWall styles → `styles/login.css` (token-driven).
+- **WS1** cinematic backdrop: depth-parallax `BookWall` subdued into a moody room + warm projector
+  beam + drifting dust + vignette (`AmbientBackdrop`), per-launch variant. transform/opacity only,
+  reduced-motion static fallback, native-vibrancy aware.
+- **WS2** form perfected: `auth/` kit (Field, PasswordField + show/hide + strength meter, SocialRow,
+  AuthIcon). Friendly real-time validation + aria-live announcer, submit idle/loading/success/error,
+  Sign In↔Sign Up morph, remember/forgot, demo entry. AA contrast (16.4/8.1:1), full keyboard order.
+- **WS3** enter transition: card recedes + wall blooms → warm flash → home cross-fades in
+  (opacity-only home wrapper → fixed navbar anchor preserved). Reduced-motion: clean cross-fade.
+- **WS4** branding: Fraunces lockup + "Now showing" eyebrow + cold-launch warm-up (once/session).
+- Login + BookWall styles **migrated** to `styles/login.css` (token-driven `--auth-*`); index.css
+  `@import`s it. Artifacts (screens + transition video + a11y report) in `artifacts/agent-11/`.
 
 ### Contract notes (for Agents 4/6/8/9/12)
 - **App.tsx enter-transition contract:** login→home hand-off keeps the home wrapper **opacity-only**

@@ -80,6 +80,9 @@ export default function AmbientBackdrop({
         <BookWall rows={rows} parallax={variant.parallax} />
       </div>
 
+      {/* Push the wall back into shadow so it reads as a quiet, deep room and the
+          beam/dust can catch the light on top of it. */}
+      <div className="auth-walldim" />
       {/* Warm key light from above — the room's own glow. */}
       <div className="auth-keylight" />
       {/* The projector beam: a soft volumetric cone that slowly sways. */}
