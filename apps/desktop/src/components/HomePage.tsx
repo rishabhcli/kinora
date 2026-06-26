@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import type React from "react";
-import { api, toUiBook, toBrowserUrl } from "../lib/api";
+import { api, toUiBook, toBrowserUrl, ApiError, type BookResponse } from "../lib/api";
 import Navbar, { navItems } from "./Navbar";
 import Greeting from "./Greeting";
 import BookShelf from "./BookShelf";
@@ -34,6 +34,10 @@ const EditProfilePage = lazy(() => import("./EditProfilePage"));
 const SettingsPage = lazy(() => import("./SettingsPage"));
 const PricingPage = lazy(() => import("./PricingPage"));
 
+// Demo credentials (mirrors LoginPage) — used to silently recover a stale
+// session so the public-domain shelf always populates in the demo experience.
+const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
+
 const PageFallback = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <div className="w-6 h-6 rounded-full border-2 border-white/10 border-t-white/30 animate-spin" />
@@ -60,14 +64,36 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
   };
   const handleCloseRoom = () => setRoomOpen(false);
 
+  // Reading room visible (opening, reading, or flying back on close).
+  const inRoom = roomOpen || selectedBook !== null;
+
   // Pull the signed-in user's real library from the backend (cover = rendered
-  // page 1). Silently no-ops in demo mode (not authed / backend down).
+  // page 1) into the "Read Live · Public Domain" shelf.
+  //
+  // A relaunch can carry a STALE token: `isAuthed()` is true but every call
+  // 401s ("invalid token"), which silently emptied this shelf and made the
+  // open-source row vanish. The demo experience should always populate it, so
+  // we recover: on a 401 (or no token at all), clear it and silently re-auth
+  // as the demo user, then retry. The refreshed token also fixes downstream
+  // calls (createSession when opening a book). Backend down → row just stays
+  // empty and the demo catalogue rows below still render.
   useEffect(() => {
-    if (!api.isAuthed()) return;
     let alive = true;
     (async () => {
       try {
-        const books = await api.listBooks();
+        if (!api.isAuthed()) {
+          await api.loginOrRegister(DEMO.email, DEMO.password).catch(() => {});
+        }
+        let books: BookResponse[];
+        try {
+          books = await api.listBooks();
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 401) {
+            api.logout();
+            await api.loginOrRegister(DEMO.email, DEMO.password);
+            books = await api.listBooks();
+          } else throw e;
+        }
         const mapped = await Promise.all(
           // Only ready books are drivable by a reading session.
           books.filter((b) => b.status === "ready").map(async (b) => {
@@ -82,7 +108,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         );
         if (alive) setMyBooks(mapped);
       } catch {
-        /* backend down / not authed — demo catalogue still renders below */
+        /* backend down — demo catalogue rows below still render */
       }
     })();
     return () => {
@@ -138,7 +164,12 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
     ) : (
     <div className="kinora-bg min-h-screen flex flex-col relative">
       <AmbientBackground />
-      <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />
+      {/* The reading room is a full-screen modal with its own ← Back bar; the
+          app nav + logo must disappear while a book is open (and stay hidden
+          through the close flight — `selectedBook` lingers until onClosed).
+          The room overlay lives inside the open-transition's own stacking
+          context, so the fixed navbar (z-50) would otherwise paint over it. */}
+      {!inRoom && <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />}
 
       {/* Capture the tapped cover's rect (pointer-down, capture phase) so a
           subsequent onOpen can morph it. Keys off the existing `.book-cover`
@@ -147,7 +178,8 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         <PageTransition activeKey={activePage}>{pages[activePage]}</PageTransition>
       </div>
 
-      {/* Footer */}
+      {/* Footer — hidden while the reading room is open (it's a focused modal). */}
+      {!inRoom && (
       <footer className="footer-glass relative z-10">
         <div className="max-w-[1280px] mx-auto px-6 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -190,6 +222,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       </footer>
+      )}
 
       {/* Reading room overlay — scroll-driven, generates the film as you read.
           Wrapped in the shared-element morph: the tapped cover flies from its
