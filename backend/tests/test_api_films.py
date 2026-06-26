@@ -220,3 +220,56 @@ async def test_restore_state_from_latest_session(
     assert restore["current_event_index"] == 0
     assert restore["current_scene_id"] == "scene_0"
     assert restore["mode"] == "viewer"
+
+
+async def test_event_with_no_accepted_shots_is_empty(
+    films_client: AsyncClient, container: Container
+) -> None:
+    headers = await register_login(films_client, "films7@example.com")
+    book_id = await seed_owned_book(films_client, container, headers)
+    async with container.session_factory() as session:
+        await SceneRepo(session).create(
+            book_id=book_id, scene_index=0, page_start=1, page_end=1, scene_id="scene_empty"
+        )
+
+    body = (await films_client.get(f"/api/books/{book_id}/events", headers=headers)).json()
+    event = body["events"][0]
+    assert event["shot_count"] == 0
+    assert event["stitched"] is False
+    assert event["duration_s"] is None
+    assert event["sync_map"]["segments"] == []
+    assert event["word_range"] == [0, 0]
+
+
+async def test_shot_without_sync_segment_is_synthesized(
+    films_client: AsyncClient, container: Container
+) -> None:
+    """A shot lacking narration.sync_segment still yields a (word-less) segment."""
+    headers = await register_login(films_client, "films8@example.com")
+    book_id = await seed_owned_book(films_client, container, headers)
+    async with container.session_factory() as session:
+        await SceneRepo(session).create(
+            book_id=book_id, scene_index=0, page_start=1, page_end=1, scene_id="scene_s"
+        )
+        await ShotRepo(session).create(
+            id="shot_bare",
+            book_id=book_id,
+            scene_id="scene_s",
+            beat_id="beat_0",
+            status=ShotStatus.ACCEPTED,
+            duration_s=4.0,
+            source_span={"page": 1, "word_range": [10, 20]},
+            narration=None,
+        )
+
+    film = (
+        await films_client.get(f"/api/books/{book_id}/scenes/scene_s/film", headers=headers)
+    ).json()
+    assert film["shot_count"] == 1
+    seg = film["sync_map"]["segments"][0]
+    assert seg["shot_id"] == "shot_bare"
+    assert (seg["t_start_s"], seg["t_end_s"]) == (0.0, 4.0)
+    assert seg["page"] == 1
+    assert seg["page_turn_at_s"] == 3.8
+    assert seg["word_range"] == [10, 20]
+    assert seg["words"] == []
