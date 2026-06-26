@@ -70,5 +70,48 @@ and attach it here before requesting the change.
 
 ---
 
-_More entries appended as profiling surfaces concrete throughput patches (in-flight render dedup, N+1 in
-`CanonService._resolve_present`, etc.)._
+## R5 — Lazy-load ReadingRoom — MEASURED
+**Update:** quantified experimentally (applied lazy split, built, reverted). Initial **HomePage chunk
+55.2 → 39.9 KB raw / 15.9 → 11.2 KB gzip** (−15.3 KB / −4.7 KB); `ReadingRoom` (15.6 KB / 5.8 KB gzip)
+deferred to book-open. **Note:** ReadingRoom is rendered unconditionally (overlay); the owner must keep
+the mount (or guard exit animation) when switching `import` → `lazyImport(() => import('./ReadingRoom'))`
++ `<Suspense fallback={null}>` — hence a proposal, not my edit.
+
+## R6 — Paginate the shelf query (realizes the new index) — PENDING
+**Target:** `backend/app/db/repositories/book.py` `BookRepo.list_for_user` · **Owner:** Agent 5
+**Rationale:** migration `d9e2f4a6b8c1` adds `books(user_id, created_at)`. Postgres uses it as an ordered
+Index Scan Backward (no filesort) only for a **bounded** read. Add `limit`/`offset` (or keyset) params:
+`... ORDER BY created_at DESC LIMIT :limit OFFSET :offset`. **Measured:** LIMIT 20 → 0.013 ms (composite,
+no sort) vs 0.317 ms (bitmap+sort) at 2000 books/user — ~24×. Until then the index is unused by that exact
+statement (shipped as the enabler for the preloaded 100-book library). A follow-up may drop the now-
+redundant `ix_books_user_id`.
+**Risk:** low — additive params; default (no limit) preserves today's behavior.
+
+## R7 — Parallelize the degrade lane — PENDING (measured)
+**Target:** `backend/app/render/*` (worker lane concurrency) · **Owner:** Agent 1
+**Rationale:** `degrade.ken_burns_over_image` is a blocking ffmpeg subprocess (releases the GIL). Running a
+lane's shots through `optim.batch.gather_bounded(limit=N)` over `asyncio.to_thread` parallelizes encodes.
+**Measured:** 8×3 s clips 1.67 → 2.94 clips/s (**1.76×** at limit 4). Behavior-preserving (same outputs).
+**Risk:** low–medium — bound concurrency to the existing per-lane caps to respect budget/CPU.
+
+## R8 — Render the degrade lane at delivery size (720×1280, not 1080p) — PENDING (measured)
+**Target:** `backend/app/render/degrade.py` `DEFAULT_SIZE` / call sites · **Owner:** Agent 1
+**Rationale:** `DEFAULT_SIZE = (1920, 1080)` but films are vertical **720×1280** (CLAUDE.md: "don't push
+1080p unnecessarily"). 720×1280 is ~44% the pixels. **Measured:** 2.50 → 4.54 clips/s (**1.82× faster**,
+**−33% file size**). Combined with R7 ≈ 3.2× degrade-lane headroom. **Risk:** low — pass the delivery size
+the pipeline already targets; verify no call site depends on 16:9.
+
+---
+
+## Findings — verified NON-beneficial (no dead indexes added)
+Investigated and **rejected** (would be write-cost-only dead weight; EXPLAIN/grep evidence):
+- `sessions.last_activity_ms` — idle sweep reads it per loaded row / off Redis; never an SQL filter/order.
+- `shots.accepted_at`, `shots.reference_set_hash` — no query filters or orders on them.
+- A `source_span_index` upper-bound (`word_index_end`) index — the word→shot seek filters only on
+  `word_index_start`; the existing `(book_id, word_index_start)` composite is optimal.
+
+## R1/R3 status
+R1 (cost-meter usage sink wiring in `composition.py` + `config.py` flags) and R3 (model-routing seam) remain
+PENDING proposals — both default-off, behavior-preserving, eval-gated where they touch quality. Also note
+`compact_json_schema` (−55% schema tokens) strips field *descriptions* that guide the model → adopt only
+after the §13 eval confirms no quality regression (treat like a routing downshift).
