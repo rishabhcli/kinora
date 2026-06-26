@@ -82,7 +82,7 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
   const loading = all === null;
 
   return (
-    <div className="pt-12 pb-8 px-6 max-w-[1280px] mx-auto relative z-10">
+    <main id="kinora-main" className="pt-12 pb-8 px-6 max-w-[1280px] mx-auto relative z-10">
       <h1 className="font-serif text-2xl font-semibold text-kinora-text mb-2 pt-4">My Library</h1>
       <p className="text-sm text-kinora-muted mb-5">
         {loading
@@ -166,6 +166,6 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
       {shelves.map((s) => (
         <BookShelf key={s.title} title={s.title} books={s.books} onOpen={onOpenBook} />
       ))}
-    </div>
+    </main>
   );
 }
