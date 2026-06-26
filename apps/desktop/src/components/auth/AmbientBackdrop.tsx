@@ -83,7 +83,7 @@ export default function AmbientBackdrop({
       aria-hidden="true"
     >
       <div className="auth-backdrop-parallax">
-        <BookWall rows={rows} parallax={variant.parallax} />
+        <BookWall />
       </div>
 
       {/* Push the wall back into shadow so it reads as a quiet, deep room and the
