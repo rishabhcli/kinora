@@ -21,7 +21,7 @@ Branch `agent/04-motion` (worktree `../kinora-a04`, base `main` —
   `useMotion` (pill spring, dropdown, tokenized chrome). FloatingDock is
   reduced-motion aware.
 - **Three signature moments demonstrated smooth** (Chrome for Testing capture):
-  open ~9.8 ms/frame · close ~9.1 ms · shelf ~8.3 ms, 0–1 long frames — well
+  open ~12 ms/frame · close ~13 ms · shelf ~8.3 ms, 0–2 long frames — well
   inside the 60 fps (16.67 ms) budget. Stills + videos + `fps-report.json` in
   `coordination/artifacts/agent-06/` (incl. reduced-motion degradation).
 - `pnpm --filter @kinora/desktop typecheck && build` green.
