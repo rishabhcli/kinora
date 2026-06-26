@@ -6,8 +6,16 @@ import Greeting from "./Greeting";
 import BookShelf from "./BookShelf";
 import HeroBanner from "./HeroBanner";
 import ReadingRoom from "./ReadingRoom";
-import AnimatedPageSwitch from "./AnimatedPageSwitch";
 import AmbientBackground from "./AmbientBackground";
+import {
+  MotionProvider,
+  MotionDebugOverlay,
+  PageTransition,
+  Reveal,
+  BookOpenTransition,
+  useSharedElement,
+  type Rect,
+} from "../motion";
 import logoImg from "../assets/logo-transparent.png";
 import {
   continueReading,
@@ -35,6 +43,21 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
   const [activePage, setActivePageState] = useState("Home");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [myBooks, setMyBooks] = useState<Book[]>([]);
+
+  // Book open/close orchestration (WS2). `roomOpen` drives the shared-
+  // element morph; `selectedBook` stays set through the close flight so the
+  // room only unmounts once the cover has flown back to its shelf slot.
+  const [roomOpen, setRoomOpen] = useState(false);
+  const [originRect, setOriginRect] = useState<Rect | null>(null);
+  const shared = useSharedElement();
+
+  const handleOpen = (book: Book) => {
+    // The shelf cover's rect was captured on pointer-down (capture phase).
+    setOriginRect(shared.takeRect());
+    setSelectedBook(book);
+    setRoomOpen(true);
+  };
+  const handleCloseRoom = () => setRoomOpen(false);
 
   // Pull the signed-in user's real library from the backend (cover = rendered
   // page 1). Silently no-ops in demo mode (not authed / backend down).
@@ -79,13 +102,16 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
             <Greeting />
           </div>
-          {myBooks.length > 0 && (
-            <BookShelf title="Read Live · Public Domain" books={myBooks} onOpen={setSelectedBook} />
-          )}
-          <BookShelf title="Continue Reading" books={continueReading} onOpen={setSelectedBook} />
-          <BookShelf title="Recently Added" books={recentlyAdded} onOpen={setSelectedBook} />
-          <BookShelf title="Popular on Kinora" books={popularOnKinora} onOpen={setSelectedBook} />
-          <BookShelf title="Recommended for You" books={recommended} onOpen={setSelectedBook} />
+          {/* Shelves cascade in on first paint (motion-system stagger). */}
+          <Reveal stagger>
+            {myBooks.length > 0 && (
+              <BookShelf title="Read Live · Public Domain" books={myBooks} onOpen={handleOpen} />
+            )}
+            <BookShelf title="Continue Reading" books={continueReading} onOpen={handleOpen} />
+            <BookShelf title="Recently Added" books={recentlyAdded} onOpen={handleOpen} />
+            <BookShelf title="Popular on Kinora" books={popularOnKinora} onOpen={handleOpen} />
+            <BookShelf title="Recommended for You" books={recommended} onOpen={handleOpen} />
+          </Reveal>
         </div>
       </main>
     ),
@@ -99,12 +125,16 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
   };
 
   return (
+    <MotionProvider>
     <div className="kinora-bg min-h-screen flex flex-col relative">
       <AmbientBackground />
       <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />
 
-      <div className="flex-1">
-        <AnimatedPageSwitch active={activePage} pages={pages} />
+      {/* Capture the tapped cover's rect (pointer-down, capture phase) so a
+          subsequent onOpen can morph it. Keys off the existing `.book-cover`
+          class — no edit to Agent 5's BookCard required. */}
+      <div className="flex-1" onPointerDownCapture={shared.capturePointer}>
+        <PageTransition activeKey={activePage}>{pages[activePage]}</PageTransition>
       </div>
 
       {/* Footer */}
@@ -151,8 +181,25 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         </div>
       </footer>
 
-      {/* Reading room overlay — scroll-driven, generates the film as you read */}
-      <ReadingRoom book={selectedBook} onClose={() => setSelectedBook(null)} />
+      {/* Reading room overlay — scroll-driven, generates the film as you read.
+          Wrapped in the shared-element morph: the tapped cover flies from its
+          shelf slot to the room and back. The room is mount-gated by `opened`
+          so the travel lands before the room's own hinge plays. */}
+      <BookOpenTransition
+        open={roomOpen}
+        originRect={originRect}
+        cover={{ image: selectedBook?.coverImage, gradient: selectedBook?.coverGradient }}
+        onClosed={() => {
+          setSelectedBook(null);
+          setOriginRect(null);
+        }}
+      >
+        {(opened) => (
+          <ReadingRoom book={opened ? selectedBook : null} onClose={handleCloseRoom} />
+        )}
+      </BookOpenTransition>
     </div>
+    <MotionDebugOverlay />
+    </MotionProvider>
   );
 }

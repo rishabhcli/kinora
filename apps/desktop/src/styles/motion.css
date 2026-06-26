@@ -35,3 +35,209 @@
     transform: translateY(0) scale(1);
   }
 }
+
+/* ── Below: Agent 4 motion system (merged) ─────────────────────────── */
+/* ================================================================
+   KINORA — MOTION SYSTEM  ·  owned by Agent 04 (Motion & Animation)
+   ----------------------------------------------------------------
+   The single source of truth for the app's *physics*: timing tokens,
+   easing curves, the consolidated @keyframes, and the transition
+   utility classes that the framer-motion primitives in `src/motion/`
+   mirror. Colours/shadows live in Agent 8's tokens — this file is
+   PURE MOTION (durations, easings, transforms, opacity) only.
+
+   Pairing rule: every easing/duration here has a numeric twin in
+   `src/motion/springs.ts`. Keep them in lockstep. CSS-driven motion
+   reads the vars; framer-motion-driven motion reads the TS twins.
+
+   Global speed: `--mo-speed` is a unitless multiplier set on :root by
+   <MotionProvider> (1 = normal). CSS durations scale with it via
+   calc(time * number); the TS layer scales numerically. One knob.
+   ================================================================ */
+
+:root {
+  /* — Easing curves (cubic-beziers) — */
+  --mo-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);   /* the Kinora signature settle */
+  --mo-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);  /* expressive entrances */
+  --mo-ease-exit: cubic-bezier(0.4, 0, 1, 1);           /* leave fast, no overshoot */
+  --mo-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);  /* a touch of bounce */
+  --mo-ease-glide: cubic-bezier(0.4, 0, 0.2, 1);        /* linear-ish UI glide */
+
+  /* — Duration scale (seconds) — */
+  --mo-dur-instant: 0.12s;
+  --mo-dur-fast: 0.18s;
+  --mo-dur-base: 0.32s;
+  --mo-dur-slow: 0.55s;
+  --mo-dur-cinematic: 0.9s;
+
+  /* — Global speed multiplier (set by <MotionProvider>) — */
+  --mo-speed: 1;
+
+  /* Speed-scaled durations — prefer these in transitions so the global
+     speed knob (and the motion debug overlay) reaches CSS motion too. */
+  --mo-t-instant: calc(var(--mo-dur-instant) * var(--mo-speed));
+  --mo-t-fast: calc(var(--mo-dur-fast) * var(--mo-speed));
+  --mo-t-base: calc(var(--mo-dur-base) * var(--mo-speed));
+  --mo-t-slow: calc(var(--mo-dur-slow) * var(--mo-speed));
+  --mo-t-cinematic: calc(var(--mo-dur-cinematic) * var(--mo-speed));
+}
+
+/* ================================================================
+   CONSOLIDATED @keyframes
+   Migrated here from the scattered set in index.css for the surfaces
+   Agent 04 owns. (Legacy keyframes that belong to other agents' files
+   — hero, aurora, aperture, ambient, login — stay in index.css until
+   Agent 8/12 split it; they are not motion-system primitives.)
+   ================================================================ */
+
+/* The profile dropdown drop-in (migrated from index.css `dropdownIn`). */
+@keyframes mo-dropdown-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Generic entrances — the CSS twins of the `fade` / `fadeUp` / `scaleIn`
+   variants, for non-React surfaces or when JS hydration is deferred. */
+@keyframes mo-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes mo-fade-up {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes mo-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* A travelling sheen for skeletons / live affordances. */
+@keyframes mo-shimmer {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(120%); }
+}
+
+/* A soft attention pulse (live dot, generating ring). */
+@keyframes mo-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50%      { transform: scale(1.12); opacity: 1; }
+}
+
+/* ================================================================
+   TRANSITION UTILITY CLASSES
+   GPU-only (transform/opacity). Durations are speed-scaled so the
+   global knob + reduced-motion reach them.
+   ================================================================ */
+
+/* Drop a `will-change` hint only for the duration of an interaction. */
+.mo-gpu { will-change: transform, opacity; }
+
+/* Tactile press — a gel squash on :active. Pairs with <Pressable>. Does
+   NOT change colour/shape (Agent 8 owns the look), only scale. */
+.mo-press {
+  transition: transform var(--mo-t-fast) var(--mo-ease-spring);
+}
+.mo-press:active:not(:disabled) { transform: scale(0.96); }
+
+/* A gentler press for large surfaces (cards, covers). */
+.mo-press-soft {
+  transition: transform var(--mo-t-fast) var(--mo-ease-spring);
+}
+.mo-press-soft:active:not(:disabled) { transform: scale(0.985); }
+
+/* Focus-ring that fades/scales in rather than popping (a11y-friendly:
+   the ring itself is provided by Agent 6/8 tokens; we animate it). */
+.mo-focus-ring {
+  transition:
+    box-shadow var(--mo-t-base) var(--mo-ease-standard),
+    outline-offset var(--mo-t-fast) var(--mo-ease-standard);
+}
+
+/* Colour/opacity cross-fade for hover affordances. */
+.mo-hover {
+  transition:
+    color var(--mo-t-fast) var(--mo-ease-glide),
+    opacity var(--mo-t-fast) var(--mo-ease-glide),
+    background-color var(--mo-t-base) var(--mo-ease-glide);
+}
+
+/* Horizontal depth-of-field for shelves: covers dissolve toward the
+   row edges so the rail reads as receding into space. */
+.mo-edge-fade-x {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--mo-edge, 44px),
+    #000 calc(100% - var(--mo-edge, 44px)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--mo-edge, 44px),
+    #000 calc(100% - var(--mo-edge, 44px)),
+    transparent 100%
+  );
+}
+
+/* The 3D-tilt glare overlay (generalised from `.comet-glare`). A soft
+   specular highlight that tracks the pointer via --mo-mx/--mo-my. */
+.mo-tilt-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--mo-t-base) var(--mo-ease-glide);
+  background: radial-gradient(
+    circle at var(--mo-mx, 50%) var(--mo-my, 50%),
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.08) 38%,
+    transparent 64%
+  );
+  mix-blend-mode: soft-light;
+}
+
+/* Keep offscreen shelf covers cheap to paint at 100+ items. Applied by
+   <ShelfScroller> to its direct children. The intrinsic size keeps the
+   scrollbar/layout stable while content is skipped. */
+.mo-shelf-rail > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 230px;
+}
+
+/* The drag affordance: grab cursor on a draggable rail, grabbing while
+   the pointer is down. */
+.mo-grab { cursor: grab; }
+.mo-grab.mo-grabbing { cursor: grabbing; }
+.mo-grab.mo-grabbing * { cursor: grabbing; }
+
+/* ================================================================
+   REDUCED MOTION  ·  law (kept in sync with useReducedMotionPref)
+   When the OS asks for less motion, neutralise every transform-based
+   transition and looping keyframe owned by the motion system. Opacity
+   cross-fades may remain (they don't trigger vestibular discomfort),
+   but we shorten them. The TS layer mirrors this for framer-motion.
+   ================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mo-t-instant: 0.01ms;
+    --mo-t-fast: 0.01ms;
+    --mo-t-base: 0.01ms;
+    --mo-t-slow: 0.01ms;
+    --mo-t-cinematic: 0.01ms;
+  }
+  .mo-press:active:not(:disabled),
+  .mo-press-soft:active:not(:disabled) { transform: none; }
+  .mo-tilt-glare { display: none; }
+  [class*="mo-"] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* A user who also asks for reduced transparency loses the glare sheen
+   (it reads as a translucent film). The tilt geometry still works. */
+@media (prefers-reduced-transparency: reduce) {
+  .mo-tilt-glare { display: none; }
+}

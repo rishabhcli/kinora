@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { useMotion } from "../motion";
 import logoImg from "../assets/logo-transparent.png";
 import GooeySearch from "./GooeySearch";
 
@@ -90,7 +91,7 @@ function NavButtons({
   pillId: string;
   padding: string;
 }) {
-  const reduce = useReducedMotion();
+  const { spring } = useMotion();
   return (
     <>
       {navItems.map((item) => {
@@ -117,11 +118,7 @@ function NavButtons({
                 aria-hidden="true"
                 className="nav-btn-active"
                 style={{ position: "absolute", inset: 0, borderRadius: "999px", zIndex: 0 }}
-                transition={
-                  reduce
-                    ? { duration: 0 }
-                    : { type: "spring", stiffness: 520, damping: 40, mass: 0.7 }
-                }
+                transition={spring("snappy")}
               />
             )}
             <span className="relative z-10 inline-flex items-center gap-1.5">
@@ -191,7 +188,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
             style={{
               gap: 2,
               opacity: buttonsInHeader ? 1 : 0,
-              transition: "opacity 0.25s ease",
+              transition: "opacity var(--mo-t-base) var(--mo-ease-glide)",
               pointerEvents: buttonsInHeader ? "auto" : "none",
             }}
           >
@@ -219,7 +216,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
               background: "rgba(22, 20, 18, 0.98)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
               boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
-              animation: "dropdownIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+              animation: "mo-dropdown-in var(--mo-t-fast) var(--mo-ease-emphasized) both",
             }}
           >
             {/* Header */}
@@ -297,7 +294,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
           borderRadius: "999px",
           padding: "5px 7px",
           opacity: dockVisible ? 1 : 0,
-          transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease",
+          transition: "transform var(--mo-t-slow) var(--mo-ease-emphasized), opacity var(--mo-t-base) var(--mo-ease-glide)",
           pointerEvents: dockVisible ? "auto" : "none",
         }}
       >
