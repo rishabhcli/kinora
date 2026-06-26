@@ -53,6 +53,7 @@ struct KinoraApp: App {
 struct RootView: View {
     @State private var screen: Screen = .home
     @State private var openBook: KBook?
+    @State private var nowPlaying: KBook?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -72,8 +73,15 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            GlassTabBar(screen: $screen)
-                .padding(.bottom, 22)
+            VStack(spacing: 12) {
+                if let np = nowPlaying, openBook == nil {
+                    NowPlayingPill(book: np) { withAnimation(.smooth(duration: 0.4)) { openBook = np } }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                GlassTabBar(screen: $screen)
+            }
+            .padding(.bottom, 22)
+            .animation(.smooth(duration: 0.4), value: nowPlaying != nil)
         }
         .ignoresSafeArea()
         .overlay {
@@ -83,6 +91,30 @@ struct RootView: View {
                     .zIndex(20)
             }
         }
+        .onChange(of: openBook) { _, new in if let b = new { nowPlaying = b } }
+    }
+}
+
+/// Find-My-style floating "Now Playing" glass accessory above the tab bar.
+struct NowPlayingPill: View {
+    let book: KBook
+    var onTap: () -> Void
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 11) {
+                Image(systemName: "play.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("NOW PLAYING").font(.system(size: 8.5, weight: .bold)).tracking(1).foregroundStyle(.white.opacity(0.55))
+                    Text(book.title).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                }
+                Spacer(minLength: 10)
+                Image(systemName: "waveform").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color(red: 0.83, green: 0.64, blue: 0.31))
+            }
+            .padding(.horizontal, 15).padding(.vertical, 10).frame(width: 268)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular, in: .capsule)
+        .shadow(color: .black.opacity(0.35), radius: 18, y: 10)
     }
 }
 
@@ -134,6 +166,7 @@ struct GlassTopBar: View {
 struct GlassTabBar: View {
     @Binding var screen: Screen
     @Namespace private var ns
+    @State private var hovered: Screen?
 
     var body: some View {
         HStack(spacing: 4) {
@@ -156,6 +189,9 @@ struct GlassTabBar: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .scaleEffect(hovered == s ? 1.1 : 1)
+                .animation(.smooth(duration: 0.2), value: hovered)
+                .onHover { hovered = $0 ? s : nil }
             }
         }
         .padding(6)
