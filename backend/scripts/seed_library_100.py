@@ -36,12 +36,8 @@ from app.library.catalog import CatalogEntry, load_catalog  # noqa: E402
 
 _REPO = Path(__file__).resolve().parents[2]
 CATALOG = _REPO / "assets" / "books" / "catalog.json"
-DEST = _REPO / "assets" / "books" / "public-domain"
 REPORT = _REPO / "assets" / "books" / "seed-report.json"
 PAGES_TO_RASTERISE = 8
-# Gutenberg cuts off *concurrent* downloads mid-body (RemoteProtocolError), so
-# downloads run sequentially; they are fast (60KB–1.3MB) and not the bottleneck.
-DOWNLOAD_CONCURRENCY = 1
 
 #: A cinematic art-direction per genre (drives the STYLE entity + shot prompts).
 _ART_BY_GENRE: dict[str, str] = {
@@ -74,54 +70,6 @@ def _cover_for(entry: CatalogEntry, *, use_hd: bool) -> tuple[bytes, str]:
     return covers.make_typographic_cover(entry.title, entry.author), "generated"
 
 
-async def _predownload(entries: list[CatalogEntry]) -> None:
-    """Fetch all missing EPUBs (downloads dominate wall time).
-
-    Prefers the Gutenberg **cache mirror** (``pg{gid}.epub`` — fast + reliable),
-    with the gutendex format URL as a fallback. Concurrency is kept low and a
-    single client is reused: Gutenberg throttles/blocks bulk concurrent access.
-    """
-    import httpx
-
-    DEST.mkdir(parents=True, exist_ok=True)
-    todo = [e for e in entries if not _cached_epub(e.gutenberg_id)]
-    if not todo:
-        return
-    print(f"pre-downloading {len(todo)} EPUBs (×{DOWNLOAD_CONCURRENCY})…", flush=True)
-    sem = asyncio.Semaphore(DOWNLOAD_CONCURRENCY)
-    ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"
-
-    async with httpx.AsyncClient(
-        follow_redirects=True, timeout=60.0, headers={"User-Agent": ua}
-    ) as client:
-
-        async def fetch(entry: CatalogEntry) -> None:
-            gid = entry.gutenberg_id
-            out = DEST / f"pg{gid}.epub"
-            urls = [
-                f"https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.epub",
-                f"https://www.gutenberg.org/cache/epub/{gid}/pg{gid}-images.epub",
-                entry.epub_url,
-            ]
-            async with sem:
-                for url in [u for u in urls if u]:
-                    try:
-                        resp = await client.get(url)
-                        resp.raise_for_status()
-                        if len(resp.content) >= 20000:
-                            out.write_bytes(resp.content)
-                            return
-                    except Exception:  # noqa: BLE001 - try the next mirror
-                        continue
-
-        await asyncio.gather(*(fetch(e) for e in todo))
-
-
-def _cached_epub(gid: int) -> Path | None:
-    out = DEST / f"pg{gid}.epub"
-    return out if out.exists() and out.stat().st_size > 20000 else None
-
-
 async def _is_seeded(book_id: str) -> bool:
     """True when the book is already ``ready`` with a cover (idempotent skip)."""
     from app.db.models.enums import BookStatus
@@ -150,8 +98,6 @@ async def amain(argv: list[str] | None = None) -> int:
         entries = entries[: args.limit]
     use_hd = not args.no_hd
     print(f"seeding {len(entries)} books (hd_covers={use_hd}, force={args.force})…", flush=True)
-
-    await _predownload(entries)
 
     report: list[dict[str, Any]] = []
     sources: Counter[str] = Counter()

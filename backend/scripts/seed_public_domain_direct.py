@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -67,30 +68,73 @@ _FRONT_MATTER = (
 )
 
 
-def download(gid: int, url: str | None = None) -> Path | None:
-    """Download (and cache) a Gutenberg EPUB; idempotent (skips a good cached file)."""
+_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"
+# Gutenberg bandwidth-throttles a busy IP and drops large transfers mid-body, so
+# we try faster mirrors first and resume via HTTP Range across drops.
+_MIRRORS = (
+    "https://gutenberg.pglaf.org",
+    "http://aleph.gutenberg.org",
+    "https://www.gutenberg.org",
+)
+
+
+def _stream_resume(url: str, tmp: Path, timeout: float, max_attempts: int = 6) -> bool:
+    """Download ``url`` into ``tmp``, resuming via Range on drops; True if complete."""
+    tmp.unlink(missing_ok=True)
+    got = 0
+    total: int | None = None
+    for _ in range(max_attempts):
+        headers = {"User-Agent": _UA}
+        if got:
+            headers["Range"] = f"bytes={got}-"
+        try:
+            with httpx.stream(
+                "GET", url, headers=headers, follow_redirects=True, timeout=timeout
+            ) as r:
+                if r.status_code not in (200, 206):
+                    return False  # 404/410 etc. — caller tries the next mirror
+                if r.status_code == 200 and got:
+                    got = 0  # server ignored Range — restart this file
+                    tmp.unlink(missing_ok=True)
+                cl = r.headers.get("Content-Length")
+                if cl:
+                    total = int(cl) + (got if r.status_code == 206 else 0)
+                with tmp.open("ab" if got else "wb") as fh:
+                    for chunk in r.iter_bytes(65536):
+                        fh.write(chunk)
+                        got += len(chunk)
+            if total and got >= total:
+                break
+        except Exception:  # noqa: BLE001 - drop/timeout: resume from what landed
+            got = tmp.stat().st_size if tmp.exists() else 0
+    return tmp.exists() and tmp.stat().st_size > 20000 and zipfile.is_zipfile(tmp)
+
+
+def download(gid: int, url: str | None = None, *, timeout: float = 45.0) -> Path | None:
+    """Download (and cache) a Gutenberg EPUB; idempotent (skips a good cached file).
+
+    Tries faster mirrors then the main site, the ``-images`` variant as a fallback,
+    each Range-resumed across Gutenberg's mid-transfer drops and validated as a real
+    EPUB (zip) before it is accepted — so a throttled/flaky connection still
+    eventually lands a complete file.
+    """
     DEST.mkdir(parents=True, exist_ok=True)
     out = DEST / f"pg{gid}.epub"
     if out.exists() and out.stat().st_size > 20000:
         return out
-    urls = [u for u in (
-        url,
-        f"https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.epub",
-        f"https://www.gutenberg.org/ebooks/{gid}.epub3.images",
-        f"https://www.gutenberg.org/ebooks/{gid}.epub.images",
-    ) if u]
-    for u in urls:
-        try:
-            with httpx.Client(follow_redirects=True, timeout=120.0,
-                              headers={"User-Agent": "Mozilla/5.0 (Kinora seed)"}) as dc:
-                r = dc.get(u)
-                r.raise_for_status()
-            if len(r.content) < 20000:
-                continue
-            out.write_bytes(r.content)
+    tmp = out.with_suffix(".part")
+    candidates = [
+        f"{base}/cache/epub/{gid}/pg{gid}{suffix}.epub"
+        for base in _MIRRORS
+        for suffix in ("", "-images")
+    ]
+    if url:
+        candidates.append(url)
+    for candidate in candidates:
+        if _stream_resume(candidate, tmp, timeout):
+            tmp.replace(out)
             return out
-        except Exception:  # noqa: BLE001 - try the next mirror
-            continue
+    tmp.unlink(missing_ok=True)
     return None
 
 
