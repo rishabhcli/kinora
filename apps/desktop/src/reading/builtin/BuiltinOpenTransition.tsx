@@ -50,6 +50,7 @@ export function BuiltinBookOpenTransition({
       className="fixed inset-0 z-[100]"
       role="dialog"
       aria-modal="true"
+      aria-label={cover.title ? `Reading ${cover.title}` : "Reading room"}
       initial="closed"
       animate="open"
       exit="closed"
