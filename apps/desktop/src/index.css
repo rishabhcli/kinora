@@ -96,6 +96,15 @@ html.kinora-native .kinora-bg {
   background: linear-gradient(180deg, rgba(24, 22, 20, 0.34) 0%, rgba(14, 13, 11, 0.42) 100%) !important;
 }
 
+/* The full-screen content canvas (home/pages) stays solid for a strong, coherent
+   dark UI — only the chrome reads as glass. The login's inset-0 scrim keeps the
+   lighter translucency above so the shelf shows behind the sign-in card. */
+html.kinora-native .kinora-bg.min-h-screen {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(120, 90, 50, 0.08) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(20, 18, 16, 0.97) 0%, rgba(13, 12, 10, 0.99) 100%) !important;
+}
+
 html.kinora-native .bookwall {
   background: linear-gradient(180deg, rgba(14, 12, 11, 0.32) 0%, rgba(10, 9, 8, 0.42) 100%) !important;
 }
@@ -341,7 +350,10 @@ html.kinora-native [class*="rounded-3xl"] {
 }
 
 .book-3d-wrapper:hover .book-cover {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 14px 30px -6px rgba(0, 0, 0, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.28),
+    0 10px 38px -8px rgba(212, 164, 78, 0.34); /* warm gold lift on hover */
   border-radius: 4px;
 }
 
@@ -1125,4 +1137,124 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
 @keyframes shimmer-slide {
   0% { transform: translateX(-50%); }
   100% { transform: translateX(0%); }
+}
+
+/* ============================================================
+   MAGIC LAYER — a living ambient backdrop, drifting light motes,
+   cursor-tracking glare on cards, and a shimmer for the greeting.
+   Everything here is GPU-only (transform/opacity) and fully
+   reduced-motion aware. Defined last so it wins.
+   ============================================================ */
+
+/* Ambient home backdrop: two slow auroras + faint rising embers that sit behind
+   all content (z-0) to give the app a warm, candle-lit, "stories breathing" feel. */
+.home-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+
+.home-aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(95px);
+  will-change: transform;
+}
+
+.home-aurora-blob--gold {
+  width: 560px;
+  height: 560px;
+  top: -18%;
+  left: -10%;
+  opacity: 0.22;
+  background: radial-gradient(circle, rgba(212, 164, 78, 0.55), transparent 70%);
+  animation: aurora-drift-1 40s ease-in-out infinite;
+}
+
+.home-aurora-blob--amber {
+  width: 480px;
+  height: 480px;
+  bottom: -16%;
+  right: -12%;
+  opacity: 0.16;
+  background: radial-gradient(circle, rgba(150, 96, 40, 0.55), transparent 70%);
+  animation: aurora-drift-2 52s ease-in-out infinite;
+}
+
+/* Slow rising "embers" — tiny warm sparks that drift up and fade, like dust in a
+   sunbeam. Count is small and opacity tiny so it reads as atmosphere, not noise. */
+.ambient-mote {
+  position: absolute;
+  bottom: -2vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 200, 120, 0.9), rgba(232, 200, 120, 0) 70%);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: ambient-rise linear infinite;
+}
+
+@keyframes ambient-rise {
+  0%   { transform: translate3d(0, 0, 0) scale(0.5); opacity: 0; }
+  12%  { opacity: var(--mote-opacity, 0.45); }
+  88%  { opacity: var(--mote-opacity, 0.45); }
+  100% { transform: translate3d(var(--mote-dx, 24px), -100vh, 0) scale(1.05); opacity: 0; }
+}
+
+/* Cursor-tracking specular glare for CometCard covers — a soft highlight that
+   slides under the pointer, so each cover catches the light as you hover. */
+.comet-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    220px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(232, 200, 120, 0.14) 32%,
+    transparent 62%
+  );
+  z-index: 5;
+}
+
+/* One-time gold shimmer sweep across the greeting name once it has revealed. */
+.greeting-shimmer {
+  background: linear-gradient(
+    100deg,
+    #e8e2d8 0%,
+    #e8e2d8 38%,
+    #f6e3b4 48%,
+    #ffffff 52%,
+    #e8e2d8 62%,
+    #e8e2d8 100%
+  );
+  background-size: 220% 100%;
+  background-position: 130% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: greeting-sheen 2.6s cubic-bezier(0.22, 1, 0.36, 1) 0.9s 1 both;
+}
+
+@keyframes greeting-sheen {
+  from { background-position: 130% 0; }
+  to   { background-position: -30% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-aurora-blob,
+  .ambient-mote { animation: none; }
+  .ambient-mote { opacity: 0; }
+  .greeting-shimmer {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: #e8e2d8;
+    color: #e8e2d8;
+  }
 }
