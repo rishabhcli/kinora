@@ -18,6 +18,18 @@ from app.memory.conflict_log import record_conflict_history
 **Verify:** `cd backend && .venv/bin/ruff check app tests scripts` → `All checks passed!` ✅
 **Risk:** none (import-only; the symbol is already used in the file).
 
+**Also unblocked (the ruff break had masked these — `make lint` runs ruff *then* mypy, stopping at
+ruff; once ruff passed, mypy surfaced 3 pre-existing errors that block the shared gate). All fixed with
+zero-semantic, type-only changes:**
+- `tests/test_prefs_learning.py:228` — `grade_filter()` returns `str | None`; bound the calls to locals
+  so `… in warm/dark` narrows (`warm = grade_filter(...); assert warm and "…" in warm`).
+- `tests/test_api_director.py` — `_collect`'s `pubsub: object` → `pubsub: Any` (it is passed to
+  `RedisClient.next_message(pubsub: PubSub)`); added `from typing import Any`.
+- (mine) `tests/test_optim_cache.py` — a test factory `-> None` made the generic cache return
+  `None`-typed; widened to `-> str | None`.
+After: `make lint` → ruff `All checks passed!` + mypy `Success: no issues found in 216 source files`.
+Flagged for the prefs (Agent 8) and director (Agent 1/3) test owners.
+
 ---
 
 ## R1 — Wire the CostMeter usage sink (default-off) — PENDING
@@ -33,12 +45,17 @@ per-book/per-session/per-model USD rollups with **zero behavior change** (a sink
 **Verify:** unit test that a routed call accumulates cost; route returns the rollup; flag-off ⇒ identical to today.
 **Risk:** low — additive, flag-gated, observe-only.
 
-## R2 — Register the `/api/optim` router — PENDING
-**Target:** `backend/app/api/routes/__init__.py` (or wherever includes are wired) · **Owner:** Agent 12
+## R2 — Register the `/api/optim` router — PENDING (route built + tested; wiring deferred to you)
+**Target:** `backend/app/api/routes/__init__.py` `ROUTERS` · **Owner:** Agent 12 (router registration is a
+shared seam — I did NOT edit it directly; a NOTE marks the spot).
 **Rationale:** expose `optim.py` (`GET /api/optim/cost`, `GET /api/optim/perf`). Named `optim`, not
 `metrics`, because `routes/metrics.py` is already the `/eval` surface.
-**Verify:** `GET /api/optim/perf` 200s on a lazy app with `DASHSCOPE_API_KEY=test`.
-**Risk:** low — new read-only endpoints.
+**Change (one-liner):** add `optim` to the `from app.api.routes import …` line and `optim.router` to
+`ROUTERS`.
+**Verify:** I confirmed `GET /api/optim/perf` → 200 via a standalone `TestClient` (auth dep overridden)
+AND, in an earlier integrator-applied spike, mounted in `create_app()` → `/api/optim/perf` 200
+(`priced_model_count: 17`). Reverted the spike to respect the seam.
+**Risk:** low — new read-only, auth-gated endpoints.
 
 ## R3 — Model routing seam (default = identity) — PENDING
 **Target:** agent constructors (`agents/*.py`) **or** the `Providers` bundle · **Owner:** Agents 1/3 + 12

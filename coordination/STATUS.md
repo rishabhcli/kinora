@@ -29,8 +29,9 @@
 
 ### Needs other agents / Agent 12 (flag-gated, behavior-preserving — `requests/agent-07.md`)
 - R1 cost-meter sink wiring + config flags (`composition.py`/`config.py`); R2 register `/api/optim`
-  (applied); R3 routing seam; R4 dead-weight removal; R5 lazy ReadingRoom; R6 paginate shelf (realizes the
-  index); R7 parallel degrade lane; R8 render at 720×1280. Each: rationale + measured delta + verify + risk.
+  (route built + tested; one-line wiring deferred — router registration is Agent 12's seam); R3 routing
+  seam; R4 dead-weight removal; R5 lazy ReadingRoom; R6 paginate shelf (realizes the index); R7 parallel
+  degrade lane; R8 render at 720×1280. Each: rationale + measured delta + verify + risk.
 
 ---
 

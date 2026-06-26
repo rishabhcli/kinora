@@ -225,8 +225,10 @@ def test_pacing_drives_dwell_and_palette_lighting_drive_grade() -> None:
     fast = duration_for_pacing(5.0, Camera(speed="fast"))
     assert fast < 5.0 < slow  # slower lingers longer, faster tightens
 
-    assert grade_filter(palette="warm") and "colorbalance" in grade_filter(palette="warm")
-    assert grade_filter(lighting="dark") and "eq=" in grade_filter(lighting="dark")
+    warm = grade_filter(palette="warm")
+    assert warm and "colorbalance" in warm
+    dark = grade_filter(lighting="dark")
+    assert dark and "eq=" in dark
     both = grade_filter(palette="cool", lighting="bright")
     assert both and both.count(",") >= 1  # two filters joined
     assert grade_filter() is None  # nothing learned → no grade (unchanged look)

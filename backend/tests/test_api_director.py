@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from httpx import AsyncClient
 
@@ -196,7 +197,7 @@ async def test_conflict_choice_records_and_announces(
 
 
 async def _collect(
-    container: Container, pubsub: object, *, until: str, limit: int = 6
+    container: Container, pubsub: Any, *, until: str, limit: int = 6
 ) -> list[dict]:
     """Read up to ``limit`` session events, stopping once ``until`` is seen."""
     events: list[dict] = []
