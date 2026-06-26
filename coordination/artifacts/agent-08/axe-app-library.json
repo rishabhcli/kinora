@@ -1,6 +1,6 @@
 {
   "url": "http://localhost:5173/e2e/harness/library.html",
-  "scannedAt": "2026-06-26T14:29:34.761Z",
+  "scannedAt": "2026-06-26T14:34:43.846Z",
   "counts": {
     "violations": 2,
     "serious": 2
@@ -20,12 +20,12 @@
         {
           "target": "button[aria-label=\"See all Continue Reading\"] > span",
           "html": "<span>See All</span>",
-          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.76 (foreground color: #79716a, background color: #181614, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.37 (foreground color: #706a63, background color: #181614, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
         },
         {
           "target": "button[aria-label=\"See all Recently Added\"] > span",
           "html": "<span>See All</span>",
-          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.76 (foreground color: #79716a, background color: #181614, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.37 (foreground color: #706a63, background color: #181614, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
         }
       ]
     },
