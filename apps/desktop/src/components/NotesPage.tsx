@@ -96,11 +96,11 @@ export default function NotesPage() {
                   <p className="text-[10px] text-kinora-muted truncate font-medium">
                     {note.book}
                   </p>
-                  <p className="text-[9px] text-kinora-muted/60">p. {note.page}</p>
+                  <p className="text-[9px] text-kinora-muted/85">p. {note.page}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-[9px] text-kinora-muted/80">{note.tag}</span>
-                  <span className="text-[9px] text-kinora-muted/60">{note.date}</span>
+                  <span className="text-[9px] text-kinora-muted/85">{note.date}</span>
                 </div>
               </div>
             </div>

@@ -1,4 +1,9 @@
-import { useState, useEffect, useRef, ReactNode } from "react";
+import { ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+
+// A soft cinematic settle — the outgoing page sinks and dims, the incoming page
+// rises into focus. Transform/opacity only, so it stays buttery on every tab.
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export default function AnimatedPageSwitch({
   active,
@@ -7,21 +12,20 @@ export default function AnimatedPageSwitch({
   active: string;
   pages: Record<string, ReactNode>;
 }) {
-  const [current, setCurrent] = useState(active);
-  const [animKey, setAnimKey] = useState(0);
-  const prevActive = useRef(active);
-
-  useEffect(() => {
-    if (active !== prevActive.current) {
-      prevActive.current = active;
-      setCurrent(active);
-      setAnimKey((k) => k + 1);
-    }
-  }, [active]);
+  const reduce = useReducedMotion();
 
   return (
-    <div key={animKey} className="tab-fade">
-      {pages[current]}
-    </div>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={active}
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.99 }}
+        animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+        exit={reduce ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.995 }}
+        transition={{ duration: reduce ? 0.2 : 0.36, ease: EASE }}
+        style={{ position: "relative", zIndex: 1, transformOrigin: "top center", willChange: "transform, opacity" }}
+      >
+        {pages[active]}
+      </motion.div>
+    </AnimatePresence>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import logoImg from "../assets/logo-transparent.png";
 import GooeySearch from "./GooeySearch";
 
@@ -74,6 +75,66 @@ export const navItems = [
   { icon: NotesIcon, label: "Notes" },
 ];
 
+/* The nav tabs share one glass "pill" that glides to whichever tab is active
+   (framer-motion shared layout). Each nav instance gets its own `pillId` so the
+   header bar and the floating dock animate independently and never fly across
+   the screen when one fades out and the other takes over. */
+function NavButtons({
+  active,
+  onNavigate,
+  pillId,
+  padding,
+}: {
+  active: string;
+  onNavigate: (page: string) => void;
+  pillId: string;
+  padding: string;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <>
+      {navItems.map((item) => {
+        const isActive = active === item.label;
+        return (
+          <button
+            key={item.label}
+            onClick={() => onNavigate(item.label)}
+            className={`relative flex items-center font-medium transition-colors duration-200 ${
+              isActive ? "text-white" : "nav-btn-hover text-white/70 hover:text-white"
+            }`}
+            style={{
+              padding,
+              borderRadius: "999px",
+              fontSize: 11,
+              textShadow: isActive
+                ? "0 1px 2px rgba(0,0,0,0.45)"
+                : "none",
+            }}
+          >
+            {isActive && (
+              <motion.span
+                layoutId={pillId}
+                aria-hidden="true"
+                className="nav-btn-active"
+                style={{ position: "absolute", inset: 0, borderRadius: "999px", zIndex: 0 }}
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 520, damping: 40, mass: 0.7 }
+                }
+              />
+            )}
+            <span className="relative z-10 inline-flex items-center gap-1.5">
+              <item.icon size={15} />
+              <span>{item.label}</span>
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
 export default function Navbar({ active, onNavigate, onLogout }: { active: string; onNavigate: (page: string) => void; onLogout?: () => void }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [scrollState, setScrollState] = useState<"top" | "middle" | "bottom">("top");
@@ -134,30 +195,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
               pointerEvents: buttonsInHeader ? "auto" : "none",
             }}
           >
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => onNavigate(item.label)}
-                className={`flex items-center gap-1.5 font-medium transition-colors ${
-                  active === item.label
-                    ? "nav-btn-active text-white"
-                    : "nav-btn-hover text-white/70 hover:text-white"
-                }`}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "999px",
-                  fontSize: 11,
-                  transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  transitionDuration: "0.35s",
-                  textShadow: active === item.label
-                    ? "0 0 12px rgba(255,255,255,0.4)"
-                    : "0 0 8px rgba(255,255,255,0.15)",
-                }}
-              >
-                <item.icon size={15} />
-                <span>{item.label}</span>
-              </button>
-            ))}
+            <NavButtons active={active} onNavigate={onNavigate} pillId="nav-pill-header" padding="6px 12px" />
           </nav>
 
           {/* Right: Search + Profile */}
@@ -264,30 +302,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
         }}
       >
         <nav className="flex items-center" style={{ gap: 2 }}>
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              onClick={() => onNavigate(item.label)}
-              className={`flex items-center gap-1.5 font-medium transition-colors ${
-                active === item.label
-                  ? "nav-btn-active text-white"
-                  : "nav-btn-hover text-white/70 hover:text-white"
-              }`}
-              style={{
-                padding: "7px 12px",
-                borderRadius: "999px",
-                fontSize: 11,
-                transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-                transitionDuration: "0.35s",
-                textShadow: active === item.label
-                  ? "0 0 12px rgba(255,255,255,0.4)"
-                  : "0 0 8px rgba(255,255,255,0.15)",
-              }}
-            >
-              <item.icon size={15} />
-              <span>{item.label}</span>
-            </button>
-          ))}
+          <NavButtons active={active} onNavigate={onNavigate} pillId="nav-pill-dock" padding="7px 12px" />
         </nav>
       </div>
       )}

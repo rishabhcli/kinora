@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { continueReading, popularOnKinora } from "../data/books";
-import { BookCoverImage } from "./SkeletonShimmer";
 
 export default function WatchPage() {
   const watchable = [...continueReading.filter((b) => b.progress > 0), ...popularOnKinora];
@@ -36,11 +35,11 @@ export default function WatchPage() {
               <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/80 border border-white/10 backdrop-blur-sm">
                 FHD
               </span>
-              <span className="text-[9px] font-medium px-2 py-0.5 rounded bg-white/5 text-white/50 border border-white/5 backdrop-blur-sm">
+              <span className="text-[9px] font-medium px-2 py-0.5 rounded bg-white/5 text-white/70 border border-white/5 backdrop-blur-sm">
                 AI CINEMATIC
               </span>
             </div>
-            <span className="text-[10px] text-white/40 font-medium tracking-wide">
+            <span className="text-[10px] text-white/70 font-medium tracking-wide">
               {isPlaying ? "NOW PLAYING" : "READY"}
             </span>
           </div>
@@ -54,15 +53,17 @@ export default function WatchPage() {
               <h2 className="font-serif text-3xl font-semibold text-white mb-1 leading-tight">
                 {selected.title}
               </h2>
-              <p className="text-sm text-white/50">{selected.author}</p>
+              <p className="text-sm text-white/75">{selected.author}</p>
             </div>
 
             {/* Play / Pause button */}
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg transition-transform hover:scale-[1.03]"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg transition-all hover:scale-[1.03]"
               style={{
-                background: "rgba(30, 28, 25, 0.92)",
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(12px) saturate(160%)",
+                WebkitBackdropFilter: "blur(12px) saturate(160%)",
                 border: "1px solid rgba(255,255,255,0.15)",
                 boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.12)",
               }}
@@ -90,7 +91,7 @@ export default function WatchPage() {
         {/* Bottom scrubber bar */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
           <div
-            className="h-full bg-kinora-gold transition-[width] duration-300"
+            className="h-full bg-kinora-gold transition-all duration-300"
             style={{ width: isPlaying ? "35%" : "0%" }}
           />
         </div>
@@ -104,11 +105,13 @@ export default function WatchPage() {
             className="w-8 h-12 rounded overflow-hidden flex-shrink-0"
             style={{ background: selected.coverGradient }}
           >
-            <BookCoverImage
+            <img
               src={selected.coverImage}
               alt=""
               className="w-full h-full object-cover"
-              fallbackBackground={selected.coverGradient}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
             />
           </div>
           <div>
@@ -153,17 +156,20 @@ export default function WatchPage() {
                   setSelected(book);
                   setIsPlaying(false);
                 }}
-                className={`flex-shrink-0 w-[140px] text-left transition-opacity duration-200 ${isActive ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
+                className={`flex-shrink-0 w-[140px] text-left transition-all duration-200 ${isActive ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
               >
                 <div
-                  className={`relative rounded-md overflow-hidden mb-1.5 transition-shadow duration-200 ${isActive ? "ring-1 ring-kinora-gold/50" : ""}`}
+                  className={`relative rounded-md overflow-hidden mb-1.5 transition-all duration-200 ${isActive ? "ring-1 ring-kinora-gold/50" : ""}`}
                   style={{ aspectRatio: "2 / 3", background: book.coverGradient }}
                 >
-                  <BookCoverImage
+                  <img
                     src={book.coverImage}
                     alt={book.title}
                     className="absolute inset-0 w-full h-full object-cover"
-                    fallbackBackground={book.coverGradient}
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
                   />
                   <div className="absolute inset-0 book-spine" />
                   {isActive && (
@@ -171,7 +177,9 @@ export default function WatchPage() {
                       <div
                         className="w-7 h-7 rounded-full flex items-center justify-center"
                         style={{
-                          background: "rgba(0,0,0,0.85)",
+                          background: "rgba(0,0,0,0.6)",
+                          backdropFilter: "blur(6px)",
+                          WebkitBackdropFilter: "blur(6px)",
                         }}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
@@ -181,9 +189,9 @@ export default function WatchPage() {
                     </div>
                   )}
                 </div>
-                <h3 className="text-[11px] font-medium text-kinora-text truncate leading-tight">
+                <h4 className="text-[11px] font-medium text-kinora-text truncate leading-tight">
                   {book.title}
-                </h3>
+                </h4>
                 <p className="text-[10px] text-kinora-muted truncate">{book.author}</p>
               </button>
             );

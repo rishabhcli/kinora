@@ -54,18 +54,58 @@ export interface BookResponse {
   progress: number | null; // 0..1
   stage: string | null;
 }
+export interface SourceSpan {
+  page?: number;
+  para?: number;
+  word_range: [number, number]; // [start, end) in the book-global word index
+}
 export interface ShotResponse {
   shot_id: string;
   status: string;
   duration_s: number | null;
   clip_url: string | null;
+  source_span: SourceSpan | null;
+  scene_id?: string | null;
+  beat_id?: string | null;
+}
+export interface WordBox {
+  word_index: number; // global across the whole book
+  text: string;
+  bbox: [number, number, number, number]; // normalized [0,1]
 }
 export interface PageResponse {
   book_id: string;
   page_number: number;
   image_url: string | null;
   text: string | null;
+  word_boxes: WordBox[] | null;
 }
+export interface SessionResponse {
+  session_id: string;
+  book_id: string;
+  focus_word: number;
+  velocity_wps: number;
+  committed_seconds_ahead: number;
+  bursting: boolean;
+  budget_remaining_s: number | null;
+}
+/** SSE payloads we care about (each frame's JSON carries its own `event`). */
+export interface BufferState {
+  event: "buffer_state";
+  committed_seconds_ahead: number;
+  bursting: boolean;
+  idle: boolean;
+  velocity_wps?: number;
+  budget_remaining_s: number | null;
+}
+export interface ClipReady {
+  event: "clip_ready";
+  shot_id: string;
+  oss_url: string;
+  video_seconds?: number;
+}
+export type SessionEvent = BufferState | ClipReady | ({ event: string } & Record<string, unknown>);
+
 interface TokenResponse { access_token: string; token_type: string; expires_in: number }
 
 export const api = {
@@ -97,11 +137,42 @@ export const api = {
   getBook: (id: string) => req<BookResponse>(`/api/books/${id}`),
   getShots: (id: string) => req<ShotResponse[]>(`/api/books/${id}/shots`),
   getPage: (id: string, n: number) => req<PageResponse>(`/api/books/${id}/pages/${n}`),
-  createSession: (bookId: string) =>
-    req<{ session_id: string }>("/api/sessions", {
+  createSession: (bookId: string, focusWord = 0) =>
+    req<SessionResponse>("/api/sessions", {
       method: "POST",
-      body: JSON.stringify({ book_id: bookId, focus_word: 0, mode: "viewer" }),
+      body: JSON.stringify({ book_id: bookId, focus_word: focusWord, mode: "viewer" }),
     }),
+  /** Tell the scheduler where the reader is (word index) + how fast (words/sec)
+   *  so it generates the window ahead. */
+  postIntent: (sessionId: string, focusWord: number, velocity: number, mode?: string) =>
+    req<Record<string, unknown>>(`/api/sessions/${sessionId}/intent`, {
+      method: "POST",
+      body: JSON.stringify({ focus_word: focusWord, velocity, ...(mode ? { mode } : {}) }),
+    }),
+  /** A jump (fast scroll / page skip) — cancels distant speculative work. */
+  seek: (sessionId: string, word: number) =>
+    req<Record<string, unknown>>(`/api/sessions/${sessionId}/seek`, {
+      method: "POST",
+      body: JSON.stringify({ word }),
+    }),
+  /** Live session stream (clip_ready / buffer_state / …). EventSource can't set
+   *  headers, so the JWT rides as ?token=. Returns a close() to unsubscribe. */
+  openSessionEvents(sessionId: string, onEvent: (e: SessionEvent) => void): () => void {
+    const url = `${BASE}/api/sessions/${sessionId}/events${auth.token ? `?token=${encodeURIComponent(auth.token)}` : ""}`;
+    const es = new EventSource(url);
+    const handler = (e: MessageEvent) => {
+      try {
+        onEvent(JSON.parse(e.data) as SessionEvent);
+      } catch {
+        /* keepalive / non-JSON frame */
+      }
+    };
+    es.onmessage = handler;
+    for (const name of ["clip_ready", "buffer_state", "keyframe_ready", "scene_stitched", "agent_activity", "budget_low", "regen_done"]) {
+      es.addEventListener(name, handler as EventListener);
+    }
+    return () => es.close();
+  },
   uploadBook(file: File, fields: { title?: string; author?: string; art_direction?: string } = {}) {
     const fd = new FormData();
     fd.append("file", file);
@@ -140,5 +211,6 @@ export function toUiBook(b: BookResponse, coverImage = ""): Book {
     coverImage,
     textColor: p.text,
     spineColor: p.spine,
+    live: true,
   };
 }

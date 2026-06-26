@@ -1,8 +1,21 @@
-import { app, BrowserWindow, Menu, Notification, dialog, shell, ipcMain } from "electron";
+import { app, BrowserWindow, Menu, Notification, dialog, shell, ipcMain, nativeImage } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import path from "path";
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+
+// Brand the app as "Kinora": the macOS app menu, About panel, role labels
+// ("Hide/Quit Kinora") and the dock all read app.name, which otherwise defaults
+// to "Electron". Must be set before the app is ready.
+app.setName("Kinora");
+
+// App icon, resolved for dev (served from /public) and prod (Vite copies
+// public/ → dist/). Used for the window (Windows/Linux) and the macOS dock.
+const APP_ICON = nativeImage.createFromPath(
+  VITE_DEV_SERVER_URL
+    ? path.join(__dirname, "../public/icon.png")
+    : path.join(__dirname, "../dist/icon.png"),
+);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -14,6 +27,8 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
+    title: "Kinora",
+    icon: APP_ICON,
     frame: true,
     // Native OS glass: real macOS vibrancy + Windows 11 acrylic. A transparent
     // backdrop lets the material show through the translucent web UI; Linux (no
@@ -121,6 +136,11 @@ ipcMain.handle("kinora:notify", (_e, title: string, body: string) => {
 });
 
 app.whenReady().then(() => {
+  app.setAboutPanelOptions({
+    applicationName: "Kinora",
+    copyright: "© Kinora — Where stories come to life.",
+  });
+  if (process.platform === "darwin" && !APP_ICON.isEmpty()) app.dock?.setIcon(APP_ICON);
   buildMenu();
   createWindow();
   notify("Kinora is ready", "Open a book to watch its AI-generated film.");

@@ -63,6 +63,7 @@ html, body, #root {
 body {
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display",
     "Segoe UI", Roboto, sans-serif;
+  font-weight: 500;
   color: #e8e2d8;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -1165,22 +1166,22 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
 }
 
 .home-aurora-blob--gold {
-  width: 560px;
-  height: 560px;
-  top: -18%;
+  width: 620px;
+  height: 620px;
+  top: -20%;
   left: -10%;
-  opacity: 0.22;
-  background: radial-gradient(circle, rgba(212, 164, 78, 0.55), transparent 70%);
+  opacity: 0.5;
+  background: radial-gradient(circle, rgba(212, 164, 78, 0.6), transparent 70%);
   animation: aurora-drift-1 40s ease-in-out infinite;
 }
 
 .home-aurora-blob--amber {
-  width: 480px;
-  height: 480px;
-  bottom: -16%;
+  width: 540px;
+  height: 540px;
+  bottom: -18%;
   right: -12%;
-  opacity: 0.16;
-  background: radial-gradient(circle, rgba(150, 96, 40, 0.55), transparent 70%);
+  opacity: 0.42;
+  background: radial-gradient(circle, rgba(168, 104, 44, 0.6), transparent 70%);
   animation: aurora-drift-2 52s ease-in-out infinite;
 }
 
@@ -1222,39 +1223,8 @@ button[class*="rounded"]:not([class*="from-"]):not([class*="gradient"]):active {
   z-index: 5;
 }
 
-/* One-time gold shimmer sweep across the greeting name once it has revealed. */
-.greeting-shimmer {
-  background: linear-gradient(
-    100deg,
-    #e8e2d8 0%,
-    #e8e2d8 38%,
-    #f6e3b4 48%,
-    #ffffff 52%,
-    #e8e2d8 62%,
-    #e8e2d8 100%
-  );
-  background-size: 220% 100%;
-  background-position: 130% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: greeting-sheen 2.6s cubic-bezier(0.22, 1, 0.36, 1) 0.9s 1 both;
-}
-
-@keyframes greeting-sheen {
-  from { background-position: 130% 0; }
-  to   { background-position: -30% 0; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .home-aurora-blob,
   .ambient-mote { animation: none; }
   .ambient-mote { opacity: 0; }
-  .greeting-shimmer {
-    animation: none;
-    background: none;
-    -webkit-text-fill-color: #e8e2d8;
-    color: #e8e2d8;
-  }
 }

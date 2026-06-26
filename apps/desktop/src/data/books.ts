@@ -9,6 +9,8 @@ export interface Book {
   coverImage: string;
   textColor: string;
   spineColor: string;
+  /** A backend book that drives a live, generate-the-film-as-you-read session. */
+  live?: boolean;
 }
 
 export const currentUser = {

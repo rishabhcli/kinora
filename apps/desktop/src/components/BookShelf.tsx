@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from "react";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import BookCard from "./BookCard";
 import type { Book } from "../data/books";
 
@@ -7,6 +8,8 @@ interface BookShelfProps {
   books: Book[];
   onOpen?: (book: Book) => void;
 }
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const ArrowIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -24,12 +27,28 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const reduce = useReducedMotion();
 
   // Drag-to-scroll state
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollStart = useRef(0);
   const dragDistance = useRef(0);
+
+  // Each shelf assembles itself as it scrolls into view — the covers rise and
+  // fade in one after another, like books being set onto the shelf.
+  const container: Variants = {
+    hidden: {},
+    show: {
+      transition: reduce ? {} : { staggerChildren: 0.06, delayChildren: 0.05 },
+    },
+  };
+  const item: Variants = reduce
+    ? { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.3 } } }
+    : {
+        hidden: { opacity: 0, y: 24 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+      };
 
   const updateScrollButtons = useCallback(() => {
     const el = scrollRef.current;
@@ -93,9 +112,21 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
   return (
     <section className="mb-8" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 280px" }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 px-1">
+      <motion.div
+        className="flex items-center justify-between mb-3 px-1"
+        initial={reduce ? { opacity: 0 } : { opacity: 0, x: -10 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true, margin: "0px 0px -70px 0px" }}
+        transition={{ duration: 0.5, ease: EASE }}
+      >
         <div className="flex items-center gap-2">
-          <div className="w-1 h-4 bg-kinora-gold/60" />
+          <motion.div
+            className="w-1 h-4 bg-kinora-gold/60 origin-top"
+            initial={reduce ? { scaleY: 1 } : { scaleY: 0 }}
+            whileInView={{ scaleY: 1 }}
+            viewport={{ once: true, margin: "0px 0px -70px 0px" }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.1 }}
+          />
           <h2 className="font-serif text-base font-semibold text-kinora-text tracking-wide">
             {title}
           </h2>
@@ -106,7 +137,7 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
             <ArrowIcon size={10} />
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Floating books row — drag to scroll */}
       <div className="shelf-container relative group/shelf">
@@ -136,18 +167,24 @@ export default function BookShelf({ title, books, onOpen }: BookShelfProps) {
             <ArrowIcon size={14} />
           </button>
         )}
-        <div
+        <motion.div
           ref={scrollRef}
           className="flex gap-4 overflow-x-auto hide-scrollbar px-1 pb-3 select-none"
           style={{ cursor: "grab" }}
           onMouseDown={handleMouseDown}
           onScroll={updateScrollButtons}
           onClickCapture={handleClickCapture}
+          variants={container}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "0px 0px -60px 0px" }}
         >
           {books.map((book) => (
-            <BookCard key={book.id} book={book} onOpen={onOpen} />
+            <motion.div key={book.id} variants={item} style={{ flex: "0 0 auto" }}>
+              <BookCard book={book} onOpen={onOpen} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
         <div className="shelf-shadow-line" />
       </div>
     </section>

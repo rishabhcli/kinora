@@ -1,5 +1,6 @@
 {
   "name": "@kinora/desktop",
+  "productName": "Kinora",
   "version": "0.0.1",
   "private": true,
   "description": "Kinora - Watch the book",

@@ -43,11 +43,11 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
             <h1 className="font-serif text-[44px] leading-[1.1] font-medium text-white">
               Where stories<br />come to life.
             </h1>
-            <p className="mt-5 text-[14px] leading-relaxed text-white/55">
+            <p className="mt-5 text-[14px] leading-relaxed text-white/75">
               Your library, reimagined as cinema. Books become films, pages become scenes — watched in the quiet of an evening.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/35">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/65">
             <span className="inline-block h-px w-8 bg-white/35" />
             Reading, rewritten
           </div>

@@ -216,7 +216,7 @@ export default function PricingPage() {
                 <span className="text-[13px] text-kinora-muted font-medium">/mo</span>
               )}
             </div>
-            <p className="text-[10px] text-kinora-muted/50 mb-6 min-h-[14px]">
+            <p className="text-[10px] text-kinora-muted/80 mb-6 min-h-[14px]">
               {plan[billing] !== 0 && billing === "yearly"
                 ? "Billed annually"
                 : plan[billing] !== 0
@@ -280,7 +280,7 @@ export default function PricingPage() {
       </div>
 
       {/* Bottom note */}
-      <p className="text-center text-[11px] text-kinora-muted/50 mt-8">
+      <p className="text-center text-[11px] text-kinora-muted/80 mt-8">
         All plans include access to the Kinora library. No hidden fees.
       </p>
     </div>

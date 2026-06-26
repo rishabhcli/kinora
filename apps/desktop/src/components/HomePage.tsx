@@ -5,8 +5,9 @@ import Navbar, { navItems } from "./Navbar";
 import Greeting from "./Greeting";
 import BookShelf from "./BookShelf";
 import HeroBanner from "./HeroBanner";
-import BookReader from "./BookReader";
+import ReadingRoom from "./ReadingRoom";
 import AnimatedPageSwitch from "./AnimatedPageSwitch";
+import AmbientBackground from "./AmbientBackground";
 import logoImg from "../assets/logo-transparent.png";
 import {
   continueReading,
@@ -44,7 +45,8 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
       try {
         const books = await api.listBooks();
         const mapped = await Promise.all(
-          books.map(async (b) => {
+          // Only ready books are drivable by a reading session.
+          books.filter((b) => b.status === "ready").map(async (b) => {
             let cover = "";
             try {
               cover = toBrowserUrl((await api.getPage(b.id, 1)).image_url);
@@ -78,7 +80,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
             <Greeting />
           </div>
           {myBooks.length > 0 && (
-            <BookShelf title="Your Library" books={myBooks} onOpen={setSelectedBook} />
+            <BookShelf title="Read Live · Public Domain" books={myBooks} onOpen={setSelectedBook} />
           )}
           <BookShelf title="Continue Reading" books={continueReading} onOpen={setSelectedBook} />
           <BookShelf title="Recently Added" books={recentlyAdded} onOpen={setSelectedBook} />
@@ -98,6 +100,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="kinora-bg min-h-screen flex flex-col relative">
+      <AmbientBackground />
       <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />
 
       <div className="flex-1">
@@ -141,15 +144,15 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
               </a>
             </div>
 
-            <p className="text-[10px] text-kinora-muted/60">
+            <p className="text-[10px] text-kinora-muted/85">
               © {new Date().getFullYear()} Kinora. All rights reserved.
             </p>
           </div>
         </div>
       </footer>
 
-      {/* Book Reader overlay */}
-      <BookReader book={selectedBook} onClose={() => setSelectedBook(null)} />
+      {/* Reading room overlay — scroll-driven, generates the film as you read */}
+      <ReadingRoom book={selectedBook} onClose={() => setSelectedBook(null)} />
     </div>
   );
 }
