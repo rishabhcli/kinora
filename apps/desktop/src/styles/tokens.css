@@ -11,3 +11,206 @@
   --spring-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --spring-duration: 0.5s;
 }
+
+/* ── Below: Agent 8 design-system layer (merged; token-driven, wins on overlap) ── */
+/* ============================================================================
+   KINORA — DESIGN TOKENS  (Agent 08 · color, depth & typography)
+   ----------------------------------------------------------------------------
+   DIRECTION — "Lamplit Library / Cinema in Print"
+   Kinora turns a book into a film that writes itself a few seconds ahead of the
+   reader. The chrome should feel like a private screening room inside a wood-
+   panelled library at midnight: warm darkness, ink on aged vellum, a single
+   brass reading-lamp throwing "lumen" amber light, and the cool glow of a screen
+   in the corner. References: Apple TV+ cinema-dark chrome, Apple Books paper
+   warmth, A24 title typography, Leica-viewfinder neutrals, candle-on-paper.
+
+   HOW IT PROPAGATES
+   Every colour is a semantic token. Components consume tokens (Tailwind classes
+   such as `text-muted`, `bg-surface`, `border-hairline`, or the legacy
+   `text-kinora-*` aliases) — never raw hex. Colours are stored as space-separated
+   RGB triples so Tailwind's `/<alpha>` opacity modifiers keep working
+   (`text-kinora-text/85`, `bg-kinora-gold/50`, …). Change a triple here and the
+   whole app shifts at once — no component edits.
+
+   THE RULE (enforced fleet-wide): no agent writes raw hex outside this file.
+
+   Depth is a misnomer-free "material" language — never call it Liquid Glass
+   (that is the native SwiftUI shell only). Here it is frosted / depth / material,
+   tuned to read correctly both with macOS window vibrancy and without it.
+
+   Contrast: every text/background pair below is WCAG-AA verified
+   (see apps/desktop/scripts/check-contrast.mjs — run `node` on it).
+   ========================================================================== */
+
+:root {
+  /* ── NEUTRAL SPINE — warm graphite → vellum ─────────────────────────────
+     A single ochre-tinted hue ramp (hue ~40°, low chroma) so darks read warm,
+     not muddy-brown and not dead-gray. */
+  --k-bg-deep-rgb: 11 10 8;        /* the pit behind everything            */
+  --k-bg-rgb: 21 19 15;            /* app canvas                           */
+  --k-surface-rgb: 30 27 22;       /* resting panels / cards               */
+  --k-surface-raised-rgb: 39 35 28;/* raised cards / popovers              */
+  --k-surface-high-rgb: 50 45 36;  /* highest opaque step (menus, sheets)  */
+
+  /* ── INK — warm off-white text ramp (all AA on the spine above) ───────── */
+  --k-text-rgb: 237 231 219;       /* primary  (15.1:1 on bg)              */
+  --k-muted-rgb: 178 167 150;      /* secondary (7.8:1 on bg)              */
+  --k-subtle-rgb: 143 133 118;     /* tertiary / captions (5.1:1 on bg)    */
+  --k-faint-rgb: 110 102 90;       /* decorative only — not for text       */
+
+  /* ── ACCENT — "lumen" brass-amber (the reading lamp) ────────────────────
+     Evolved from the old flat gold into a warmer, more saturated lamplight,
+     with a bright highlight and a deep ember for fills. */
+  --k-accent-rgb: 224 166 78;      /* workhorse gold   (8.6:1 on bg)       */
+  --k-accent-strong-rgb: 242 208 138;/* bright glint / hover highlight     */
+  --k-accent-deep-rgb: 138 92 38;  /* ember — for fills / gradient floors  */
+  --k-accent-cool-rgb: 122 169 173;/* cinema-teal counter-accent (screen)  */
+
+  /* ── SEMANTIC STATE — warm-tuned so they belong to the palette ───────── */
+  --k-success-rgb: 104 188 132;
+  --k-warning-rgb: 232 180 74;
+  --k-danger-rgb: 233 116 102;
+  --k-info-rgb: 122 168 206;
+
+  /* ── CONVENIENCE solids (for plain CSS; Tailwind uses the triples) ────── */
+  --k-bg-deep: rgb(var(--k-bg-deep-rgb));
+  --k-bg: rgb(var(--k-bg-rgb));
+  --k-surface: rgb(var(--k-surface-rgb));
+  --k-surface-raised: rgb(var(--k-surface-raised-rgb));
+  --k-surface-high: rgb(var(--k-surface-high-rgb));
+  --k-text: rgb(var(--k-text-rgb));
+  --k-text-muted: rgb(var(--k-muted-rgb));
+  --k-text-subtle: rgb(var(--k-subtle-rgb));
+  --k-accent: rgb(var(--k-accent-rgb));
+  --k-accent-strong: rgb(var(--k-accent-strong-rgb));
+  --k-accent-deep: rgb(var(--k-accent-deep-rgb));
+  --k-accent-cool: rgb(var(--k-accent-cool-rgb));
+
+  /* ── LINES & MATERIAL fills (alpha over ink / specular white) ─────────── */
+  --k-border: rgb(var(--k-text-rgb) / 0.10);       /* hairline             */
+  --k-border-strong: rgb(var(--k-text-rgb) / 0.18);/* defined edge         */
+  --k-specular: rgb(255 255 255 / 0.5);            /* top light catch      */
+  --k-specular-soft: rgb(255 255 255 / 0.14);
+  /* frosted fills — warm, so the blur has something to refract */
+  --k-surface-glass: rgb(var(--k-surface-raised-rgb) / 0.62);
+  --k-surface-glass-strong: rgb(var(--k-surface-high-rgb) / 0.82);
+  --k-scrim: rgb(var(--k-bg-deep-rgb) / 0.72);     /* overlays / behind modals */
+
+  /* ── ELEVATION — a single coherent shadow ladder (key + ambient) ─────── */
+  --k-elev-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 6px -2px rgb(0 0 0 / 0.28);
+  --k-elev-2: 0 2px 4px rgb(0 0 0 / 0.34), 0 8px 18px -6px rgb(0 0 0 / 0.42);
+  --k-elev-3: 0 4px 10px -2px rgb(0 0 0 / 0.40), 0 16px 30px -10px rgb(0 0 0 / 0.48);
+  --k-elev-4: 0 8px 20px -6px rgb(0 0 0 / 0.45), 0 28px 52px -18px rgb(0 0 0 / 0.60);
+  --k-elev-5: 0 16px 40px -12px rgb(0 0 0 / 0.55), 0 48px 92px -30px rgb(0 0 0 / 0.70);
+  --k-ring-top: inset 0 1px 0 var(--k-specular);          /* material rim   */
+  --k-ring-edge: inset 0 0 0 0.5px var(--k-specular-soft);
+  --k-glow-accent: 0 0 0 1px rgb(var(--k-accent-rgb) / 0.38),
+                   0 10px 34px -10px rgb(var(--k-accent-rgb) / 0.34);
+
+  /* ── BLUR / MATERIAL ──────────────────────────────────────────────────── */
+  --k-blur-sm: 8px;
+  --k-blur: 16px;
+  --k-blur-lg: 28px;
+  --k-blur-xl: 44px;
+  --k-saturate: 170%;
+  --k-material-bright: 1.06; /* brightness lift on frosted material         */
+
+  /* ── RADIUS ──────────────────────────────────────────────────────────── */
+  --k-radius-xs: 6px;
+  --k-radius-sm: 10px;
+  --k-radius: 14px;
+  --k-radius-lg: 20px;
+  --k-radius-xl: 28px;
+  --k-radius-pill: 999px;
+
+  /* ── TYPOGRAPHY ──────────────────────────────────────────────────────────
+     Three intentional faces:
+       · UI       — system-first (SF Pro on macOS) for crisp, native chrome
+       · DISPLAY  — Fraunces, the cinematic variable serif, for titles/hero
+       · READING  — Newsreader, drawn for immersive on-screen long-form reading */
+  --k-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Inter", "DM Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+  --k-font-display: "Fraunces", "Hoefler Text", Georgia, "Times New Roman", serif;
+  --k-font-reading: "Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --k-font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  /* modular scale (≈ minor-third; base 15px == reading base) */
+  --k-text-xs: 0.75rem;     /* 12 */
+  --k-text-sm: 0.8125rem;   /* 13 */
+  --k-text-base: 0.9375rem; /* 15 */
+  --k-text-md: 1.0625rem;   /* 17 */
+  --k-text-lg: 1.25rem;     /* 20 */
+  --k-text-xl: 1.5rem;      /* 24 */
+  --k-text-2xl: 1.9375rem;  /* 31 */
+  --k-text-3xl: 2.4375rem;  /* 39 */
+  --k-text-4xl: 3.0625rem;  /* 49 */
+  --k-text-5xl: 3.8125rem;  /* 61 */
+
+  --k-weight-normal: 400;
+  --k-weight-medium: 500;
+  --k-weight-semibold: 600;
+  --k-weight-bold: 700;
+
+  --k-leading-tight: 1.15;
+  --k-leading-snug: 1.3;
+  --k-leading-normal: 1.5;
+  --k-leading-relaxed: 1.7;
+  --k-leading-reading: 1.8;
+
+  --k-tracking-display: -0.018em; /* large serif wants negative tracking */
+  --k-tracking-tight: -0.01em;
+  --k-tracking-normal: 0em;
+  --k-tracking-wide: 0.04em;
+  --k-tracking-caps: 0.14em;      /* small-caps / eyebrow labels */
+
+  --k-measure: 66ch;              /* the readability sweet spot */
+  --k-measure-narrow: 54ch;
+  --k-measure-wide: 74ch;
+
+  /* ── READING-THEME VALUES (Agent 06 binds these to the reading pane) ────
+     Published as the source of truth for READING_THEMES in lib/readingPrefs.ts.
+     `*-ink` is an RGB triple so the reader can vary alpha (active vs dimmed). */
+  --k-read-dark-bg: transparent;
+  --k-read-dark-ink: 237 231 219;
+  --k-read-dark-swatch: #15130f;
+
+  --k-read-night-bg: 0 0 0 / 0.60;
+  --k-read-night-ink: 210 205 196;
+  --k-read-night-swatch: #000000;
+
+  --k-read-sepia-bg: 240 231 213;   /* warm paper */
+  --k-read-sepia-ink: 60 48 32;     /* ~9.4:1 */
+  --k-read-sepia-swatch: #f0e7d5;
+
+  --k-read-paper-bg: 247 244 238;   /* cool paper */
+  --k-read-paper-ink: 30 28 26;     /* ~15.4:1 */
+  --k-read-paper-swatch: #f7f4ee;
+
+  --k-read-contrast-bg: 0 0 0;      /* high-contrast a11y theme */
+  --k-read-contrast-ink: 255 255 255;
+  --k-read-contrast-accent: 246 214 150;
+  --k-read-contrast-swatch: #000000;
+}
+
+/* ── HIGH-CONTRAST (a11y) — coordinate with Agent 06 ──────────────────────
+   Brightens ink, accent and lines to clear AAA where possible. Bind via
+   [data-contrast="high"] on <html> (Agent 06 owns the toggle/data model). */
+[data-contrast="high"] {
+  --k-text-rgb: 255 255 255;
+  --k-muted-rgb: 214 206 193;
+  --k-subtle-rgb: 184 174 158;
+  --k-accent-rgb: 246 214 150;
+  --k-border: rgb(var(--k-text-rgb) / 0.22);
+  --k-border-strong: rgb(var(--k-text-rgb) / 0.40);
+}
+
+/* ── REDUCED TRANSPARENCY — degrade frosted material to solid surfaces ────
+   Honours the OS setting; coordinate with Agent 06's a11y layer. Material
+   classes read these so they fall back gracefully (no muddy glass). */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --k-surface-glass: rgb(var(--k-surface-raised-rgb));
+    --k-surface-glass-strong: rgb(var(--k-surface-high-rgb));
+    --k-scrim: rgb(var(--k-bg-deep-rgb) / 0.96);
+  }
+}
