@@ -9,7 +9,7 @@ module.exports = {
           "bg-deep": "#0e0d0c",
           text: "#e8e2d8",
           muted: "#a89e94",
-          subtle: "#6b6258",
+          subtle: "#8d8378",
           gold: "#d4a44e",
           "gold-light": "#e8c878",
         },
