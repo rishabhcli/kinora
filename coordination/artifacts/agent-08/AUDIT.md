@@ -5,15 +5,26 @@ Target: **WCAG 2.2 AA** (AAA for reading text where feasible). Tooling: `@axe-co
 
 ## Automated axe-core scan (WCAG 2.0/2.1/2.2 A + AA)
 
-| Surface | Owner | Serious/critical | Report |
+| Surface | Owner | Serious/critical (full scan) | Report |
 |---|---|---|---|
 | Owned reading surfaces (ReadingControls + ReadAloudView) | A06 | **0** | `axe-owned-reading-surfaces.json` |
 | Keyboard shortcut cheat-sheet (dialog) | A06 | **0** | `axe-owned-cheatsheet.json` |
-| Login screen (`/`) | A11 | **0** (full scan) | `axe-login-full.json`, `axe-login-owned.json` |
+| Login screen (`/`, real app, demo mode) | A11 | **0** | `axe-login-full.json` |
+| Home screen (`/`, real app, demo books) | A05 | **0** | `axe-app-home.json` |
+| Reading room (real `ReadingRoom`, opened from Home) | A10 | **0** | `axe-app-reading-room.json` |
+| Library (real `LibraryPage` via harness) | A05 | **2** (filed → agent-05) | `axe-app-library.json` |
 
-**Owned surfaces: zero serious/critical.** Library + the live reading room render only
-with the backend/data, so the owned reading-room surfaces are scanned via `e2e/harness`
-(same components, real styling); per-agent findings filed for the host screens.
+**Agent 06 owned surfaces: zero serious/critical everywhere.** Login, Home, and the live
+reading room scan clean. The only serious findings are 2 on the **library** (Agent 5’s
+`BookShelf`/`LibraryPage`): `color-contrast` (inactive filter chips) +
+`scrollable-region-focusable` (the shelf scroller / non-focusable `BookCard`) — filed in
+`requests/agent-05.md`.
+
+> Live library/reading-room are scanned via the real app in demo mode (login enters even
+> when the backend is down; Home/Library render static demo books; the reading room shows
+> placeholder text). The library uses the harness (`e2e/harness/library.html`) because the
+> in-app page switch is flaky headless — it mounts the **real** `LibraryPage`, so the scan
+> is genuine.
 
 ### Issues found + fixed during the scan
 1. **`color-contrast` (serious)** — the voice `<select>` inherited light text on the UA

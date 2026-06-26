@@ -1,6 +1,7 @@
 {
   "url": "http://localhost:5173/",
-  "scannedAt": "2026-06-26T14:29:36.231Z",
+  "screen": "app-reading-room",
+  "scannedAt": "2026-06-26T14:29:37.930Z",
   "counts": {
     "violations": 0,
     "serious": 0
