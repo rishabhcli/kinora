@@ -28,22 +28,26 @@ def test_concat_two_clips_into_one_valid_mp4() -> None:
     assert degrade.verify_playable(scene) is True
 
 
-def test_concat_outputs_1080p_and_combines_shot_durations() -> None:
-    """Spec ("mashed-up version on device, 1080p"): the offline scene stitch
-    concatenates a scene's shots into one 1920x1080 mp4 whose duration is the sum
-    of the shots'. Fully offline — only ffmpeg, no model/network. The clips are
-    rendered at the production geometry (``degrade.DEFAULT_SIZE``), the same size
-    ``SceneStitcher`` infers from the first shot when no override is passed."""
-    assert degrade.DEFAULT_SIZE == (1920, 1080)  # the production render geometry
-    # Two real 1080p Ken-Burns shots of different lengths (per-shot durations).
-    shot_a = degrade.ken_burns_over_image(png_bytes(1920, 1080), 2.0, audio_bytes=wav_bytes(2.0))
-    shot_b = degrade.ken_burns_over_image(png_bytes(1920, 1080), 3.0)  # silence-padded
+def test_concat_enforces_vertical_film_geometry() -> None:
+    """Kinora films are **vertical 720x1280** (short-drama format), so the offline
+    scene stitch must concatenate a scene's shots into one 720x1280 mp4 whose
+    duration is the sum of the shots'. The bug this guards: ``concat_clips`` used
+    to *infer* geometry from the first clip and fall back to landscape 1920x1080,
+    which leaked a landscape (or letterboxed) film. With no ``size`` override the
+    stitch now enforces the vertical film geometry — a non-film source clip is
+    scaled+padded into vertical, never leaked as landscape. Fully offline (ffmpeg
+    only, no model/network)."""
+    assert degrade.FILM_SIZE == (720, 1280)  # the canonical vertical film geometry
+    # Landscape source shots of different lengths — the exact shape that used to
+    # leak a landscape stitch through the inferred-size path.
+    shot_a = degrade.ken_burns_over_image(png_bytes(640, 360), 2.0, audio_bytes=wav_bytes(2.0))
+    shot_b = degrade.ken_burns_over_image(png_bytes(640, 360), 3.0)  # silence-padded
 
-    # No size override → the stitcher's production path (size inferred from shot A).
+    # No size override → the stitcher's production path (now vertical, not inferred).
     scene = concat_clips([shot_a, shot_b])
 
     info = degrade.probe(scene)
-    assert (info.width, info.height) == (1920, 1080)  # 1080p out
+    assert (info.width, info.height) == (720, 1280)  # vertical 720x1280, NOT 1920x1080
     assert info.has_video is True and info.has_audio is True
     assert abs(info.duration_s - 5.0) < 0.4  # 2s + 3s combined
     assert degrade.verify_playable(scene) is True

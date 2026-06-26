@@ -35,7 +35,7 @@ from app.db.models.shot import Shot
 from app.db.repositories.scene import SceneRepo
 from app.render.degrade import (
     DEFAULT_FPS,
-    DEFAULT_SIZE,
+    FILM_SIZE,
     FfmpegError,
     get_ffmpeg_exe,
     inspect,
@@ -138,16 +138,6 @@ def _safe_has_audio(clip: bytes) -> bool:
         return False
 
 
-def _probe_size(clip: bytes) -> tuple[int, int] | None:
-    try:
-        info = inspect(clip)
-    except FfmpegError:
-        return None
-    if info.width and info.height:
-        return (info.width, info.height)
-    return None
-
-
 def _normalize_segment(clip: bytes, *, size: tuple[int, int], fps: int) -> bytes:
     """Re-encode one clip to a common geometry/fps + stereo AAC (silence if mute).
 
@@ -224,7 +214,10 @@ def concat_clips(
 
     Args:
         clips: the ordered clip byte-strings (full Wan and/or degraded rungs).
-        size: output geometry; inferred from the first clip when ``None``.
+        size: output geometry; defaults to the vertical :data:`FILM_SIZE`
+            (720×1280) so the stitch *enforces* the film aspect rather than
+            inheriting whatever the first clip happened to be — a landscape or
+            mismatched source is scaled+padded into vertical, never leaked.
         fps: output frame rate.
 
     Raises:
@@ -233,7 +226,7 @@ def concat_clips(
     """
     if not clips:
         raise ValueError("concat_clips requires at least one clip")
-    out_size = size or _probe_size(clips[0]) or DEFAULT_SIZE
+    out_size = size or FILM_SIZE
     normalized = [_normalize_segment(clip, size=out_size, fps=fps) for clip in clips]
     if len(normalized) == 1:
         return normalized[0]
