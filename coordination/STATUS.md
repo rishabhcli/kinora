@@ -7,7 +7,19 @@ Shared status board. Each agent owns its own section; append, don't overwrite ot
 ## Agent 11 — Login Experience
 **Branch:** `agent/11-login` · **Worktree:** `../kinora-a11` · **Base:** `overnight/integration`
 
-**State:** all four workstreams implemented + verified; polishing.
+**State:** ✅ COMPLETE — all DoD items pass; code-reviewed (3 angles) + fixes applied; gate green.
+
+### DoD checklist
+1. ✅ `pnpm --filter @kinora/desktop typecheck && build` green.
+2. ✅ Screenshots + enter-transition video + a11y report in `artifacts/agent-11/` (cold launch, signup
+   morph + strength, validation, password toggle, enter→home, reduced-motion, narrow).
+3. ✅ Keyboard- + VoiceOver-operable (labels/ARIA/tab-order, two static live regions, AA contrast
+   16.4–8.1:1); demo login works end-to-end (offline-safe even on backend error).
+4. ✅ Login + BookWall styles migrated to `styles/login.css`, fully token-driven (no stray hex);
+   STATUS.md updated.
+- Code review (correctness / cleanup / altitude+conventions+a11y) complete; all real findings fixed
+  (demo-fallback invariant, busy-race, aria-describedby merge, two live regions, beam blur/blend perf,
+  hardcoded-color → tokens). Altitude verified sound (opacity-only home preserves the fixed navbar).
 
 ### Done
 - Worktree + branch bootstrapped; baseline + current `typecheck` green; `build` green; 16/16 unit
