@@ -210,6 +210,50 @@ async def test_canon_query_returns_only_the_relevant_slice(session: AsyncSession
     assert "char_ghost" not in everywhere
 
 
+async def test_get_entity_time_travel_boundaries(session: AsyncSession) -> None:
+    # Pins the §8.3 time-travel read at its interval boundaries — the subtle part:
+    # before introduction → None; at the version-change beat the *newer* version
+    # wins the tie (get_as_of_beat prefers the highest version).
+    books = BookRepo(session)
+    canon = CanonService(session, embedder=FakeEmbedder())
+    book = await books.create(title="Time Travel")
+
+    await canon.upsert_entity(
+        book_id=book.id,
+        entity_key="char_x",
+        entity_type=EntityType.CHARACTER,
+        name="X v1",
+        valid_from_beat=5,
+    )
+
+    # Before it is introduced → not present.
+    assert await canon.get_entity(book.id, "char_x", at_beat=1) is None
+    # At the introduction beat → v1.
+    at5 = await canon.get_entity(book.id, "char_x", at_beat=5)
+    assert at5 is not None and at5.version == 1 and at5.name == "X v1"
+
+    # A second version valid from beat 10.
+    await canon.upsert_entity(
+        book_id=book.id,
+        entity_key="char_x",
+        entity_type=EntityType.CHARACTER,
+        name="X v2",
+        valid_from_beat=10,
+    )
+    # Just before the change → still v1.
+    at9 = await canon.get_entity(book.id, "char_x", at_beat=9)
+    assert at9 is not None and at9.version == 1
+    # At the boundary beat → the newer version wins the tie.
+    at10 = await canon.get_entity(book.id, "char_x", at_beat=10)
+    assert at10 is not None and at10.version == 2 and at10.name == "X v2"
+    # Latest (no beat) → v2.
+    latest = await canon.get_entity(book.id, "char_x")
+    assert latest is not None and latest.version == 2
+
+    # An entity key that was never created → None (not an error).
+    assert await canon.get_entity(book.id, "char_missing", at_beat=10) is None
+
+
 async def test_canon_query_kind_filter(session: AsyncSession) -> None:
     books = BookRepo(session)
     scenes = SceneRepo(session)

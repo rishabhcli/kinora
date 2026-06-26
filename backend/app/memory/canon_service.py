@@ -23,6 +23,7 @@ import anyio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.db.models.beat import Beat
 from app.db.models.entity import Entity
 from app.db.models.enums import EntityType, ShotStatus
@@ -42,6 +43,8 @@ from app.memory.interfaces import (
     RefImage,
     StateSlice,
 )
+
+logger = get_logger("app.memory.canon")
 
 # Resolving "as of the latest version" = resolving at a beat beyond any real one,
 # so ``get_as_of_beat`` returns the still-open (current) version.
@@ -305,6 +308,10 @@ class CanonService:
         # Fetch the locked reference image off the event loop; embed it only if
         # it is actually present in object storage.
         if not await anyio.to_thread.run_sync(self._store.exists, key):
+            # A locked reference key is declared but its image is missing — the
+            # Critic's identity (CCS) check will be skipped (§9.5). Surface it so a
+            # missing upload isn't silently degrading QA.
+            logger.warning("canon.locked_reference_missing", key=key)
             return None
         data = await anyio.to_thread.run_sync(self._store.get_bytes, key)
         vectors = await self._embedder.embed_images([data])

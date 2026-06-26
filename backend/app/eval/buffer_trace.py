@@ -76,6 +76,9 @@ class DryRunBudget:
     async def is_low(self) -> bool:
         return False
 
+    def is_low_at(self, remaining: float) -> bool:
+        return False
+
     async def remaining(self) -> float:
         return self._remaining
 

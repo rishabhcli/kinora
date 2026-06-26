@@ -100,6 +100,9 @@ class FakeBudget:
     async def is_low(self) -> bool:
         return self._low
 
+    def is_low_at(self, remaining: float) -> bool:
+        return self._low
+
     async def remaining(self) -> float:
         return self._remaining
 

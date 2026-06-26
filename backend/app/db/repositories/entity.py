@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterable, Sequence
 from typing import Any
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select, text, update
 
 from app.db.base import new_id
 from app.db.models.entity import Entity
 from app.db.models.enums import EntityType
 from app.db.repositories.base import BaseRepository
+
+
+def _entity_lock_key(book_id: str, entity_key: str) -> int:
+    """A stable 63-bit signed advisory-lock key for one (book, entity) chain."""
+    raw = f"kinora:entity:{book_id}:{entity_key}".encode()
+    return int.from_bytes(hashlib.sha1(raw).digest()[:8], "big", signed=True)
 
 
 class EntityRepo(BaseRepository):
@@ -39,7 +46,17 @@ class EntityRepo(BaseRepository):
         its interval closed at ``valid_from_beat`` and is recorded as the new
         version's ``supersedes`` target. The boundary beat resolves to the newer
         version (``get_as_of_beat`` prefers the highest version on a tie).
+
+        A transaction-scoped advisory lock on the (book, entity) chain serializes
+        concurrent writers: without it two upserts could read the same open
+        version, both close it, and collide on ``version`` (UniqueConstraint) or
+        leave a broken interval. The lock releases on commit/rollback.
         """
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)").bindparams(
+                k=_entity_lock_key(book_id, entity_key)
+            )
+        )
         existing = list(
             (
                 await self.session.execute(

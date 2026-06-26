@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 import anyio
 
@@ -33,6 +34,18 @@ def build_default_tools() -> MemoryTools:
     return build_container().build_tools()
 
 
+def build_http_app() -> Any:
+    """The streamable-HTTP MCP app with the §12 book-scoped authorizer wired on.
+
+    The authorizer needs the same container the tools came from, so this builds
+    both from one container (cheap to reuse — DI seams are lazy).
+    """
+    container = build_container()
+    return build_streamable_http_app(
+        container.build_tools(), authorizer=container.build_mcp_authorizer()
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     """CLI entrypoint."""
     parser = argparse.ArgumentParser(
@@ -45,13 +58,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--port", type=int, default=8765, help="HTTP bind port (--http only)")
     args = parser.parse_args(argv)
 
-    tools = build_default_tools()
     if args.http:
         import uvicorn
 
-        uvicorn.run(build_streamable_http_app(tools), host=args.host, port=args.port)
+        uvicorn.run(build_http_app(), host=args.host, port=args.port)
     else:
-        anyio.run(run_stdio, tools)
+        anyio.run(run_stdio, build_default_tools())
 
 
 if __name__ == "__main__":

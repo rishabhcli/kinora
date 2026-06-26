@@ -183,7 +183,12 @@ class BudgetService:
 
     async def is_low(self) -> bool:
         """True when remaining has dropped below the degradation floor (§11.1)."""
-        return await self.remaining() < self._limits.low_floor_s
+        return self.is_low_at(await self.remaining())
+
+    def is_low_at(self, remaining: float) -> bool:
+        """``is_low`` for an already-fetched ``remaining`` — lets a caller that
+        just queried :meth:`remaining` reuse it instead of a second DB round-trip."""
+        return remaining < self._limits.low_floor_s
 
     def can_render_live(self) -> bool:
         """The ``KINORA_LIVE_VIDEO`` go-live gate (§11.1)."""

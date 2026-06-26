@@ -111,6 +111,25 @@ async def test_cross_session_dedup(queue: RedisRenderQueue) -> None:
     assert await queue.depth() == 1  # paid for once, not twice
 
 
+async def test_cancel_token_set_has_ttl(redis_client: RedisClient) -> None:
+    # The token set carries a sliding TTL so it can't linger as a zombie if a
+    # job_id never drains (§12.1 defense-in-depth).
+    ns = f"kinora:test:rq:{uuid.uuid4().hex[:10]}"
+    q = RedisRenderQueue(redis_client, namespace=ns, token_ttl_s=120)
+    try:
+        await q.enqueue(
+            shot_hash="hash_tok",
+            priority=RenderPriority.SPECULATIVE,
+            book_id="b",
+            job_id="jt",
+            cancel_token="traj_1",
+        )
+        ttl = await q._redis.ttl(q._token_key("traj_1"))
+        assert 0 < ttl <= 120
+    finally:
+        await q.purge()
+
+
 # --- priority (§4.9/§12.2) -------------------------------------------------- #
 
 

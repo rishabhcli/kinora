@@ -118,6 +118,29 @@ async def test_release_restores_and_commit_charges_actual(session: AsyncSession)
     assert await budget.remaining() == 15.0
 
 
+async def test_release_after_commit_is_a_noop(session: AsyncSession) -> None:
+    # A late release of an already-committed reservation must not "give back" the
+    # committed seconds (double-counting the other way): the commit charge stands.
+    budget = _budget(session, ceiling=20.0)
+    reservation = await budget.reserve(8.0)
+    await budget.commit(reservation, actual_seconds=5.0)
+    assert await budget.remaining() == 15.0
+
+    await budget.release(reservation)  # stray release after commit
+    assert await budget.remaining() == 15.0  # unchanged — commit still charged
+
+
+async def test_is_low_at_matches_is_low(session: AsyncSession) -> None:
+    # The pure snapshot variant (used by the scheduler to avoid a re-query) must
+    # agree with the async is_low for the same remaining value.
+    budget = _budget(session, ceiling=20.0, low_floor=5.0)
+    assert budget.is_low_at(10.0) is False
+    assert budget.is_low_at(4.0) is True
+
+    await budget.reserve(16.0)  # remaining 4.0 < 5.0
+    assert budget.is_low_at(await budget.remaining()) == await budget.is_low()
+
+
 async def test_is_low_and_can_render_live(session: AsyncSession) -> None:
     budget = _budget(session, ceiling=20.0, low_floor=5.0, live_video=False)
     assert await budget.is_low() is False

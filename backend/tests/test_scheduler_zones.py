@@ -14,7 +14,49 @@ from app.scheduler.zones import (
     classify_shot,
     eta_seconds,
     trajectory_is_stable,
+    viewer_zone,
 )
+
+_COMMIT_H = 8.0
+_SPEC_H = 20.0
+
+
+def _zone(eta: float | None, *, stable: bool = True, budget_ok: bool = True) -> Zone:
+    return viewer_zone(
+        eta, stable=stable, budget_ok=budget_ok, commit_horizon_s=_COMMIT_H, spec_horizon_s=_SPEC_H
+    )
+
+
+def test_viewer_zone_none_eta_is_cold() -> None:
+    assert _zone(None) is Zone.COLD
+
+
+def test_viewer_zone_near_shot_is_committed_when_stable_and_funded() -> None:
+    assert _zone(2.0, stable=True, budget_ok=True) is Zone.COMMITTED
+
+
+def test_viewer_zone_beyond_spec_horizon_is_cold() -> None:
+    assert _zone(_SPEC_H + 1.0) is Zone.COLD
+
+
+def test_viewer_zone_between_horizons_is_speculative() -> None:
+    assert _zone((_COMMIT_H + _SPEC_H) / 2) is Zone.SPECULATIVE
+
+
+def test_viewer_zone_near_shot_demotes_to_speculative_when_skimming() -> None:
+    # Inside the commit horizon but unstable → ride the keyframe ladder, not video.
+    assert _zone(2.0, stable=False, budget_ok=True) is Zone.SPECULATIVE
+
+
+def test_viewer_zone_near_shot_demotes_to_speculative_when_budget_pressured() -> None:
+    assert _zone(2.0, stable=True, budget_ok=False) is Zone.SPECULATIVE
+
+
+def test_viewer_zone_far_shot_stays_speculative_regardless_of_gates() -> None:
+    # The demotion only applies to would-be COMMITTED shots; a SPECULATIVE-zone
+    # shot is unaffected by stability/budget.
+    mid = (_COMMIT_H + _SPEC_H) / 2
+    assert _zone(mid, stable=False, budget_ok=False) is Zone.SPECULATIVE
 
 
 @dataclass

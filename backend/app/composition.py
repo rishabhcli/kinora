@@ -57,6 +57,7 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
     from app.providers import Providers
@@ -263,6 +264,21 @@ class Container:
                 planner=self._planner(),
             )
         return self._tools
+
+    def build_mcp_authorizer(self) -> BookScopedAuthorizer:
+        """The §12 book-scoped authorizer for the streamable-HTTP MCP surface.
+
+        Rejects tool calls naming an unknown ``book_id``; the lookup hits
+        :class:`BookRepo` over a short-lived session.
+        """
+        from app.db.repositories.book import BookRepo
+        from app.mcp.authz import BookScopedAuthorizer
+
+        async def _book_exists(book_id: str) -> bool:
+            async with self.session_factory() as db:
+                return await BookRepo(db).get(book_id) is not None
+
+        return BookScopedAuthorizer(book_exists=_book_exists)
 
     @property
     def keyframe_service(self) -> KeyframeService:

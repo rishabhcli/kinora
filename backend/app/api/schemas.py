@@ -230,7 +230,9 @@ class IntentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     focus_word: int = Field(ge=0)
-    velocity: float = 4.0
+    # Downstream clamp_velocity abs+clamps this, but reject non-finite (NaN/inf —
+    # min/max with NaN is unreliable) and absurd values at the boundary (§4.3).
+    velocity: float = Field(default=4.0, ge=0, le=1000.0, allow_inf_nan=False)
     mode: str | None = None
 
 

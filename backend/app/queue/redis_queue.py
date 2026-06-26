@@ -112,7 +112,7 @@ def conflict_history_key(session_id: str) -> str:
 # Enqueue: idempotency check, backpressure check, then create. Returns a
 # two-element array ``{status, job_id}`` where status is enqueued|existing|dropped.
 #   KEYS = [shot_key, job_key, lane_key, lane_committed, lane_spec, lane_keyframe, token_key]
-#   ARGV = [job_id, priority, fields_json, backpressure_depth, has_token, ready_at_ms]
+#   ARGV = [job_id, priority, fields_json, backpressure_depth, has_token, ready_at_ms, token_ttl_s]
 _ENQUEUE_LUA = """
 local shot_key = KEYS[1]
 local job_key = KEYS[2]
@@ -127,6 +127,7 @@ local fields_json = ARGV[3]
 local threshold = tonumber(ARGV[4])
 local has_token = ARGV[5]
 local ready_at = tonumber(ARGV[6])
+local token_ttl = tonumber(ARGV[7])
 
 local existing = redis.call('GET', shot_key)
 if existing then
@@ -149,6 +150,9 @@ redis.call('SET', shot_key, job_id)
 redis.call('ZADD', lane_key, ready_at, job_id)
 if has_token == '1' then
     redis.call('SADD', token_key, job_id)
+    -- Sliding TTL so a trajectory's token set can't outlive it as a zombie if some
+    -- job_ids never drain (refreshed on every enqueue with this token).
+    redis.call('EXPIRE', token_key, token_ttl)
 end
 return {'enqueued', job_id}
 """
@@ -221,6 +225,25 @@ class RetryOutcome:
     decision: RetryDecision
     attempts: int
     delay_s: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class RetryPolicy:
+    """Pure retry decision + backoff schedule, separated from the Redis I/O so it
+    can be reasoned about and tested without a queue. ``attempts`` is 1-based (the
+    attempt that just failed); past the cap a job is dead-lettered, otherwise it is
+    re-queued after the (clamped) backoff for that attempt."""
+
+    cap: int
+    backoff_s: tuple[float, ...]
+
+    def decide(self, attempts: int) -> RetryDecision:
+        return RetryDecision.DEADLETTER if attempts > self.cap else RetryDecision.RETRY
+
+    def backoff_for(self, attempts: int) -> float:
+        if not self.backoff_s:
+            return 0.0
+        return self.backoff_s[min(attempts - 1, len(self.backoff_s) - 1)]
 
 
 @dataclass(slots=True)
@@ -326,6 +349,10 @@ class RedisRenderQueue:
         retry_cap: int = 2,
         retry_backoff_s: Sequence[float] = (2.0, 8.0, 30.0),
         success_ttl_s: int = 3600,
+        # Sliding TTL on a trajectory's cancel-token set; refreshed on every enqueue,
+        # so it only expires well after the last enqueue — bounding zombie token sets
+        # whose members never drained. Generous default (6h) >> any reading session gap.
+        token_ttl_s: int = 21_600,
         session_factory: SessionFactory | None = None,
         clock_ms: Callable[[], int] | None = None,
     ) -> None:
@@ -334,9 +361,9 @@ class RedisRenderQueue:
         self._ns = namespace
         self._backpressure_depth = backpressure_depth
         self._lease_ms = lease_ms
-        self._retry_cap = retry_cap
-        self._backoff = tuple(retry_backoff_s)
+        self._retry_policy = RetryPolicy(cap=retry_cap, backoff_s=tuple(retry_backoff_s))
         self._success_ttl_s = success_ttl_s
+        self._token_ttl_s = token_ttl_s
         self._session_factory = session_factory
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
 
@@ -440,6 +467,7 @@ class RedisRenderQueue:
             str(self._backpressure_depth),
             "1" if cancel_token else "0",
             str(now),
+            str(self._token_ttl_s),
         )
         status = EnqueueStatus(raw[0])
         resolved = raw[1] or None
@@ -567,7 +595,7 @@ class RedisRenderQueue:
         if error is not None:
             mapping["error"] = error[:500]
 
-        if attempts > self._retry_cap:
+        if self._retry_policy.decide(attempts) is RetryDecision.DEADLETTER:
             mapping["status"] = RenderJobStatus.DEADLETTER.value
             await self._redis.hset(job_key, mapping=mapping)
             await self._redis.lpush(self._dlq_key, job_id)
@@ -581,7 +609,7 @@ class RedisRenderQueue:
             await self._mirror_status(job_id, RenderJobStatus.DEADLETTER, attempts=attempts)
             return RetryOutcome(decision=RetryDecision.DEADLETTER, attempts=attempts)
 
-        delay_s = self._backoff[min(attempts - 1, len(self._backoff) - 1)]
+        delay_s = self._retry_policy.backoff_for(attempts)
         ready_at = now + int(delay_s * 1000)
         mapping["status"] = RenderJobStatus.RETRYING.value
         mapping["ready_at"] = str(ready_at)

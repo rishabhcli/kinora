@@ -76,6 +76,8 @@ class BudgetGate(Protocol):
 
     async def is_low(self) -> bool: ...
 
+    def is_low_at(self, remaining: float) -> bool: ...
+
     async def remaining(self) -> float: ...
 
     async def reserve(
@@ -229,13 +231,16 @@ class SchedulerService:
         # 2. Refresh committed-seconds-ahead from the buffer relative to w.
         session.recompute_committed_ahead()
         session.budget_remaining_s = await self._budget.remaining()
-        await self._maybe_publish_budget_low(session)
+        # One budget snapshot drives the whole tick: is_low + the fill gate + the
+        # zone badge all read this, instead of each re-querying used_seconds().
+        budget_low = self._budget.is_low_at(session.budget_remaining_s)
+        await self._maybe_publish_budget_low(session, low=budget_low)
 
         # 3. Dual-watermark hysteresis fill (velocity-adaptive promotion).
         was_bursting = session.bursting
         promoted: list[str] = []
         if allow_promotion:
-            promoted = await self._fill_committed(session)
+            promoted = await self._fill_committed(session, budget_low=budget_low)
         if session.bursting != was_bursting:
             metrics.inc_watermark_crossing("low" if session.bursting else "high")
         metrics.inc_promotions(len(promoted))
@@ -248,7 +253,9 @@ class SchedulerService:
 
         await self._save(session)
         metrics.set_buffer_occupancy(session.session_id, session.committed_seconds_ahead)
-        await self._publish_buffer_state(session, idle=False, promoted=len(promoted))
+        await self._publish_buffer_state(
+            session, idle=False, promoted=len(promoted), budget_low=budget_low
+        )
         tick = SchedulerTick(
             idle=False,
             promoted=promoted,
@@ -268,9 +275,8 @@ class SchedulerService:
         )
         return tick
 
-    async def _maybe_publish_budget_low(self, session: SchedulerSession) -> None:
+    async def _maybe_publish_budget_low(self, session: SchedulerSession, *, low: bool) -> None:
         """Announce ``budget_low`` once per low-budget episode (§5.6/§11.1)."""
-        low = await self._budget.is_low()
         if not low:
             session.budget_low_announced = False
             return
@@ -292,15 +298,23 @@ class SchedulerService:
 
     # -- buffer surfacing (the §5.3 indicator) ------------------------------- #
 
-    async def _zone_and_eta(self, session: SchedulerSession) -> tuple[Zone, float | None]:
-        """Classify the nearest upcoming shot + its ETA for the §5.3 surfacing."""
+    async def _zone_and_eta(
+        self, session: SchedulerSession, *, budget_low: bool | None = None
+    ) -> tuple[Zone, float | None]:
+        """Classify the nearest upcoming shot + its ETA for the §5.3 surfacing.
+
+        ``budget_low`` may be passed in by a caller that already has the tick's
+        budget snapshot; when omitted (the idle path) it is queried once.
+        """
         shot = await self._shots.next_uncommitted_shot(session.book_id, session.focus_word)
         next_eta = (
             eta_seconds(_shot_start(shot), session.focus_word, session.velocity_wps)
             if shot is not None
             else None
         )
-        budget_ok = self._budget.can_render_live() and not await self._budget.is_low()
+        if budget_low is None:
+            budget_low = await self._budget.is_low()
+        budget_ok = self._budget.can_render_live() and not budget_low
         zone = viewer_zone(
             next_eta,
             stable=trajectory_is_stable(session),
@@ -311,7 +325,12 @@ class SchedulerService:
         return zone, next_eta
 
     async def _publish_buffer_state(
-        self, session: SchedulerSession, *, idle: bool, promoted: int = 0
+        self,
+        session: SchedulerSession,
+        *,
+        idle: bool,
+        promoted: int = 0,
+        budget_low: bool | None = None,
     ) -> None:
         """Surface live buffer occupancy + zone to the client (§5.3/§5.6).
 
@@ -325,7 +344,7 @@ class SchedulerService:
         """
         if self._events is None:
             return
-        zone, next_eta = await self._zone_and_eta(session)
+        zone, next_eta = await self._zone_and_eta(session, budget_low=budget_low)
         inflight = session.inflight
         await self._events.publish(
             session.session_id,
@@ -349,13 +368,18 @@ class SchedulerService:
 
     # -- watermark fill ------------------------------------------------------ #
 
-    async def _fill_committed(self, session: SchedulerSession) -> list[str]:
+    async def _fill_committed(
+        self, session: SchedulerSession, *, budget_low: bool | None = None
+    ) -> list[str]:
         """Fill the committed buffer between watermarks with hysteresis (§4.5/§4.6).
 
         Burst on-set is gated by the **low** watermark and burst-off by the
         **high** watermark; between them the committed lane is idle. Inside a
         burst, each candidate is promoted only while its ETA is under the commit
         horizon, the trajectory is stable, and the budget can afford it.
+
+        ``budget_low`` is the tick's budget snapshot; omitted only by direct
+        callers (tests), in which case it is queried once.
         """
         # Hysteresis state machine.
         if session.committed_seconds_ahead < self._low:
@@ -365,11 +389,22 @@ class SchedulerService:
         if not session.bursting:
             return []
 
-        can_promote = self._budget.can_render_live() and not await self._budget.is_low()
+        if budget_low is None:
+            budget_low = await self._budget.is_low()
+        can_promote = self._budget.can_render_live() and not budget_low
         stable = trajectory_is_stable(session)
         promoted: list[str] = []
         buffered_ids = {b.shot_id for b in session.committed_buffer}
         cursor = session.focus_word
+        # Track remaining budget locally from the tick snapshot, decremented per
+        # reservation, so the per-candidate affordability check doesn't re-query
+        # used_seconds() each iteration. _reserve (advisory-locked) stays the
+        # authoritative ceiling guard.
+        remaining_s = (
+            session.budget_remaining_s
+            if session.budget_remaining_s is not None
+            else await self._budget.remaining()
+        )
 
         while session.committed_seconds_ahead < self._high:
             shot = await self._shots.next_uncommitted_shot(session.book_id, cursor)
@@ -385,7 +420,7 @@ class SchedulerService:
                 break  # beyond the commit horizon / skimming -> ride keyframes
 
             est = _shot_duration(shot)
-            if not can_promote or await self._budget.remaining() < est:
+            if not can_promote or remaining_s < est:
                 break  # cannot spend video-seconds -> ride the keyframe ladder
 
             reservation = await self._reserve(session, shot, est)
@@ -429,6 +464,7 @@ class SchedulerService:
             )
             buffered_ids.add(shot.id)
             session.committed_seconds_ahead += est
+            remaining_s -= est  # this reservation stands until the worker releases it
             promoted.append(shot.id)
 
         if session.committed_seconds_ahead >= self._high:

@@ -328,8 +328,11 @@ async def _run_regens(container: Container, book_id: str, shot_ids: list[str]) -
     for shot_id in shot_ids:
         try:
             outcome = await container.run_regen(book_id, shot_id, None)
-        except Exception as exc:  # noqa: BLE001 - one shot failing must not stall the rest
-            logger.warning("director.regen_failed", shot_id=shot_id, error=str(exc))
+        except Exception:  # noqa: BLE001 - one shot failing must not stall the rest
+            # Keep the full traceback (a bare str(exc) hid the cause); the shot
+            # stays in its pre-regen state for a later retry rather than silently
+            # vanishing from the feed.
+            logger.exception("director.regen_failed", shot_id=shot_id)
             continue
         await container.redis.publish(
             channel,
