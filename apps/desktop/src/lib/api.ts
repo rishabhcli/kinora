@@ -3,7 +3,10 @@
 // Bearer token kept in localStorage; every call attaches it when present.
 import type { Book } from "../data/books";
 
-const BASE: string =
+// Exported primitive (shared seam, owned by Agent 12): feature API modules in
+// src/lib/api/*.ts compose against BASE/auth/http/toBrowserUrl — they never edit
+// this file. See coordination/CONTRACTS.md §7.
+export const BASE: string =
   (import.meta.env.VITE_KINORA_API_URL as string | undefined) ?? "http://localhost:8000";
 
 const TOKEN_KEY = "kinora.token";
@@ -41,6 +44,12 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => res.statusText));
   return res.status === 204 ? (null as T) : ((await res.json()) as T);
 }
+
+/** Shared fetch primitive (seam, owned by Agent 12). Prefixes BASE, attaches the
+ *  bearer token, JSON-encodes, throws ApiError on non-2xx, parses JSON (null on
+ *  204). Feature modules in src/lib/api/*.ts do `import { http } from "../api"`.
+ *  Identical behaviour to the internal `req`; exported under the contract name. */
+export const http = req;
 
 // ---- Backend response shapes (subset we consume) ------------------------- //
 export interface BookResponse {
