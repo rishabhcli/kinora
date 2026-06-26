@@ -31,3 +31,14 @@ partial is fully self-contained in `styles/login.css`.
 ## 3. No dependency / lockfile changes
 TDD for pure functions runs via `node --test` (Node 26 strips `.ts`) under
 `apps/desktop/tests/auth/` — **no new devDeps, no lockfile churn.**
+
+## 4. Post-integration cleanup notes (from code review — not blocking)
+- **Dust-mote duplication:** `auth/AmbientBackdrop` + `login.css .auth-mote` re-implement the same
+  drifting-dust technique as the home `AmbientBackground.tsx` + `index.css .ambient-mote`. This is a
+  consequence of the lane split (login styles are required to be self-contained in `login.css`).
+  Post-integration, Agents 10/12 could factor a shared mote primitive + keyframe and have both
+  backdrops consume it. Left duplicated on purpose to avoid editing the home component / `index.css`
+  rules I don't own.
+- **`EASE` curve `[0.22,1,0.36,1]`** is inlined in `App.tsx` + `LoginPage.tsx` (matches the repo's
+  existing house style — same literal in BookShelf/AnimatedPageSwitch/PricingPage/ReadingRoom). When
+  Agent 4 ships `src/motion/`, a single exported easing const can replace all copies.

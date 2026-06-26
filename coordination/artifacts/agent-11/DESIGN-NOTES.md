@@ -61,6 +61,12 @@ successful auth, offline-safe (never throws). Source = Agent 5 cover API (stubbe
 `data/books` cover URLs today; Agent 12 swaps the source at integration).
 
 ## Tried / decisions log
+- ⚠️ LOOP-STATE COLLISION: my session is rooted in the MAIN repo (`/Users/.../kinora`),
+  and sibling agents (a02/a04/a09) clobber the shared `.claude/ralph-loop.local.md`, so the Ralph
+  stop hook sometimes re-feeds the WRONG agent's mission (saw Agent 02). My true task is fixed:
+  **Agent 11 / promise `AGENT 11 COMPLETE`** (per the original user command). On any wrong re-feed:
+  `cd /Users/m3-max/Documents/GitHub/kinora && bash agent-prompts/arm-ralph.sh 11`, then continue
+  Agent 11. NEVER output another agent's promise.
 - (iter 1) Established thesis + tokens + plan. BookWall already glides on glass — ELEVATE (depth,
   beam, dust), don't replace. Bundled `public/generated/film-0X.mp4` are 720x1280 — kept as an
   OPTIONAL ambient layer but default OFF (a blurred film fighting card legibility is a risk; the

@@ -97,8 +97,8 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
       await api.loginOrRegister(useEmail, usePassword);
       leave(mode === "login" ? "Welcome back. Opening your library…" : "Welcome to Kinora. Opening your library…");
     } catch (e) {
-      if (e instanceof ApiError) {
-        // Backend reachable but refused — real, recoverable feedback.
+      if (e instanceof ApiError && validate) {
+        // Primary submit, backend reachable but refused — real, recoverable feedback.
         setStatus("error");
         const text =
           e.status === 429
@@ -108,8 +108,13 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
         setAnnounce(text);
         pwRef.current?.focus();
       } else {
-        // Network unreachable — continue into the offline demo library.
-        leave("You're offline — opening the demo library…");
+        // Demo / social entry, or a network error on submit → always open the
+        // offline-safe demo library so the door is never a dead end.
+        leave(
+          e instanceof ApiError
+            ? "Opening the demo library…"
+            : "You're offline — opening the demo library…",
+        );
       }
     }
   }
@@ -127,12 +132,14 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
   }
 
   function onForgot() {
+    if (busy) return;
     const text = "Reset isn't wired up in the demo — the demo password is prefilled.";
     setFormMsg({ kind: "info", text });
     setAnnounce(text);
   }
 
   function switchMode() {
+    if (busy) return; // don't mutate mode mid-submit / during the exit beat
     setMode((m) => (m === "login" ? "register" : "login"));
     setFormMsg(null);
     setSubmitted(false);
@@ -336,13 +343,14 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
         </motion.div>
       </div>
 
-      {/* Single live region: progress is polite, errors are assertive. */}
-      <div
-        className="sr-only"
-        role="status"
-        aria-live={status === "error" ? "assertive" : "polite"}
-      >
-        {announce}
+      {/* Two static live regions with fixed politeness — swapping aria-live on one
+          region as content changes can make AT drop the message. Progress is
+          announced politely; errors assertively (role=alert ⇒ assertive). */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {status === "error" ? "" : announce}
+      </div>
+      <div className="sr-only" role="alert">
+        {status === "error" ? announce : ""}
       </div>
     </motion.div>
   );

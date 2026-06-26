@@ -16,11 +16,14 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { id, label, icon, error, showError, trailing, className, ...input },
+  { id, label, icon, error, showError, trailing, className, "aria-describedby": describedBy, ...input },
   ref,
 ) {
   const invalid = Boolean(showError && error);
   const errorId = `${id}-error`;
+  // Merge the caller's aria-describedby (e.g. the strength meter) with the error
+  // id so neither clobbers the other.
+  const describe = [invalid ? errorId : null, describedBy].filter(Boolean).join(" ") || undefined;
   return (
     <div className="auth-field">
       <label htmlFor={id} className="auth-field-label">
@@ -37,7 +40,7 @@ const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
           id={id}
           className={`auth-input${icon ? " has-icon" : ""}${trailing ? " has-trailing" : ""}${className ? ` ${className}` : ""}`}
           aria-invalid={invalid || undefined}
-          aria-describedby={invalid ? errorId : undefined}
+          aria-describedby={describe}
           {...input}
         />
         {trailing && <span className="auth-input-trailing">{trailing}</span>}

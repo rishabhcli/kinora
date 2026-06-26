@@ -22,13 +22,15 @@
   --auth-subtle: #8a8074; /* tertiary (still AA) */
   --auth-gold: #d4a44e;
   --auth-gold-bright: #e8c878;
+  --auth-cream: #efe3cf; /* tagline gradient mid-stop */
   --auth-danger: #e88c6a;
   --auth-good: #8fb573;
 
-  /* rgb channels for effects (specular / shadow / warm light) */
+  /* rgb channels for effects (specular / shadow / warm light / tints) */
   --auth-hi: 246, 240, 231; /* warm white highlight */
   --auth-shadow: 6, 5, 4; /* deep shadow */
   --auth-gold-rgb: 212, 164, 78;
+  --auth-danger-rgb: 232, 140, 106;
 
   /* cream page-block (BookWall 3D books) */
   --auth-page: #e7dcc4;
@@ -139,7 +141,7 @@
   font-size: clamp(34px, 4vw, 52px);
   line-height: 1.06;
   letter-spacing: -0.01em;
-  background: linear-gradient(168deg, var(--auth-ink) 0%, #efe3cf 42%, var(--auth-gold-bright) 100%);
+  background: linear-gradient(168deg, var(--auth-ink) 0%, var(--auth-cream) 42%, var(--auth-gold-bright) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -267,10 +269,10 @@
   color: var(--auth-gold);
 }
 .auth-input-wrap.is-invalid .auth-input {
-  border-color: rgba(232, 140, 106, 0.6);
+  border-color: rgba(var(--auth-danger-rgb), 0.6);
 }
 .auth-input-wrap.is-invalid .auth-input:focus {
-  box-shadow: 0 0 0 3px rgba(232, 140, 106, 0.16);
+  box-shadow: 0 0 0 3px rgba(var(--auth-danger-rgb), 0.16);
 }
 .auth-input-trailing {
   position: absolute;
@@ -399,8 +401,8 @@
 }
 .auth-formmsg--error {
   color: var(--auth-danger);
-  background: rgba(232, 140, 106, 0.1);
-  border: 1px solid rgba(232, 140, 106, 0.22);
+  background: rgba(var(--auth-danger-rgb), 0.1);
+  border: 1px solid rgba(var(--auth-danger-rgb), 0.22);
 }
 .auth-formmsg--info {
   color: var(--auth-muted);
@@ -646,23 +648,24 @@
   inset: -25% -10%;
   pointer-events: none;
   transform-origin: var(--beam-x, 50%) 0%;
-  transform: rotate(var(--beam-angle, -12deg)) translate3d(calc(var(--mx) * 12px), 0, 0);
+  /* rotate only — compositor-friendly. The radial gradients are already soft, so
+     no filter:blur (which would re-rasterise every sway frame) and no blend with
+     a per-frame mx-translate. Wall parallax lives on .auth-backdrop-parallax. */
+  transform: rotate(var(--beam-angle, -12deg));
   background:
     radial-gradient(
       20% 88% at var(--beam-x, 50%) -8%,
-      rgba(var(--auth-gold-rgb), calc(0.34 * var(--warmth, 1))) 0%,
-      rgba(var(--auth-gold-rgb), 0.12) 26%,
-      transparent 54%
+      rgba(var(--auth-gold-rgb), calc(0.32 * var(--warmth, 1))) 0%,
+      rgba(var(--auth-gold-rgb), 0.1) 28%,
+      transparent 56%
     ),
     radial-gradient(
       9% 70% at var(--beam-x, 50%) -8%,
-      rgba(var(--auth-hi), calc(0.22 * var(--warmth, 1))) 0%,
-      transparent 46%
+      rgba(var(--auth-hi), calc(0.2 * var(--warmth, 1))) 0%,
+      transparent 48%
     );
   mix-blend-mode: screen;
-  filter: blur(7px);
   animation: auth-beam-sway 16s ease-in-out infinite;
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes auth-beam-sway {
   0%, 100% { transform: rotate(calc(var(--beam-angle, -12deg) - 1.6deg)); }
