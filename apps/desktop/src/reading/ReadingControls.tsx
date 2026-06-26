@@ -230,7 +230,16 @@ export function ReadingControls({ prefs, onChange, voices: providedVoices }: Rea
             id={voiceId}
             value={prefs.ttsVoiceURI ?? ""}
             onChange={(e) => onChange({ ttsVoiceURI: e.target.value || null })}
-            style={{ maxWidth: 160 }}
+            style={{
+              maxWidth: 160,
+              // Explicit colours so light text never lands on the native white
+              // default (fails contrast); matches the dark panel.
+              background: "#1f1b16",
+              color: "#e8e2d8",
+              border: "1px solid rgba(255,255,255,0.18)",
+              borderRadius: 8,
+              padding: "0.3rem 0.45rem",
+            }}
           >
             <option value="">System default</option>
             {voices.map((v) => (

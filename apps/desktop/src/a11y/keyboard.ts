@@ -118,12 +118,35 @@ export function isMacPlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/i.test(probe);
 }
 
+// Only true text-entry contexts suppress single-key shortcuts. Non-text inputs
+// (range/checkbox/radio/button/etc.) and selects must NOT swallow them, so e.g.
+// "?" opens the cheat-sheet while a slider has focus.
+const TEXT_ENTRY_INPUT_TYPES = new Set([
+  "text",
+  "search",
+  "email",
+  "url",
+  "tel",
+  "password",
+  "number",
+  "date",
+  "datetime-local",
+  "month",
+  "time",
+  "week",
+]);
+
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el || !el.tagName) return false;
   const tag = el.tagName.toLowerCase();
-  if (tag === "input" || tag === "textarea" || tag === "select") return true;
-  return Boolean(el.isContentEditable);
+  if (tag === "textarea") return true;
+  if (el.isContentEditable) return true;
+  if (tag === "input") {
+    const type = ((el as HTMLInputElement).type || "text").toLowerCase();
+    return TEXT_ENTRY_INPUT_TYPES.has(type);
+  }
+  return false;
 }
 
 function onKeyDown(e: KeyboardEvent): void {

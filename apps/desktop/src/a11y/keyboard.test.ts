@@ -126,6 +126,29 @@ describe("registerShortcut", () => {
     input.remove();
   });
 
+  it("still fires when focus is on a non-text control (range slider, checkbox)", () => {
+    const fn = vi.fn();
+    registerShortcut("?", fn);
+    const range = document.createElement("input");
+    range.type = "range";
+    document.body.appendChild(range);
+    range.focus();
+    press(range, { key: "?" });
+    expect(fn).toHaveBeenCalledTimes(1);
+    range.remove();
+  });
+
+  it("does not fire while typing in a textarea", () => {
+    const fn = vi.fn();
+    registerShortcut("r", fn);
+    const ta = document.createElement("textarea");
+    document.body.appendChild(ta);
+    ta.focus();
+    press(ta, { key: "r" });
+    expect(fn).not.toHaveBeenCalled();
+    ta.remove();
+  });
+
   it("still fires in a field when whenInputFocused is true (e.g. Escape)", () => {
     const fn = vi.fn();
     registerShortcut("esc", fn, { whenInputFocused: true });

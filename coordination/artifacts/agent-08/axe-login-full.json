@@ -1,0 +1,9 @@
+{
+  "url": "http://localhost:5173/",
+  "scannedAt": "2026-06-26T12:21:01.112Z",
+  "counts": {
+    "violations": 0,
+    "serious": 0
+  },
+  "violations": []
+}
