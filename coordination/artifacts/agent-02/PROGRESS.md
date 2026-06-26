@@ -15,27 +15,31 @@ Branch `agent/02-scroll-film`, worktree `../kinora-a02`, base `overnight/integra
       / `classifyScroll` / `schedulerSignal` / `nextSegmentToPreload` — 18 tests green.
 
 ### WS1 — scroll → timeline scrubbing
-- [ ] `useScrollFilm.ts`: rAF scroll→currentTime, velocity scrub/play, scheduler
-      signalling (postIntent/seek), at-rest debounce, preload, parallax refs.
-- [ ] `ScrollFilmEngine.tsx`: scroll container + text column + film pane + rail +
-      scrub indicator + parallax. Inertia / scroll-snap. GPU transforms only.
+- [x] `useScrollFilm.ts`: single rAF scroll→currentTime, EMA velocity scrub/play,
+      scheduler signalling (postIntent/seek, throttled), idle self-stop + settle,
+      dt-clamped velocity (post-idle flick fix, `scrollVelocity` unit-tested).
+- [x] `ScrollFilmEngine.tsx`: scroll container + themed text column + film pane +
+      rail + scrub indicator + parallax. GPU transforms only, imperative hot path.
 
 ### WS2 — cross-event handoff
-- [ ] `FilmPane.tsx`: ≤2 `<video>` layers, crossfade only on `src` change
-      (event-level when stitched films exist), instant under reduced motion.
+- [x] `FilmPane.tsx`: ≤2 `<video>` layers, crossfade only on `src` change (so
+      stitched-event segments scrub seamlessly; shot/event boundaries crossfade),
+      instant hard-cut while scrubbing or under reduced motion.
 
 ### WS3 — fallback parity
-- [ ] Bundled `/generated/film-NN.mp4` scrubs identically with `live=false`.
+- [x] Bundled `/generated/film-NN.mp4` scrubs identically with `live=false`
+      (single-segment timeline; `currentTime = fraction·duration`).
 
 ### Verification
-- [ ] `pnpm --filter @kinora/desktop typecheck && build` green (with all new files).
-- [ ] Runtime demo harness (`__demo__/`) + Playwright: scrub tracks scroll;
-      reduced-motion = instant cuts; no console errors; rAF-driven (no jank).
-- [ ] `test:reading` green for any added pure helpers.
+- [x] `pnpm --filter @kinora/desktop typecheck && build` green (all new files).
+- [x] Runtime harness (`__demo__/`) + Electron verifier: **13/13** — scrub frame-
+      accurate, ~60fps (median 8.3ms) under continuous scroll, segment handoff,
+      crossfade, reduced-motion instant cuts, no runtime errors. See VERIFICATION.md.
+- [x] `test:reading` green — **27/27** (added `computeFrame`, `scrollVelocity`).
 
 ### Done
-- [ ] CONTRACTS.md final · artifacts in `coordination/artifacts/agent-02/` · self code-review.
-- [ ] Output `<promise>AGENT 02 COMPLETE</promise>` only when all DoD items truly pass.
+- [x] CONTRACTS.md matches the shipped signature · artifacts in `coordination/artifacts/agent-02/`.
+- [~] Self code-review, then output `<promise>AGENT 02 COMPLETE</promise>`.
 
 ## Notes / decisions
 - `coordination/artifacts/agent-04/` in the mission DoD is template residue — this

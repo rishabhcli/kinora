@@ -8,6 +8,8 @@ import {
   classifyScroll,
   schedulerSignal,
   nextSegmentToPreload,
+  computeFrame,
+  scrollVelocity,
   type SegmentInput,
 } from "../timeline.ts";
 
@@ -158,6 +160,69 @@ test("nextSegmentToPreload returns the upcoming segment within lookahead words",
   eq(nextSegmentToPreload(tl, 95, 20)!.id, "b"); // approaching the boundary
   eq(nextSegmentToPreload(tl, 10, 20), null); // boundary still far away
   eq(nextSegmentToPreload(tl, 150, 20), null); // already in the last segment
+});
+
+// ---- computeFrame (the per-rAF-frame glue, kept pure) -------------------- //
+
+const twoShot = buildTimeline([
+  { id: "a", wordStart: 0, wordEnd: 100, src: "a.mp4", duration: 4 },
+  { id: "b", wordStart: 100, wordEnd: 200, src: "b.mp4", duration: 6 },
+]);
+
+test("computeFrame maps scroll position to src + currentTime at rest (play mode)", () => {
+  const f = computeFrame({ timeline: twoShot, scrollTop: 0, scrollRange: 1000, velocityWordsPerSec: 0 });
+  eq(f.focusWord, 0);
+  eq(f.src, "a.mp4");
+  close(f.time, 0);
+  eq(f.mode, "play");
+});
+
+test("computeFrame at mid-scroll picks the right segment and clip time", () => {
+  // fraction 0.75 → focusWord 150 → segment b, local (150-100)/100 = 0.5 → time 3s
+  const f = computeFrame({ timeline: twoShot, scrollTop: 750, scrollRange: 1000, velocityWordsPerSec: 0 });
+  eq(f.focusWord, 150);
+  eq(f.src, "b.mp4");
+  close(f.time, 3); // clipStart 0 + 0.5 * 6s
+});
+
+test("computeFrame enters scrub mode under a fast flick", () => {
+  const f = computeFrame({ timeline: twoShot, scrollTop: 500, scrollRange: 1000, velocityWordsPerSec: 80 });
+  eq(f.mode, "scrub");
+});
+
+test("computeFrame uses live video duration for the unknown-length fallback film", () => {
+  const fallback = buildTimeline([{ id: "fallback", wordStart: 0, wordEnd: 1000, src: "film.mp4" }]);
+  const f = computeFrame({ timeline: fallback, scrollTop: 250, scrollRange: 1000, velocityWordsPerSec: 0, liveDuration: 40 });
+  close(f.time, 10); // fraction 0.25 → 0.25 * 40s
+});
+
+test("computeFrame on an empty timeline yields no src and play mode", () => {
+  const f = computeFrame({ timeline: buildTimeline([]), scrollTop: 10, scrollRange: 100, velocityWordsPerSec: 0 });
+  eq(f.src, "");
+  eq(f.segment, null);
+  eq(f.mode, "play");
+});
+
+test("computeFrame guards a zero scroll range (content not yet scrollable)", () => {
+  const f = computeFrame({ timeline: twoShot, scrollTop: 0, scrollRange: 0, velocityWordsPerSec: 0 });
+  eq(f.fraction, 0);
+  eq(f.focusWord, 0);
+});
+
+// ---- scrollVelocity (post-idle jump must still read as fast) ------------- //
+
+test("scrollVelocity clamps a stale dt so a jump after idle still reads fast", () => {
+  // 500-word jump reported with a bogus 4s dt (loop had gone idle) → clamp to the
+  // 0.05s max → 10000 wps, decisively a flick.
+  close(scrollVelocity(0, 500, 4, 0.05), 10000);
+});
+
+test("scrollVelocity uses the real dt for warm, continuous scrolling", () => {
+  close(scrollVelocity(100, 110, 0.016), 10 / 0.016); // 625 wps
+});
+
+test("scrollVelocity is zero when dt is non-positive", () => {
+  eq(scrollVelocity(0, 50, 0), 0);
 });
 
 await done();

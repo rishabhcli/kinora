@@ -148,6 +148,70 @@ export function schedulerSignal(prevWord: number, word: number, dtSeconds: numbe
   return { kind: Math.abs(dw) > 120 ? "seek" : "intent", word, velocity };
 }
 
+/** Scroll speed in words/sec, with the sampling interval clamped to `maxDt`. The
+ *  clamp matters when the rAF loop restarts after idling (its `prevAt` is stale, so
+ *  the raw `dt` is huge): a real jump would otherwise be diluted to ~0 velocity and
+ *  misread as slow reading. A jump that happened faster than `maxDt` reads as a
+ *  flick — which is what it is. */
+export function scrollVelocity(
+  prevFocus: number,
+  focus: number,
+  dtSeconds: number,
+  maxDt = 0.05,
+): number {
+  const vdt = Math.min(dtSeconds, maxDt);
+  return vdt > 0 ? (focus - prevFocus) / vdt : 0;
+}
+
+export interface FrameInput {
+  timeline: Timeline;
+  /** the scroll container's scrollTop (px) */
+  scrollTop: number;
+  /** scrollHeight − clientHeight (px); 0 when content isn't scrollable yet */
+  scrollRange: number;
+  /** smoothed scroll speed in words/sec (drives scrub vs play) */
+  velocityWordsPerSec: number;
+  /** the active `<video>`'s duration, for segments with an unknown clip window */
+  liveDuration?: number;
+  scrubThreshold?: number;
+}
+
+export interface Frame {
+  fraction: number;
+  focusWord: number;
+  segment: FilmSegment | null;
+  /** the src to show ("" when the timeline is empty) */
+  src: string;
+  /** the `currentTime` (s) to scrub the active video to */
+  time: number;
+  localFraction: number;
+  mode: "scrub" | "play";
+}
+
+/** The whole per-frame computation, kept pure so the rAF loop in `useScrollFilm`
+ *  stays a thin DOM adapter: scroll position + velocity → which film + where in it
+ *  + whether to scrub or play. */
+export function computeFrame(input: FrameInput): Frame {
+  const { timeline, scrollTop, scrollRange, velocityWordsPerSec, liveDuration } = input;
+  const fraction = scrollRange > 0 ? clamp(scrollTop / scrollRange, 0, 1) : 0;
+  const focusWord = focusWordFromFraction(fraction, timeline.totalWords);
+  const mode = classifyScroll(velocityWordsPerSec, { scrubThreshold: input.scrubThreshold });
+  const head = resolvePlayhead(timeline, focusWord);
+  if (!head) {
+    return { fraction, focusWord, segment: null, src: "", time: 0, localFraction: 0, mode };
+  }
+  const time = segmentTime(head.segment, head.localFraction, liveDuration);
+  return {
+    fraction,
+    focusWord,
+    segment: head.segment,
+    src: head.segment.src,
+    time,
+    localFraction: head.localFraction,
+    mode,
+  };
+}
+
 /** The next segment to decode ahead of the reader: the one immediately after the
  *  current playhead, but only once its start is within `lookaheadWords`. Returns
  *  `null` when the boundary is still far off or the reader is in the last

@@ -15,16 +15,18 @@ the old two-pane film+text region was):
 
 ```ts
 import { ScrollFilmEngine } from "@/reading/ScrollFilmEngine";
+import type { ReadingPrefs, ReadingTheme } from "@/lib/readingPrefs";
 
 interface ScrollFilmEngineProps {
   book: Book;                       // from data/books — cover/poster + id
-  pages: { n: number; text: string }[]; // ordered page text (empty ⇒ placeholder)
+  pages: { n: number; text: string }[]; // ordered page text (empty ⇒ placeholder copy)
   shots: ShotResponse[];            // from api.getShots — source_span.word_range drives the sync map
   clips?: Record<string, string>;   // shot_id → browser-ready mp4 url (live SSE clip_ready)
   sessionId?: string | null;        // present ⇒ scheduler signalling (postIntent/seek) is live
   live?: boolean;                    // false ⇒ bundled fallback film path (WS3)
   fallbackFilm?: string;             // bundled mp4 for the no-backend path (default chosen from book.id)
-  prefs: ReadingPrefsLike;           // theme + typography (structurally compatible with lib/readingPrefs)
+  prefs: ReadingPrefs;               // theme + typography, from lib/readingPrefs useReadingPrefs()
+  effectiveTheme?: ReadingTheme;     // resolved theme (autoNight) from useReadingPrefs(); defaults to prefs.theme
   reducedMotion?: boolean;           // default: framer-motion useReducedMotion(). Agent 6 → useReducedMotionPref()
   bufferAhead?: number | null;       // committed seconds ahead (SSE buffer_state) → progress rail lead
   bursting?: boolean;                // SSE buffer_state.bursting → rail colour
@@ -34,19 +36,15 @@ interface ScrollFilmEngineProps {
 function ScrollFilmEngine(props: ScrollFilmEngineProps): JSX.Element;
 ```
 
+Wiring from `ReadingRoom` (Agent 12): pass `useReadingPrefs()`'s `prefs` +
+`effectiveTheme`, the SSE-maintained `clipByShot` as `clips`, and the session's
+`bufferAhead`/`bursting`. The shell creates the session + owns the SSE stream; the
+engine only **signals** the scheduler (seek/postIntent) from scroll.
+
 The engine **owns** the scrollable reading area: the pinned vertical film pane
 (720×1280 / 9:16), the scrolling text column, the progress+buffer rail, scroll↔film
 sync, scrubbing, parallax, and the scrub indicator. The `ReadingRoom` shell keeps
 the top bar, appearance popover, cover-open animation, backdrop, and Escape handling.
-
-`ReadingPrefsLike` (structural — no import coupling to Agent 10/Agent 6):
-
-```ts
-interface ReadingPrefsLike {
-  fontScale: number; leading: number; measure: number;
-  theme?: string; // resolved theme key; engine maps to bg/ink or uses neutral defaults
-}
-```
 
 **Consumes:** `api.getShots`/`createSession`/`postIntent`/`seek`/`openSessionEvents`
 + `toBrowserUrl` (Agent 12, `lib/api.ts`); stitched event-film API + sync map when
