@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode, type ElementType } from "react";
+import { forwardRef, useMemo, type ReactNode, type ElementType } from "react";
 import { motion } from "framer-motion";
 import { useMotion } from "./MotionProvider";
 
@@ -36,7 +36,16 @@ export const Pressable = forwardRef<HTMLElement, PressableProps>(function Pressa
   ref,
 ) {
   const { spring, reduced } = useMotion();
-  const Comp = motion(as as ElementType);
+  // Resolve to a STABLE motion component (never call the factory inline in
+  // render — that would remount the element every render). String tags use
+  // the cached proxy (motion.button …); component tags use motion.create.
+  const Comp = useMemo<ElementType>(
+    () =>
+      typeof as === "string"
+        ? (motion as unknown as Record<string, ElementType>)[as] ?? motion.create(as)
+        : motion.create(as as ElementType),
+    [as],
+  );
 
   return (
     <Comp
