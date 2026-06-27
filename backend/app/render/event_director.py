@@ -55,6 +55,7 @@ from app.render.degrade import (
     ken_burns_over_image,
     zoom_for_camera,
 )
+from app.render.segment_packer import MAX_SEGMENT_S, pack_segments
 from app.render.shot_grammar import (
     is_motion_reversal,
     resolve_screen_directions,
@@ -384,6 +385,107 @@ def plan_event_script(
     return EventScript(event_id=event_id, book_id=book_id, scene_id=scene_id, shots=shots)
 
 
+def plan_segment_script(
+    *,
+    event_id: str,
+    book_id: str,
+    scene_id: str | None,
+    beats: Sequence[Beat],
+    canon: CanonSlice | None = None,
+    duration_for_beat: Any = shot_duration_for_beat,
+    max_segment_s: float = MAX_SEGMENT_S,
+) -> EventScript:
+    """Plan a scene as ONE ≤15s continuous take per packed segment (single-clip).
+
+    The single-clip overhaul: consecutive beats are packed into ≤``max_segment_s``
+    segments (:func:`app.render.segment_packer.pack_segments`) and each segment
+    becomes ONE :class:`EventShot` — a continuous take, not a 3-6 shot cluster. A
+    scene that fits in one segment renders as a single clip (no stitch); a longer
+    scene yields a few segments that chain off each other's last frame and are
+    reassembled by the existing stitcher. Mode chaining, shot-grammar camera, and
+    the explicit last-frame hand-off mirror :func:`plan_event_script`, applied per
+    segment instead of per beat.
+    """
+    segments = pack_segments(
+        beats, duration_for_beat=duration_for_beat, scene_id=scene_id or event_id,
+        max_segment_s=max_segment_s,
+    )
+    by_id = {b.beat_id: b for b in beats}
+    has_locked = _has_locked_character(canon)
+    has_characters = bool(canon and canon.characters)
+    prev_endpoint = canon.previous_endpoint if canon is not None else None
+
+    def _beats_of(seg: Any) -> list[Beat]:
+        return [by_id[bid] for bid in seg.beat_ids if bid in by_id]
+
+    # Screen direction resolves across the segments' representative (first) beats.
+    rep_beats = [(_beats_of(seg) or [Beat(summary="")])[0] for seg in segments]
+    directions = resolve_screen_directions(rep_beats)
+
+    shots: list[EventShot] = []
+    for ordinal, seg in enumerate(segments):
+        seg_beats = _beats_of(seg)
+        rep = seg_beats[0] if seg_beats else Beat(summary="")
+        last_beat = seg_beats[-1] if seg_beats else rep
+        mode = decide_render_mode(
+            RenderModeInputs(
+                locked_character_present=has_locked,
+                needs_motion=True,
+                must_land_exact_pose=False,  # a segment is a continuous take
+                prev_shot_accepted_continuous=(ordinal > 0 or prev_endpoint is not None),
+                is_establishing_no_character=not has_characters,
+                minor_edit_on_accepted_clip=False,
+            )
+        )
+        if ordinal > 0:
+            continues_from = shots[ordinal - 1].shot_id
+            last_frame_key = keys.lastframe(book_id, continues_from)
+        elif prev_endpoint is not None:
+            continues_from = prev_endpoint.shot_id
+            last_frame_key = prev_endpoint.last_frame_key or keys.lastframe(
+                book_id, prev_endpoint.shot_id
+            )
+        else:
+            continues_from = None
+            last_frame_key = None
+
+        directive = ContinuityDirective(
+            wardrobe=_wardrobe_from_canon(canon),
+            setting=_setting_from(canon, rep),
+            lighting=_lighting_from(canon, rep),
+            time_of_day=_time_of_day_from(canon, rep),
+            camera_logic=("establishing" if ordinal == 0 else "continuation"),
+            screen_direction=directions[ordinal].value,
+            motion_reversal=any(is_motion_reversal(b) for b in seg_beats),
+            hand_off=_hand_off_for(last_beat),
+            continues_from_shot_id=continues_from,
+            last_frame_key=last_frame_key,
+        )
+        shots.append(
+            EventShot(
+                shot_id=seg.segment_id,
+                beat_id=(seg.beat_ids[0] if seg.beat_ids else None),
+                ordinal=ordinal,
+                render_mode=mode,
+                summary=" ".join(b.summary for b in seg_beats if b.summary),
+                camera=camera_for_ordinal(ordinal, rep),
+                duration_s=seg.duration_s,
+                source_span=seg.source_span,
+                directive=directive,
+            )
+        )
+
+    logger.info(
+        "segment.planned",
+        event_id=event_id,
+        scene_id=scene_id,
+        segments=len(shots),
+        single_clip=len(shots) == 1,
+        modes=[s.render_mode.value for s in shots],
+    )
+    return EventScript(event_id=event_id, book_id=book_id, scene_id=scene_id, shots=shots)
+
+
 # --------------------------------------------------------------------------- #
 # Rendering — concurrent fan-out + stitch
 # --------------------------------------------------------------------------- #
@@ -656,6 +758,7 @@ __all__ = [
     "RenderedShot",
     "camera_for_ordinal",
     "plan_event_script",
+    "plan_segment_script",
     "shot_duration_for_beat",
     "wants_exact_pose",
 ]

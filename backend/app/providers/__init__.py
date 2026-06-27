@@ -10,8 +10,12 @@ renders are gated behind ``settings.kinora_live_video``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.core.config import Settings, get_settings
+
+if TYPE_CHECKING:
+    from .local_wan import LocalWanVideoProvider
 
 from .base import (
     BreakerState,
@@ -70,7 +74,7 @@ class Providers:
     vl: VLProvider
     image: ImageProvider
     tts: TtsProvider
-    video: VideoProvider
+    video: VideoProvider | LocalWanVideoProvider
     embeddings: EmbeddingProvider
 
     async def aclose(self) -> None:
@@ -84,18 +88,28 @@ def create_providers(
     resilience: ResilienceConfig | None = None,
 ) -> Providers:
     """Construct a shared client and all providers bound to it."""
+    resolved = settings or get_settings()
     client = ProviderClient(
-        settings or get_settings(),
+        resolved,
         usage_sink=usage_sink,
         resilience=resilience,
     )
+    # TEMPORARY: route video to the local Wan2.2 host server when selected;
+    # default ("cloud") keeps the DashScope Wan provider unchanged.
+    video: VideoProvider | LocalWanVideoProvider
+    if resolved.video_backend == "local":
+        from .local_wan import LocalWanVideoProvider
+
+        video = LocalWanVideoProvider(resolved)
+    else:
+        video = VideoProvider(client)
     return Providers(
         client=client,
         chat=ChatProvider(client),
         vl=VLProvider(client),
         image=ImageProvider(client),
         tts=TtsProvider(client),
-        video=VideoProvider(client),
+        video=video,
         embeddings=EmbeddingProvider(client),
     )
 

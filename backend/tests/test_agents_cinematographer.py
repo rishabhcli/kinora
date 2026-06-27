@@ -9,9 +9,11 @@ from app.agents.cinematographer import (
     decide_render_mode,
     locked_reference_ids,
 )
-from app.agents.contracts import Beat, RenderMode
+from app.agents.contracts import Beat, RenderMode, SourceSpan
+from app.agents.prompts import SEGMENT
 from app.memory.interfaces import CanonEntitySlice, CanonSlice, EndpointFrame, RefImage
 from app.providers import Providers
+from app.render.segment_packer import Segment
 from tests.test_agents_support import (
     JsonSequencer,
     providers,  # noqa: F401  (pytest fixture)
@@ -119,3 +121,88 @@ async def test_design_shot_continuation_when_previous_endpoint(providers: Provid
 
     spec = await Cinematographer(providers).design_shot(beat, canon)
     assert spec.render_mode is RenderMode.VIDEO_CONTINUATION
+
+
+# --------------------------------------------------------------------------- #
+# design_segment — one continuous ≤15s i2v take over a packed beat-run (overhaul)
+# --------------------------------------------------------------------------- #
+
+
+def _segment(duration_s: float = 12.5) -> Segment:
+    return Segment(
+        segment_id="scene_001_seg_00",
+        ordinal=0,
+        beat_ids=["beat_0001", "beat_0002"],
+        source_span=SourceSpan(page=1, word_range=(0, 30)),
+        duration_s=duration_s,
+    )
+
+
+def _segment_beats() -> list[Beat]:
+    return [
+        Beat(beat_id="beat_0001", scene_id="scene_001", summary="hero approaches the gate"),
+        Beat(
+            beat_id="beat_0002",
+            scene_id="scene_001",
+            summary="hero pushes it open and steps through",
+        ),
+    ]
+
+
+async def test_design_segment_is_one_continuous_take(providers: Providers) -> None:  # noqa: F811
+    """A packed segment designs ONE clip whose duration is the packed ≤15s length,
+    keyed by the segment id, with invented refs dropped (verbatim locked only)."""
+    fill = {
+        "prompt": "Hero approaches the gate then pushes through; slow push from wide to medium",
+        "negative_prompt": "extra fingers, warped face",
+        "reference_image_ids": ["char_hero@v3", "char_ghost@v9"],  # one valid, one invented
+        "camera": {"move": "push_in", "speed": "slow", "shot_size": "wide"},
+        "seed": 4242,
+    }
+    providers.chat.chat_json = JsonSequencer(fill)  # type: ignore[method-assign]
+
+    spec = await Cinematographer(providers).design_segment(
+        _segment(12.5), _segment_beats(), _slice_with_locked_hero()
+    )
+
+    assert spec.shot_id == "scene_001_seg_00"
+    assert spec.render_mode is RenderMode.REFERENCE_TO_VIDEO  # locked char, no anchor
+    assert spec.target_duration_s == 12.5  # the packed segment duration, not a 5s shot
+    assert spec.reference_image_ids == ["char_hero@v3"]  # invented id refused
+    assert spec.prompt.startswith("Hero approaches")
+    assert spec.seed == 4242
+
+
+async def test_design_segment_uses_the_long_form_segment_prompt(providers: Providers) -> None:  # noqa: F811
+    """The overhaul: design_segment drives the model with the segment@v1 prompt,
+    not the per-shot cinematographer prompt."""
+    captured: dict[str, str] = {}
+
+    async def recording(messages, model, **kwargs):  # type: ignore[no-untyped-def]
+        captured["system"] = messages[0]["content"]
+        return {"prompt": "p", "seed": 1}
+
+    providers.chat.chat_json = recording  # type: ignore[method-assign]
+    await Cinematographer(providers).design_segment(
+        _segment(), _segment_beats(), _slice_with_locked_hero()
+    )
+    assert captured["system"] == SEGMENT.system
+    assert SEGMENT.version == "segment@v1"
+
+
+async def test_design_segment_continues_from_previous_anchor(providers: Providers) -> None:  # noqa: F811
+    """When the segment chains off the prior segment's last frame, the mode is a
+    video continuation (anchored), not a fresh reference-to-video."""
+    providers.chat.chat_json = JsonSequencer({"prompt": "p", "seed": 1})  # type: ignore[method-assign]
+    spec = await Cinematographer(providers).design_segment(
+        _segment(), _segment_beats(), _slice_with_locked_hero(), continues_from_previous=True
+    )
+    assert spec.render_mode is RenderMode.VIDEO_CONTINUATION
+
+
+async def test_design_segment_text_to_video_when_no_character(providers: Providers) -> None:  # noqa: F811
+    providers.chat.chat_json = JsonSequencer({"prompt": "p", "seed": 1})  # type: ignore[method-assign]
+    bare = CanonSlice(book_id="b", beat_id="beat_0001", beat_index=1, scene_id="scene_001")
+    spec = await Cinematographer(providers).design_segment(_segment(), _segment_beats(), bare)
+    assert spec.render_mode is RenderMode.TEXT_TO_VIDEO
+    assert spec.reference_image_ids == []

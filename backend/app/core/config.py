@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     video_model_i2v: str = "wan2.7-i2v"
     video_model_r2v: str = "wan2.7-r2v"
 
+    # --- Video backend (TEMPORARY local-Wan2.2 switch) ---
+    # "cloud" (default) = DashScope Wan (the video_model ids above). "local" =
+    # a host-side Wan2.2 TI2V-5B server (native macOS/MPS) at ``local_wan_url``.
+    # Revert at any time with VIDEO_BACKEND=cloud — nothing else changes.
+    video_backend: str = "cloud"
+    local_wan_url: str = "http://host.docker.internal:8765"
+
     # --- Embeddings ---
     # ``tongyi-embedding-vision-plus`` embeds BOTH images and text into one shared
     # 1152-dim space (verified live), which is exactly what CCS (image-vs-image)

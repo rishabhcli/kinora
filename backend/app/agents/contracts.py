@@ -114,6 +114,25 @@ class ShotListItem(BaseModel):
     est_cost: EstCost = Field(default_factory=EstCost)
 
 
+class Segment(BaseModel):
+    """A packed run of consecutive beats rendered as ONE ≤15s continuous take.
+
+    The single-clip pipeline groups consecutive same-page beats up to the wan2.7
+    15s ceiling (see :mod:`app.render.segment_packer`) and the Cinematographer
+    designs one continuous i2v take per segment — replacing the many-stitched-5s-
+    shots structure with a single seam-free clip per moment. A scene yielding more
+    than one segment is reassembled by the existing stitcher.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    segment_id: str
+    ordinal: int = 0
+    beat_ids: list[str] = Field(default_factory=list)
+    source_span: SourceSpan = Field(default_factory=SourceSpan)
+    duration_s: float = 0.0
+
+
 # --------------------------------------------------------------------------- #
 # Cinematographer — the shot spec (§7.1)
 # --------------------------------------------------------------------------- #

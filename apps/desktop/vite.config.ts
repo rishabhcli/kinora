@@ -10,7 +10,11 @@ import path from "path";
 //   injected polyfill is dead weight here.
 // - manualChunks: keep react/framer-motion in long-lived vendor chunks (good cache hit rate); the
 //   7 page screens are already React.lazy split. See coordination/PERF.md for measured bundle deltas.
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // base "./" for `vite build`: Electron loads the renderer via loadFile() over file://,
+  // where Vite's default absolute base ("/assets/…") 404s and the app renders blank.
+  // A relative base resolves assets next to index.html. Dev (served over http) keeps "/".
+  base: command === "build" ? "./" : "/",
   plugins: [react()],
   resolve: {
     alias: {
@@ -33,4 +37,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

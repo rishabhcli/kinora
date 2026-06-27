@@ -84,13 +84,16 @@ class BaseAgent:
         temperature: float | None = None,
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
+        system: str | None = None,
     ) -> TModel:
         """Run a JSON-strict text completion and validate it into ``response_model``.
 
         On a Pydantic validation error, a single repair round-trip is attempted;
-        a second failure propagates.
+        a second failure propagates. ``system`` overrides the agent's bound system
+        prompt for this call only (so one agent can run a second task with a
+        different prompt — e.g. the Cinematographer's long-form segment prompt).
         """
-        messages = self._messages(payload)
+        messages = self._messages(payload, system=system)
         before = self._token_total()
         raw = await self._providers.chat.chat_json(
             messages, self.model, temperature=temperature, max_tokens=max_tokens, tools=tools
@@ -183,9 +186,9 @@ class BaseAgent:
 
     # -- internals ----------------------------------------------------------- #
 
-    def _messages(self, payload: Payload) -> list[dict[str, Any]]:
+    def _messages(self, payload: Payload, *, system: str | None = None) -> list[dict[str, Any]]:
         return [
-            {"role": "system", "content": self.prompt.system},
+            {"role": "system", "content": system or self.prompt.system},
             {"role": "user", "content": self._user_content(payload)},
         ]
 

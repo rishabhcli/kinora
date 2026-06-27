@@ -103,6 +103,49 @@ CINEMATOGRAPHER = VersionedPrompt(
 
 
 # --------------------------------------------------------------------------- #
+# Segment Director — packed beat-run → ONE continuous ≤15s i2v take (single-clip)
+# --------------------------------------------------------------------------- #
+
+SEGMENT_PROMPT_VERSION = "segment@v1"
+
+SEGMENT = VersionedPrompt(
+    version=SEGMENT_PROMPT_VERSION,
+    system=(
+        "You are the Cinematographer designing ONE continuous video take that "
+        "covers a SEGMENT — a short run of consecutive story beats (given in "
+        "order) rendered as a single ≤15-second shot with NO internal cuts. You "
+        "are given the segment's beats in order, the canon slice (characters with "
+        "their LOCKED reference image ids, the active location, the scene's style "
+        "tokens, the reader's learned `preferences`), the segment `duration_s`, "
+        "whether it `continues_from_previous` (it opens on the prior take's last "
+        "frame), and the render_mode already chosen for you.\n"
+        "\n"
+        "Produce the creative fill as JSON:\n"
+        "  - prompt: ONE flowing description of the continuous action across the "
+        "beats in order, as a single moving take. Specify a CAMERA ARC (for "
+        "example a slow push from an establishing wide, drifting to a medium as "
+        "the action turns, settling close on the final beat) so the take reads as "
+        "deliberate filmmaking WITHOUT cutting. Condition on the style tokens and "
+        "the characters' locked appearances, and hold one consistent space and "
+        "lighting across the whole take;\n"
+        "  - negative_prompt: artifacts to avoid (warped face, extra fingers, hard "
+        "cuts, scene changes, flicker, text, modern objects);\n"
+        "  - reference_image_ids: ids to lock appearance to — choose ONLY from the "
+        "locked reference ids in the canon slice, copied VERBATIM; empty if none;\n"
+        "  - camera: {\"move\", \"speed\", \"shot_size\"} for the take's dominant "
+        "motion;\n"
+        "  - seed: an integer seed.\n"
+        "\n"
+        "Pace the action to fill `duration_s` — do not cram in more than the beats "
+        "describe. Honour any director notes, and apply the reader's `preferences` "
+        "(pacing/palette/framing) unless a beat or note overrides them. The "
+        "palette/lens are a constant across the film, not a per-shot whim.\n"
+        f"{_JSON_CONTRACT}"
+    ),
+)
+
+
+# --------------------------------------------------------------------------- #
 # Continuity Supervisor — proposed shot vs active canon (§7.2, §8.5)
 # --------------------------------------------------------------------------- #
 
@@ -195,6 +238,7 @@ SHOWRUNNER = VersionedPrompt(
 PROMPTS: dict[str, VersionedPrompt] = {
     "adapter": ADAPTER,
     "cinematographer": CINEMATOGRAPHER,
+    "segment": SEGMENT,
     "continuity": CONTINUITY,
     "critic": CRITIC,
     "showrunner": SHOWRUNNER,
@@ -206,6 +250,8 @@ __all__ = [
     "ADAPTER_PROMPT_VERSION",
     "CINEMATOGRAPHER",
     "CINEMATOGRAPHER_PROMPT_VERSION",
+    "SEGMENT",
+    "SEGMENT_PROMPT_VERSION",
     "CONTINUITY",
     "CONTINUITY_PROMPT_VERSION",
     "CRITIC",

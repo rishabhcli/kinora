@@ -61,6 +61,22 @@ async def test_run_json_propagates_second_validation_failure(providers: Provider
     assert seq.calls == 2
 
 
+async def test_run_json_uses_system_override_when_given(providers: Providers) -> None:  # noqa: F811
+    """A per-call ``system`` override replaces the agent's bound prompt — lets one
+    agent run a second task (e.g. the Cinematographer's long-form segment prompt)
+    without a separate class."""
+    captured: dict[str, str] = {}
+
+    async def recording_chat_json(messages, model, **kwargs):  # type: ignore[no-untyped-def]
+        captured["system"] = messages[0]["content"]
+        return {"x": 5}
+
+    providers.chat.chat_json = recording_chat_json  # type: ignore[method-assign]
+    out = await _agent(providers).run_json({}, Out, system="SEGMENT SYSTEM PROMPT")
+    assert out == Out(x=5)
+    assert captured["system"] == "SEGMENT SYSTEM PROMPT"  # the override, not PROMPT.system
+
+
 async def test_run_json_vl_validates_multimodal_reply(providers: Providers) -> None:  # noqa: F811
     seq = JsonSequencer({"x": 3})
     providers.vl.analyze_json = seq  # type: ignore[method-assign]

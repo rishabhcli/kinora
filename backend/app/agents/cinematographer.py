@@ -10,6 +10,7 @@ ids are dropped (the appearance is pinned to the canon, not re-imagined).
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.core.config import Settings, get_settings
@@ -30,9 +31,10 @@ from .contracts import (
     CinematographerFill,
     DirectorNote,
     RenderMode,
+    Segment,
     ShotSpec,
 )
-from .prompts import CINEMATOGRAPHER
+from .prompts import CINEMATOGRAPHER, SEGMENT
 
 #: Director-note cues that demand the shot land on an exact composition (→ FLF).
 _POSE_CUES = ("pose", "land on", "end on", "final frame", "freeze", "compose on")
@@ -172,6 +174,73 @@ class Cinematographer(BaseAgent):
             camera=camera,
             seed=fill.seed if fill.seed is not None else _stable_seed(beat.beat_id or "beat"),
             target_duration_s=target_duration_s,
+            end_frame_ref=None,
+        )
+
+    async def design_segment(
+        self,
+        segment: Segment,
+        beats: Sequence[Beat],
+        canon_slice: CanonSlice,
+        director_notes: list[DirectorNote] | None = None,
+        *,
+        continues_from_previous: bool = False,
+        priors: PreferencePriors | None = None,
+    ) -> ShotSpec:
+        """Design ONE continuous ≤15s take for a packed ``segment`` (the single-clip overhaul).
+
+        Unlike :meth:`design_shot`, a segment spans several beats rendered as a
+        single seam-free i2v take: the render mode is reference/continuation (or
+        text-to-video when no character is present), never a pose-landing
+        first/last-frame, and the clip's duration is the segment's packed length
+        (≤15s). The model is driven by the long-form ``segment@v1`` prompt and
+        selects locked references verbatim. ``continues_from_previous`` marks a
+        segment that opens on the prior segment's last frame (within-scene chain).
+        """
+        notes = director_notes or []
+        has_character = bool(canon_slice.characters)
+        anchored = continues_from_previous or canon_slice.previous_endpoint is not None
+        inputs = RenderModeInputs(
+            locked_character_present=any(_has_locked_ref(c) for c in canon_slice.characters),
+            needs_motion=True,
+            must_land_exact_pose=False,  # a segment is a continuous take, not a pose landing
+            prev_shot_accepted_continuous=anchored,
+            is_establishing_no_character=not has_character,
+            minor_edit_on_accepted_clip=False,
+        )
+        mode = decide_render_mode(inputs)
+        candidates = locked_reference_ids(canon_slice)
+
+        payload = {
+            "segment_id": segment.segment_id,
+            "duration_s": segment.duration_s,
+            "render_mode": mode.value,
+            "continues_from_previous": anchored,
+            "beats": [
+                {"summary": b.summary, "described_visuals": b.described_visuals, "mood": b.mood}
+                for b in beats
+            ],
+            "style_tokens": canon_slice.style.style_tokens if canon_slice.style else None,
+            "locked_reference_ids": candidates,
+            "director_notes": [n.model_dump(mode="json") for n in notes],
+            "preferences": preferences_payload(priors) or None,
+        }
+        fill = await self.run_json(
+            payload, CinematographerFill, temperature=0.4, system=SEGMENT.system
+        )
+        camera, prompt = self._apply_priors(fill.camera, fill.prompt, priors, notes)
+
+        return ShotSpec(
+            shot_id=segment.segment_id,
+            beat_id=beats[0].beat_id if beats else None,
+            scene_id=beats[0].scene_id if beats else None,
+            render_mode=mode,
+            prompt=prompt,
+            negative_prompt=fill.negative_prompt,
+            reference_image_ids=self._select_refs(mode, fill.reference_image_ids, candidates),
+            camera=camera,
+            seed=fill.seed if fill.seed is not None else _stable_seed(segment.segment_id),
+            target_duration_s=segment.duration_s,
             end_frame_ref=None,
         )
 

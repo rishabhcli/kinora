@@ -174,6 +174,52 @@ def test_plan_event_script_first_shot_continues_from_prior_event_endpoint() -> N
     assert script.shots[0].directive.last_frame_key == "lastframes/book_demo/shot_prev.png"
 
 
+def test_plan_segment_script_packs_beats_into_le15s_segments() -> None:
+    """The single-clip planner packs consecutive beats into ≤15s segments (one
+    EventShot per segment), chaining a continuation off each segment's last frame —
+    the bridge's b0+b1 share page 12 (one take), b2 on page 13 opens the next."""
+    from app.render.event_director import plan_segment_script
+
+    script = plan_segment_script(
+        event_id="evt_seg",
+        book_id="book_demo",
+        scene_id="scene_005",
+        beats=_bridge_beats(),
+        canon=make_slice(),  # one locked-reference character
+    )
+    assert [s.ordinal for s in script.shots] == [0, 1]
+    assert [s.shot_id for s in script.shots] == ["scene_005_seg_00", "scene_005_seg_01"]
+    assert all(s.duration_s <= 15.0 for s in script.shots)
+    # One continuous take establishes; the next continues from its last frame.
+    assert script.shots[0].render_mode == RenderMode.REFERENCE_TO_VIDEO
+    assert script.shots[1].render_mode == RenderMode.VIDEO_CONTINUATION
+    assert script.shots[1].directive.continues_from_shot_id == "scene_005_seg_00"
+    assert (
+        script.shots[1].directive.last_frame_key == "lastframes/book_demo/scene_005_seg_00.png"
+    )
+    # The first segment's prompt material spans BOTH its packed beats.
+    assert "bridge" in script.shots[0].summary and "sprints" in script.shots[0].summary
+
+
+def test_plan_segment_script_one_segment_when_scene_fits_in_15s() -> None:
+    """A short same-page scene becomes ONE ≤15s take — no stitch needed."""
+    from app.render.event_director import plan_segment_script
+
+    beats = [
+        Beat(
+            beat_id=f"b{i}",
+            scene_id="s",
+            beat_index=i,
+            summary="short",
+            source_span=SourceSpan(page=1, word_range=(i * 5, i * 5 + 5)),
+        )
+        for i in range(2)
+    ]
+    script = plan_segment_script(event_id="e", book_id="bk", scene_id="s", beats=beats)
+    assert len(script.shots) == 1
+    assert script.shots[0].duration_s <= 15.0
+
+
 def test_plan_event_script_caps_shots_at_max() -> None:
     beats = [
         Beat(beat_id=f"b{i}", scene_id="s", beat_index=i, summary=f"beat {i}") for i in range(9)
