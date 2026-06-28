@@ -29,6 +29,12 @@ from app.db.models.enums import (
     SessionMode,
     ShotStatus,
 )
+from app.db.models.llmops import (
+    LLMOpsChangelog,
+    LLMOpsEvalReport,
+    LLMOpsPromptVersion,
+    LLMOpsRun,
+)
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -52,6 +58,10 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "LLMOpsChangelog",
+    "LLMOpsEvalReport",
+    "LLMOpsPromptVersion",
+    "LLMOpsRun",
     "Page",
     "Pref",
     "RenderJob",

@@ -151,6 +151,26 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # --- LLM-ops / prompt registry (app.llmops; additive, safe defaults) ---
+    # The LLM-ops platform (versioned prompt registry, eval/A-B harness,
+    # injection/jailbreak defense, model registry, run tracing, response cache)
+    # is read-only-by-default and seeds itself from app.agents.prompts without
+    # editing them. All settings default to a conservative, offline posture.
+    #
+    #: Master switch for the /api/llmops surface. OFF keeps the API unchanged.
+    llmops_enabled: bool = False
+    #: Always sanitize untrusted input text (fence it as data) — defense in depth.
+    llmops_guardrail_always_sanitize: bool = True
+    #: Injection score at/above which an input is BLOCKED (vs merely sanitized).
+    llmops_injection_block_score: float = 0.85
+    #: Response-cache TTL (seconds) and max in-memory entries.
+    llmops_cache_ttl_s: float = 3600.0
+    llmops_cache_max_entries: int = 2048
+    #: In-memory run-trace ring-buffer capacity (per process).
+    llmops_trace_capacity: int = 10_000
+    #: Default number of eval/A-B runs (the §13 "mean + spread over N" knob).
+    llmops_eval_runs: int = 3
+
     @property
     def is_local(self) -> bool:
         """True when running in the local development environment."""

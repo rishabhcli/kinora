@@ -9,6 +9,7 @@ from app.api.routes import (
     events,
     films,
     library,
+    llmops,
     metrics,
     optim,
     prefs,
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    llmops.router,  # LLM-ops surface (prompt registry/eval/guardrails); 404 unless llmops_enabled
 ]
 
 __all__ = ["ROUTERS"]
