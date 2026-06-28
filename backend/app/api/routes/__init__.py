@@ -19,6 +19,7 @@ from app.api.routes import (
     metrics,
     notifications,
     optim,
+    portability,
     prefs,
     recommendations,
     reports,
@@ -65,6 +66,7 @@ ROUTERS = [
     moderation_router,  # content moderation & safety (§9/§10)
     compliance_router,  # /compliance: consent, retention, DSAR, holds, ledger, report
     llmops.router,  # LLM-ops surface (prompt registry/eval/guardrails); 404 unless llmops_enabled
+    portability.router,  # data export/import & portability (book/canon/account/backup)
 ]
 
 
