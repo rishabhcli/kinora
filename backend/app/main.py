@@ -125,6 +125,11 @@ def create_app() -> FastAPI:
         sweeper: asyncio.Task[None] | None = None
         if getattr(app.state, "run_idle_sweeper", True):
             sweeper = asyncio.create_task(_idle_sweeper(container, stop))
+            # The notifications bridge is background work too: gate it the same way
+            # so tests that disable background tasks never start it (keeps the
+            # timing-sensitive worker/pubsub tests isolated).
+            with contextlib.suppress(Exception):
+                container.start_notification_bridge()
         try:
             yield
         finally:

@@ -29,6 +29,14 @@ from app.db.models.enums import (
     SessionMode,
     ShotStatus,
 )
+from app.db.models.notification import (
+    NotificationDeadLetter,
+    NotificationDelivery,
+    NotificationInbox,
+    NotificationOutbox,
+    NotificationPreference,
+    WebhookEndpointRow,
+)
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -52,9 +60,15 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "NotificationDeadLetter",
+    "NotificationDelivery",
+    "NotificationInbox",
+    "NotificationOutbox",
+    "NotificationPreference",
     "Page",
     "Pref",
     "RenderJob",
+    "WebhookEndpointRow",
     "RenderJobStatus",
     "RenderPriority",
     "Scene",

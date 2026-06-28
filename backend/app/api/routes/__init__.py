@@ -10,6 +10,7 @@ from app.api.routes import (
     films,
     library,
     metrics,
+    notifications,
     optim,
     prefs,
     sessions,
@@ -26,6 +27,7 @@ ROUTERS = [
     prefs.router,
     events.router,
     metrics.router,
+    notifications.router,  # notifications & webhooks platform (§5/§12)
     optim.router,
 ]
 
