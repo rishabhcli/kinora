@@ -75,8 +75,120 @@ class RenderMode(StrEnum):
 
 
 # --------------------------------------------------------------------------- #
-# Adapter — beats & the shot list (§4.2, §10)
+# Adapter — deep literary comprehension (§4.2, §10)
 # --------------------------------------------------------------------------- #
+
+
+class NarrativePerson(StrEnum):
+    """Grammatical/narratorial person of a beat's telling (POV analysis, §10).
+
+    The Adapter's literary-comprehension pass tags each beat with the *voice*
+    that narrates it so multi-POV books render from the right vantage and an
+    unreliable narrator can be flagged downstream rather than taken at face value.
+    """
+
+    FIRST = "first"
+    SECOND = "second"
+    THIRD_LIMITED = "third_limited"
+    THIRD_OMNISCIENT = "third_omniscient"
+    UNKNOWN = "unknown"
+
+
+class DiscourseMode(StrEnum):
+    """How a beat's content reaches the reader — the surface vs. the interior.
+
+    ``free_indirect`` is the literary middle ground (the narrator's third person
+    coloured by a character's diction/feeling); the Adapter detects it so a beat
+    of pure interiority is rendered as subjective imagery, not a literal action.
+    """
+
+    NARRATION = "narration"
+    DIALOGUE = "dialogue"
+    INTERIOR_MONOLOGUE = "interior_monologue"
+    FREE_INDIRECT = "free_indirect"
+
+
+class SceneTempo(StrEnum):
+    """The pacing of a beat's moment — drives pacing-aware shot density (§4.2).
+
+    Tempo is the multiplier on how many shots a beat earns: a ``scene`` (real-time
+    dramatised action / dialogue) gets denser coverage than ``summary`` (narrative
+    compression of long spans) so the edit breathes with the prose's own rhythm.
+    """
+
+    PAUSE = "pause"  # description / stillness — held, sparse coverage
+    SCENE = "scene"  # dramatised real-time action — dense coverage
+    SUMMARY = "summary"  # compressed narration of long spans — sparse
+    ELLIPSIS = "ellipsis"  # a jump/gap in time — a single transition shot
+
+
+class TimePosition(StrEnum):
+    """Where a beat sits on the STORY timeline relative to the narration (§4.2).
+
+    Narrative-time (the order words appear on the page) is separated from
+    story-time (chronological order of events) so flashbacks/flash-forwards are
+    reconstructed into the order events actually happen, while the source-span
+    index still keys off narrative-time for scroll-sync.
+    """
+
+    PRESENT = "present"  # on the main narrative now-line
+    FLASHBACK = "flashback"  # an earlier story moment told later
+    FLASHFORWARD = "flashforward"  # a later story moment told earlier
+    TIMELESS = "timeless"  # habitual / gnomic / out of sequence
+
+
+class DialogueLine(BaseModel):
+    """One attributed line of speech within a beat (speaker diarization, §10).
+
+    ``speaker`` is a name the Adapter resolved from the dialogue tag or nearby
+    context; it is left empty when unattributable rather than guessed (the §10
+    no-invent guardrail extends to attribution).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    speaker: str = ""
+    quote: str
+    #: True when the speaker was inferred from context, not an explicit "X said".
+    inferred: bool = False
+
+
+class LiteraryDevice(BaseModel):
+    """A figure of speech detected in a beat and its translation to shot intent.
+
+    The §10 pipeline turns metaphor/simile/symbolism into concrete *visual*
+    intent (``visual_intent``) so the Cinematographer can stage the image the
+    prose evokes — e.g. "her grief was a stone" → a literal weight/sinking motif —
+    without the Adapter inventing entities the canon does not know.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    kind: str  # metaphor | simile | symbol | personification | imagery | irony
+    text: str  # the source phrase the device occupies
+    tenor: str = ""  # what the figure is really about
+    vehicle: str = ""  # the image it is expressed through
+    visual_intent: str = ""  # the concrete thing to show on screen
+
+
+class StoryTime(BaseModel):
+    """A beat's position on the reconstructed STORY timeline (non-linear, §4.2).
+
+    ``order`` is the chronological rank used to render flashbacks/flash-forwards
+    in story order; ``narrative_order`` is the beat's position in the text (the
+    scroll-sync key). They differ exactly when the prose tells events out of
+    sequence. ``marker`` keeps the verbatim cue ("years before", "that morning").
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    position: TimePosition = TimePosition.PRESENT
+    #: Chronological rank among beats (lower = earlier in story-time).
+    order: int = 0
+    #: Position in the narration as read (mirrors ``Beat.beat_index``).
+    narrative_order: int = 0
+    #: The verbatim temporal cue the classifier keyed on, if any.
+    marker: str | None = None
 
 
 class Beat(BaseModel):
@@ -85,6 +197,10 @@ class Beat(BaseModel):
     ``entities`` are canon names the Adapter could resolve from the text; an
     entity it is unsure about is flagged ``unresolved`` (the Adapter never
     invents a character, per the §10 guardrail).
+
+    The deep-comprehension fields below are all OPTIONAL and default to a neutral
+    value, so a beat produced by the legacy single-pass path is still valid; the
+    literary-comprehension pass (:mod:`app.agents.comprehension`) fills them.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -100,6 +216,57 @@ class Beat(BaseModel):
     mood: str | None = None
     source_span: SourceSpan = Field(default_factory=SourceSpan)
 
+    # -- deep literary comprehension (all additive, default-neutral) --------- #
+    #: The narrating voice (multi-POV / unreliable-narrator handling).
+    pov: NarrativePerson = NarrativePerson.UNKNOWN
+    #: The point-of-view character whose vantage the beat is told from, if any.
+    pov_character: str | None = None
+    #: Whether this beat's telling is flagged unreliable (irony, deception, bias).
+    unreliable: bool = False
+    #: How the content reaches the reader (narration / dialogue / interiority).
+    discourse: DiscourseMode = DiscourseMode.NARRATION
+    #: Verbatim or paraphrased interior content when the beat is interiority.
+    interiority: str | None = None
+    #: Attributed lines of speech within the beat (speaker diarization).
+    dialogue: list[DialogueLine] = Field(default_factory=list)
+    #: Figures of speech translated to concrete visual intent.
+    devices: list[LiteraryDevice] = Field(default_factory=list)
+    #: The pacing of the moment — drives pacing-aware shot density.
+    tempo: SceneTempo = SceneTempo.SCENE
+    #: Position on the reconstructed story timeline (non-linear ordering).
+    story_time: StoryTime = Field(default_factory=StoryTime)
+
+
+class ShotIntent(BaseModel):
+    """The comprehension-derived staging brief for a beat (Adapter → Cinematographer).
+
+    A structured distillation of a beat's deep comprehension into directing
+    guidance the Cinematographer conditions on: whether to stage the shot
+    literally or as a SUBJECTIVE/POV image (interiority / free-indirect / an
+    unreliable narrator), whose vantage to shoot from, the figures of speech to
+    realise visually, the speakers in frame, and a pacing hint. It carries no
+    invented entities — every name is one comprehension resolved from the text
+    (the §10 guardrail). All fields are optional/neutral so an un-comprehended
+    beat yields an empty (harmless) intent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Stage as the character's inner view rather than a literal exterior action.
+    subjective: bool = False
+    #: The POV character whose vantage the shot adopts, if any.
+    pov_character: str | None = None
+    #: Treat depicted facts as a biased/coloured CLAIM (unreliable narrator).
+    unreliable: bool = False
+    #: Concrete visual instructions translated from the beat's literary devices.
+    visual_motifs: list[str] = Field(default_factory=list)
+    #: Distinct named speakers present in the beat's dialogue (in order).
+    speakers: list[str] = Field(default_factory=list)
+    #: A short pacing hint ("held", "brisk", "single transition", …).
+    pacing: str = ""
+    #: A one-line natural-language brief assembled from the above.
+    brief: str = ""
+
 
 class ShotListItem(BaseModel):
     """One shot in the Adapter's decomposition: a ~5s clip with its source span."""
@@ -112,6 +279,8 @@ class ShotListItem(BaseModel):
     source_span: SourceSpan = Field(default_factory=SourceSpan)
     est_duration_s: float = 5.0
     est_cost: EstCost = Field(default_factory=EstCost)
+    #: Comprehension-derived staging brief for this shot's beat (may be empty).
+    intent: ShotIntent = Field(default_factory=lambda: ShotIntent())
 
 
 class Segment(BaseModel):
@@ -821,15 +990,19 @@ __all__ = [
     "ContinuityResult",
     "CrossVolumeConflict",
     "DecisionRecord",
+    "DialogueLine",
     "DirectorNote",
+    "DiscourseMode",
     "EstCost",
-    "EpisodeBoundary",
     "ActBoundary",
+    "EpisodeBoundary",
+    "LiteraryDevice",
+    "MonotonyRun",
     "Motif",
     "MotifCallback",
     "MotifKind",
     "MotifReport",
-    "MonotonyRun",
+    "NarrativePerson",
     "PacingCurve",
     "PacingReport",
     "PlanShotsResponse",
@@ -840,14 +1013,18 @@ __all__ = [
     "RelationshipKind",
     "RenderMode",
     "RepairAction",
+    "SceneTempo",
     "ScenePlan",
     "ScenePlanItem",
     "SeriesBible",
+    "ShotIntent",
     "ShotListItem",
     "ShotSpec",
     "SourceSpan",
+    "StoryTime",
     "TensionPoint",
     "TextualSupport",
+    "TimePosition",
     "Verdict",
     "Volume",
 ]

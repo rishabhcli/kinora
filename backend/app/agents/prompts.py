@@ -66,6 +66,46 @@ ADAPTER = VersionedPrompt(
 
 
 # --------------------------------------------------------------------------- #
+# Adapter — deep literary-comprehension refinement (§4.2, §10)
+# --------------------------------------------------------------------------- #
+
+ADAPTER_COMPREHEND_PROMPT_VERSION = "adapter_comprehend@v1"
+
+ADAPTER_COMPREHEND = VersionedPrompt(
+    version=ADAPTER_COMPREHEND_PROMPT_VERSION,
+    system=(
+        "You are a literary analyst refining a deterministic first pass over ONE "
+        "narrative beat. You are given the beat's text and a heuristic analysis "
+        "the system already computed; CORRECT it only where the text clearly "
+        "warrants, and return the SAME JSON shape:\n"
+        "  - pov: one of first | second | third_limited | third_omniscient | "
+        "unknown — the narrating voice;\n"
+        "  - pov_character: the point-of-view character's name when third_limited, "
+        "else null. Use ONLY a name present in the provided known_entities; never "
+        "invent one;\n"
+        "  - unreliable: true only if the telling is biased/ironic/deceptive/"
+        "self-doubting;\n"
+        "  - discourse: narration | dialogue | interior_monologue | free_indirect "
+        "— how the content reaches the reader (free_indirect = third-person "
+        "narration carrying a character's own diction/feeling without a 'she "
+        "thought' tag);\n"
+        "  - tempo: pause | scene | summary | ellipsis — the pacing of the moment;\n"
+        "  - dialogue: [{\"speaker\", \"quote\", \"inferred\"}] — attribute each "
+        "quoted line; leave speaker \"\" if unattributable. Speakers MUST be in "
+        "known_entities or empty;\n"
+        "  - devices: [{\"kind\", \"text\", \"tenor\", \"vehicle\", "
+        "\"visual_intent\"}] — figures of speech translated to a CONCRETE thing to "
+        "show on screen. visual_intent is a staging instruction, NOT a new "
+        "character or prop.\n"
+        "\n"
+        "Be conservative: keep the heuristic value unless the text plainly "
+        "disagrees. Never invent entities (the §10 guardrail). Answer directly.\n"
+        f"{_JSON_CONTRACT}"
+    ),
+)
+
+
+# --------------------------------------------------------------------------- #
 # Cinematographer — beat + canon slice → shot spec (§7.1, §9.3, §10)
 # --------------------------------------------------------------------------- #
 
@@ -299,6 +339,7 @@ SERIES = VersionedPrompt(
 #: Registry of every agent prompt by a short key (for inspection / logging).
 PROMPTS: dict[str, VersionedPrompt] = {
     "adapter": ADAPTER,
+    "adapter_comprehend": ADAPTER_COMPREHEND,
     "cinematographer": CINEMATOGRAPHER,
     "segment": SEGMENT,
     "continuity": CONTINUITY,
@@ -310,6 +351,8 @@ PROMPTS: dict[str, VersionedPrompt] = {
 
 __all__ = [
     "ADAPTER",
+    "ADAPTER_COMPREHEND",
+    "ADAPTER_COMPREHEND_PROMPT_VERSION",
     "ADAPTER_PROMPT_VERSION",
     "CINEMATOGRAPHER",
     "CINEMATOGRAPHER_PROMPT_VERSION",
