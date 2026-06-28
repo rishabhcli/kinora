@@ -49,6 +49,19 @@ from app.db.models.user import User
 # Base.metadata so Alembic autogenerate + create_all see it. Imported here rather
 # than in app.reports to keep the single table-registration entry point.
 from app.reports.db_model import ReportArtifact
+# Workspaces & teams subsystem (additive; registers its tables on Base.metadata).
+from app.workspaces.models import (
+    Collection,
+    CollectionItem,
+    Organization,
+    OwnershipTransfer,
+    ResourceShare,
+    Workspace,
+    WorkspaceActivity,
+    WorkspaceBook,
+    WorkspaceInvitation,
+    WorkspaceMember,
+)
 
 __all__ = [
     "AppConnection",
@@ -65,10 +78,19 @@ __all__ = [
     "CanonAudit",
     "CanonBranch",
     "ConnectionStatus",
+    "Collection",
+    "CollectionItem",
+    "ConnectionStatus",
     "ContinuityState",
     "Defect",
     "Entity",
     "EntityType",
+    "IngestCheckpoint",
+    "IngestMilestone",
+    "ImportedItem",
+    "JobRun",
+    "Organization",
+    "OwnershipTransfer",
     "IngestCheckpoint",
     "IngestMilestone",
     "ImportedItem",
@@ -80,6 +102,7 @@ __all__ = [
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
+    "ResourceShare",
     "Scene",
     "ScheduledJob",
     "Session",
@@ -89,4 +112,9 @@ __all__ = [
     "ShotStatus",
     "SourceSpanIndex",
     "User",
+    "Workspace",
+    "WorkspaceActivity",
+    "WorkspaceBook",
+    "WorkspaceInvitation",
+    "WorkspaceMember",
 ]

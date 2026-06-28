@@ -15,6 +15,7 @@ from app.api.routes import (
     prefs,
     reports,
     sessions,
+    workspaces,
 )
 
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
@@ -31,6 +32,7 @@ ROUTERS = [
     optim.router,
     reports.router,  # reports subsystem: document generation + signed retrieval
     integrations.router,  # third-party source import (app.integrations)
+    workspaces.router,  # Workspaces & teams: collaboration ownership (§5)
 ]
 
 __all__ = ["ROUTERS"]
