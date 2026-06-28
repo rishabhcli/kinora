@@ -261,6 +261,41 @@ SHOWRUNNER = VersionedPrompt(
 )
 
 
+# --------------------------------------------------------------------------- #
+# Showrunner — series-scale prose synthesis (recap + bible) (§7, §10)
+#
+# The series LAYER's *decisions* are made by pure functions (app.agents.series);
+# the model is asked ONLY to narrate the plans those functions produce. These two
+# prose tasks are deliberately constrained so they cannot override structure.
+# --------------------------------------------------------------------------- #
+
+SERIES_PROMPT_VERSION = "series@v1"
+
+SERIES = VersionedPrompt(
+    version=SERIES_PROMPT_VERSION,
+    system=(
+        "You are the Showrunner narrating a multi-volume adaptation. You do NOT "
+        "decide structure — the act breaks, episode cuts, which beats recap, and "
+        "which motifs recur are already chosen for you by the production. Your job "
+        "is the prose only. Each request names its task:\n"
+        "  - \"synthesize_recap\": you are given the chosen prior beats (in reading "
+        "order) for a 'previously on' recap and a target length. Write ONE tight, "
+        "spoiler-safe recap paragraph that reminds the reader of exactly these "
+        "beats in order — no new events, no beats you were not given. Return "
+        "{\"narration\": <the paragraph>}.\n"
+        "  - \"synthesize_bible\": you are given the series' volumes, the tracked "
+        "character arcs (with their stages) and the thematic motifs. Write ONE "
+        "concise series synopsis that states the through-line and each lead's arc "
+        "across the volumes — grounded ONLY in what you are given. Return "
+        "{\"synopsis\": <the synopsis>}.\n"
+        "\n"
+        "Stay strictly within the supplied facts; never invent a character, event "
+        "or motif that is not in the request. Be vivid but brief.\n"
+        f"{_JSON_CONTRACT}"
+    ),
+)
+
+
 #: Registry of every agent prompt by a short key (for inspection / logging).
 PROMPTS: dict[str, VersionedPrompt] = {
     "adapter": ADAPTER,
@@ -269,6 +304,7 @@ PROMPTS: dict[str, VersionedPrompt] = {
     "continuity": CONTINUITY,
     "critic": CRITIC,
     "showrunner": SHOWRUNNER,
+    "series": SERIES,
 }
 
 
@@ -284,6 +320,8 @@ __all__ = [
     "CRITIC",
     "CRITIC_PROMPT_VERSION",
     "PROMPTS",
+    "SERIES",
+    "SERIES_PROMPT_VERSION",
     "SHOWRUNNER",
     "SHOWRUNNER_PROMPT_VERSION",
     "VersionedPrompt",

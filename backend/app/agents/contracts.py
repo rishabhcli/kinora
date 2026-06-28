@@ -241,7 +241,13 @@ class ConflictObject(BaseModel):
 
 
 class DecisionRecord(BaseModel):
-    """The Showrunner's resolution of a conflict, written to episodic memory (§7.2)."""
+    """The Showrunner's resolution of a conflict, written to episodic memory (§7.2).
+
+    ``recommended_option`` / ``scores`` are additive, optional fields populated by
+    the series-scale weighed arbitration (:mod:`app.agents.series.arbitration`).
+    They are *advisory*: the §7.2 hard gate still owns ``chosen_option``. Older
+    callers that never set them serialize identically to before.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -249,6 +255,8 @@ class DecisionRecord(BaseModel):
     chosen_option: ConflictOption
     reasoning: str
     evolved_canon: bool = False
+    recommended_option: ConflictOption | None = None
+    scores: dict[str, float] = Field(default_factory=dict)
 
 
 class ContinuityResult(BaseModel):
@@ -306,6 +314,392 @@ class QARecord(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Series-scale showrunning — cross-book canon, arcs, pacing, structure (§7, §8)
+#
+# The single-book contracts above describe one volume. The models below let the
+# Showrunner reason about a *series*: multiple volumes that share characters,
+# relationships, themes and a continuity that must hold across books. Everything
+# here is additive and design-time — the per-book canon graph (§8.1) and episodic
+# store (§8.2) remain the source of truth for entity state; the series layer is a
+# thin cross-book *index* and a set of read models computed from structured plan
+# signals (no new ingest). The decisions over these models live in
+# :mod:`app.agents.series` as pure functions, mirroring :func:`decide_arbitration`.
+# --------------------------------------------------------------------------- #
+
+
+class ArcStage(StrEnum):
+    """Where a character/relationship sits in its dramatic arc (§7).
+
+    The ordering is monotone: an arc advances forward through these stages over
+    the course of a series. ``intensity`` (carried on :class:`ArcBeat`) captures
+    the magnitude within a stage; the stage captures the *shape*.
+    """
+
+    SETUP = "setup"
+    RISING = "rising"
+    TURN = "turn"
+    CLIMAX = "climax"
+    FALLING = "falling"
+    RESOLUTION = "resolution"
+
+
+#: Canonical forward ordering of :class:`ArcStage` (index = progression rank).
+ARC_STAGE_ORDER: tuple[ArcStage, ...] = (
+    ArcStage.SETUP,
+    ArcStage.RISING,
+    ArcStage.TURN,
+    ArcStage.CLIMAX,
+    ArcStage.FALLING,
+    ArcStage.RESOLUTION,
+)
+
+
+class RelationshipKind(StrEnum):
+    """The character-pair relationship kinds the series layer tracks (§7)."""
+
+    ALLY = "ally"
+    RIVAL = "rival"
+    FAMILY = "family"
+    ROMANTIC = "romantic"
+    MENTOR = "mentor"
+    ENEMY = "enemy"
+    NEUTRAL = "neutral"
+
+
+class Volume(BaseModel):
+    """One book within a series; ties a series position to a canon ``book_id``.
+
+    The series is an ordered list of volumes. ``book_id`` is the per-book canon's
+    id (§8.1) when the volume has been ingested; it is ``None`` for a volume that
+    is planned but not yet imported.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    volume_index: int
+    title: str | None = None
+    book_id: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    beat_count: int = 0
+    synopsis: str = ""
+
+
+class ArcBeat(BaseModel):
+    """A single sampled point on a character's (or relationship's) arc (§7).
+
+    ``intensity`` is a 0..1 magnitude of dramatic charge at this beat; ``stage``
+    is the arc stage it belongs to. The series-position key is
+    ``(volume_index, beat_index)`` so points sort across volumes the way the
+    source-span index sorts within a book (§4.2).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    volume_index: int = 0
+    beat_index: int = 0
+    stage: ArcStage = ArcStage.SETUP
+    intensity: float = 0.0
+    summary: str = ""
+    source_span: SourceSpan = Field(default_factory=SourceSpan)
+
+
+class ArcState(BaseModel):
+    """The *resolved* arc-state at a series position — the read model (§8.5).
+
+    Like a continuity state resolved "as of" a beat (§8.5 forgetting), an arc
+    resolved at ``(volume, beat)`` reflects only the beats up to that point, so a
+    time-travel read (the reader scrolls back) sees the arc as it stood then.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage: ArcStage = ArcStage.SETUP
+    intensity: float = 0.0
+    last_volume: int = 0
+    last_beat: int = 0
+    beats_seen: int = 0
+
+
+class CharacterArc(BaseModel):
+    """A character's evolving arc across the volumes of a series (§7)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    entity_key: str
+    name: str = ""
+    beats: list[ArcBeat] = Field(default_factory=list)
+    spanned_volumes: list[int] = Field(default_factory=list)
+
+
+class RelationshipArc(BaseModel):
+    """A relationship's trajectory between two characters across volumes (§7).
+
+    ``entity_keys`` is the unordered pair (sorted on construction so a relation is
+    keyed canonically). ``kind`` is its dominant flavour; the ``beats`` carry the
+    evolving intensity (e.g. allies drifting into rivals).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    entity_keys: tuple[str, str]
+    kind: RelationshipKind = RelationshipKind.NEUTRAL
+    beats: list[ArcBeat] = Field(default_factory=list)
+    spanned_volumes: list[int] = Field(default_factory=list)
+
+
+class MotifKind(StrEnum):
+    """How a motif recurs at a given callback point (§7 thematic planning)."""
+
+    PLANT = "plant"
+    ECHO = "echo"
+    PAYOFF = "payoff"
+
+
+class Motif(BaseModel):
+    """A thematic motif and where it should recur across the series (§7).
+
+    A motif is *planted* once, *echoed* through the middle, and *paid off* near a
+    climax. ``payoff_volumes`` names the volumes whose climaxes should land the
+    motif; the scheduler (:mod:`app.agents.series.motifs`) turns this into
+    concrete :class:`MotifCallback` points.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    motif_id: str
+    label: str = ""
+    description: str = ""
+    planted_volume: int = 0
+    planted_beat: int = 0
+    payoff_volumes: list[int] = Field(default_factory=list)
+
+
+class MotifCallback(BaseModel):
+    """A scheduled recurrence of a motif at a concrete series position (§7)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    motif_id: str
+    kind: MotifKind
+    volume_index: int
+    beat_index: int
+    note: str = ""
+
+
+class TensionPoint(BaseModel):
+    """One sample of the narrative-tension curve at a series position (§7)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    volume_index: int = 0
+    beat_index: int = 0
+    tension: float = 0.0
+    source_span: SourceSpan = Field(default_factory=SourceSpan)
+
+
+class MonotonyRun(BaseModel):
+    """A flat stretch of the pacing curve (low tension variance) — what to fix."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start_index: int
+    end_index: int
+    mean_tension: float
+    length: int
+
+
+class PacingCurve(BaseModel):
+    """The narrative-tension/pacing curve the planner optimizes against (§7).
+
+    Derived stats are computed once by :func:`app.agents.series.pacing.tension_curve`
+    so consumers (the planner, the structure detector, the eval harness) read them
+    instead of recomputing: ``peak_index`` is the climax sample, ``mean_tension``
+    the average charge, ``monotony_runs`` the flat stretches that need a re-plan.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    points: list[TensionPoint] = Field(default_factory=list)
+    peak_index: int = 0
+    mean_tension: float = 0.0
+    monotony_runs: list[MonotonyRun] = Field(default_factory=list)
+
+
+class ActBoundary(BaseModel):
+    """A detected act break (or midpoint) within a volume (§7).
+
+    ``kind`` is ``act`` for a major structural break and ``midpoint`` for the
+    mid-act turn; ``tension_delta`` is the sustained tension change that marked it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    volume_index: int = 0
+    at_beat: int = 0
+    kind: str = "act"
+    tension_delta: float = 0.0
+
+
+class EpisodeBoundary(BaseModel):
+    """An episode (binge-unit) boundary cut from the pacing curve (§7).
+
+    Episodes end on a local tension peak so they close on a cliffhanger; the last
+    episode of a volume closes on its climax/resolution and is not a cliffhanger.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    episode_index: int
+    volume_index: int = 0
+    beat_start: int = 0
+    beat_end: int = 0
+    title: str | None = None
+    cliffhanger: bool = True
+    peak_tension: float = 0.0
+
+
+class RecapItem(BaseModel):
+    """One prior beat selected for a "previously on" recap (§7)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    volume_index: int
+    beat_index: int
+    summary: str = ""
+    weight: float = 0.0
+    est_seconds: float = 0.0
+    motif_ids: list[str] = Field(default_factory=list)
+
+
+class RecapSpec(BaseModel):
+    """The "previously on" plan for the start of a volume/episode (§7, §8.7).
+
+    The items are chosen under a video-second budget (§11); a recap reuses already
+    accepted clips from episodic memory (§8.2) so it costs near-zero new
+    video-seconds (§8.7). The Showrunner fills the narration prose over this plan.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    for_volume: int
+    items: list[RecapItem] = Field(default_factory=list)
+    total_target_s: float = 0.0
+    narration: str = ""
+
+
+class SeriesBible(BaseModel):
+    """The cross-book canon index for a whole series (§7, §8.1).
+
+    A thin index over the per-book canon: it references entity keys, never
+    duplicates appearance/state. It records what no single book's canon can — the
+    volume ordering, each character's and relationship's arc across volumes, and
+    the thematic motifs with their planned callbacks.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    series_id: str
+    title: str = ""
+    volumes: list[Volume] = Field(default_factory=list)
+    character_arcs: list[CharacterArc] = Field(default_factory=list)
+    relationship_arcs: list[RelationshipArc] = Field(default_factory=list)
+    motifs: list[Motif] = Field(default_factory=list)
+    synopsis: str = ""
+
+
+class ArbitrationContext(BaseModel):
+    """The richer signals the series-scale arbitration weighs (§7.2).
+
+    These extend the §7.2 policy *without replacing it*: the hard gate (no evolve
+    without textual support) is unchanged. When honor and surface both remain
+    eligible, these decide which better serves the series — a high
+    ``dramatic_stakes`` near a climax favours surfacing to the reader, a high
+    ``arc_continuity_weight`` favours honoring the established arc.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    arc_continuity_weight: float = 0.5
+    dramatic_stakes: float = 0.5
+    motif_payoff_pending: bool = False
+    in_climax: bool = False
+    spans_volumes: bool = False
+
+
+class ArbitrationDecision(BaseModel):
+    """A scored, explainable arbitration outcome (§7.2 series-scale).
+
+    A superset of :class:`DecisionRecord`'s decision fields: ``chosen_option`` is
+    still the §7.2-gated authoritative pick; ``recommended_option`` is what the
+    score favoured (it may match or, for honor-vs-surface, refine it); ``scores``
+    is the per-option weighing for transparency in the agent-activity feed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    conflict_id: str
+    chosen_option: ConflictOption
+    recommended_option: ConflictOption
+    evolved_canon: bool = False
+    scores: dict[str, float] = Field(default_factory=dict)
+    reasoning: str = ""
+
+
+class CrossVolumeConflict(BaseModel):
+    """A contradiction between a proposed beat and a *prior volume*'s canon (§7.2).
+
+    The cross-book counterpart of the per-book :class:`ConflictObject`: a Volume-3
+    depiction that violates an established Volume-1 fact. ``prior_volume_index``
+    cites the offending earlier volume so the Showrunner can weigh continuity.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    conflict_id: str
+    subject_entity_key: str
+    claim: str
+    prior_fact: str
+    prior_volume_index: int
+    current_volume_index: int
+    current_beat_index: int = 0
+
+
+class ArcCoherenceReport(BaseModel):
+    """§13 eval: does each tracked arc advance monotonically across the series."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    arcs_checked: int = 0
+    monotonic_arcs: int = 0
+    regressions: list[str] = Field(default_factory=list)
+    coherence: float = 1.0
+
+
+class PacingReport(BaseModel):
+    """§13 eval: pacing quality of a volume's curve."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    score: float = 0.0
+    mean_tension: float = 0.0
+    peak_position: float = 0.0
+    monotony_fraction: float = 0.0
+    longest_flat_run: int = 0
+
+
+class MotifReport(BaseModel):
+    """§13 eval: did every planted motif pay off across the series."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    motifs_checked: int = 0
+    paid_off: int = 0
+    unresolved: list[str] = Field(default_factory=list)
+    payoff_rate: float = 1.0
+
+
+# --------------------------------------------------------------------------- #
 # Per-agent request/response wrappers
 # --------------------------------------------------------------------------- #
 
@@ -339,7 +733,13 @@ class PlanShotsResponse(BaseModel):
 
 
 class ScenePlanItem(BaseModel):
-    """One scene in the Showrunner's high-level production plan."""
+    """One scene in the Showrunner's high-level production plan.
+
+    ``volume_index`` / ``act`` / ``tension`` are additive series-scale fields:
+    which volume the scene belongs to, the act it sits in (filled by the §7
+    structure detector), and its planned narrative tension (0..1). All default,
+    so a single-book plan is unchanged.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
@@ -349,14 +749,26 @@ class ScenePlanItem(BaseModel):
     page_start: int | None = None
     page_end: int | None = None
     key_entities: list[str] = Field(default_factory=list)
+    volume_index: int = 0
+    act: int | None = None
+    tension: float | None = None
 
 
 class ScenePlan(BaseModel):
-    """The Showrunner's decomposition of a book into scenes (§7)."""
+    """The Showrunner's decomposition of a book into scenes (§7).
+
+    ``series_id`` / ``volume_index`` / ``pacing_curve`` are additive series-scale
+    fields: the series this plan belongs to, the volume's position in it, and the
+    optimized pacing curve the planner produced. All default — a one-book plan
+    serializes exactly as before.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     scenes: list[ScenePlanItem] = Field(default_factory=list)
+    series_id: str | None = None
+    volume_index: int = 0
+    pacing_curve: PacingCurve | None = None
 
 
 class TextualSupport(BaseModel):
@@ -373,28 +785,53 @@ class TextualSupport(BaseModel):
 
 
 __all__ = [
+    "ARC_STAGE_ORDER",
     "AnalyzePageRequest",
     "AnalyzePageResponse",
+    "ArbitrationContext",
+    "ArbitrationDecision",
+    "ArcBeat",
+    "ArcCoherenceReport",
+    "ArcStage",
+    "ArcState",
     "Beat",
     "Camera",
+    "CharacterArc",
     "CinematographerFill",
     "ConflictObject",
     "ConflictOption",
     "ConflictOptionSpec",
     "ConflictType",
     "ContinuityResult",
+    "CrossVolumeConflict",
     "DecisionRecord",
     "DirectorNote",
     "EstCost",
+    "EpisodeBoundary",
+    "ActBoundary",
+    "Motif",
+    "MotifCallback",
+    "MotifKind",
+    "MotifReport",
+    "MonotonyRun",
+    "PacingCurve",
+    "PacingReport",
     "PlanShotsResponse",
     "QARecord",
+    "RecapItem",
+    "RecapSpec",
+    "RelationshipArc",
+    "RelationshipKind",
     "RenderMode",
     "RepairAction",
     "ScenePlan",
     "ScenePlanItem",
+    "SeriesBible",
     "ShotListItem",
     "ShotSpec",
     "SourceSpan",
+    "TensionPoint",
     "TextualSupport",
     "Verdict",
+    "Volume",
 ]
