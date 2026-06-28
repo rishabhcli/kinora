@@ -106,5 +106,16 @@
       "on": "Activado",
       "off": "Desactivado"
     }
+  },
+  "icu": {
+    "shotsRendered": "{count, plural, =0 {Aún no hay tomas} one {# toma renderizada} other {# tomas renderizadas}}",
+    "booksInLibrary": "{count, plural, one {{count} libro} other {{count} libros}} en tu biblioteca",
+    "readerGreeting": "{gender, select, female {Bienvenida de nuevo, está leyendo} male {Bienvenido de nuevo, está leyendo} other {Bienvenido de nuevo, están leyendo}}",
+    "addedOn": "Añadido el {date, date, long}",
+    "bufferAhead": "{seconds, number} segundos en búfer por delante",
+    "renderProgress": "{percent, number, percent} renderizado",
+    "creditsLeft": "{amount, number, ::currency/USD} de créditos restantes",
+    "lastOpened": "Abierto por última vez {when}",
+    "rankedNth": "Tu {n, selectordinal, other {#.º}} libro de este mes"
   }
 }
