@@ -8,6 +8,7 @@ from app.api.routes import (
     director,
     events,
     films,
+    integrations,
     library,
     metrics,
     optim,
@@ -29,6 +30,7 @@ ROUTERS = [
     metrics.router,
     optim.router,
     reports.router,  # reports subsystem: document generation + signed retrieval
+    integrations.router,  # third-party source import (app.integrations)
 ]
 
 __all__ = ["ROUTERS"]

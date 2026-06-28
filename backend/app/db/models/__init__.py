@@ -30,6 +30,13 @@ from app.db.models.enums import (
     ShotStatus,
 )
 from app.db.models.ingest_checkpoint import IngestCheckpoint, IngestMilestone
+from app.db.models.integration import (
+    AppConnection,
+    ConnectionStatus,
+    ImportedItem,
+    SyncRun,
+    SyncRunStatus,
+)
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -43,6 +50,7 @@ from app.db.models.user import User
 from app.reports.db_model import ReportArtifact
 
 __all__ = [
+    "AppConnection",
     "AuditAction",
     "Base",
     "ReportArtifact",
@@ -55,14 +63,18 @@ __all__ = [
     "BudgetLedger",
     "CanonAudit",
     "CanonBranch",
+    "ConnectionStatus",
     "ContinuityState",
     "Defect",
     "Entity",
     "EntityType",
     "IngestCheckpoint",
     "IngestMilestone",
+    "ImportedItem",
     "Page",
     "Pref",
+    "SyncRun",
+    "SyncRunStatus",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
