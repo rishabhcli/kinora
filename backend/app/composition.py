@@ -261,6 +261,11 @@ class Container:
     #: providers are unavailable). See :meth:`build_moderation`.
     moderation_factory: ModerationFactory | None = None
 
+    # Billing payment provider seam (additive). None => the in-memory fake
+    # transport is built lazily; tests can inject a fake with scripted failures.
+    # A real Stripe transport is NEVER wired here.
+    billing_provider: object | None = None
+
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
@@ -268,6 +273,7 @@ class Container:
     _integrations_http: HttpxClient | None = field(default=None, repr=False)
     _auth_service: AuthService | None = field(default=None, repr=False)
     _translation_provider: TranslationProvider | None = field(default=None, repr=False)
+    _billing_service: object | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -581,6 +587,63 @@ class Container:
             glossary=glossary if isinstance(glossary, Glossary) else None,
             memory=memory if isinstance(memory, TranslationMemory) else None,
             review_threshold=self.settings.translation_review_threshold,
+        )
+
+    # -- billing & payments (additive; commercial mirror of the §11 budget) -- #
+
+    def _build_billing_provider(self) -> object:
+        """The payment provider transport — ALWAYS the in-memory fake by default.
+
+        No real Stripe/network/payment call is ever made. The ``billing_provider``
+        seam lets tests inject a fake with scripted declines; production uses the
+        same fake transport (the Stripe shape exists but is intentionally unwired).
+        """
+        if self.billing_provider is not None:
+            return self.billing_provider
+        from app.billing.provider.base import ProviderConfig
+        from app.billing.provider.fake import FakePaymentProvider
+
+        self.billing_provider = FakePaymentProvider(
+            _config=ProviderConfig(
+                name="fake",
+                webhook_secret=self.settings.billing_webhook_secret,
+                webhook_tolerance_s=self.settings.billing_webhook_tolerance_s,
+            )
+        )
+        return self.billing_provider
+
+    @property
+    def billing_service(self) -> object:
+        """The :class:`app.billing.service.BillingService` (lazy, fake provider)."""
+        if self._billing_service is None:
+            from app.billing.service import BillingConfig, BillingService
+            from app.billing.tax import TaxRateResolver
+
+            retry_days = tuple(
+                int(p.strip())
+                for p in str(self.settings.billing_dunning_retry_days).split(",")
+                if p.strip()
+            ) or (1, 3, 5, 7)
+            self._billing_service = BillingService(
+                session_factory=self.session_factory,
+                provider=self._build_billing_provider(),  # type: ignore[arg-type]
+                config=BillingConfig(
+                    default_currency=self.settings.billing_default_currency,
+                    invoice_prefix=self.settings.billing_invoice_prefix,
+                    dunning_retry_days=retry_days,
+                    auto_charge_on_finalize=self.settings.billing_auto_charge_on_finalize,
+                ),
+                tax_resolver=TaxRateResolver.with_defaults(),
+            )
+        return self._billing_service
+
+    def build_billing_webhook_handler(self) -> object:
+        """Build the idempotent inbound-webhook handler over the fake provider."""
+        from app.billing.webhooks import WebhookHandler
+
+        return WebhookHandler(
+            service=self.billing_service,  # type: ignore[arg-type]
+            provider=self._build_billing_provider(),  # type: ignore[arg-type]
         )
 
     # -- per-request scheduler stack (bound to a request DB session) --------- #

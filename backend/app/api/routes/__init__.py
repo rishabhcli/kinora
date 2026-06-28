@@ -21,6 +21,7 @@ from app.api.routes import (
     translation,
     workspaces,
 )
+from app.billing import routes as billing  # additive: billing & payments domain
 
 # Additive: the content-moderation & safety admin/operations surface (§9/§10).
 # The router lives under app.moderation to keep the safety domain self-contained.
@@ -39,6 +40,7 @@ ROUTERS = [
     metrics.router,
     optim.router,
     finops.router,
+    billing.router,  # billing & payments (additive)
     recommendations.router,  # server-side recsys: watch-next + interaction logging
     reports.router,  # reports subsystem: document generation + signed retrieval
     integrations.router,  # third-party source import (app.integrations)
