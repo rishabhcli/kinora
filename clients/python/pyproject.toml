@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kinora"
+version = "1.0.0"
+description = "Typed Python SDK for the Kinora API (page-synced AI film generation)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Kinora" }]
+keywords = ["kinora", "sdk", "ai", "video", "books", "sse"]
+dependencies = ["httpx>=0.27"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "respx>=0.21",
+  "mypy>=1.10",
+  "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/rishabhcli/kinora"
+Documentation = "https://github.com/rishabhcli/kinora/tree/main/docs/portal"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kinora"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+# spec.py is a generated artifact (node clients/spec/sync-py.mjs is the source of
+# truth + the staleness gate); ruff must not rewrite it.
+extend-exclude = ["src/kinora/spec.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["B904"]  # we deliberately raise typed errors without `from` in mappers
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+files = ["src/kinora"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
