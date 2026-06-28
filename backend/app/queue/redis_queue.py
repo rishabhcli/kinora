@@ -348,6 +348,12 @@ class RedisRenderQueue:
         lease_ms: int = 900_000,
         retry_cap: int = 2,
         retry_backoff_s: Sequence[float] = (2.0, 8.0, 30.0),
+        # An optional jittered backoff schedule (app.queue.backoff.BackoffSchedule).
+        # When supplied it *replaces* ``retry_backoff_s``: a deterministic, seeded
+        # jittered schedule of length ``retry_cap + 1`` is materialised into the
+        # RetryPolicy so retries spread out instead of re-hammering the provider in
+        # lockstep (§12.1). Default ``None`` keeps the literal fixed schedule.
+        backoff: Any | None = None,
         success_ttl_s: int = 3600,
         # Sliding TTL on a trajectory's cancel-token set; refreshed on every enqueue,
         # so it only expires well after the last enqueue — bounding zombie token sets
@@ -361,7 +367,13 @@ class RedisRenderQueue:
         self._ns = namespace
         self._backpressure_depth = backpressure_depth
         self._lease_ms = lease_ms
-        self._retry_policy = RetryPolicy(cap=retry_cap, backoff_s=tuple(retry_backoff_s))
+        if backoff is not None:
+            # Materialise a fixed jittered tuple long enough for every attempt up to
+            # the cap (attempt N's delay is index N-1); deterministic for a seed.
+            schedule = tuple(backoff.materialise(retry_cap + 1))
+        else:
+            schedule = tuple(retry_backoff_s)
+        self._retry_policy = RetryPolicy(cap=retry_cap, backoff_s=schedule)
         self._success_ttl_s = success_ttl_s
         self._token_ttl_s = token_ttl_s
         self._session_factory = session_factory
@@ -549,9 +561,7 @@ class RedisRenderQueue:
         await self._mirror_status(str(job_id), RenderJobStatus.RESERVED)
         return job
 
-    async def mark_submitted(
-        self, job_id: str, *, provider_task_id: str | None = None
-    ) -> None:
+    async def mark_submitted(self, job_id: str, *, provider_task_id: str | None = None) -> None:
         """Transition a claimed job to ``submitted`` (render started)."""
         mapping: dict[str, str] = {"status": RenderJobStatus.SUBMITTED.value}
         if provider_task_id is not None:
