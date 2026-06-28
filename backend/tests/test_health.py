@@ -34,6 +34,8 @@ async def _ready_client(container: _ReadinessContainer) -> AsyncIterator[AsyncCl
     app = create_app()
     app.state.container = container
     app.state.run_idle_sweeper = False
+    app.state.run_realtime_sweeper = False
+    app.state.run_notification_bridge = False
     async with LifespanManager(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://testserver") as http:

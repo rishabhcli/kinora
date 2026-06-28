@@ -93,7 +93,16 @@ function timelineFromProps(
           duration: s.duration_s ?? undefined,
         };
       });
-    if (segs.length > 0) return buildTimeline(segs);
+    if (segs.length > 0) {
+      // Seeded public-domain books ship one Ken-Burns clip on shot 0; forward-fill
+      // so scroll-scrubbing keeps the film visible instead of blank segments.
+      let carry = "";
+      for (const seg of segs) {
+        if (seg.src) carry = seg.src;
+        else if (carry) seg.src = carry;
+      }
+      return buildTimeline(segs);
+    }
   }
   // Fallback (or live with no shots yet): one continuous film. totalWords cancels
   // out of the time mapping (localFraction === scroll fraction), so 1000 is fine.
@@ -177,6 +186,9 @@ export function ScrollFilmEngine({
     () => 0,
   );
   useEffect(() => () => cache.clear(), [cache]); // revoke all blob URLs on unmount
+  useEffect(() => {
+    cache.clear();
+  }, [book.id, cache]);
 
   const timeline = useMemo(
     () => timelineFromProps(shots, clips, live, film, cache),

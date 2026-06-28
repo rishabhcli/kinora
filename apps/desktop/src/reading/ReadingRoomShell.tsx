@@ -407,6 +407,7 @@ export function ReadingRoomShell({
       {/* Content area — film engine + progress rail + warm-up overlay */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ScrollFilmEngine
+          key={book.id}
           book={book}
           pages={session.pages}
           shots={session.shots}

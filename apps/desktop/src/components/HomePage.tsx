@@ -7,6 +7,7 @@ import { useGlobalNavShortcuts } from "../a11y/useNavShortcuts";
 import Greeting from "./Greeting";
 import HeroBanner from "./HeroBanner";
 import AmbientBackground from "./AmbientBackground";
+import BookShelf from "./BookShelf";
 import DiscoveryHome from "./discovery/DiscoveryHome";
 import DiscoverySearch from "./discovery/DiscoverySearch";
 import CommandPalette from "./discovery/CommandPalette";
@@ -60,6 +61,7 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
   const [activePage, setActivePageState] = useState("Home");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [myBooks, setMyBooks] = useState<Book[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
 
   // Book open/close orchestration (WS2). `roomOpen` drives the shared-
   // element morph; `selectedBook` stays set through the close flight so the
@@ -100,6 +102,12 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         awardWinners,
       ),
     [myBooks],
+  );
+  // Live backend titles get their own shelf; keep them out of discovery rails so
+  // they aren't duplicated or dropped when a rail's minRowSize isn't met.
+  const discoveryBooks = useMemo(
+    () => catalog.filter((b) => !b.live),
+    [catalog],
   );
   const popularity = useMemo(
     () => popularityPrior(catalog, popularOnKinora.map((b) => b.id)),
@@ -148,6 +156,8 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
         if (alive) setMyBooks(mapped);
       } catch {
         /* backend down — demo catalogue rows below still render */
+      } finally {
+        if (alive) setLibraryLoading(false);
       }
     })();
     return () => {
@@ -206,12 +216,21 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
             <Greeting />
           </div>
         </div>
-        {/* Personalized, self-learning discovery surface: continue-reading +
-            recommendation rails driven by the engine in lib/discovery. Browsing
-            (hover/preview/open) feeds the taste profile for next time. */}
+        {/* Backend public-domain library — always its own shelf (not subject to
+            discovery minRowSize), restored from the UI-baseline BookShelf row. */}
+        {myBooks.length > 0 && (
+          <div className="px-6 max-w-[1280px] mx-auto mb-2">
+            <BookShelf
+              title={t("library.readLivePublicDomain")}
+              books={myBooks}
+              onOpen={handleOpen}
+            />
+          </div>
+        )}
+        {/* Personalized discovery rails for the demo catalogue (live books excluded). */}
         <DiscoveryHome
-          books={catalog}
-          loading={myBooks.length === 0}
+          books={discoveryBooks}
+          loading={libraryLoading}
           popularity={popularity}
           onOpenBook={handleOpen}
           onMoreLikeThis={(b) => openSearch(b.genre ?? b.title)}

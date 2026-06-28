@@ -197,9 +197,11 @@ def create_app() -> FastAPI:
         # so tests that disable background tasks never start it (keeps the
         # timing-sensitive worker/pubsub tests isolated).
         if getattr(app.state, "run_notification_bridge", True):
-            bridge_task = container.start_notification_bridge()
-            if bridge_task is not None:
-                background.append(bridge_task)
+            start_bridge = getattr(container, "start_notification_bridge", None)
+            if start_bridge is not None:
+                bridge_task = start_bridge()
+                if bridge_task is not None:
+                    background.append(bridge_task)
         try:
             yield
         finally:
