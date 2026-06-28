@@ -75,6 +75,12 @@ from app.db.models.integration import (
     SyncRunStatus,
 )
 from app.db.models.job import JobRun, ScheduledJob
+from app.db.models.llmops import (
+    LLMOpsChangelog,
+    LLMOpsEvalReport,
+    LLMOpsPromptVersion,
+    LLMOpsRun,
+)
 from app.db.models.notification import (
     NotificationDeadLetter,
     NotificationDelivery,
@@ -219,6 +225,10 @@ __all__ = [
     "IngestMilestone",
     "ImportedItem",
     "JobRun",
+    "LLMOpsChangelog",
+    "LLMOpsEvalReport",
+    "LLMOpsPromptVersion",
+    "LLMOpsRun",
     "LegalHold",
     "MfaMethod",
     "ModerationAuditEntry",

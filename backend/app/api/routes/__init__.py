@@ -15,6 +15,7 @@ from app.api.routes import (
     flags,
     integrations,
     library,
+    llmops,
     metrics,
     notifications,
     optim,
@@ -63,6 +64,7 @@ ROUTERS = [
     translation.router,  # content-translation subsystem (app.translation, §8/§9)
     moderation_router,  # content moderation & safety (§9/§10)
     compliance_router,  # /compliance: consent, retention, DSAR, holds, ledger, report
+    llmops.router,  # LLM-ops surface (prompt registry/eval/guardrails); 404 unless llmops_enabled
 ]
 
 

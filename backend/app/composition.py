@@ -297,6 +297,7 @@ class Container:
     _flag_service: FlagService | None = field(default=None, repr=False)
     _analytics_service: AnalyticsService | None = field(default=None, repr=False)
     _conversation_memory: ConversationMemory | None = field(default=None, repr=False)
+    _llmops: Any = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -369,6 +370,41 @@ class Container:
 
     def _embedder(self) -> Embedder:
         return self.embedder if self.embedder is not None else self.providers.embeddings
+
+    # -- LLM-ops platform (lazy; pure + offline — app.llmops) ---------------- #
+
+    @property
+    def llmops(self) -> Any:
+        """The wired :class:`~app.llmops.service.LLMOpsService` (built on first use).
+
+        Pure + offline: it seeds the prompt registry from ``app.agents.prompts``
+        and builds an in-memory trace store + response cache + model catalog +
+        deterministic judge, sized from the ``llmops_*`` settings. Constructing it
+        makes no model call and opens no connection — it is additive and inert
+        until a route (or a caller) reaches for it.
+        """
+        if self._llmops is None:
+            from app.llmops.cache import InMemoryBackend, ResponseCache
+            from app.llmops.guardrails import GuardrailPolicy
+            from app.llmops.output_policy import OutputPolicy, Severity
+            from app.llmops.service import LLMOpsService
+            from app.llmops.tracing import InMemoryTraceStore
+
+            s = self.settings
+            guardrails = GuardrailPolicy(
+                output_policy=OutputPolicy(expect_json=True, block_at=Severity.HIGH),
+                input_block_score=s.llmops_injection_block_score,
+                always_sanitize_input=s.llmops_guardrail_always_sanitize,
+            )
+            self._llmops = LLMOpsService.create(
+                trace_store=InMemoryTraceStore(capacity=s.llmops_trace_capacity),
+                cache=ResponseCache(
+                    backend=InMemoryBackend(max_entries=s.llmops_cache_max_entries),
+                    default_ttl_s=s.llmops_cache_ttl_s,
+                ),
+                guardrails=guardrails,
+            )
+        return self._llmops
 
     def _planner(self) -> ShotPlanner:
         if self.shot_planner is not None:
