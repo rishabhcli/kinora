@@ -100,6 +100,21 @@ class Settings(BaseSettings):
 
     # --- Postgres (async SQLAlchemy URL) ---
     database_url: str = "postgresql+asyncpg://kinora:kinora@localhost:5432/kinora"
+    # Optional read-replica URL. When set, the DB-infrastructure read/write split
+    # (``app.db.routing``) serves reads from the replica and writes from the
+    # primary; unset → all traffic goes to ``database_url`` (single-node default).
+    database_replica_url: str | None = None
+    # Connection-pool / timeout knobs consumed by ``app.db.engine.EngineConfig``.
+    # Defaults reproduce the historical hard-coded engine behaviour, so adopting
+    # the typed builder changes nothing until a knob is overridden.
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_timeout_s: float = 30.0
+    db_pool_recycle_s: int = 1800
+    # Server-side statement_timeout in ms (0 = unlimited) applied per connection.
+    db_statement_timeout_ms: int = 0
+    # Queries slower than this are logged + captured in the slow-query ring buffer.
+    db_slow_query_ms: float = 500.0
 
     # --- Redis ---
     redis_url: str = "redis://localhost:6379/0"
