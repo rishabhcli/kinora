@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.api.routes import (
+    assistant,
     auth,
     books,
     director,
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    assistant.router,  # reader assistant: grounded, spoiler-aware RAG Q&A (§8)
 ]
 
 __all__ = ["ROUTERS"]

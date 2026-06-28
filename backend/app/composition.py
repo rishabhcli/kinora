@@ -57,6 +57,9 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.assistant.memory import ConversationMemory
+    from app.assistant.service import AssistantService
+    from app.assistant.synth import ChatClient
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
@@ -226,11 +229,16 @@ class Container:
     comment_classifier: CommentClassifier | None = None
     regen_runner: RegenRunner | None = None
     ingest_runner: IngestRunner | None = None
+    #: Chat client the reader assistant synthesizes over (None => providers.chat).
+    #: A seam so the assistant route can be driven end-to-end with a fake chat
+    #: (zero credits) while production uses the real DashScope/OpenAI provider.
+    assistant_chat: ChatClient | None = None
 
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
     _keyframe_service: KeyframeService | None = field(default=None, repr=False)
+    _conversation_memory: ConversationMemory | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -333,6 +341,46 @@ class Container:
             service=self.build_scheduler(session),
             store=self.scheduler_store,
             settings=self.settings,
+        )
+
+    # -- reader assistant: grounded RAG Q&A over a book + canon (§8 read side) -- #
+
+    @property
+    def conversation_memory(self) -> ConversationMemory:
+        """Shared, Redis-backed conversation memory for the reader assistant (§8).
+
+        Threaded follow-ups persist across requests (and API instances) through a
+        per-conversation Redis key with a TTL. Built lazily so a container with no
+        Redis use stays connection-free.
+        """
+        if self._conversation_memory is None:
+            from app.assistant.memory import ConversationMemory, RedisConversationStore
+
+            self._conversation_memory = ConversationMemory(
+                RedisConversationStore(self.redis)
+            )
+        return self._conversation_memory
+
+    def build_assistant(self, session: AsyncSession) -> AssistantService:
+        """Build an :class:`AssistantService` bound to a request DB session.
+
+        Wires the real canon read model (pages/entities/shots/beats over
+        ``session``), the container's embedder seam (faked in tests), and the
+        shared chat provider behind the synthesizer. The conversation memory is
+        the container-level Redis-backed singleton so follow-ups thread.
+        """
+        from app.assistant.read_model import DbCanonReadModel
+        from app.assistant.service import AssistantService
+        from app.assistant.synth import AnswerSynthesizer
+
+        read_model = DbCanonReadModel(session)
+        chat = self.assistant_chat if self.assistant_chat is not None else self.providers.chat
+        synthesizer = AnswerSynthesizer(chat, self.settings.chat_model_plus)
+        return AssistantService(
+            read_model,
+            synthesizer,
+            embedder=self._embedder(),
+            memory=self.conversation_memory,
         )
 
     # -- Director seams ------------------------------------------------------ #
