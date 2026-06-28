@@ -59,6 +59,7 @@ from app.storage.object_store import ObjectStore
 if TYPE_CHECKING:
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
+    from app.media.service import MediaService
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
     from app.providers import Providers
     from app.scheduler.keyframe import KeyframeService
@@ -231,6 +232,8 @@ class Container:
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
     _keyframe_service: KeyframeService | None = field(default=None, repr=False)
+    # Media subsystem (app.media) — additive, lazily built. (Media domain.)
+    _media_service: MediaService | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -308,6 +311,21 @@ class Container:
                 settings=self.settings,
             )
         return self._keyframe_service
+
+    # -- media / asset service (app.media) — additive, lazy (Media domain) --- #
+
+    @property
+    def media_service(self) -> MediaService:
+        """Content-addressed media store + ffmpeg derivations + GC (§8.7, §9)."""
+        if self._media_service is None:
+            from app.media.service import build_media_service
+
+            self._media_service = build_media_service(
+                self.settings,
+                object_store=self.object_store,
+                session_factory=self.session_factory,
+            )
+        return self._media_service
 
     # -- per-request scheduler stack (bound to a request DB session) --------- #
 

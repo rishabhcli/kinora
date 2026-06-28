@@ -9,6 +9,7 @@ from app.api.routes import (
     events,
     films,
     library,
+    media,
     metrics,
     optim,
     prefs,
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    media.router,  # Media domain: /api/media asset registry (additive)
 ]
 
 __all__ = ["ROUTERS"]

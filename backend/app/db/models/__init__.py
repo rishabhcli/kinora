@@ -36,6 +36,11 @@ from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
+# Media subsystem (app.media) — registered here so Alembic autogenerate and the
+# app's metadata see the media_assets table. Additive only (Media domain).
+from app.media.kinds import MediaAssetKind
+from app.media.models import MediaAsset
+
 __all__ = [
     "AuditAction",
     "Base",
@@ -52,6 +57,8 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "MediaAsset",
+    "MediaAssetKind",
     "Page",
     "Pref",
     "RenderJob",
