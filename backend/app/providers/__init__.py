@@ -11,8 +11,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.core.config import Settings, get_settings
+
+if TYPE_CHECKING:
+    from .resilience import ProviderRegistry, ResilientGateway
 
 from .base import (
     BreakerState,
@@ -86,11 +90,20 @@ class Providers:
     # Set only when ``reasoning_provider="openai"``: the second transport that
     # backs ``chat`` (OpenAI), sharing the main client's usage sink.
     reasoning_client: ProviderClient | None = None
+    # Set only when ``provider_gateway_enabled`` (round-2, opt-in): the hardened
+    # resilience gateway + multi-cloud capability registry composed *around* the
+    # shared client (per-model breakers, adaptive rate-limit, hedging, response
+    # cache). ``None`` by default so the round-1 path is unchanged. See
+    # ``app.providers.resilience``.
+    gateway: ResilientGateway | None = None
+    registry: ProviderRegistry | None = None
 
     async def aclose(self) -> None:
         await self.client.aclose()
         if self.reasoning_client is not None:
             await self.reasoning_client.aclose()
+        if self.gateway is not None:
+            await self.gateway.aclose()
 
 
 def create_providers(
@@ -132,6 +145,15 @@ def create_providers(
     else:
         chat = ChatProvider(client)
     video = VideoProvider(client)
+    gateway: ResilientGateway | None = None
+    registry: ProviderRegistry | None = None
+    if resolved.provider_gateway_enabled:
+        # Opt-in: build the resilience gateway fanning its metering into the same
+        # usage sink the client uses, so cost/budget accounting stays unified.
+        from .resilience import build_gateway, registry_from_settings
+
+        gateway = build_gateway(resolved, usage_sink=client.usage_sink)
+        registry = registry_from_settings(resolved)
     return Providers(
         client=client,
         reasoning_client=reasoning_client,
@@ -141,6 +163,8 @@ def create_providers(
         tts=TtsProvider(client),
         video=video,
         embeddings=EmbeddingProvider(client),
+        gateway=gateway,
+        registry=registry,
     )
 
 
