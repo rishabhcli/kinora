@@ -28,7 +28,7 @@ from fastapi.responses import JSONResponse
 from app import __version__
 from app.api.errors import install_exception_handlers
 from app.api.middleware import SecurityHeadersMiddleware
-from app.api.routes import ROUTERS
+from app.api.routes import ROUTERS, root_routers
 from app.composition import Container, build_container
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
@@ -225,6 +225,12 @@ def create_app() -> FastAPI:
 
     for router in ROUTERS:
         app.include_router(router, prefix=API_PREFIX)
+
+    # The public GraphQL gateway mounts at the root (its own ``/graphql`` surface,
+    # separate from the internal ``/api`` REST routes). Additive — see
+    # ``app/graphql/DESIGN.md``.
+    for router in root_routers():
+        app.include_router(router)
 
     return app
 
