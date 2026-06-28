@@ -21,6 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.realtime.connections import ConnectionLimitExceeded
 from app.api.schemas import ErrorBody, ErrorResponse
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -99,6 +100,17 @@ def install_exception_handlers(app: FastAPI) -> None:
         logger.warning("api.provider_error", error=str(exc))
         detail = {"code": exc.code} if exc.code else None
         return _json(502, "provider_error", exc.message, detail)
+
+    @app.exception_handler(ConnectionLimitExceeded)
+    async def _on_conn_limit(_: Request, exc: ConnectionLimitExceeded) -> JSONResponse:
+        # The realtime layer refuses an over-cap connection on an HTTP route with a
+        # 429 (the SSE/WS paths surface it as a typed event / close code instead).
+        return _json(
+            429,
+            "connection_limit",
+            "too many concurrent connections; close one and retry",
+            {"scope": exc.scope, "limit": exc.limit},
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def _on_http(_: Request, exc: StarletteHTTPException) -> JSONResponse:

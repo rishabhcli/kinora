@@ -41,6 +41,9 @@ API_PREFIX = "/api"
 IDLE_SWEEP_INTERVAL_S = 4.0
 #: Redis key prefix the Scheduler stores session control state under.
 _SESSION_KEY_PREFIX = "kinora:sched:session"
+#: Realtime connection-sweeper cadence — reaps stale SSE/WS registry entries so
+#: the presence headcount can't drift upward after a missed disconnect (§5.6).
+REALTIME_SWEEP_INTERVAL_S = 20.0
 
 
 def _metric_path(request: Request) -> str:
@@ -98,6 +101,60 @@ async def _scan_session_ids(container: Container, match: str) -> list[str]:
     return out
 
 
+async def _realtime_connection_sweeper(container: Container, stop: asyncio.Event) -> None:
+    """Periodically reap stale SSE/WS registry entries (§5.6 connection lifecycle).
+
+    A crashed client never sends a close frame; its connection-registry entry is
+    TTL'd but the *presence headcount* derived from it would lag until the TTL
+    fires. This sweeper trims stale members on a tighter cadence so the headcount
+    stays accurate. Fully defensive — a Redis blip is logged and retried.
+    """
+    from app.api.realtime.services import RealtimeServices
+
+    log = get_logger("app.main.realtime_sweeper")
+    try:
+        bundle = RealtimeServices.from_container(container)
+    except Exception as exc:  # noqa: BLE001 - a stub/misconfigured container disables it
+        log.warning("realtime_sweeper.disabled", error=str(exc))
+        return
+    while not stop.is_set():
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=REALTIME_SWEEP_INTERVAL_S)
+        if stop.is_set():
+            break
+        try:
+            await bundle.connections.reap_all()
+        except Exception as exc:  # noqa: BLE001 - the sweeper must never crash the app
+            log.warning("realtime_sweeper.error", error=str(exc))
+
+
+async def _start_event_recorder(
+    container: Container, stop: asyncio.Event
+) -> asyncio.Task[None] | None:
+    """Launch the §5.6 event recorder (the resumable-stream tee), if enabled.
+
+    The recorder pattern-subscribes to every session channel and appends each
+    event to its per-session log so a dropped SSE/WS connection can resume from a
+    ``Last-Event-ID``. Returns the task (cancelled on shutdown) or ``None`` when
+    the container can't back it (a readiness/test stub without a real Redis).
+    """
+    from app.api.realtime.event_log import EventLog
+    from app.api.realtime.recorder import EventRecorder
+
+    log = get_logger("app.main.event_recorder")
+    try:
+        redis = container.redis
+        recorder = EventRecorder(
+            redis,
+            EventLog(redis),
+            elect_leader=container.settings.realtime_recorder_elect_leader,
+        )
+    except Exception as exc:  # noqa: BLE001 - a stub container disables the recorder
+        log.warning("event_recorder.disabled", error=str(exc))
+        return None
+    return asyncio.create_task(recorder.run(stop))
+
+
 def create_app() -> FastAPI:
     """Build and configure the Kinora FastAPI application."""
     settings = get_settings()
@@ -122,17 +179,28 @@ def create_app() -> FastAPI:
             version=__version__,
         )
         stop = asyncio.Event()
-        sweeper: asyncio.Task[None] | None = None
+        background: list[asyncio.Task[None]] = []
         if getattr(app.state, "run_idle_sweeper", True):
-            sweeper = asyncio.create_task(_idle_sweeper(container, stop))
+            background.append(asyncio.create_task(_idle_sweeper(container, stop)))
+        # Realtime transport background work (§5.6): the event recorder (resumable
+        # stream tee) + the connection sweeper. Suppressible in tests via
+        # ``app.state.run_realtime_sweeper = False`` (mirrors run_idle_sweeper).
+        if getattr(app.state, "run_realtime_sweeper", True):
+            recorder_task = await _start_event_recorder(container, stop)
+            if recorder_task is not None:
+                background.append(recorder_task)
+            background.append(
+                asyncio.create_task(_realtime_connection_sweeper(container, stop))
+            )
         try:
             yield
         finally:
             stop.set()
-            if sweeper is not None:
-                sweeper.cancel()
+            for task in background:
+                task.cancel()
+            for task in background:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await sweeper
+                    await task
             await container.shutdown()
             logger.info("kinora.shutdown", service=settings.service_name)
 

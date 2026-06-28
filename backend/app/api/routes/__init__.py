@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.api.realtime.routes_realtime import router as realtime_router
 from app.api.routes import (
     auth,
     books,
@@ -27,6 +28,10 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    # Realtime + API-quality layer (resumable SSE/WS, presence, cursor
+    # pagination, versions). Additive — extends the §5.6 transport without
+    # touching the round-1 event/session/director routes.
+    realtime_router,
 ]
 
 __all__ = ["ROUTERS"]
