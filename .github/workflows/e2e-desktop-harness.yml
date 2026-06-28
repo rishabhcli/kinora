@@ -1,0 +1,120 @@
+name: Desktop E2E harness
+
+# Hermetic Playwright E2E + a11y + perf for the desktop renderer. The whole
+# suite is NETWORK-MOCKED (apps/desktop/e2e/mocks) so it needs ONLY the Vite dev
+# server — no FastAPI backend, no Docker, no Wan credits. KINORA_LIVE_VIDEO is
+# irrelevant here (no real backend is started); it is documented as OFF anyway.
+#
+# This is a SEPARATE workflow from ci.yml so it can run in the official Playwright
+# container (matching the committed Linux visual baselines) without touching the
+# shared CI definition.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/desktop/**"
+      - ".github/workflows/e2e-desktop-harness.yml"
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - ".github/workflows/e2e-desktop-harness.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Functional + a11y + perf — the hermetic, network-mocked suite. Excludes the
+  # visual-regression specs (those run in the pinned container job below so the
+  # baselines match) and the live-backend specs (gated off by default).
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E (mocked, hermetic)
+    runs-on: ubuntu-latest
+    # The official Playwright image bundles the browsers + system deps.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+    env:
+      CI: "true"
+      KINORA_E2E_MOCK: "1"
+      KINORA_LIVE_VIDEO: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck the E2E suite
+        run: pnpm --filter @kinora/desktop run e2e:typecheck
+      - name: Run E2E (functional + a11y + perf)
+        working-directory: apps/desktop
+        run: >-
+          npx playwright test -c e2e/playwright.e2e.config.ts
+          --ignore-snapshots
+          e2e/specs/auth.spec.ts
+          e2e/specs/navigation.spec.ts
+          e2e/specs/library.spec.ts
+          e2e/specs/upload.spec.ts
+          e2e/specs/reading-room.spec.ts
+          e2e/specs/film-sync.spec.ts
+          e2e/specs/director.spec.ts
+          e2e/specs/smoke.spec.ts
+          e2e/specs/perf.spec.ts
+          e2e/specs/a11y.audit.spec.ts
+      - name: Upload report + artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            apps/desktop/test-results/e2e-report
+            apps/desktop/test-results/e2e-results.json
+            apps/desktop/test-results/e2e-junit.xml
+            coordination/artifacts/e2e-a11y
+            coordination/artifacts/e2e-perf
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Visual regression — pinned to the SAME Playwright container the baselines
+  # were captured in, so font + AA rendering matches. If a baseline is missing
+  # (first run, or a newly-added screen) Playwright writes it; commit the result.
+  # Diffs are uploaded as artifacts for review.
+  # ---------------------------------------------------------------------------
+  visual:
+    name: Visual regression (pinned container)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+    env:
+      CI: "true"
+      KINORA_E2E_MOCK: "1"
+      KINORA_LIVE_VIDEO: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Run visual specs
+        working-directory: apps/desktop
+        run: npx playwright test -c e2e/playwright.e2e.config.ts e2e/specs/visual.spec.ts
+      - name: Upload visual diffs + report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-visual
+          path: |
+            apps/desktop/test-results/e2e
+            apps/desktop/test-results/e2e-report
+          if-no-files-found: ignore
+          retention-days: 14
