@@ -1,0 +1,23 @@
+# Checkov config for the Kinora IaC. Soft-fail in CI (report-only) until a
+# baseline is agreed; the skips below are deliberate, documented exceptions that
+# match decisions recorded in DESIGN.md / the chart + module comments.
+
+skip-check:
+  # CKV_DOCKER_2: an image-level HEALTHCHECK is intentionally omitted from the
+  # SHARED backend image — it runs as 5 different roles and an api-specific probe
+  # would mark the workers/mcp unhealthy. Health is owned by compose/k8s probes.
+  - CKV_DOCKER_2
+  # CKV_K8S_21: default namespace — the chart/kustomize are installed into an
+  # explicit namespace at deploy time (helm -n / kustomize namespace:), not baked
+  # into the rendered manifests.
+  - CKV_K8S_21
+  # CKV2_K8S_6 / network policy presence is satisfied by the chart's
+  # default-deny + per-role NetworkPolicies; the kustomize base ships the MCP one.
+
+# Don't descend into provider caches / rendered state.
+skip-path:
+  - infra/terraform/.*/\.terraform/.*
+
+compact: true
+quiet: true
+download-external-modules: false

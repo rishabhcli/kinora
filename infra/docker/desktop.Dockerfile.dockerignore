@@ -1,0 +1,20 @@
+# Per-Dockerfile ignore for the web renderer build. The build context is the repo
+# root; keep it to the pnpm workspace manifests + the desktop app source.
+*
+
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!apps/desktop
+!infra/docker/desktop.nginx.conf
+
+# Trim heavy / irrelevant subtrees even within apps/desktop.
+apps/desktop/node_modules
+apps/desktop/dist
+apps/desktop/out
+apps/desktop/.turbo
+**/node_modules
+**/.git
+**/.DS_Store
+**/.env
+**/.env.*

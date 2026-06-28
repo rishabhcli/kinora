@@ -1,0 +1,95 @@
+name: Infra security scan
+
+# IaC + container security scanning: Checkov + Trivy (config/IaC mode) over the
+# Terraform, Kubernetes, Dockerfiles, and compose, plus a Trivy filesystem scan
+# for vulnerable/leaked content. Results upload as SARIF to the Security tab.
+# Non-blocking by default (soft_fail) so a single new check doesn't wedge the
+# pipeline; tighten to hard-fail once a baseline is agreed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-security.yml"
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-security.yml"
+  schedule:
+    # Weekly re-scan so newly-published CVEs / policy updates surface even with
+    # no code change.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: infra-security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  checkov:
+    name: Checkov (Terraform + k8s + Dockerfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          framework: terraform,kubernetes,dockerfile,helm,github_actions
+          config_file: infra/.checkov.yaml
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+          soft_fail: true
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+  trivy-config:
+    name: Trivy (IaC misconfig)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          format: sarif
+          output: trivy-config.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0" # report-only; flip to "1" to gate once baselined
+      - name: Upload Trivy config SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+  trivy-fs:
+    name: Trivy (filesystem secrets/vuln)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy fs scan (secrets + vuln)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: infra
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-fs.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+      - name: Upload Trivy fs SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs

@@ -1,0 +1,23 @@
+{{- /* PodDisruptionBudget per role that opts in — keeps the api/mcp/frontend
+       available through node drains / rolling upgrades. */ -}}
+{{- range $role, $cfg := .Values.roles }}
+{{- if and $cfg.enabled $cfg.pdb $cfg.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "kinora.fullname" $ }}-{{ $role }}
+  labels:
+    {{- include "kinora.labels" $ | nindent 4 }}
+    {{- include "kinora.componentLabel" (dict "role" $role) | nindent 4 }}
+spec:
+  {{- if $cfg.pdb.minAvailable }}
+  minAvailable: {{ $cfg.pdb.minAvailable }}
+  {{- else if $cfg.pdb.maxUnavailable }}
+  maxUnavailable: {{ $cfg.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "kinora.roleSelectorLabels" (dict "root" $ "role" $role) | nindent 6 }}
+{{- end }}
+{{- end }}

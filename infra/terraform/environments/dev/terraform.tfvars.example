@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Dev sizing is in main.tf.
+
+# --- Alibaba credentials (or use ALICLOUD_ACCESS_KEY / ALICLOUD_SECRET_KEY) ---
+alicloud_access_key = "LTAI..."
+alicloud_secret_key = "..."
+region              = "ap-southeast-1"
+
+# --- Fail-closed network (no defaults; reject 0.0.0.0/0) ---
+admin_cidr = "203.0.113.10/32" # your egress / LB
+ssh_cidr   = "203.0.113.10/32" # ideally a bastion/VPN /32
+
+# --- App ---
+dashscope_api_key = "sk-..."
+ecs_password      = "ChangeMe-Complex-1!"
+oss_bucket_name   = "kinora-dev-assets-UNIQUE"
+
+# --- CORS: the dev frontend origin(s); no wildcard ---
+cors_origins = ["http://localhost:5173"]
+
+# jwt_secret / mcp_auth_token: leave unset to auto-generate.

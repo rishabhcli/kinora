@@ -1,0 +1,43 @@
+{{- /* HorizontalPodAutoscaler per role that opts in. api/render-worker scale on
+       CPU; render-worker can additionally scale on a custom Redis queue-depth
+       metric (needs prometheus-adapter / a custom-metrics API). */ -}}
+{{- range $role, $cfg := .Values.roles }}
+{{- if and $cfg.enabled $cfg.autoscaling $cfg.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "kinora.fullname" $ }}-{{ $role }}
+  labels:
+    {{- include "kinora.labels" $ | nindent 4 }}
+    {{- include "kinora.componentLabel" (dict "role" $role) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "kinora.fullname" $ }}-{{ $role }}
+  minReplicas: {{ $cfg.autoscaling.minReplicas }}
+  maxReplicas: {{ $cfg.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $cfg.autoscaling.targetCPUUtilizationPercentage }}
+    {{- if and $cfg.autoscaling.queueDepth $cfg.autoscaling.queueDepth.enabled }}
+    - type: External
+      external:
+        metric:
+          name: {{ $cfg.autoscaling.queueDepth.metricName }}
+        target:
+          type: AverageValue
+          averageValue: {{ $cfg.autoscaling.queueDepth.targetAverageValue | quote }}
+    {{- end }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 180
+    scaleUp:
+      stabilizationWindowSeconds: 30
+{{- end }}
+{{- end }}

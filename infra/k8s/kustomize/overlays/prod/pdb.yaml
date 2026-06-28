@@ -1,0 +1,36 @@
+# Prod-only PodDisruptionBudgets keep api/frontend/mcp available through drains.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kinora-api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: api }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kinora-frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: frontend }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kinora-mcp
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kinora-render-worker
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: render-worker }

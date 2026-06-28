@@ -1,0 +1,57 @@
+#!/bin/bash
+# Kinora ECS node bootstrap (${role}). Installs Docker, writes the runtime env,
+# and runs the backend container with this node's command. Rendered by Terraform
+# (templatefile); values are interpolated from the managed-service outputs.
+#
+# IMPORTANT: do NOT enable shell tracing (`set -x`). The env block below contains
+# real secrets (DB/Redis passwords, the DashScope key, the S3 secret, and the
+# JWT / MCP tokens); `set -x` would echo every rendered value into
+# /var/log/cloud-init-output.log in plaintext. We keep `-euo pipefail` only.
+#
+# Hardening note: user_data is the simplest secret-injection path but it is still
+# readable via the instance metadata service / ECS console. For real production
+# prefer KMS-encrypted user_data, Secrets Manager / OOS Secret Parameters, or a
+# RAM-role + at-boot fetch, and keep this file free of `set -x`.
+set -euo pipefail
+
+# --- Docker (Aliyun Linux 3 / dnf) ---
+dnf install -y docker || yum install -y docker
+systemctl enable --now docker
+
+# --- Runtime environment (no secrets are committed; injected at apply time) ---
+# Written with a quoted heredoc so the shell never expands/echoes the values, and
+# 0640 perms so only root (+ the docker group) can read them.
+install -d -m 0750 /etc/kinora
+umask 077
+cat > /etc/kinora/kinora.env <<'ENV'
+APP_ENV=${app_env}
+DATABASE_URL=${database_url}
+REDIS_URL=${redis_url}
+S3_ENDPOINT_URL=${s3_endpoint_url}
+S3_REGION=${s3_region}
+S3_BUCKET=${s3_bucket}
+S3_ACCESS_KEY=${s3_access_key}
+S3_SECRET_KEY=${s3_secret_key}
+DASHSCOPE_API_KEY=${dashscope_api_key}
+DASHSCOPE_BASE_URL=${dashscope_base_url}
+KINORA_LIVE_VIDEO=${kinora_live_video}
+VIDEO_MODEL=${video_model}
+VIDEO_MODEL_I2V=${video_model_i2v}
+VIDEO_MODEL_R2V=${video_model_r2v}
+JWT_SECRET=${jwt_secret}
+MCP_AUTH_TOKEN=${mcp_auth_token}
+CORS_ORIGINS=${cors_origins}
+ENV
+chmod 0640 /etc/kinora/kinora.env
+
+# --- Pull + run the backend image with this node's command ---
+# If the image lives in a private ACR, add a `docker login` here (or attach a RAM
+# role + use the ACR credential helper) before the pull.
+docker pull "${image}"
+docker rm -f kinora-${role} 2>/dev/null || true
+docker run -d --name kinora-${role} \
+  --restart always \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+  --env-file /etc/kinora/kinora.env \
+  ${publish} \
+  "${image}" ${command}

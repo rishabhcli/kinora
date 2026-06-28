@@ -1,0 +1,19 @@
+apiVersion: v2
+name: kinora
+description: >-
+  Kinora backend — the six-role process model (api, ingest-worker, render-worker,
+  mcp, frontend) deployed as the same image with a different command, plus HPA,
+  PodDisruptionBudgets, probes, resource limits, NetworkPolicies, and a migrate
+  pre-install hook. Built to mirror infra/docker-compose.yml and the Terraform
+  compute module so the topology is identical across local / cloud / cluster.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kinora
+  - fastapi
+  - mcp
+  - render-pipeline
+home: https://github.com/rishabhcli/kinora
+maintainers:
+  - name: Kinora infra

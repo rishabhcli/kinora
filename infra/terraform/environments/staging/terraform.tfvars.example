@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (gitignored). Staging sizing is in main.tf.
+alicloud_access_key = "LTAI..."
+alicloud_secret_key = "..."
+region              = "ap-southeast-1"
+
+admin_cidr = "203.0.113.0/24"   # your LB / office egress
+ssh_cidr   = "203.0.113.10/32"  # bastion/VPN /32
+
+dashscope_api_key = "sk-..."
+ecs_password      = "ChangeMe-Complex-1!"
+oss_bucket_name   = "kinora-staging-assets-UNIQUE"
+
+cors_origins = ["https://staging.kinora.example.com"]
+
+# jwt_secret / mcp_auth_token: leave unset to auto-generate.

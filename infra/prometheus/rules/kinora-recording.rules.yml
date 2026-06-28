@@ -1,0 +1,65 @@
+# Kinora recording rules — pre-compute the §13 / §12.5 headline metrics so the
+# Grafana panels + alerts read cheap, stable series instead of re-deriving them.
+# Every metric here is emitted by app/observability/metrics.py.
+
+groups:
+  - name: kinora.recording
+    interval: 30s
+    rules:
+      # --- Render throughput / latency --------------------------------------- #
+      - record: kinora:render_latency_seconds:p50
+        expr: histogram_quantile(0.50, sum(rate(kinora_render_latency_seconds_bucket[5m])) by (le, mode))
+      - record: kinora:render_latency_seconds:p95
+        expr: histogram_quantile(0.95, sum(rate(kinora_render_latency_seconds_bucket[5m])) by (le, mode))
+
+      # --- Accepted-footage efficiency (§13): accepted / (accepted+degraded) -- #
+      - record: kinora:accepted_footage_ratio:5m
+        expr: |
+          sum(rate(kinora_shots_accepted_total[5m]))
+          /
+          clamp_min(
+            sum(rate(kinora_shots_accepted_total[5m])) + sum(rate(kinora_shots_degraded_total[5m])),
+            1
+          )
+
+      # --- Regeneration rate (§13): retries per accepted shot ---------------- #
+      - record: kinora:regen_rate:5m
+        expr: |
+          sum(rate(kinora_render_retries_total[5m]))
+          /
+          clamp_min(sum(rate(kinora_shots_accepted_total[5m])), 1)
+
+      # --- Cache hit ratio (§12.3) ------------------------------------------- #
+      - record: kinora:cache_hit_ratio:5m
+        expr: |
+          sum(rate(kinora_cache_hits_total[5m]))
+          /
+          clamp_min(sum(rate(kinora_cache_hits_total[5m])) + sum(rate(kinora_cache_misses_total[5m])), 1)
+
+      # --- Video-seconds budget burn (§11.1) — spent so far + burn rate ------ #
+      - record: kinora:video_seconds_spent:total
+        expr: sum(kinora_video_seconds_spent_total)
+      - record: kinora:video_seconds_burn:rate1h
+        expr: sum(rate(kinora_video_seconds_spent_total[1h])) * 3600
+
+      # --- Provider error ratio ---------------------------------------------- #
+      - record: kinora:provider_error_ratio:5m
+        expr: |
+          sum(rate(kinora_provider_errors_total[5m]))
+          /
+          clamp_min(sum(rate(kinora_provider_calls_total[5m])), 1)
+
+      # --- API error ratio (5xx / all) --------------------------------------- #
+      - record: kinora:http_5xx_ratio:5m
+        expr: |
+          sum(rate(kinora_http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(kinora_http_requests_total[5m])), 1)
+
+      # --- Queue depth across lanes (committed + speculative + keyframe) ------ #
+      - record: kinora:queue_depth:total
+        expr: sum(kinora_queue_depth)
+
+      # --- Buffer health: fraction of sessions above the low watermark (25s) -- #
+      - record: kinora:sessions_below_low_watermark
+        expr: count(kinora_buffer_occupancy_seconds < 25) or vector(0)

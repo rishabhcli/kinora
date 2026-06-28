@@ -1,0 +1,26 @@
+Kinora {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Roles deployed (same image, different command — the §process model):
+{{- range $role, $cfg := .Values.roles }}
+{{- if $cfg.enabled }}
+  - {{ $role }} (replicas: {{ $cfg.replicas }}{{ if and $cfg.autoscaling $cfg.autoscaling.enabled }}, HPA {{ $cfg.autoscaling.minReplicas }}-{{ $cfg.autoscaling.maxReplicas }}{{ end }})
+{{- end }}
+{{- end }}
+
+Live-video gate: KINORA_LIVE_VIDEO={{ index .Values.config "KINORA_LIVE_VIDEO" }} (keep "false" unless you intend to spend Wan video-seconds).
+
+{{- if .Values.ingress.enabled }}
+API + frontend are exposed at: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+No Ingress is enabled. Reach the API in-cluster:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kinora.fullname" . }}-api 8000:{{ .Values.roles.api.service.port }}
+{{- end }}
+
+The MCP server is intra-cluster only (NetworkPolicy {{ include "kinora.fullname" . }}-mcp-intra-app); it is never put behind the Ingress.
+
+{{- if .Values.secrets.create }}
+
+WARNING: this release rendered a chart-managed Secret from values. For production
+set secrets.create=false and point secrets.existingSecret at an External-Secrets /
+Vault-synced Secret instead of committing real credentials to values.
+{{- end }}

@@ -1,0 +1,23 @@
+{{- /* A ClusterIP Service per role that opts in (api/mcp/frontend). MCP gets a
+       Service for in-cluster discovery only — it is never put behind Ingress. */ -}}
+{{- range $role, $cfg := .Values.roles }}
+{{- if and $cfg.enabled $cfg.service $cfg.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kinora.fullname" $ }}-{{ $role }}
+  labels:
+    {{- include "kinora.labels" $ | nindent 4 }}
+    {{- include "kinora.componentLabel" (dict "role" $role) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "kinora.roleSelectorLabels" (dict "root" $ "role" $role) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $cfg.service.port }}
+      targetPort: {{ $cfg.port }}
+      protocol: TCP
+{{- end }}
+{{- end }}

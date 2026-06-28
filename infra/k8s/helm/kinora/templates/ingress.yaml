@@ -1,0 +1,43 @@
+{{- /* Ingress for api + frontend ONLY. The MCP server (8765) is deliberately
+       absent — it must never be internet-facing. The API path prefixes are
+       routed to the api Service; everything else falls through to frontend. */ -}}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "kinora.fullname" . }}
+  labels:
+    {{- include "kinora.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          {{- range $p := list "/health" "/auth" "/books" "/sessions" "/me" "/api" "/metrics" "/docs" "/openapi.json" }}
+          - path: {{ $p }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "kinora.fullname" $ }}-api
+                port:
+                  number: {{ $.Values.roles.api.service.port }}
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "kinora.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.roles.frontend.service.port }}
+{{- end }}

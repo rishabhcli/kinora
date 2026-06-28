@@ -1,0 +1,107 @@
+# Kinora alerting rules — the conditions that mean "the generation-on-scroll loop
+# is degrading" (§12.5) or "we're about to overspend the scarce video budget"
+# (§11.1). Thresholds align with the documented defaults: BUDGET_CEILING_VIDEO_S
+# = 1650, WATERMARK_LOW_S = 25.
+
+groups:
+  - name: kinora.availability
+    rules:
+      - alert: KinoraApiDown
+        expr: up{job="kinora-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Kinora API target is down"
+          description: "Prometheus cannot scrape the API /metrics for 2m — the control plane (scheduler + ingest) is likely down."
+
+      - alert: KinoraHighHttp5xx
+        expr: kinora:http_5xx_ratio:5m > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Elevated API 5xx rate ({{ $value | humanizePercentage }})"
+          description: "More than 5% of API responses are 5xx over 5m."
+
+  - name: kinora.render_pipeline
+    rules:
+      - alert: KinoraRenderLatencyHigh
+        expr: kinora:render_latency_seconds:p95 > 90
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Render p95 latency high for {{ $labels.mode }} ({{ $value | humanizeDuration }})"
+          description: "p95 end-to-end render latency exceeds 90s for 10m; the committed buffer may start draining."
+
+      - alert: KinoraDeadLetterGrowing
+        expr: increase(kinora_dlq_total[15m]) > 5
+        for: 0m
+        labels: { severity: warning }
+        annotations:
+          summary: "Render dead-letter queue growing"
+          description: "More than 5 shots dead-lettered in 15m (§12.1) — a provider or canon issue is recurring."
+
+      - alert: KinoraProviderErrorRateHigh
+        expr: kinora:provider_error_ratio:5m > 0.2
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "DashScope provider error ratio high ({{ $value | humanizePercentage }})"
+          description: "Over 20% of provider calls are failing over 5m — possible throttling (429 RateQuota) or an outage."
+
+      - alert: KinoraQueueBacklog
+        expr: kinora:queue_depth:total > 100
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Render queue backlog ({{ $value }} jobs)"
+          description: "Total queue depth across lanes exceeds 100 for 10m — scale render-workers or investigate stalls (§12.2)."
+
+      - alert: KinoraAcceptedFootageLow
+        expr: kinora:accepted_footage_ratio:5m < 0.7
+        for: 15m
+        labels: { severity: info }
+        annotations:
+          summary: "Accepted-footage efficiency low ({{ $value | humanizePercentage }})"
+          description: "Fewer than 70% of shots are passing QA over 15m (§13) — the crew is regenerating more than expected."
+
+  - name: kinora.budget
+    rules:
+      # Soft warning at 80% of the 1650s ceiling.
+      - alert: KinoraVideoBudget80pct
+        expr: kinora:video_seconds_spent:total > 1320
+        for: 0m
+        labels: { severity: warning }
+        annotations:
+          summary: "Video-seconds budget at 80% ({{ $value }}/1650s)"
+          description: "Spent video-seconds crossed 80% of BUDGET_CEILING_VIDEO_S (§11.1); promotion will soon ride the degradation ladder."
+
+      # Hard warning at the ceiling itself — the hard cap should already be
+      # enforced server-side, so crossing it means the ledger is mis-accounting.
+      - alert: KinoraVideoBudgetExhausted
+        expr: kinora:video_seconds_spent:total >= 1650
+        for: 0m
+        labels: { severity: critical }
+        annotations:
+          summary: "Video-seconds budget exhausted ({{ $value }}/1650s)"
+          description: "The hard video ceiling is reached; live Wan renders should be gated off. Confirm the budget ledger + KINORA_LIVE_VIDEO gate."
+
+      # Unexpected burn while the go-live gate should be OFF.
+      - alert: KinoraVideoSpendWithGateOff
+        expr: (max(kinora_live_video) == 0) and (sum(rate(kinora_video_seconds_spent_total[10m])) > 0)
+        for: 0m
+        labels: { severity: critical }
+        annotations:
+          summary: "Video-seconds spent while KINORA_LIVE_VIDEO is OFF"
+          description: >-
+            The budget ledger is recording video spend even though the live gate
+            reports off — investigate immediately (possible mis-gated render path).
+
+  - name: kinora.buffer
+    rules:
+      - alert: KinoraSessionsBelowWatermark
+        expr: kinora:sessions_below_low_watermark > 0
+        for: 5m
+        labels: { severity: info }
+        annotations:
+          summary: "{{ $value }} reading session(s) below the low watermark (25s)"
+          description: "Committed buffer dipped under WATERMARK_LOW_S for 5m — readers may be skimming faster than the scheduler can fill (§12.5)."

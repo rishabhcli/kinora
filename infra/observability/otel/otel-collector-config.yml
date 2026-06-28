@@ -1,0 +1,65 @@
+# OpenTelemetry Collector — a vendor-neutral funnel for traces/metrics/logs. The
+# backend can export OTLP here (OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317);
+# the collector fans metrics out to Prometheus (scraped at :8889) and logs to Loki.
+# Inert until the app sends OTLP — having it running is harmless.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  resourcedetection:
+    detectors: [env, system]
+    timeout: 5s
+
+exporters:
+  # App-derived metrics re-exposed for Prometheus to scrape at :8889/metrics.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: kinora_otel
+  # Logs to Loki via the OTLP-native push.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  # The collector's own internal metrics, scraped by Prometheus at :8888.
+  telemetry:
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlphttp/loki]
