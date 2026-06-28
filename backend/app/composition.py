@@ -61,6 +61,7 @@ from app.storage.object_store import ObjectStore
 if TYPE_CHECKING:
     from app.auth.service import AuthService
     from app.finops.service import FinOpsService
+    from app.flags.service import FlagService
     from app.integrations.http import HttpxClient
     from app.integrations.service import IntegrationsService
     from app.mcp.authz import BookScopedAuthorizer
@@ -274,6 +275,7 @@ class Container:
     _auth_service: AuthService | None = field(default=None, repr=False)
     _translation_provider: TranslationProvider | None = field(default=None, repr=False)
     _billing_service: object | None = field(default=None, repr=False)
+    _flag_service: FlagService | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -322,6 +324,27 @@ class Container:
                 revocations=revocations,
             )
         return self._auth_service
+
+    @property
+    def flag_service(self) -> FlagService:
+        """The feature-flags & experimentation service (lazy; needs no network).
+
+        Bound to THIS container's unit of work + Redis so flag reads/writes hit
+        the same database and the cache invalidations ride the same Redis the
+        rest of the container uses. The pure evaluator inside it works even with
+        no infra; the service merely persists/caches definitions.
+        """
+        if self._flag_service is None:
+            from app.flags.service import FlagService
+
+            self._flag_service = FlagService(
+                self.session_factory,
+                redis=self.redis,
+                default_salt=self.settings.flags_default_salt,
+                cache_ttl_s=self.settings.flags_cache_ttl_s,
+                channel=self.settings.flags_stream_channel,
+            )
+        return self._flag_service
 
     def _embedder(self) -> Embedder:
         return self.embedder if self.embedder is not None else self.providers.embeddings

@@ -9,6 +9,7 @@ from app.api.routes import (
     events,
     finops,
     films,
+    flags,
     integrations,
     library,
     metrics,
@@ -41,6 +42,7 @@ ROUTERS = [
     optim.router,
     finops.router,
     billing.router,  # billing & payments (additive)
+    flags.router,  # feature flags & experimentation platform (app.flags)
     recommendations.router,  # server-side recsys: watch-next + interaction logging
     reports.router,  # reports subsystem: document generation + signed retrieval
     integrations.router,  # third-party source import (app.integrations)

@@ -127,6 +127,15 @@ from app.moderation.models import (
     ViolationCounter,
 )
 
+# Feature-flags & experimentation platform tables (app.flags). Imported here so
+# Alembic autogenerate + create_all register them on Base.metadata.
+from app.flags.db_models import (
+    FeatureFlag,
+    FlagAudit,
+    FlagExperiment,
+    FlagExposure,
+)
+
 __all__ = [
     "AppConnection",
     "ApiKey",
@@ -169,6 +178,10 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "FeatureFlag",
+    "FlagAudit",
+    "FlagExperiment",
+    "FlagExposure",
     "IngestCheckpoint",
     "IngestMilestone",
     "ImportedItem",
