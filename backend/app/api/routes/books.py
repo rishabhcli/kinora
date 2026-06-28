@@ -65,12 +65,17 @@ logger = get_logger("app.api.books")
 
 router = APIRouter(prefix="/books", tags=["books"])
 
-#: Hard upload size cap — generous for an illustrated PDF/EPUB, bounded for safety.
-MAX_PDF_BYTES = 50 * 1024 * 1024
-#: Per-book page cap — bounds Phase-A (token-only) DashScope spend; the spec's
-#: working maximum is a ~300-page book (kinora.md §11.1). Enforced after we know
-#: the extracted page count, before any ingest is triggered.
-MAX_INGEST_PAGES = 300
+#: Hard upload size cap — bumped to 1GB to accommodate large illustrated PDFs
+#: and full-novel EPUBs. The stream-and-abort read path (``_read_capped``) means
+#: an oversized body still never fully buffers, but operators should monitor
+#: worker RAM since a 1GB PDF parsed by PyMuPDF can spike memory significantly.
+MAX_PDF_BYTES = 1024 * 1024 * 1024
+#: Per-book page cap — bumped from 300 to 2000 so long novels and reference
+#: works fit. This raises the worst-case Phase-A DashScope spend per book ~6.7×
+#: (kinora.md §11.1); operators should pair this with per-tenant rate limits if
+#: cost control is critical. Enforced after the extracted page count is known,
+#: before any token-spending ingest is triggered.
+MAX_INGEST_PAGES = 2000
 #: Max books a single user may own — a coarse per-tenant ingest quota.
 MAX_BOOKS_PER_USER = 50
 #: Streaming read chunk; the upload body is read in chunks and aborted the moment

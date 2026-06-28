@@ -396,9 +396,9 @@ body {
   color: var(--k-text);
 }
 
-/* Focus — visible, on-brand, and only for keyboard users. */
+/* Focus — visible, neutral white (gold reads as "yellow highlight" on inputs). */
 :focus-visible {
-  outline: 1px solid rgb(var(--k-accent-rgb) / 0.4);
+  outline: 1px solid rgba(255, 255, 255, 0.35);
   outline-offset: 1px;
   border-radius: var(--k-radius-xs);
 }

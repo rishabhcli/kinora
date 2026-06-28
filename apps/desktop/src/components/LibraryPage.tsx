@@ -113,13 +113,16 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
 
   return (
     <main id="kinora-main" className="pt-16 pb-12 px-6 max-w-[1280px] mx-auto relative z-10">
-      {/* Header */}
+      {/* Header — home page style with gold accent */}
       <div className="mb-8 pt-4">
-        <p className="text-[11px] font-medium text-kinora-muted mb-2 tracking-wide uppercase">Collection</p>
+        <div className="flex items-center gap-3 mb-2">
+          <span className="inline-block" style={{ width: 28, height: 2, background: "linear-gradient(90deg, #d4a44e, transparent)" }} />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "#d4a44e" }}>Collection</p>
+        </div>
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="font-serif text-3xl font-semibold text-kinora-text">My Library</h1>
-            <p className="text-[13px] text-kinora-muted mt-2">
+            <h1 className="font-serif text-2xl font-semibold text-kinora-text">My Library</h1>
+            <p className="text-[12px] text-kinora-muted mt-1.5">
               {loading
                 ? "Loading your shelf…"
                 : `${books.length} book${books.length === 1 ? "" : "s"} in your collection${offline ? " · offline" : ""}`}

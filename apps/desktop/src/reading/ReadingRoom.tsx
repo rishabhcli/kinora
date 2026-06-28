@@ -4,13 +4,25 @@
 // flawless open→read→close whole that is fully functional every time, even with
 // KINORA_LIVE_VIDEO OFF. See coordination/CONTRACTS.md.
 import { AnimatePresence } from "framer-motion";
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { Book } from "../data/books";
 import { BookOpenTransition } from "./producers";
 import { ReadingRoomShell } from "./ReadingRoomShell";
 import { useFilmSession } from "./useFilmSession";
 import { canReveal, initialState, reduce as machineReduce } from "./machine";
 import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
+
+// Persisted across sessions: whether the user has explicitly enabled AI video
+// generation. Default OFF — the reader sees the bundled fallback film and the
+// text content immediately, with a clear toggle in the top bar to opt in.
+const GEN_KEY = "kinora.reading.generateVideo";
+function readGenPref(): boolean {
+  try {
+    return localStorage.getItem(GEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export default function ReadingRoom({
   book,
@@ -24,6 +36,13 @@ export default function ReadingRoom({
   const [state, dispatch] = useReducer(machineReduce, initialState);
   const reduceMotion = useReducedMotionPref();
   const prevId = useRef<string | null>(null);
+  const [generateVideo, setGenerateVideo] = useState<boolean>(readGenPref);
+  const onToggleGenerate = useCallback((next: boolean) => {
+    setGenerateVideo(next);
+    try {
+      localStorage.setItem(GEN_KEY, next ? "1" : "0");
+    } catch { /* storage blocked */ }
+  }, []);
 
   // OPEN on a new book; CLOSE when it goes away (handles rapid open/close).
   // MUST be declared before useFilmSession so its effect runs FIRST — otherwise
@@ -37,7 +56,7 @@ export default function ReadingRoom({
   }, [book]);
 
   // The data + live session loader (dispatches META/PAGES/SHOTS/SESSION/FALLBACK).
-  const session = useFilmSession(book, dispatch);
+  const session = useFilmSession(book, dispatch, generateVideo);
 
   // Reveal once the film frame is painted AND the open animation is ready.
   useEffect(() => {
@@ -77,7 +96,7 @@ export default function ReadingRoom({
           onOpened={onOpened}
           onClosed={onClosed}
         >
-          <ReadingRoomShell book={book} onClose={onClose} state={state} dispatch={dispatch} session={session} reduce={reduceMotion} />
+          <ReadingRoomShell book={book} onClose={onClose} state={state} dispatch={dispatch} session={session} reduce={reduceMotion} generateVideo={generateVideo} onToggleGenerate={onToggleGenerate} />
         </BookOpenTransition>
       )}
     </AnimatePresence>

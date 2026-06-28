@@ -44,7 +44,14 @@ interface AgentActivityMsg {
   message?: string;
 }
 
-export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) => void): FilmSession {
+export function useFilmSession(
+  book: Book | null,
+  dispatch: (e: MachineEvent) => void,
+  /** When false, skip the SSE/createSession live path and stay on the bundled
+   *  fallback film. The reader can flip this on at any time from the top bar to
+   *  start AI generation (gives users explicit control over generation spend). */
+  generateVideo: boolean = true,
+): FilmSession {
   const [pages, setPages] = useState<PageText[]>([]);
   const [shots, setShots] = useState<ShotResponse[]>([]);
   const [clipByShot, setClipByShot] = useState<Record<string, string>>({});
@@ -80,6 +87,14 @@ export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) =>
     // No auth → no backend session at all → straight to the bundled film.
     if (!api.isAuthed()) {
       dispatch({ type: "FALLBACK", message: "Offline preview" });
+      return;
+    }
+
+    // Generation gated OFF → show the bundled fallback film immediately and skip
+    // all token-spending live calls. Flipping the toggle ON re-runs this effect
+    // (generateVideo is in the dep array) and kicks off the live session.
+    if (!generateVideo) {
+      dispatch({ type: "FALLBACK", message: "AI film is off — turn it on in the top bar to generate" });
       return;
     }
 
@@ -203,7 +218,7 @@ export function useFilmSession(book: Book | null, dispatch: (e: MachineEvent) =>
       pendingClips.current = {};
       setSessionId(null);
     };
-  }, [book, dispatch]);
+  }, [book, dispatch, generateVideo]);
 
   return { pages, shots, clipByShot, sessionId, live, fallbackFilm, bufferAhead, bursting, inflight, zone, crew };
 }

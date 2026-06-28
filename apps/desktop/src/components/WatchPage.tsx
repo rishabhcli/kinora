@@ -7,18 +7,21 @@ export default function WatchPage() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   return (
-    <div className="pt-16 pb-12 max-w-[1280px] mx-auto relative z-10">
-      {/* Page header */}
-      <div className="px-6 mb-6 pt-4">
-        <p className="text-[11px] font-medium text-kinora-muted mb-2 tracking-wide uppercase">Cinematic</p>
-        <h1 className="font-serif text-3xl font-semibold text-kinora-text">Watch</h1>
-        <p className="text-[13px] text-kinora-muted mt-2">
+    <div className="pt-20 pb-12 px-6 max-w-[1280px] mx-auto relative z-10">
+      {/* Compact page header — matches home page style */}
+      <div className="mb-5 pt-2">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="inline-block" style={{ width: 28, height: 2, background: "linear-gradient(90deg, #d4a44e, transparent)" }} />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "#d4a44e" }}>Cinematic</p>
+        </div>
+        <h1 className="font-serif text-2xl font-semibold text-kinora-text">Watch</h1>
+        <p className="text-[12px] text-kinora-muted mt-1">
           Page-synced films that generate themselves as you read.
         </p>
       </div>
 
       {/* Full-bleed cinematic hero */}
-      <div className="relative w-full overflow-hidden rounded-2xl" style={{ aspectRatio: "21 / 9" }}>
+      <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: "21 / 9" }}>
         {/* Backdrop */}
         <div className="absolute inset-0">
           <img
@@ -37,30 +40,20 @@ export default function WatchPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/20" />
 
         {/* Content overlay */}
-        <div className="absolute inset-0 flex flex-col justify-between p-8">
+        <div className="absolute inset-0 flex flex-col justify-between p-6">
           {/* Top row — badges */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span
-                className="text-[9px] font-bold px-2 py-0.5 rounded"
-                style={{
-                  background: "linear-gradient(135deg, rgba(212,164,78,0.2) 0%, rgba(212,164,78,0.08) 100%)",
-                  color: "#e8c878",
-                  border: "1px solid rgba(212,164,78,0.15)",
-                }}
-              >
+              <span className="text-[9px] font-medium px-2 py-0.5 rounded bg-white/5 text-white/60 border border-white/5">
                 FHD
-              </span>
-              <span className="text-[9px] font-medium px-2 py-0.5 rounded bg-white/5 text-white/70 border border-white/5 backdrop-blur-sm">
-                AI CINEMATIC
               </span>
             </div>
             <span
               className="text-[10px] font-medium tracking-wide flex items-center gap-1.5"
-              style={{ color: isPlaying ? "#e8c878" : "rgba(255,255,255,0.6)" }}
+              style={{ color: isPlaying ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.5)" }}
             >
               {isPlaying && (
-                <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: "#e8c878", boxShadow: "0 0 6px #e8c878" }} />
+                <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.6)" }} />
               )}
               {isPlaying ? "NOW PLAYING" : "READY"}
             </span>
@@ -69,46 +62,34 @@ export default function WatchPage() {
           {/* Bottom row — title + play */}
           <div className="flex items-end justify-between">
             <div className="max-w-[60%]">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-kinora-gold mb-2 font-medium">
-                Kinora Cinematic
-              </p>
               <h2 className="font-serif text-3xl font-semibold text-white mb-1 leading-tight">
                 {selected.title}
               </h2>
-              <p className="text-sm text-white/75">{selected.author}</p>
+              <p className="text-sm text-white/60">{selected.author}</p>
             </div>
 
-            {/* Play / Pause button */}
+            {/* Play / Pause button — flat, neutral */}
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-[1.03]"
+              className="flex items-center gap-2.5 px-5 py-2.5 rounded-lg transition-colors duration-200"
               style={{
-                background: isPlaying
-                  ? "rgba(255,255,255,0.12)"
-                  : "linear-gradient(135deg, #d4a44e 0%, #c8923a 100%)",
-                backdropFilter: isPlaying ? "blur(12px) saturate(160%)" : undefined,
-                WebkitBackdropFilter: isPlaying ? "blur(12px) saturate(160%)" : undefined,
-                border: isPlaying
-                  ? "1px solid rgba(255,255,255,0.15)"
-                  : "1px solid rgba(212,164,78,0.3)",
-                boxShadow: isPlaying
-                  ? "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.12)"
-                  : "0 4px 20px -2px rgba(212,164,78,0.35)",
-                color: isPlaying ? "white" : "#1a1512",
+                background: isPlaying ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.85)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                color: isPlaying ? "white" : "#0f0e0c",
               }}
             >
               {isPlaying ? (
                 <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                    <rect x="7" y="5" width="3.5" height="14" rx="1" />
-                    <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                    <rect x="6" y="4" width="4" height="16" rx="1.5" />
+                    <rect x="14" y="4" width="4" height="16" rx="1.5" />
                   </svg>
                   <span className="text-[13px] font-semibold">Pause</span>
                 </>
               ) : (
                 <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M10 8.5l5 3.5-5 3.5z" />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
                   </svg>
                   <span className="text-[13px] font-semibold">Play</span>
                 </>
@@ -123,7 +104,7 @@ export default function WatchPage() {
             className="h-full transition-all duration-300"
             style={{
               width: isPlaying ? "35%" : "0%",
-              background: "linear-gradient(90deg, #d4a44e 0%, #e8c878 100%)",
+              background: "rgba(255,255,255,0.5)",
             }}
           />
         </div>
@@ -131,10 +112,10 @@ export default function WatchPage() {
 
       {/* Metadata strip below hero */}
       <div
-        className="px-6 py-4 flex items-center justify-between mb-6 mt-4 rounded-xl"
+        className="py-3.5 flex items-center justify-between mb-6 mt-4 rounded-md px-4"
         style={{
-          background: "linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)",
-          border: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.05)",
         }}
       >
         <div className="flex items-center gap-4">
@@ -163,13 +144,13 @@ export default function WatchPage() {
         </div>
         <div className="flex items-center gap-3">
           <button className="text-[11px] text-kinora-muted hover:text-kinora-text transition-colors flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04]">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20.5C12 20.5 3.5 15.5 3.5 9.5C3.5 6.5 5.8 4.5 8.5 4.5C10.2 4.5 11.5 5.5 12 6.5C12.5 5.5 13.8 4.5 15.5 4.5C18.2 4.5 20.5 6.5 20.5 9.5C20.5 15.5 12 20.5 12 20.5z" />
             </svg>
             Add to Favorites
           </button>
           <button className="text-[11px] text-kinora-muted hover:text-kinora-text transition-colors flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04]">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 4.5C5 3.67 5.67 3 6.5 3H16l3 3v13.5c0 .83-.67 1.5-1.5 1.5h-11c-.83 0-1.5-.67-1.5-1.5z" />
               <path d="M16 3v3h3" />
               <path d="M8 10h8M8 13h8M8 16h5" strokeWidth={1.4} />
@@ -180,9 +161,9 @@ export default function WatchPage() {
       </div>
 
       {/* Book selector */}
-      <div className="px-6">
+      <div>
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-1 h-4 bg-kinora-gold/60 rounded-full" />
+          <div className="w-1 h-4 bg-white/20 rounded-full" />
           <h2 className="font-serif text-base font-semibold text-kinora-text tracking-wide">
             Available to Watch
           </h2>
@@ -205,7 +186,7 @@ export default function WatchPage() {
                     aspectRatio: "2 / 3",
                     background: book.coverGradient,
                     boxShadow: isActive
-                      ? "0 4px 20px -4px rgba(212,164,78,0.25)"
+                      ? "0 4px 16px -4px rgba(0,0,0,0.4)"
                       : "none",
                   }}
                 >
@@ -223,7 +204,7 @@ export default function WatchPage() {
                     <div
                       className="absolute inset-0"
                       style={{
-                        border: "2px solid rgba(212,164,78,0.5)",
+                        border: "2px solid rgba(255,255,255,0.4)",
                         borderRadius: "8px",
                       }}
                     />
@@ -231,14 +212,14 @@ export default function WatchPage() {
                   {isActive && (
                     <div className="absolute bottom-1 left-1 right-1 flex items-center justify-center">
                       <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center"
+                        className="w-8 h-8 rounded-full flex items-center justify-center"
                         style={{
-                          background: "linear-gradient(135deg, rgba(212,164,78,0.9) 0%, rgba(200,146,58,0.9) 100%)",
+                          background: "rgba(255,255,255,0.85)",
                           boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
                         }}
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#1a1512">
-                          <path d="M10 8.5l5 3.5-5 3.5z" />
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#0f0e0c">
+                          <path d="M8 5v14l11-7z" />
                         </svg>
                       </div>
                     </div>

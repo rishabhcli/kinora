@@ -51,11 +51,14 @@ export default function SettingsPage() {
 
   return (
     <div className="pt-12 pb-8 px-6 max-w-[1100px] mx-auto relative z-10">
-      {/* Header */}
+      {/* Header — home page style with gold accent */}
       <div className="mb-8 pt-4">
-        <p className="text-[11px] font-medium text-kinora-muted mb-2 tracking-wide uppercase">{t("settings.title")}</p>
+        <div className="flex items-center gap-3 mb-2">
+          <span className="inline-block" style={{ width: 28, height: 2, background: "linear-gradient(90deg, #d4a44e, transparent)" }} />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "#d4a44e" }}>{t("settings.title")}</p>
+        </div>
         <div className="flex items-end justify-between gap-4">
-          <h1 className="font-serif text-3xl font-semibold text-kinora-text">{t("settings.title")}</h1>
+          <h1 className="font-serif text-2xl font-semibold text-kinora-text">{t("settings.title")}</h1>
           <div className="relative" style={{ width: 240 }}>
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-kinora-subtle pointer-events-none">
               <Icon name="magnifyingglass" size={14} />

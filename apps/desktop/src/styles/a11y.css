@@ -82,11 +82,22 @@
   outline: 2px solid var(--kinora-a11y-focus);
 }
 
-/* ---- Keyboard focus ring (the app otherwise strips outlines) ---------------- */
+/* ---- Keyboard focus ring (the app otherwise strips outlines) ----------------
+   Neutral white ring — the previous gold ring read as a "yellow highlight" on
+   inputs and search fields. Reserved colour focus for the high-contrast mode. */
 :focus-visible {
-  outline: 1px solid rgb(var(--k-accent-rgb) / 0.4) !important;
+  outline: 1px solid rgba(255, 255, 255, 0.35) !important;
   outline-offset: 1px;
   border-radius: 3px;
+}
+/* Inputs/textareas: no outline at all — the field's own border + a soft inset
+   box-shadow is the affordance. Prevents the "yellow box" effect on search. */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 /* Don't show the ring for pointer interactions, only keyboard. */
 :focus:not(:focus-visible) {

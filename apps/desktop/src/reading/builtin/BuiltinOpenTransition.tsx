@@ -131,28 +131,6 @@ export function BuiltinBookOpenTransition({
 
       {/* The cover swings open on its spine, then lifts away (skipped on reduced motion) */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ perspective: 2200 } as CSSProperties}>
-        {/* Static "first page" — revealed as the cover swings open */}
-        {!reduce && (
-          <div
-            className="absolute"
-            style={{
-              width: "min(40vh, 300px)",
-              aspectRatio: "2 / 3",
-              background: "linear-gradient(135deg, #f5efe4 0%, #ebe5d8 50%, #e0d9ca 100%)",
-              borderRadius: "3px 8px 8px 3px",
-              boxShadow: "0 20px 50px -16px rgba(0,0,0,0.6)",
-              opacity: 0.92,
-            } as CSSProperties}
-          >
-            {/* Page text lines suggestion */}
-            <div className="absolute inset-0 flex flex-col gap-[3px] px-5 py-6" style={{ opacity: 0.15 }}>
-              {Array.from({ length: 14 }).map((_, i) => (
-                <div key={i} style={{ height: 2, background: "#8a7a60", borderRadius: 1, width: i % 3 === 2 ? "60%" : "100%" }} />
-              ))}
-            </div>
-          </div>
-        )}
-
         <motion.div
           className="relative"
           style={{

@@ -15,9 +15,13 @@ import {
   type LibraryBook,
 } from "../lib/api/library";
 
-const MAX_BYTES = 50 * 1024 * 1024; // mirrors the backend MAX_PDF_BYTES
-const MAX_MB = 50;
-const ACCEPT = [".epub", ".pdf"];
+const MAX_BYTES = 1024 * 1024 * 1024; // 1 GB, mirrors backend MAX_PDF_BYTES
+const MAX_MB = 1024;
+// EPUB + PDF are fully supported end-to-end (ingest, page render, video sync).
+// Other formats (txt, mobi, azw3, html, docx) are accepted via the picker but
+// the backend rejects them; the validator surfaces a friendly message.
+const ACCEPT_SUPPORTED = [".epub", ".pdf"];
+const ACCEPT_ALL = [".epub", ".pdf", ".txt", ".mobi", ".azw3", ".html", ".htm", ".docx"];
 
 export interface UploadItem {
   key: string;
@@ -36,13 +40,21 @@ interface UploadBookProps {
   onReady?: (book: LibraryBook) => void;
 }
 
+function fmtSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)}GB`;
+  return `${Math.round(bytes / 1024 / 1024)}MB`;
+}
+
 function validate(file: File): string | null {
   const name = file.name.toLowerCase();
-  if (!ACCEPT.some((ext) => name.endsWith(ext))) {
-    return "Only EPUB or PDF files are supported.";
+  if (!ACCEPT_ALL.some((ext) => name.endsWith(ext))) {
+    return "Unsupported file type. Try EPUB or PDF.";
+  }
+  if (!ACCEPT_SUPPORTED.some((ext) => name.endsWith(ext))) {
+    return "Only EPUB or PDF are supported today — more formats are coming.";
   }
   if (file.size > MAX_BYTES) {
-    return `That file is ${Math.round(file.size / 1024 / 1024)}MB — the limit is ${MAX_MB}MB.`;
+    return `That file is ${fmtSize(file.size)} — the limit is 1GB.`;
   }
   if (file.size < 200) return "That file looks empty or corrupt.";
   return null;
@@ -50,8 +62,8 @@ function validate(file: File): string | null {
 
 function friendlyError(e: unknown): string {
   if (e instanceof ApiError) {
-    if (e.status === 413 && e.detail.includes("page")) return "Over the 300-page limit.";
-    if (e.status === 413) return `Over the ${MAX_MB}MB limit.`;
+    if (e.status === 413 && e.detail.includes("page")) return "Over the per-book page limit.";
+    if (e.status === 413) return `Over the 1GB upload limit.`;
     if (e.status === 415 || e.status === 400) return "That isn't a readable EPUB or PDF.";
     if (e.status === 429) return "Your library is full (50-book limit).";
     if (e.status === 401) return "Please sign in again.";
@@ -165,7 +177,7 @@ export default function UploadBook({ onUploadsChange, onReady }: UploadBookProps
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         aria-label="Upload a book — drag an EPUB or PDF here, or click to choose a file"
-        className="w-full rounded-2xl px-6 py-5 flex items-center gap-4 text-left transition-colors"
+        className="w-full rounded-lg px-5 py-4 flex items-center gap-3.5 text-left transition-colors"
         style={{
           border: `1px dashed ${dragging ? "rgba(212,164,78,0.8)" : "rgba(255,255,255,0.18)"}`,
           background: dragging ? "rgba(212,164,78,0.10)" : "rgba(255,255,255,0.04)",
@@ -173,8 +185,8 @@ export default function UploadBook({ onUploadsChange, onReady }: UploadBookProps
       >
         <span
           aria-hidden
-          className="flex items-center justify-center rounded-xl shrink-0"
-          style={{ width: 44, height: 44, background: "rgba(212,164,78,0.16)" }}
+          className="flex items-center justify-center rounded-md shrink-0"
+          style={{ width: 40, height: 40, background: "rgba(212,164,78,0.16)" }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgb(212,164,78)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 16V4M7 9l5-5 5 5" />
@@ -186,14 +198,14 @@ export default function UploadBook({ onUploadsChange, onReady }: UploadBookProps
             {dragging ? "Drop to add to your library" : "Upload your own book"}
           </span>
           <span className="text-[11px] text-kinora-muted">
-            Drag an EPUB or PDF here, or click to choose · up to {MAX_MB}MB, 300 pages
+            Drag an EPUB or PDF here, or click to choose · up to 1GB, large books OK
           </span>
         </span>
         <input
           ref={inputRef}
           id={inputId}
           type="file"
-          accept=".epub,.pdf,application/epub+zip,application/pdf"
+          accept=".epub,.pdf,.txt,.mobi,.azw3,.html,.htm,.docx,application/epub+zip,application/pdf,text/plain,text/html"
           multiple
           className="hidden"
           onChange={(e) => {
@@ -208,7 +220,7 @@ export default function UploadBook({ onUploadsChange, onReady }: UploadBookProps
           {items.map((it) => (
             <li
               key={it.key}
-              className="flex items-center gap-3 rounded-xl px-3 py-2 text-[12px]"
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-[12px]"
               style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid rgba(255,255,255,0.10)" }}
             >
               <span

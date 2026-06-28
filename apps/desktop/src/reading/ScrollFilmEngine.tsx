@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import type { Book } from "../data/books";
 import { api, toBrowserUrl, type ShotResponse } from "../lib/api";
 import {
@@ -27,6 +27,8 @@ import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 const PRELOAD_LOOKAHEAD_WORDS = 240;
 
 const FILM_W = 320;
+const FILM_MIN = 200;
+const FILM_MAX = 560;
 const PARALLAX_PX = 12; // film drift over the full scroll (GPU translate; off when reduced)
 const PARA_THROTTLE_MS = 100;
 
@@ -119,6 +121,43 @@ export function ScrollFilmEngine({
 }: ScrollFilmEngineProps) {
   const autoReduce = useReducedMotionPref();
   const reduce = reducedMotionProp ?? autoReduce;
+
+  // Draggable splitter: film pane width is state-driven so the reader can resize.
+  const [filmWidth, setFilmWidth] = useState(FILM_W);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+
+  const onSplitterDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      // Film is on the right; new width = distance from mouse to container's right edge.
+      const newWidth = rect.right - e.clientX;
+      setFilmWidth(Math.max(FILM_MIN, Math.min(FILM_MAX, newWidth)));
+    };
+    const onUp = () => {
+      if (draggingRef.current) {
+        draggingRef.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   const film =
     fallbackFilm ??
@@ -320,7 +359,7 @@ export function ScrollFilmEngine({
   });
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[1180px] flex-1 items-stretch gap-10 overflow-hidden px-8 py-8">
+    <div ref={containerRef} className="mx-auto flex min-h-0 w-full max-w-[1180px] flex-1 items-stretch overflow-hidden px-8 py-8">
       {/* Scrolling book text + reading-progress rail */}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <div
@@ -331,25 +370,10 @@ export function ScrollFilmEngine({
           aria-label="Reading text — use arrow keys, space, or Page Up/Down to scroll"
           className="scrollbar-slim min-h-0 flex-1 overflow-y-auto pr-6 focus:outline-none"
         >
-          <div className="mb-2 flex items-center gap-3">
-            <span
-              className="inline-block"
-              style={{ width: 30, height: 1, background: "linear-gradient(90deg, #d4a44e, transparent)" }}
-            />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "#d4a44e" }}>
-              Now Reading
-            </span>
-          </div>
-          <h1
-            className="mb-1 font-serif text-2xl font-semibold"
-            style={{
-              background: "linear-gradient(168deg, #f4efe6 0%, #efe3cf 42%, #e8c878 100%)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              color: "transparent",
-            }}
-          >
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.2em] text-kinora-muted">
+            Now Reading
+          </p>
+          <h1 className="mb-1 font-serif text-2xl font-semibold text-kinora-text">
             {book.title}
           </h1>
           <p className="mb-7 text-[13px] text-kinora-muted">by {book.author}</p>
@@ -374,14 +398,12 @@ export function ScrollFilmEngine({
                     data-para={i}
                     className={font.className}
                     style={{
-                      color: `rgba(${theme.ink}, ${i === 0 ? 1 : 0.62})`,
-                      borderLeft: `2px solid ${i === 0 ? "rgba(212,164,78,0.7)" : "transparent"}`,
-                      paddingLeft: 14,
+                      color: `rgba(${theme.ink}, ${i === 0 ? 0.92 : 0.62})`,
                       fontSize: `${15 * prefs.fontScale}px`,
                       lineHeight: prefs.leading,
                       letterSpacing: sp.letter,
                       wordSpacing: sp.word,
-                      transition: reduce ? "none" : "color 0.4s ease, border-color 0.4s ease",
+                      transition: reduce ? "none" : "color 0.4s ease",
                     }}
                   >
                     {para}
@@ -394,7 +416,7 @@ export function ScrollFilmEngine({
 
         {/* Read-so-far + committed-ahead rail; ticks = shots, dot = your place. */}
         <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-1 rounded-full" aria-hidden style={{ background: "rgba(255,255,255,0.06)" }}>
-          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "linear-gradient(180deg, rgba(212,164,78,0.7) 0%, rgba(212,164,78,0.4) 100%)" }} />
+          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "rgba(232,226,216,0.35)" }} />
           {live && (
             <div
               ref={railLeadRef}
@@ -402,8 +424,7 @@ export function ScrollFilmEngine({
               style={{
                 top: "0%",
                 height: `${Math.min(0.18, Math.max(0, (bufferAhead ?? 0) / 30)) * 100}%`,
-                background: `linear-gradient(180deg, ${bursting ? "rgba(251,191,36,0.85)" : "rgba(52,211,153,0.75)"}, transparent)`,
-                boxShadow: `0 0 8px ${bursting ? "rgba(251,191,36,0.55)" : "rgba(52,211,153,0.45)"}`,
+                background: "rgba(232,226,216,0.15)",
               }}
             />
           )}
@@ -414,15 +435,34 @@ export function ScrollFilmEngine({
               style={{ top: `${(s.wordStart / Math.max(1, timeline.totalWords)) * 100}%`, background: "rgba(255,255,255,0.22)" }}
             />
           ))}
-          <div ref={railDotRef} className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ top: "0%", background: "#e8e2d8", boxShadow: "0 0 6px rgba(232,226,216,0.7)" }} />
+          <div ref={railDotRef} className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ top: "0%", background: "rgba(232,226,216,0.8)" }} />
+        </div>
+      </div>
+
+      {/* Draggable splitter — drag left to expand film, right to shrink */}
+      <div
+        onMouseDown={onSplitterDown}
+        className="group relative flex-shrink-0 cursor-col-resize select-none"
+        style={{ width: 6, marginLeft: 10, marginRight: 10 }}
+        aria-label="Drag to resize video and text panels"
+        role="separator"
+        aria-orientation="vertical"
+      >
+        <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200" style={{ background: "rgba(255,255,255,0.08)" }} />
+        <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200 group-hover:bg-kinora-gold/40" style={{ background: "transparent" }} />
+        {/* Grip dots */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-[3px]">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[3px] w-[3px] rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+          ))}
         </div>
       </div>
 
       {/* Pinned vertical film (720×1280 / 9:16) */}
-      <div className="flex-shrink-0 self-start">
+      <div className="flex-shrink-0 self-start" style={{ width: filmWidth }}>
         <div
-          className="glass-card relative overflow-hidden rounded-[24px]"
-          style={{ width: FILM_W, aspectRatio: "9 / 16", boxShadow: "inset 0 1px 0 rgba(246,240,231,0.1), 0 34px 90px -22px rgba(6,5,4,0.85)" } as CSSProperties}
+          className="glass-card relative overflow-hidden rounded-xl"
+          style={{ width: filmWidth, aspectRatio: "9 / 16", boxShadow: "inset 0 1px 0 rgba(246,240,231,0.1), 0 34px 90px -22px rgba(6,5,4,0.85)" } as CSSProperties}
         >
           <div
             ref={parallaxRef}
@@ -438,11 +478,10 @@ export function ScrollFilmEngine({
             />
           </div>
           <div
-            className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1"
-            style={{ background: "rgba(0,0,0,0.42)", backdropFilter: "blur(10px)" }}
+            className="absolute left-3 top-3 flex items-center gap-1.5 rounded-md px-2 py-0.5"
+            style={{ background: "rgba(0,0,0,0.55)" }}
           >
-            <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
-            <span className="text-[9px] font-semibold tracking-wide text-white/90">AI FILM</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/85">FILM</span>
           </div>
           {/* Scrub indicator — fades in only while actively scrubbing */}
           <div

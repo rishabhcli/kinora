@@ -191,7 +191,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
       <header className="fixed top-0 left-0 right-0 z-50" data-profile-dropdown style={{
         background: "rgb(var(--k-surface-raised-rgb) / 0.92)",
       }}>
-        <div className="px-6 py-2.5 flex items-center justify-between max-w-[1280px] mx-auto">
+        <div className="px-6 py-1 flex items-center justify-between max-w-[1280px] mx-auto">
           {/* Left: Logo */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate("Home")}>
             <BookLogoIcon size={36} />
@@ -226,73 +226,62 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
           </div>
         </div>
 
-        {/* Profile dropdown */}
+        {/* Profile dropdown — denser, web-app menu style (no gold tinting, no big radii) */}
         {profileOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute top-12 right-6 w-64 rounded-2xl overflow-hidden z-[60]"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-10 right-6 w-60 overflow-hidden z-[60]"
             style={{
-              background: "rgb(var(--k-surface-high-rgb) / 0.96)",
-              border: "1px solid rgba(212, 164, 78, 0.12)",
-              boxShadow: "0 16px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.03)",
+              borderRadius: 8,
+              background: "#1a1714",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 10px 32px -8px rgba(0,0,0,0.6)",
             }}
           >
-            {/* Header with gradient */}
+            {/* Header — flat, no gradient, no glow */}
             <div
-              className="relative px-4 py-3.5"
-              style={{
-                background: "linear-gradient(135deg, rgba(212,164,78,0.08) 0%, transparent 100%)",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-              }}
+              className="px-3 py-2.5 flex items-center gap-2.5"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
             >
-              <div className="flex items-center gap-3">
-                <div className="relative" style={{ filter: "drop-shadow(0 2px 8px rgba(212,164,78,0.2))" }}>
-                  <GeometricAvatar size={36} ring />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-kinora-text truncate">User</p>
-                  <p className="text-[10px] text-kinora-muted truncate">user@kinora.app</p>
-                </div>
+              <GeometricAvatar size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-kinora-text truncate leading-tight">User</p>
+                <p className="text-[10px] text-kinora-muted truncate">user@kinora.app</p>
               </div>
             </div>
 
             {/* Menu items */}
-            <div className="py-1.5">
+            <div className="py-1">
               {[
-                { label: "Edit Profile", icon: <path d="M12 12.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />, icon2: <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />, action: () => { onNavigate("Edit Profile"); setProfileOpen(false); } },
-                { label: "Settings", icon: <circle cx="12" cy="12" r="3" />, icon2: <path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />, action: () => { onNavigate("Settings"); setProfileOpen(false); } },
-                { label: "Pricing", icon: <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />, icon2: null, action: () => { onNavigate("Pricing"); setProfileOpen(false); } },
+                { label: "Edit Profile", icon: <><path d="M12 12.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" /><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" /></>, action: () => { onNavigate("Edit Profile"); setProfileOpen(false); } },
+                { label: "Settings", icon: <><circle cx="12" cy="12" r="3" /><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></>, action: () => { onNavigate("Settings"); setProfileOpen(false); } },
+                { label: "Pricing", icon: <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />, action: () => { onNavigate("Pricing"); setProfileOpen(false); } },
               ].map((item) => (
                 <button
                   key={item.label}
                   onClick={item.action}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-kinora-muted transition-all duration-200 group"
-                  style={{ borderRadius: 0 }}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[12px] text-kinora-muted hover:bg-white/[0.04] hover:text-kinora-text transition-colors"
                 >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="transition-colors duration-200 group-hover:text-[rgba(212,164,78,0.9)]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
                     {item.icon}
-                    {item.icon2}
                   </svg>
-                  <span className="flex-1 text-left transition-colors duration-200 group-hover:text-kinora-text">{item.label}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="opacity-0 group-hover:opacity-40 transition-opacity duration-200">
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
+                  <span className="flex-1 text-left">{item.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Divider */}
-            <div className="h-px mx-4" style={{ background: "linear-gradient(90deg, transparent, rgb(var(--k-text-rgb) / 0.10), transparent)" }} />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
             {/* Log Out */}
-            <div className="py-1.5">
+            <div className="py-1">
               <button
                 onClick={() => { setProfileOpen(false); onLogout?.(); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-red-400/60 hover:text-red-400 transition-all duration-200 group"
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[12px] text-kinora-muted hover:bg-white/[0.04] hover:text-red-300 transition-colors"
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200 group-hover:translate-x-[-1px]">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <path d="M16 17l5-5-5-5M21 12H9" />
                 </svg>

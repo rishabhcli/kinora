@@ -293,7 +293,7 @@ export const recommended: Book[] = [
     progress: 0,
     coverColor: "#e67e22",
     coverGradient: "linear-gradient(135deg, #e67e22 0%, #a85c15 100%)",
-    coverImage: cover("9780345472328"),
+    coverImage: "https://books.google.com/books/content?id=Pff9Xzpsj4oC&printsec=frontcover&img=1&zoom=0&source=gbs_api",
     textColor: "#f8e8d8",
     spineColor: "#7d4510",
   },

@@ -117,15 +117,17 @@ export default function PricingPage() {
 
   return (
     <div className="pt-24 pb-8 px-6 max-w-[1280px] mx-auto relative z-10">
-      {/* Header */}
+      {/* Header — home page style with gold accent */}
       <div className="text-center mb-10 pt-4">
-        <p className="text-[11px] font-medium text-kinora-muted mb-3 tracking-wide uppercase">
-          Pricing
-        </p>
-        <h1 className="font-serif text-3xl font-semibold text-kinora-text mb-3">
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <span className="inline-block" style={{ width: 28, height: 2, background: "linear-gradient(90deg, transparent, #d4a44e, transparent)" }} />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.26em]" style={{ color: "#d4a44e" }}>Pricing</p>
+          <span className="inline-block" style={{ width: 28, height: 2, background: "linear-gradient(90deg, transparent, #d4a44e, transparent)" }} />
+        </div>
+        <h1 className="font-serif text-2xl font-semibold text-kinora-text mb-3">
           Choose your plan
         </h1>
-        <p className="text-[13px] text-kinora-muted max-w-md mx-auto">
+        <p className="text-[12px] text-kinora-muted max-w-md mx-auto">
           Start free, upgrade when you're ready. Cancel anytime.
         </p>
       </div>
