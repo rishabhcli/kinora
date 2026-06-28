@@ -114,9 +114,7 @@ async def get_buffer_trace(
 
 
 @router.get("/report/{book_id}")
-async def get_report(
-    book_id: str, container: ContainerDep, user: CurrentUser
-) -> dict[str, Any]:
+async def get_report(book_id: str, container: ContainerDep, user: CurrentUser) -> dict[str, Any]:
     """Return the cached crew-vs-baseline §13 report for a book (exact contract).
 
     The report is produced (and cached) by ``python -m app.eval.run --book
@@ -134,6 +132,99 @@ async def get_report(
             status=404,
         )
     return cached
+
+
+# --------------------------------------------------------------------------- #
+# Live telemetry surface (the §13 warehouse + SLOs + dashboards-as-code).
+#
+# These read endpoints back the operator panels and the demo "metrics panel".
+# The cheap warehouse snapshot is computed in-process (no infra); the SLO + alert
+# + dashboard payloads are pure data derived from code, so they never touch the
+# DB / Redis / a provider. All require an authenticated user but are not scoped
+# to a single book (they describe the process, not one adaptation).
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/warehouse")
+async def get_warehouse_snapshot(user: CurrentUser) -> dict[str, Any]:
+    """Return the live per-agent quality/cost rollup (the online §13 warehouse).
+
+    The snapshot is a JSON-safe dict of per-agent stats (calls / tokens / cost /
+    latency p50/p95 / repair-rate / QA means / accepted-vs-degraded), the crew
+    totals, and the §13-flavoured derived headline numbers (acceptance rate,
+    regen rate, mean CCS, cost per accepted shot). Mirrors the warehouse into the
+    per-agent Prometheus gauges as a side effect, so a subsequent ``/metrics``
+    scrape is consistent with what this returned.
+    """
+    from app.telemetry.warehouse import get_warehouse
+
+    warehouse = get_warehouse()
+    snapshot = warehouse.snapshot()
+    warehouse.export_prometheus()
+    logger.info(
+        "eval.warehouse_served",
+        agents=len(snapshot.get("agents", [])),
+        calls=snapshot.get("crew_totals", {}).get("calls", 0),
+    )
+    return snapshot
+
+
+@router.get("/slo")
+async def get_slo_catalogue(user: CurrentUser) -> dict[str, Any]:
+    """Return the SLO catalogue (objectives, SLI queries, burn-rate windows)."""
+    from app.telemetry.slo import slo_catalogue
+
+    return dict(slo_catalogue())
+
+
+@router.get("/slo/alerts")
+async def get_slo_alert_rules(
+    user: CurrentUser,
+    fmt: Annotated[str, Query(pattern="^(json|yaml)$")] = "json",
+) -> Any:
+    """Return the Prometheus recording + alerting rules derived from the SLOs.
+
+    ``fmt=json`` (default) returns the rule-file dict; ``fmt=yaml`` returns the
+    serialized rule file as ``text/plain`` ready to mount in Prometheus.
+    """
+    from fastapi.responses import PlainTextResponse
+
+    from app.telemetry.alerts import (
+        build_alert_rules,
+        build_recording_rules,
+        rules_yaml,
+    )
+
+    if fmt == "yaml":
+        return PlainTextResponse(rules_yaml(), media_type="text/plain; charset=utf-8")
+    recording = build_recording_rules()
+    alerting = build_alert_rules()
+    return {"groups": recording["groups"] + alerting["groups"]}
+
+
+@router.get("/dashboards")
+async def list_dashboards(user: CurrentUser) -> dict[str, Any]:
+    """List the available dashboards-as-code (names + titles)."""
+    from app.telemetry.dashboards import build_dashboard, dashboard_names
+
+    names = dashboard_names()
+    out = []
+    for name in names:
+        model = build_dashboard(name)
+        if model is not None:
+            out.append({"name": name, "title": model.get("title"), "uid": model.get("uid")})
+    return {"dashboards": out}
+
+
+@router.get("/dashboards/{name}")
+async def get_dashboard(name: str, user: CurrentUser) -> dict[str, Any]:
+    """Return one Grafana dashboard JSON model by name (importable as-is)."""
+    from app.telemetry.dashboards import build_dashboard
+
+    model = build_dashboard(name)
+    if model is None:
+        raise APIError("dashboard_not_found", f"no such dashboard {name!r}", status=404)
+    return model
 
 
 __all__ = ["BufferTracePoint", "report_cache_key", "router"]
