@@ -279,6 +279,73 @@ class ConflictResolver:
         return next((s for s in canon_slice.active_states if s.state_id == state_id), None)
 
 
+# --------------------------------------------------------------------------- #
+# Evolve-canon propagation (§8.5): when canon evolves, the change ripples.
+# --------------------------------------------------------------------------- #
+
+
+class RetirementProposal(BaseModel):
+    """One cascading retirement the canon-write layer should apply on an evolve.
+
+    ``evolve_canon`` does not just assert the new fact — the prior, now-superseded
+    fact on the same functional channel (and any fact that depended on a now-gone
+    object) must be retired so the §8.4 active set stays single-valued going
+    forward. This is the §8.5 "close the old fact's interval" write, *derived* by
+    the pure reasoner and surfaced for the canon service to apply.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    state_id: str
+    retire_at_beat: int
+    reason: str
+    proof: str = ""
+
+
+def propagate_evolution(
+    canon_slice: CanonSlice,
+    *,
+    subject_entity_key: str,
+    predicate: str,
+    object_value: str,
+    at_beat: int,
+) -> list[RetirementProposal]:
+    """Derive the cascading retirements an ``evolve_canon`` should also apply (§8.5).
+
+    Builds a :class:`CanonTimeline` from the slice's active states, then asks the
+    pure propagation reasoner which prior facts the newly-asserted fact
+    supersedes. Returns typed proposals (with proof traces) for the canon-write
+    seam — it stays the *caller's* decision whether to apply them, mirroring how
+    §8.5 keeps the stale fact for time-travel reads.
+    """
+    from app.render.continuity_reasoning import BeatInterval, CanonTimeline
+    from app.render.continuity_reasoning.facts import Fact, fact_slot
+    from app.render.continuity_reasoning.propagation import propagate_supersede
+
+    timeline = CanonTimeline.from_state_slices(list(canon_slice.active_states))
+    new_fact = Fact(
+        subject=subject_entity_key,
+        predicate=predicate,
+        object=object_value,
+        interval=BeatInterval(at_beat, None),
+        fact_id="evolved",
+        slot=fact_slot(predicate, object_value),
+    )
+    proposals: list[RetirementProposal] = []
+    for effect in propagate_supersede(timeline, new_fact=new_fact):
+        if not effect.affected.fact_id:
+            continue
+        proposals.append(
+            RetirementProposal(
+                state_id=effect.affected.fact_id,
+                retire_at_beat=effect.at_beat,
+                reason=effect.trace.summary,
+                proof=effect.trace.render(),
+            )
+        )
+    return proposals
+
+
 __all__ = [
     "Arbiter",
     "CanonEvolver",
@@ -286,4 +353,6 @@ __all__ = [
     "ConflictResolver",
     "ContinuityChecker",
     "ResolutionAction",
+    "RetirementProposal",
+    "propagate_evolution",
 ]
