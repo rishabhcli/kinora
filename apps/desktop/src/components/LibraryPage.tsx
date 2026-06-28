@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { Book } from "../data/books";
 import { continueReading, popularOnKinora, recentlyAdded, recommended } from "../data/books";
 import BookShelf from "./BookShelf";
@@ -12,6 +12,16 @@ import {
   type LibraryBook,
   type SortKey,
 } from "../lib/api/library";
+
+// The Director Studio is a heavy, lazily-loaded overlay surface (the "second
+// section" beside the reading room). It only mounts when the Director opens a
+// book in studio mode, so the library's first paint stays light.
+const DirectorStudio = lazy(() => import("./director/DirectorStudio"));
+// The faceted "workbench" view is an alternate, power-user library surface
+// (smart collections + facets + sorting); lazily loaded since it's opt-in.
+const LibraryWorkbench = lazy(() => import("./library/LibraryWorkbench"));
+
+type LibraryView = "shelves" | "workbench";
 
 interface LibraryPageProps {
   /** Opens a book in the reading room — wired by the nav shell (Agent 10). */
@@ -51,6 +61,12 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
   const [genre, setGenre] = useState("All");
   const [sort, setSort] = useState<SortKey>("recent");
   const [uploads, setUploads] = useState<UploadItem[]>([]);
+  // Director mode: when on, opening a book launches the Director Studio overlay
+  // instead of the reading room. Only live (backend-driven) books can be
+  // directed — a mock/offline book has no shots/canon to edit.
+  const [directorMode, setDirectorMode] = useState(false);
+  const [studioBook, setStudioBook] = useState<Book | null>(null);
+  const [view, setView] = useState<LibraryView>("shelves");
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +83,20 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
   }, [load]);
 
   const books = all ?? [];
+
+  // Open a book: in director mode, launch the studio (live books only); else
+  // hand off to the reading-room flow owned by the nav shell.
+  const handleOpen = useCallback(
+    (book: Book) => {
+      if (directorMode && book.live) {
+        setStudioBook(book);
+      } else {
+        onOpenBook?.(book);
+      }
+    },
+    [directorMode, onOpenBook],
+  );
+
   const genresPresent = useMemo(
     () => CATALOG_GENRES.filter((g) => books.some((b) => b.genre === g)),
     [books],
@@ -95,11 +125,67 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
                 : `${books.length} book${books.length === 1 ? "" : "s"} in your collection${offline ? " · offline" : ""}`}
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            {/* View toggle — shelves (default) vs the faceted workbench. */}
+            <div
+              className="flex items-center rounded-xl p-0.5"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+              role="group"
+              aria-label="Library view"
+            >
+              {(["shelves", "workbench"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  aria-pressed={view === v}
+                  className="rounded-lg px-3 py-1.5 text-[11px] font-medium capitalize transition-all"
+                  style={{
+                    background: view === v ? "rgba(212,164,78,0.18)" : "transparent",
+                    color: view === v ? "rgba(236,231,223,0.98)" : "rgba(236,231,223,0.6)",
+                  }}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            {/* Director-mode toggle — opening a live book then launches the Studio. */}
+            <button
+              type="button"
+              onClick={() => setDirectorMode((v) => !v)}
+              aria-pressed={directorMode}
+              className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11.5px] font-medium transition-all"
+              style={{
+                background: directorMode
+                  ? "linear-gradient(135deg, #d4a44e 0%, #c8923a 100%)"
+                  : "rgba(255,255,255,0.04)",
+                color: directorMode ? "#1a1408" : "rgba(236,231,223,0.9)",
+                border: `1px solid ${directorMode ? "rgba(212,164,78,0.4)" : "rgba(255,255,255,0.1)"}`,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="6" width="14" height="12" rx="2" />
+                <path d="m22 8-6 4 6 4V8z" />
+              </svg>
+              {directorMode ? "Director mode on" : "Director mode"}
+            </button>
+          </div>
         </div>
+        {directorMode && (
+          <p className="text-[11px] mt-2" style={{ color: "rgba(212,164,78,0.9)" }}>
+            Open a live book to direct it — re-roll shots, comment to re-render, edit canon.
+          </p>
+        )}
       </div>
 
       <UploadBook onUploadsChange={setUploads} onReady={() => void load()} />
 
+      {view === "workbench" ? (
+        <Suspense fallback={<p className="text-[12px] text-kinora-muted py-8">Loading workbench…</p>}>
+          <LibraryWorkbench books={books} onOpenBook={handleOpen} />
+        </Suspense>
+      ) : (
+       <>
       {/* Search + sort */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="relative flex-1 min-w-[220px]">
@@ -197,8 +283,20 @@ export default function LibraryPage({ onOpenBook }: LibraryPageProps) {
       )}
 
       {shelves.map((s) => (
-        <BookShelf key={s.title} title={s.title} books={s.books} onOpen={onOpenBook} />
+        <BookShelf key={s.title} title={s.title} books={s.books} onOpen={handleOpen} />
       ))}
+       </>
+      )}
+
+      {studioBook && (
+        <Suspense fallback={null}>
+          <DirectorStudio
+            book={studioBook}
+            library={books}
+            onClose={() => setStudioBook(null)}
+          />
+        </Suspense>
+      )}
     </main>
   );
 }
