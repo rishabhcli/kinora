@@ -72,6 +72,13 @@ const DUST_MOTES: DustMote[] = [
   { size: 2, x: 65, y: 45, dx: 15, dy: -40, duration: 17, delay: 1.5 },
 ];
 
+// Balanced mode is the default desktop profile — skip decorative motes
+// entirely (they're display:none in CSS, but rendering them still costs
+// React reconciliation on every slide change).
+const isBalanced =
+  typeof document !== "undefined" &&
+  document.documentElement.classList.contains("kinora-balanced");
+
 export default function HeroBanner() {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -102,8 +109,20 @@ export default function HeroBanner() {
     return () => observer.disconnect();
   }, []);
 
+  // Pause the carousel when the tab is in the background so we don't burn
+  // image-decode + React reconciliation while no one is looking.
+  const [docVisible, setDocVisible] = useState(
+    typeof document === "undefined" || document.visibilityState !== "hidden"
+  );
   useEffect(() => {
-    if (paused || !visible) return;
+    if (typeof document === "undefined") return;
+    const onVis = () => setDocVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  useEffect(() => {
+    if (paused || !visible || !docVisible) return;
     timeoutRef.current = setTimeout(() => {
       goNext();
     }, SLIDE_DURATION);
@@ -111,7 +130,7 @@ export default function HeroBanner() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [current, paused, visible, goNext]);
+  }, [current, paused, visible, docVisible, goNext]);
 
   const slide = slides[current];
 
@@ -135,8 +154,9 @@ export default function HeroBanner() {
           />
         </div>
 
-      {/* Floating dust motes — CSS only, no framer-motion */}
-      {visible && (
+      {/* Floating dust motes — CSS only, no framer-motion. Skip them
+          entirely in balanced mode (the default desktop profile). */}
+      {visible && !isBalanced && (
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {DUST_MOTES.map((mote, i) => (
           <div
