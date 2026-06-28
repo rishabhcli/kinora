@@ -137,6 +137,24 @@ class Settings(BaseSettings):
     ingest_recovery_interval_s: float = 30.0
     ingest_recovery_limit: int = 25
 
+    # --- Reliability / load-test / SLO (app.reliability + loadtest) ---
+    # Defaults consumed by the reliability toolkit (load runner, canaries, SLO
+    # gating); the CLI overrides them per-run. Additive-only — nothing above is
+    # changed. See loadtest/DESIGN.md.
+    load_default_users: int = 16
+    load_default_duration_s: float = 60.0
+    load_default_target_rps: float = 0.0  # 0 => closed model (think-time paced)
+    load_ramp_seconds: float = 5.0
+    #: §4.9 control-tick latency budget — intent must stay snappy so the buffer
+    #: keeps up; the load report / canary gate the intent endpoint against this.
+    slo_intent_p99_ms: float = 250.0
+    #: §4.8 latency-to-first-frame — a seek must bridge ~instantly.
+    slo_seek_coherent_p99_ms: float = 150.0
+    #: The §13 availability target the load report's SLO set gates on.
+    slo_availability_target: float = 0.995
+    #: Default seed for the chaos engine + deterministic load runs.
+    chaos_default_seed: int = 1337
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"
