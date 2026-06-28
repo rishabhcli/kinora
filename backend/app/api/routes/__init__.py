@@ -12,6 +12,7 @@ from app.api.routes import (
     metrics,
     optim,
     prefs,
+    reports,
     sessions,
 )
 
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    reports.router,  # reports subsystem: document generation + signed retrieval
 ]
 
 __all__ = ["ROUTERS"]

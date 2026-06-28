@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "footer": "Generated for Ada Lovelace · 28 Jun 2026",
+    "generated_at": "28 Jun 2026 12:00 UTC",
+    "kind": "reading_progress",
+    "subject": "The Tinderbox",
+    "subtitle": "The Tinderbox · Hans Christian Andersen",
+    "tags": [],
+    "title": "Reading Progress"
+  },
+  "sections": [
+    {
+      "blocks": [
+        {
+          "block_type": "heading",
+          "level": 1,
+          "text": "The Tinderbox"
+        },
+        {
+          "block_type": "paragraph",
+          "muted": true,
+          "text": "Hans Christian Andersen"
+        },
+        {
+          "block_type": "spacer",
+          "size": 8
+        },
+        {
+          "block_type": "keyvalue",
+          "columns": 3,
+          "items": [
+            {
+              "emphasis": true,
+              "label": "Complete",
+              "stat": {
+                "display": "70.0%",
+                "value": 70.0
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Words read",
+              "stat": {
+                "display": "4,200",
+                "value": 4200
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Film watched",
+              "stat": {
+                "display": "3.5 min",
+                "value": 210.0
+              }
+            }
+          ]
+        },
+        {
+          "block_type": "chart",
+          "height": 44,
+          "kind": "progress",
+          "labels": [],
+          "options": {
+            "label": "70.0%"
+          },
+          "series": [
+            {
+              "name": "complete",
+              "values": [
+                0.7
+              ]
+            }
+          ]
+        },
+        {
+          "block_type": "paragraph",
+          "muted": true,
+          "text": "You've reached word 4,200 of 6,000 — about 1,800 words to go. 18 of 20 shots have been rendered and accepted into your film so far."
+        },
+        {
+          "block_type": "callout",
+          "text": "Keep going: you're 70.0% of the way through.",
+          "title": "Where you stand",
+          "tone": "info"
+        }
+      ],
+      "page_break_before": false,
+      "title": null
+    },
+    {
+      "blocks": [
+        {
+          "block_type": "table",
+          "caption": "Your progress, in full",
+          "columns": [
+            {
+              "align": "left",
+              "key": "metric",
+              "kind": "text",
+              "label": "Metric"
+            },
+            {
+              "align": "right",
+              "key": "value",
+              "kind": "number",
+              "label": "Value"
+            }
+          ],
+          "rows": [
+            {
+              "metric": "Pages",
+              "value": "24"
+            },
+            {
+              "metric": "Words in book",
+              "value": "6,000"
+            },
+            {
+              "metric": "Words read",
+              "value": "4,200"
+            },
+            {
+              "metric": "Shots accepted",
+              "value": "18"
+            },
+            {
+              "metric": "Shots total",
+              "value": "20"
+            },
+            {
+              "metric": "Film watched",
+              "value": "3:30"
+            },
+            {
+              "metric": "Last read",
+              "value": "28 Jun 2026"
+            }
+          ]
+        }
+      ],
+      "page_break_before": false,
+      "title": "The numbers"
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+{
+  "meta": {
+    "footer": "Kinora operations · budget · 28 Jun 2026",
+    "generated_at": "28 Jun 2026 12:00 UTC",
+    "kind": "budget",
+    "subject": null,
+    "subtitle": "Fleet-wide",
+    "tags": [],
+    "title": "Budget Report"
+  },
+  "sections": [
+    {
+      "blocks": [
+        {
+          "block_type": "heading",
+          "level": 1,
+          "text": "Video-second budget"
+        },
+        {
+          "block_type": "paragraph",
+          "muted": true,
+          "text": "Video-seconds are Kinora's hard-capped currency (§11). Every render reserves before it runs and commits its actual cost on completion."
+        },
+        {
+          "block_type": "spacer",
+          "size": 6
+        },
+        {
+          "block_type": "keyvalue",
+          "columns": 3,
+          "items": [
+            {
+              "emphasis": false,
+              "label": "Ceiling",
+              "stat": {
+                "display": "27m 30s",
+                "value": 1650
+              }
+            },
+            {
+              "emphasis": true,
+              "label": "Committed",
+              "stat": {
+                "display": "7m",
+                "value": 420
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Reserved",
+              "stat": {
+                "display": "30s",
+                "value": 30
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Remaining",
+              "stat": {
+                "display": "20m",
+                "value": 1200
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Used",
+              "stat": {
+                "display": "27.3%",
+                "value": 27.27272727272727
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Reservations",
+              "stat": {
+                "display": "5",
+                "value": 5
+              }
+            }
+          ]
+        },
+        {
+          "block_type": "chart",
+          "height": 44,
+          "kind": "progress",
+          "labels": [],
+          "options": {
+            "label": "27.3% of 27m 30s used"
+          },
+          "series": [
+            {
+              "name": "used",
+              "values": [
+                0.2727272727272727
+              ]
+            }
+          ]
+        },
+        {
+          "block_type": "callout",
+          "text": "20m of video budget remain (72.7% free).",
+          "title": "Status",
+          "tone": "success"
+        }
+      ],
+      "page_break_before": false,
+      "title": null
+    },
+    {
+      "blocks": [
+        {
+          "block_type": "chart",
+          "height": 200,
+          "kind": "donut",
+          "labels": [],
+          "series": [
+            {
+              "name": "Committed",
+              "values": [
+                420
+              ]
+            },
+            {
+              "name": "Reserved",
+              "values": [
+                30
+              ]
+            },
+            {
+              "name": "Free",
+              "values": [
+                1200
+              ]
+            }
+          ],
+          "title": "Budget split"
+        }
+      ],
+      "page_break_before": false,
+      "title": "Where it went"
+    },
+    {
+      "blocks": [
+        {
+          "block_type": "table",
+          "caption": "Committed video-seconds by book",
+          "columns": [
+            {
+              "align": "left",
+              "key": "book",
+              "kind": "text",
+              "label": "Book"
+            },
+            {
+              "align": "right",
+              "key": "seconds",
+              "kind": "seconds",
+              "label": "Video"
+            },
+            {
+              "align": "right",
+              "key": "minutes",
+              "kind": "number",
+              "label": "Minutes"
+            }
+          ],
+          "rows": [
+            {
+              "book": "The Tinderbox",
+              "minutes": "5.0 min",
+              "seconds": "5m"
+            },
+            {
+              "book": "Aesop's Fable",
+              "minutes": "2.0 min",
+              "seconds": "2m"
+            }
+          ],
+          "total_row": {
+            "book": "Total committed",
+            "minutes": "7.0 min",
+            "seconds": "7m"
+          }
+        }
+      ],
+      "page_break_before": false,
+      "title": "Top spenders"
+    }
+  ]
+}
