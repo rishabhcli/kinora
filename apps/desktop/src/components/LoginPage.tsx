@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import logoImg from "../assets/logo-transparent.png";
 
 const DEMO = { email: "demo@kinora.local", password: "demo-password-123" } as const;
 
 export default function LoginPage({ onEnter }: { onEnter: () => void }) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState<string>(DEMO.email);
   const [password, setPassword] = useState<string>(DEMO.password);
@@ -50,15 +52,15 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
           </div>
           <div className="max-w-md">
             <h1 className="font-serif text-[44px] leading-[1.1] font-medium text-white">
-              Where stories<br />come to life.
+              {t("login.heroTitle")}
             </h1>
             <p className="mt-5 text-[14px] leading-relaxed text-white">
-              Your library, reimagined as cinema. Books become films, pages become scenes — watched in the quiet of an evening.
+              {t("login.heroSubtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white">
             <span className="inline-block h-px w-8 bg-white" />
-            Reading, rewritten
+            {t("login.heroKicker")}
           </div>
         </div>
       </div>
@@ -81,12 +83,10 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
       >
         {/* Heading */}
         <h2 className="mb-1.5 text-center font-serif text-[22px] font-semibold text-white">
-          {mode === "login" ? "Sign in" : "Sign up"}
+          {mode === "login" ? t("login.signIn") : t("login.signUp")}
         </h2>
         <p className="mb-6 text-center text-[13px] text-white">
-          {mode === "login"
-            ? "Welcome back to your library"
-            : "Start watching books as films"}
+          {mode === "login" ? t("login.welcomeBack") : t("login.startWatching")}
         </p>
 
         {/* Form */}
@@ -95,7 +95,7 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
             type="email"
             required
             autoFocus
-            placeholder="Email address"
+            placeholder={t("login.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="login-input w-full rounded-lg px-4 py-2.5 text-[13px]"
@@ -103,7 +103,7 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
           <input
             type="password"
             required
-            placeholder="Password"
+            placeholder={t("login.passwordPlaceholder")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="login-input w-full rounded-lg px-4 py-2.5 text-[13px]"
@@ -113,10 +113,10 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
             <div className="flex items-center justify-between text-[12px]">
               <label className="flex cursor-pointer items-center gap-2 text-white">
                 <input type="checkbox" className="h-3.5 w-3.5" style={{ accentColor: "#ffffff" }} defaultChecked />
-                Remember me
+                {t("login.rememberMe")}
               </label>
               <button type="button" className="transition text-white">
-                Forgot password?
+                {t("login.forgotPassword")}
               </button>
             </div>
           )}
@@ -126,14 +126,14 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
             disabled={busy}
             className="login-btn mt-2 w-full rounded-lg py-2.5 text-[13px] font-semibold transition disabled:opacity-50"
           >
-            {busy ? "One moment…" : mode === "login" ? "Sign in" : "Create account"}
+            {busy ? t("common.oneMoment") : mode === "login" ? t("login.signIn") : t("login.createAccount")}
           </button>
         </form>
 
         {/* Divider */}
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />
-          <span className="text-[10px] uppercase tracking-widest text-white">or</span>
+          <span className="text-[10px] uppercase tracking-widest text-white">{t("login.or")}</span>
           <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />
         </div>
 
@@ -173,7 +173,7 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
                   <path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.66-.22.66-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.16.58.67.48C19.13 20.17 22 16.42 22 12c0-5.52-4.48-10-10-10z"/>
                 </svg>
               )}
-              Continue with {p.name}
+              {t("login.continueWith", { provider: p.name })}
             </button>
           ))}
         </div>
@@ -184,19 +184,19 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
           onClick={() => { setMode("login"); enter(); }}
           className="mt-3 w-full text-center text-[11px] transition text-white"
         >
-          Explore the demo library →
+          {t("login.exploreDemo")}
         </button>
 
         <div className="mt-5 flex items-center justify-center gap-1.5 text-[12px]">
           <span className="text-white">
-            {mode === "login" ? "New to Kinora?" : "Already have an account?"}
+            {mode === "login" ? t("login.newToKinora") : t("login.alreadyHaveAccount")}
           </span>
           <button
             type="button"
             onClick={() => setMode(mode === "login" ? "register" : "login")}
             className="text-white transition hover:text-white/80"
           >
-            {mode === "login" ? "Sign up" : "Sign in"}
+            {mode === "login" ? t("login.signUp") : t("login.signIn")}
           </button>
         </div>
       </div>

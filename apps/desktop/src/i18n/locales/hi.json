@@ -1,0 +1,110 @@
+{
+  "language": {
+    "name": "भाषा",
+    "description": "वह भाषा जो Kinora पूरे ऐप में उपयोग करता है।"
+  },
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "zh": "中文",
+    "hi": "हिन्दी"
+  },
+  "nav": {
+    "home": "होम",
+    "library": "पुस्तकालय",
+    "watch": "देखें",
+    "favorites": "पसंदीदा",
+    "notes": "नोट्स"
+  },
+  "common": {
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "close": "बंद करें",
+    "open": "खोलें",
+    "back": "वापस",
+    "restore": "पुनर्स्थापित करें",
+    "clear": "साफ़ करें",
+    "cleared": "साफ़ हो गया",
+    "loading": "लोड हो रहा है…",
+    "oneMoment": "एक क्षण…"
+  },
+  "login": {
+    "signIn": "साइन इन करें",
+    "signUp": "साइन अप करें",
+    "welcomeBack": "अपने पुस्तकालय में फिर से स्वागत है",
+    "startWatching": "किताबों को फ़िल्मों की तरह देखना शुरू करें",
+    "emailPlaceholder": "ईमेल पता",
+    "passwordPlaceholder": "पासवर्ड",
+    "rememberMe": "मुझे याद रखें",
+    "forgotPassword": "पासवर्ड भूल गए?",
+    "createAccount": "खाता बनाएँ",
+    "or": "या",
+    "continueWith": "{{provider}} के साथ जारी रखें",
+    "exploreDemo": "डेमो पुस्तकालय देखें →",
+    "newToKinora": "Kinora पर नए हैं?",
+    "alreadyHaveAccount": "पहले से खाता है?",
+    "tagline": "जहाँ कहानियाँ जीवंत हो जाती हैं।",
+    "heroTitle": "जहाँ कहानियाँ जीवंत हो जाती हैं।",
+    "heroSubtitle": "आपका पुस्तकालय, सिनेमा के रूप में फिर से कल्पित। किताबें फ़िल्में बन जाती हैं, पन्ने दृश्य — एक शांत शाम में देखे जाते हैं।",
+    "heroKicker": "पढ़ना, फिर से लिखा गया"
+  },
+  "library": {
+    "continueReading": "पढ़ना जारी रखें",
+    "recentlyAdded": "हाल ही में जोड़ा गया",
+    "popularOnKinora": "Kinora पर लोकप्रिय",
+    "recommended": "आपके लिए अनुशंसित",
+    "readLivePublicDomain": "लाइव पढ़ें · सार्वजनिक डोमेन"
+  },
+  "reading": {
+    "back": "वापस",
+    "closeReader": "रीडर बंद करें और वापस जाएँ",
+    "readingSettings": "पढ़ने की सेटिंग्स",
+    "bufferedAhead": "{{seconds}} सेकंड आगे तक बफ़र",
+    "generatingAhead": "आगे तैयार हो रहा है…",
+    "readingAria": "{{title}} पढ़ा जा रहा है"
+  },
+  "settings": {
+    "title": "सेटिंग्स",
+    "searchPlaceholder": "सेटिंग्स खोजें",
+    "noMatches": "कोई मिलान नहीं।",
+    "categoriesAria": "सेटिंग्स श्रेणियाँ",
+    "sections": {
+      "general": "सामान्य",
+      "appearance": "रूप",
+      "reading": "पढ़ना",
+      "playback": "प्लेबैक",
+      "notifications": "सूचनाएँ",
+      "privacy": "गोपनीयता",
+      "account": "खाता",
+      "about": "परिचय"
+    },
+    "general": {
+      "subtitle": "Kinora कैसे शुरू होता है और व्यवहार करता है।",
+      "openTo": "Kinora यहाँ खोलें",
+      "openToDesc": "लॉन्च होने पर Kinora जो दृश्य दिखाता है।",
+      "soundEffects": "ध्वनि प्रभाव",
+      "soundEffectsDesc": "हल्की पन्ना-पलटने और UI ध्वनियाँ।",
+      "reset": "रीसेट",
+      "restoreDefaults": "सभी डिफ़ॉल्ट पुनर्स्थापित करें",
+      "restoreDefaultsDesc": "हर Kinora सेटिंग को उसके मूल मान पर रीसेट करें।",
+      "restoreConfirm": "सभी Kinora सेटिंग्स को डिफ़ॉल्ट पर पुनर्स्थापित करें?"
+    },
+    "appearance": {
+      "subtitle": "पूरे ऐप में लागू एक्सेसिबिलिटी ओवरराइड।",
+      "reduceMotion": "गति कम करें",
+      "reduceMotionDesc": "एनिमेशन और ट्रांज़िशन कम करें।",
+      "reduceTransparency": "पारदर्शिता कम करें",
+      "reduceTransparencyDesc": "फ़्रॉस्टेड-ग्लास ब्लर के बजाय ठोस सतहें।",
+      "increaseContrast": "कंट्रास्ट बढ़ाएँ",
+      "increaseContrastDesc": "गौण टेक्स्ट को उज्ज्वल करें और किनारों को स्पष्ट करें।",
+      "themesHint": "पढ़ने के थीम (डार्क, सेपिया, पेपर…) «पढ़ना» के अंतर्गत हैं।"
+    },
+    "override": {
+      "system": "सिस्टम",
+      "on": "चालू",
+      "off": "बंद"
+    }
+  }
+}

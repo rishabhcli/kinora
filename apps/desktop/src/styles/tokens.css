@@ -192,6 +192,71 @@
   --k-read-contrast-swatch: #000000;
 }
 
+/* ==========================================================================
+   APP-WIDE THEMES — bound via html[data-theme] (set by A11yProvider from the
+   reader's chosen theme). Everything downstream (chrome, cards, borders,
+   glass, scrims, Tailwind colors, .kinora-bg) derives from the RGB-triple
+   spine below, so overriding the triples here re-themes the ENTIRE app — not
+   just the reading pane. `dark` is the :root default. Light themes also soften
+   the specular + shadow ladder so material reads correctly on a light canvas.
+   ========================================================================== */
+[data-theme="night"] {
+  --k-bg-deep-rgb: 3 3 5;
+  --k-bg-rgb: 9 9 12;
+  --k-surface-rgb: 17 17 21;
+  --k-surface-raised-rgb: 25 25 30;
+  --k-surface-high-rgb: 34 34 40;
+  --k-text-rgb: 224 224 231;
+  --k-muted-rgb: 158 158 170;
+  --k-subtle-rgb: 120 120 132;
+  --k-faint-rgb: 88 88 100;
+  --k-accent-strong-rgb: 244 210 142;
+}
+
+[data-theme="sepia"] {
+  --k-bg-deep-rgb: 222 209 183;
+  --k-bg-rgb: 240 231 213;
+  --k-surface-rgb: 232 221 197;
+  --k-surface-raised-rgb: 226 213 186;
+  --k-surface-high-rgb: 218 203 174;
+  --k-text-rgb: 60 48 32;
+  --k-muted-rgb: 104 86 60;
+  --k-subtle-rgb: 136 118 90;
+  --k-faint-rgb: 168 150 120;
+  --k-accent-rgb: 150 102 36;
+  --k-accent-strong-rgb: 178 126 52;
+  --k-accent-deep-rgb: 120 80 30;
+  --k-specular: rgb(255 255 255 / 0.7);
+  --k-specular-soft: rgb(255 255 255 / 0.4);
+  --k-elev-1: 0 1px 2px rgb(60 40 20 / 0.10), 0 2px 6px -2px rgb(60 40 20 / 0.10);
+  --k-elev-2: 0 2px 6px rgb(60 40 20 / 0.12), 0 8px 18px -6px rgb(60 40 20 / 0.14);
+  --k-elev-3: 0 4px 10px -2px rgb(60 40 20 / 0.14), 0 16px 30px -10px rgb(60 40 20 / 0.16);
+  --k-elev-4: 0 8px 20px -6px rgb(60 40 20 / 0.16), 0 28px 52px -18px rgb(60 40 20 / 0.20);
+  --k-elev-5: 0 16px 40px -12px rgb(60 40 20 / 0.20), 0 48px 92px -30px rgb(60 40 20 / 0.24);
+}
+
+[data-theme="paper"] {
+  --k-bg-deep-rgb: 230 226 218;
+  --k-bg-rgb: 247 244 238;
+  --k-surface-rgb: 240 237 230;
+  --k-surface-raised-rgb: 233 230 222;
+  --k-surface-high-rgb: 224 220 211;
+  --k-text-rgb: 30 28 26;
+  --k-muted-rgb: 92 88 82;
+  --k-subtle-rgb: 128 122 114;
+  --k-faint-rgb: 165 158 148;
+  --k-accent-rgb: 146 98 34;
+  --k-accent-strong-rgb: 174 122 50;
+  --k-accent-deep-rgb: 116 78 28;
+  --k-specular: rgb(255 255 255 / 0.8);
+  --k-specular-soft: rgb(255 255 255 / 0.5);
+  --k-elev-1: 0 1px 2px rgb(20 20 20 / 0.08), 0 2px 6px -2px rgb(20 20 20 / 0.08);
+  --k-elev-2: 0 2px 6px rgb(20 20 20 / 0.10), 0 8px 18px -6px rgb(20 20 20 / 0.12);
+  --k-elev-3: 0 4px 10px -2px rgb(20 20 20 / 0.12), 0 16px 30px -10px rgb(20 20 20 / 0.14);
+  --k-elev-4: 0 8px 20px -6px rgb(20 20 20 / 0.14), 0 28px 52px -18px rgb(20 20 20 / 0.18);
+  --k-elev-5: 0 16px 40px -12px rgb(20 20 20 / 0.18), 0 48px 92px -30px rgb(20 20 20 / 0.22);
+}
+
 /* ── HIGH-CONTRAST (a11y) — coordinate with Agent 06 ──────────────────────
    Brightens ink, accent and lines to clear AAA where possible. Bind via
    [data-contrast="high"] on <html> (Agent 06 owns the toggle/data model). */

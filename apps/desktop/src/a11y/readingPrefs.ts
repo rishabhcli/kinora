@@ -77,6 +77,25 @@ export const DEFAULT_READING_PREFS: ReadingPrefs = {
 
 const KEY = "kinora.readingPrefs";
 
+/** Fired (same-tab) whenever reading prefs are persisted, so app-wide listeners
+ *  (e.g. the global theme applier) can re-sync without sharing React state. */
+export const READING_PREFS_EVENT = "kinora:reading-prefs-changed";
+
+/** Read + normalize the persisted reading prefs (safe outside React). */
+export function loadReadingPrefs(): ReadingPrefs {
+  try {
+    return normalizeReadingPrefs(JSON.parse(localStorage.getItem(KEY) || "{}") as Partial<ReadingPrefs>);
+  } catch {
+    return DEFAULT_READING_PREFS;
+  }
+}
+
+/** Apply the effective reading theme as `html[data-theme]` so the WHOLE app
+ *  (chrome + reading pane + login) re-themes, not just the text area. */
+export function applyThemeAttribute(theme: ReadingTheme = resolveEffectiveTheme(loadReadingPrefs())): void {
+  if (typeof document !== "undefined") document.documentElement.dataset.theme = theme;
+}
+
 export const clampPref = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
@@ -109,13 +128,7 @@ export function resolveEffectiveTheme(prefs: ReadingPrefs, hour: number = new Da
 }
 
 export function useReadingPrefs() {
-  const [prefs, setPrefs] = useState<ReadingPrefs>(() => {
-    try {
-      return normalizeReadingPrefs(JSON.parse(localStorage.getItem(KEY) || "{}") as Partial<ReadingPrefs>);
-    } catch {
-      return DEFAULT_READING_PREFS;
-    }
-  });
+  const [prefs, setPrefs] = useState<ReadingPrefs>(loadReadingPrefs);
 
   useEffect(() => {
     try {
@@ -123,6 +136,8 @@ export function useReadingPrefs() {
     } catch {
       /* storage blocked */
     }
+    // Notify app-wide listeners (the global theme applier) in the same tab.
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(READING_PREFS_EVENT));
   }, [prefs]);
 
   const update = useCallback((p: Partial<ReadingPrefs>) => {

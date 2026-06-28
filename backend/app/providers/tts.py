@@ -25,15 +25,28 @@ import re
 import wave
 from typing import Any
 
+from app.core.logging import get_logger
+
 from .base import ProviderClient, data_uri
 from .base import sdk_get as _get
-from .errors import ProviderError, ResponseParseError
+from .errors import ProviderBadRequest, ProviderError, ResponseParseError
 from .types import TtsResult, TtsWord, Usage
 
+logger = get_logger("app.providers.tts")
+
+#: A known-good hosted preset voice used when an assigned per-character voice is
+#: rejected by the model snapshot (the supported set varies by revision). Falling
+#: back keeps narration playing instead of discarding an already-rendered shot.
+_FALLBACK_VOICE = "Cherry"
+
 #: Map bare model families (as configured) to the concrete intl snapshot ids.
+#: The bare ``qwen3-tts-flash`` alias returns 403 AllocationQuota.FreeTierOnly on
+#: the intl free tier (the alias tracks a newer paid-only revision), but the dated
+#: ``qwen3-tts-flash-2025-09-18`` snapshot retains free quota — so pin to it.
+#: Verify with scripts/provider_preflight.py --spend-smoke before changing.
 _TTS_MODEL_SNAPSHOTS = {
     "qwen3-tts-vc": "qwen3-tts-vc-2026-01-22",
-    "qwen3-tts-flash": "qwen3-tts-flash",
+    "qwen3-tts-flash": "qwen3-tts-flash-2025-09-18",
     "qwen3-tts-instruct-flash": "qwen3-tts-instruct-flash",
 }
 _DEFAULT_SAMPLE_RATE = 24000
@@ -187,16 +200,37 @@ class TtsProvider:
         from dashscope import MultiModalConversation
 
         model = resolve_tts_model(model or self._settings.tts_model)
-        call = functools.partial(
-            MultiModalConversation.call,
-            api_key=self._client.api_key,
-            model=model,
-            text=text,
-            voice=voice_id,
-            language_type=language_type,
-            stream=False,
-        )
-        rsp = await self._client.call_sdk(call, op="tts", model=model, timeout=timeout)
+
+        async def _synth(voice: str) -> Any:
+            call = functools.partial(
+                MultiModalConversation.call,
+                api_key=self._client.api_key,
+                model=model,
+                text=text,
+                voice=voice,
+                language_type=language_type,
+                stream=False,
+            )
+            return await self._client.call_sdk(call, op="tts", model=model, timeout=timeout)
+
+        used_voice = voice_id
+        try:
+            rsp = await _synth(used_voice)
+        except ProviderBadRequest as exc:
+            # A per-character preset voice can be unsupported by the hosted
+            # snapshot (the supported set varies by model revision). Never let an
+            # unsupported voice discard an already-rendered shot — retry once with
+            # a known-good voice so narration still plays.
+            if used_voice == _FALLBACK_VOICE or "voice" not in str(exc).lower():
+                raise
+            logger.warning(
+                "tts.voice_fallback",
+                requested=used_voice,
+                fallback=_FALLBACK_VOICE,
+                error=str(exc),
+            )
+            used_voice = _FALLBACK_VOICE
+            rsp = await _synth(used_voice)
         audio_node = _get(_get(rsp, "output"), "audio")
         url = _get(audio_node, "url")
         if not url:
@@ -223,7 +257,7 @@ class TtsProvider:
             duration_s=round(duration_s, 3),
             word_timestamps=words,
             alignment=alignment,
-            voice_id=voice_id,
+            voice_id=used_voice,
             model=model,
             audio_format="wav",
         )

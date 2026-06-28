@@ -207,6 +207,12 @@ variable "render_worker_count" {
   default     = 1
 }
 
+variable "ingest_worker_count" {
+  description = "Number of ingest recovery-worker ECS nodes."
+  type        = number
+  default     = 1
+}
+
 # ---------------------------------------------------------------------------- #
 # Application runtime
 # ---------------------------------------------------------------------------- #
@@ -215,6 +221,12 @@ variable "container_image" {
   description = "Fully-qualified Kinora backend image (e.g. registry.ap-southeast-1.aliyuncs.com/kinora/backend:TAG)."
   type        = string
   default     = "registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest"
+}
+
+variable "frontend_container_image" {
+  description = "Fully-qualified Kinora web renderer image, built from infra/docker/desktop.Dockerfile with VITE_KINORA_API_URL pointed at the API."
+  type        = string
+  default     = "registry.ap-southeast-1.aliyuncs.com/kinora/frontend:latest"
 }
 
 variable "dashscope_api_key" {
@@ -234,6 +246,24 @@ variable "kinora_live_video" {
   description = "Go-live gate for real Wan video spend (kinora.md §11.1). Keep false until you intend to spend video-seconds."
   type        = bool
   default     = false
+}
+
+variable "video_model" {
+  description = "Hosted Wan text-to-video model id (verified available on the intl tier)."
+  type        = string
+  default     = "wan2.7-t2v"
+}
+
+variable "video_model_i2v" {
+  description = "Hosted Wan image-to-video model id."
+  type        = string
+  default     = "wan2.7-i2v"
+}
+
+variable "video_model_r2v" {
+  description = "Hosted Wan reference-to-video model id (rides the i2v model)."
+  type        = string
+  default     = "wan2.7-i2v"
 }
 
 # ---------------------------------------------------------------------------- #

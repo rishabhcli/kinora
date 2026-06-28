@@ -14,16 +14,19 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node src/test/run-node-tests.mjs",
     "test:watch": "vitest",
     "test:a11y": "playwright test",
-    "test:reading": "node src/reading/__tests__/run.mjs"
+    "test:reading": "node src/test/run-node-tests.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.41.0",
+    "i18next": "^26.3.3",
+    "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.8"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",

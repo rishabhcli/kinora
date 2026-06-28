@@ -43,6 +43,11 @@ output "api_public_ip" {
   value       = alicloud_instance.api.public_ip
 }
 
+output "frontend_public_ip" {
+  description = "Public IP of the frontend web renderer node (if internet bandwidth > 0)."
+  value       = alicloud_instance.frontend.public_ip
+}
+
 output "mcp_public_ip" {
   description = "Public IP of the MCP node."
   value       = alicloud_instance.mcp.public_ip
@@ -51,6 +56,11 @@ output "mcp_public_ip" {
 output "render_worker_public_ips" {
   description = "Public IPs of the render-worker nodes."
   value       = alicloud_instance.render_worker[*].public_ip
+}
+
+output "ingest_worker_public_ips" {
+  description = "Public IPs of the ingest-worker nodes."
+  value       = alicloud_instance.ingest_worker[*].public_ip
 }
 
 output "database_url" {
@@ -81,10 +91,12 @@ output "next_steps" {
   description = "Post-apply checklist."
   value = join("\n", [
     "1. Build + push the backend image to var.container_image (ACR).",
-    "2. SSH to the API node and confirm the container is up: curl http://localhost:8000/health",
-    "3. Run migrations once: docker exec kinora-api alembic -c alembic.ini upgrade head",
+    "2. Build + push the renderer image to var.frontend_container_image with VITE_KINORA_API_URL=http://<api_public_ip>:8000.",
+    "3. SSH to the API node and confirm the container is up: curl http://localhost:8000/health",
+    "4. Run migrations once: docker exec kinora-api alembic -c alembic.ini upgrade head",
     "   (this also runs CREATE EXTENSION vector on RDS PostgreSQL).",
-    "4. Seed the demo book: python backend/scripts/seed_demo.py --via api --api-url http://<api_public_ip>:8000",
-    "5. Flip var.kinora_live_video = true only when you intend to spend Wan video-seconds.",
+    "5. Seed the demo book: python backend/scripts/seed_demo.py --via api --api-url http://<api_public_ip>:8000",
+    "6. Run provider proof: docker exec kinora-api python scripts/provider_preflight.py --json",
+    "7. Flip var.kinora_live_video = true only when you intend to spend Wan video-seconds.",
   ])
 }

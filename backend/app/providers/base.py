@@ -25,6 +25,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, TypeVar
+from urllib.parse import urlsplit
 
 import anyio
 import httpx
@@ -263,8 +264,16 @@ class ProviderClient:
         usage_sink: UsageSink | None = None,
         resilience: ResilienceConfig | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        base_url_override: str | None = None,
+        api_key_override: str | None = None,
     ) -> None:
         self.settings = settings or get_settings()
+        # Non-DashScope targets (e.g. OpenAI for the reasoning provider) supply
+        # their own base URL + bearer key while reusing this client's retry /
+        # breaker / rate-limit / usage machinery. When unset, the client is the
+        # DashScope transport that backs every native provider.
+        self._base_url_override = base_url_override
+        self._api_key_override = api_key_override
         self.config = resilience or ResilienceConfig()
         self._default_sink = LoggingUsageSink()
         self.usage_sink: UsageSink = usage_sink or self._default_sink
@@ -283,21 +292,39 @@ class ProviderClient:
 
     @property
     def base_url(self) -> str:
-        return self.settings.dashscope_base_url.rstrip("/")
+        return (self._base_url_override or self.settings.dashscope_base_url).rstrip("/")
 
     @property
     def compat_base(self) -> str:
-        """OpenAI-compatible base (chat + VL + model list)."""
-        return f"{self.base_url}/compatible-mode/v1"
+        """OpenAI-compatible base (chat + VL + model list).
+
+        For an override target (OpenAI), ``base_url`` is already the
+        ``/v1`` chat base, so it is returned as-is; otherwise the DashScope
+        ``/compatible-mode/v1`` path is derived.
+        """
+        base = self.base_url
+        if self._base_url_override is not None:
+            return base
+        if base.endswith("/compatible-mode/v1"):
+            return base
+        if base.endswith("/api/v1"):
+            return f"{base.removesuffix('/api/v1')}/compatible-mode/v1"
+        return f"{base}/compatible-mode/v1"
 
     @property
     def native_base(self) -> str:
         """Native DashScope base (image/TTS/video async services)."""
-        return f"{self.base_url}/api/v1"
+        base = self.base_url
+        if base.endswith("/api/v1"):
+            return base
+        if base.endswith("/compatible-mode/v1"):
+            return f"{base.removesuffix('/compatible-mode/v1')}/api/v1"
+        return f"{base}/api/v1"
 
     @property
     def ws_url(self) -> str:
-        host = self.base_url.split("://", 1)[-1]
+        parsed = urlsplit(self.base_url)
+        host = parsed.netloc or parsed.path.split("/", 1)[0]
         return f"wss://{host}/api-ws/v1/inference"
 
     # -- Cost accounting -------------------------------------------------- #
@@ -341,7 +368,7 @@ class ProviderClient:
 
     @property
     def api_key(self) -> str:
-        return self.settings.dashscope_api_key
+        return self._api_key_override or self.settings.dashscope_api_key
 
     # -- Core resilient executor ------------------------------------------ #
 

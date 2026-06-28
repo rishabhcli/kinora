@@ -73,6 +73,34 @@ async def test_upload_accepts_real_pdf_and_triggers_ingest(
     assert any(b["id"] == book_id for b in shelf.json())
 
 
+async def test_recover_importing_books_reingests_stored_source(container: Container) -> None:
+    """Startup recovery respawns Phase A from the durable source_pdf_key."""
+    book_id = new_id()
+    from app.storage.object_store import keys
+
+    container.object_store.put_bytes(keys.pdf(book_id), tiny_pdf(), "application/pdf")
+    async with container.session_factory() as session:
+        await BookRepo(session).create(
+            title="Interrupted",
+            source_pdf_key=keys.pdf(book_id),
+            status=BookStatus.IMPORTING,
+            book_id=book_id,
+        )
+
+    spawned = await container.recover_importing_books()
+    assert spawned == 1
+    runner = container.ingest_runner
+    assert isinstance(runner, FakeIngestRunner)
+    for _ in range(20):
+        if book_id in runner.calls:
+            break
+        await asyncio.sleep(0.05)
+    assert runner.calls == [book_id]
+    async with container.session_factory() as session:
+        book = await BookRepo(session).get(book_id)
+        assert book is not None and book.status is BookStatus.READY
+
+
 async def test_upload_rejects_non_pdf(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:

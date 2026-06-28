@@ -174,7 +174,7 @@ class TtsResult(BaseModel):
 
 
 class WanMode(StrEnum):
-    """The Wan 2.7 render modes from the decision tree (§9.3)."""
+    """Hosted Wan render modes from the decision tree (§9.3)."""
 
     TEXT_TO_VIDEO = "text_to_video"
     IMAGE_TO_VIDEO = "image_to_video"

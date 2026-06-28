@@ -2,11 +2,19 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { A11yProvider } from "./a11y/A11yProvider";
+import { applyThemeAttribute } from "./a11y/readingPrefs";
+// Side-effect init of the i18next singleton BEFORE first render so every
+// useTranslation() consumer has the detected language + sets <html lang>.
+import "./i18n";
 // Single CSS aggregator (Captain seam) — imports tailwind + all owned partials,
 // incl. a11y.css last so A6's focus-ring / reduced-motion overrides win.
 import "./styles/index.css";
 
 const root = document.documentElement;
+
+// Set the global theme attribute before first paint so the whole app (incl. the
+// login screen) renders in the reader's chosen theme with no flash of default.
+applyThemeAttribute();
 
 // In the native macOS shell (apps/desktop-native) the window is a real
 // NSGlassEffectView; flag the document so the UI goes translucent and the

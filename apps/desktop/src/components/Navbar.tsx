@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { useMotion } from "../motion";
 import logoImg from "../assets/logo-transparent.png";
 import GooeySearch from "./GooeySearch";
@@ -98,10 +99,20 @@ function NavButtons({
   padding: string;
 }) {
   const { spring } = useMotion();
+  const { t } = useTranslation();
   return (
     <>
       {navItems.map((item) => {
         const isActive = active === item.label;
+        // The English `item.label` stays the page IDENTITY (passed to onNavigate
+        // + matched against `active`); only the visible text is translated.
+        const navKey = `nav.${item.label.toLowerCase()}` as
+          | "nav.home"
+          | "nav.library"
+          | "nav.watch"
+          | "nav.favorites"
+          | "nav.notes";
+        const display = t(navKey);
         return (
           <button
             key={item.label}
@@ -129,7 +140,7 @@ function NavButtons({
             )}
             <span className="relative z-10 inline-flex items-center gap-1.5">
               <item.icon size={15} />
-              <span>{item.label}</span>
+              <span>{display}</span>
             </span>
           </button>
         );
@@ -178,7 +189,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
     <>
       {/* Top bar — clean, no glass */}
       <header className="fixed top-0 left-0 right-0 z-50" data-profile-dropdown style={{
-        background: "rgba(15, 14, 12, 0.92)",
+        background: "rgb(var(--k-surface-raised-rgb) / 0.92)",
       }}>
         <div className="px-6 py-2.5 flex items-center justify-between max-w-[1280px] mx-auto">
           {/* Left: Logo */}
@@ -223,7 +234,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="absolute top-12 right-6 w-64 rounded-2xl overflow-hidden z-[60]"
             style={{
-              background: "rgba(20, 18, 16, 0.96)",
+              background: "rgb(var(--k-surface-high-rgb) / 0.96)",
               border: "1px solid rgba(212, 164, 78, 0.12)",
               boxShadow: "0 16px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.03)",
             }}
@@ -273,7 +284,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
             </div>
 
             {/* Divider */}
-            <div className="h-px mx-4" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)" }} />
+            <div className="h-px mx-4" style={{ background: "linear-gradient(90deg, transparent, rgb(var(--k-text-rgb) / 0.10), transparent)" }} />
 
             {/* Log Out */}
             <div className="py-1.5">
@@ -303,7 +314,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
           transform: `translateX(-50%) translateY(${dockVisible ? 0 : 120}px)`,
           borderRadius: "999px",
           padding: "5px 7px",
-          background: "rgba(15, 14, 12, 0.92)",
+          background: "rgb(var(--k-surface-raised-rgb) / 0.92)",
           border: "1px solid rgba(255, 255, 255, 0.06)",
           boxShadow: "0 8px 32px -8px rgba(0, 0, 0, 0.6)",
           opacity: dockVisible ? 1 : 0,

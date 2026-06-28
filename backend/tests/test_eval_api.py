@@ -94,9 +94,9 @@ async def test_buffer_trace_endpoint_returns_sawtooth_contract(
     times = [p["t"] for p in body]
     occupancy = [p["committed_seconds_ahead"] for p in body]
     assert times == sorted(times) and len(set(times)) == len(times)  # monotonic time
-    assert all(p["low"] == 25.0 for p in body)
-    assert all(p["high"] == 75.0 for p in body)
-    assert max(occupancy) == 75.0  # filled to the high watermark
+    assert all(p["low"] == container.settings.watermark_low_s for p in body)
+    assert all(p["high"] == container.settings.watermark_high_s for p in body)
+    assert max(occupancy) == container.settings.watermark_high_s  # filled to H
     assert min(occupancy) >= 0.0
     assert any(b - a > 10.0 for a, b in zip(occupancy, occupancy[1:], strict=False))  # refill burst
 

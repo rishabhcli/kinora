@@ -38,17 +38,16 @@ jobs:
       - name: Ruff (lint)
         run: ruff check app tests scripts
       - name: Mypy (types)
-        run: mypy app
+        run: mypy app tests
       - name: Pytest (no infra → infra tests skip)
         run: pytest -q
 
   # ---------------------------------------------------------------------------
-  # 0. Apps — the pnpm/Turborepo monorepo: typecheck the shared core + both
-  #    shells, run the core unit tests, and build the Electron renderer. Mobile
-  #    is typecheck-only here; device/simulator e2e runs elsewhere (EAS/Maestro).
+  # 0. Apps — the current pnpm workspace contains the Electron/Vite desktop app.
+  #    packages/core and apps/mobile do not exist on disk.
   # ---------------------------------------------------------------------------
   apps:
-    name: Apps (core + desktop + mobile)
+    name: Apps (desktop)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,13 +58,10 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Typecheck (core + desktop + mobile)
-        run: |
-          pnpm run typecheck
-          pnpm --filter @kinora/desktop run typecheck
-          pnpm --filter @kinora/mobile run typecheck
-      - name: Test (core)
-        run: pnpm --filter @kinora/core run test
+      - name: Typecheck (desktop)
+        run: pnpm --filter @kinora/desktop run typecheck
+      - name: Test (desktop)
+        run: pnpm --filter @kinora/desktop run test
       - name: Build (desktop renderer + main)
         run: pnpm --filter @kinora/desktop run build
 
@@ -227,36 +223,3 @@ jobs:
       - name: API log on failure
         if: ${{ failure() }}
         run: cat /tmp/api.log || true
-
-  # ---------------------------------------------------------------------------
-  # 5. Mobile e2e — Maestro against a dev build on an Android emulator. The APK
-  #    build step depends on your EAS setup (see the TODO); flow lives in
-  #    apps/mobile/.maestro/.
-  # ---------------------------------------------------------------------------
-  e2e-mobile:
-    name: E2E mobile (Maestro)
-    runs-on: ubuntu-latest
-    # Template: needs the APK build step (TODO below) wired to your EAS setup,
-    # so it must not gate CI until then.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Install Maestro
-        run: |
-          curl -Ls https://get.maestro.mobile.dev | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-      # TODO(eas): produce a debug APK and install it on the emulator below —
-      # e.g. `npx expo prebuild -p android` + `./gradlew assembleDebug`, or
-      # download an `eas build --profile development` artifact.
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          working-directory: apps/mobile
-          script: maestro test .maestro/login.yaml

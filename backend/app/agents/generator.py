@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.providers import Providers, WanMode, WanSpec, data_uri
 from app.providers.types import TtsWord
 
-from .contracts import RenderMode, ShotSpec
+from .contracts import Camera, RenderMode, ShotSpec
 
 #: 1:1 value mapping from the agents' RenderMode to the provider's WanMode.
 _RENDER_TO_WAN = {
@@ -33,6 +33,76 @@ _RENDER_TO_WAN = {
     RenderMode.VIDEO_CONTINUATION: WanMode.VIDEO_CONTINUATION,
     RenderMode.INSTRUCTION_EDIT: WanMode.INSTRUCTION_EDIT,
 }
+
+#: Wan only consumes a text prompt + media — the designed ``camera`` block is lost
+#: unless we render it into the prompt. These maps translate the Cinematographer's
+#: (and the reader's learned priors') camera choices into film-grammar phrasing so
+#: Wan 2.7 actually executes the intended move/framing instead of a static frame.
+_MOVE_PHRASES = {
+    "static": "locked-off static frame",
+    "locked": "locked-off static frame",
+    "push": "slow dolly push-in",
+    "push_in": "slow dolly push-in",
+    "dolly_in": "slow dolly push-in",
+    "pull": "smooth dolly pull-back",
+    "pull_out": "smooth dolly pull-back",
+    "dolly_out": "smooth dolly pull-back",
+    "pan": "smooth horizontal pan",
+    "tilt": "deliberate vertical tilt",
+    "track": "tracking shot gliding alongside the action",
+    "tracking": "tracking shot gliding alongside the action",
+    "follow": "tracking shot following the subject",
+    "orbit": "orbiting arc around the subject",
+    "arc": "orbiting arc around the subject",
+    "crane": "sweeping crane move",
+    "handheld": "subtle handheld energy",
+    "zoom": "deliberate zoom",
+    "zoom_in": "deliberate zoom-in",
+    "zoom_out": "deliberate zoom-out",
+}
+_SHOT_PHRASES = {
+    "extreme_wide": "extreme wide vista",
+    "wide": "wide establishing shot",
+    "establishing": "wide establishing shot",
+    "full": "full shot",
+    "medium": "medium shot",
+    "cowboy": "medium cowboy framing",
+    "close": "intimate close-up",
+    "closeup": "intimate close-up",
+    "close_up": "intimate close-up",
+    "extreme_close": "extreme close-up",
+}
+_SPEED_PHRASES = {"slow": "slow and deliberate", "medium": "steady", "fast": "energetic"}
+#: A light filmic finish that plays to Wan 2.7's motion/detail strengths without
+#: overriding the per-shot creative description.
+_CINEMATIC_FINISH = (
+    "cinematic composition, volumetric lighting, shallow depth of field, "
+    "fluid lifelike motion, atmospheric detail, film grain"
+)
+
+
+def _norm(value: str) -> str:
+    return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _camera_phrase(camera: Camera) -> str:
+    """Render a :class:`Camera` block as natural-language film grammar for Wan."""
+    shot = _SHOT_PHRASES.get(_norm(camera.shot_size), camera.shot_size.strip())
+    speed = _SPEED_PHRASES.get(_norm(camera.speed), camera.speed.strip())
+    move = _MOVE_PHRASES.get(_norm(camera.move), camera.move.strip())
+    return f"{shot}, {speed} {move}".strip()
+
+
+def compose_wan_prompt(prompt: str, camera: Camera) -> str:
+    """Fold the camera block + a filmic finish into the Wan text prompt.
+
+    Wan receives only text + media, so the designed camera move/framing is baked
+    into the prompt here (otherwise every clip defaults to a flat static frame).
+    """
+    base = (prompt or "").strip().rstrip(".")
+    phrase = _camera_phrase(camera)
+    parts = [p for p in (base, f"Camera: {phrase}", _CINEMATIC_FINISH) if p]
+    return ". ".join(parts)
 
 
 class GeneratorOutput(BaseModel):
@@ -84,7 +154,7 @@ def build_wan_spec(
 
     wan = WanSpec(
         mode=mode,
-        prompt=spec.prompt,
+        prompt=compose_wan_prompt(spec.prompt, spec.camera),
         negative_prompt=spec.negative_prompt,
         seed=spec.seed,
         duration_s=int(round(spec.target_duration_s)),
@@ -147,4 +217,10 @@ class Generator:
         )
 
 
-__all__ = ["Generator", "GeneratorOutput", "build_wan_spec", "wan_mode_for"]
+__all__ = [
+    "Generator",
+    "GeneratorOutput",
+    "build_wan_spec",
+    "compose_wan_prompt",
+    "wan_mode_for",
+]

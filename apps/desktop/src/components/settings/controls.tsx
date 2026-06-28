@@ -293,6 +293,41 @@ export function Stepper({
   );
 }
 
+/* ── Select (native dropdown, styled to match the settings surface) ──────── */
+export interface SelectOption<T extends string> {
+  value: T;
+  label: string;
+}
+export function Select<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  id,
+}: {
+  value: T;
+  options: SelectOption<T>[];
+  onChange: (v: T) => void;
+  ariaLabel: string;
+  id?: string;
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(e.target.value as T)}
+      className="kn-set-focusable min-h-9 max-w-[220px] rounded-lg border border-white/10 bg-[#191511] px-2.5 py-1.5 text-sm text-kinora-text outline-none"
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /* ── A small text/action button used inside rows ────────────────────────── */
 export function RowButton({
   children,
