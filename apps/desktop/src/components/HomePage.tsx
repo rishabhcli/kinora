@@ -1,13 +1,20 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { api, toUiBook, toBrowserUrl, ApiError, type BookResponse } from "../lib/api";
 import Navbar, { navItems } from "./Navbar";
 import { useGlobalNavShortcuts } from "../a11y/useNavShortcuts";
 import Greeting from "./Greeting";
-import BookShelf from "./BookShelf";
 import HeroBanner from "./HeroBanner";
 import AmbientBackground from "./AmbientBackground";
+import DiscoveryHome from "./discovery/DiscoveryHome";
+import DiscoverySearch from "./discovery/DiscoverySearch";
+import CommandPalette from "./discovery/CommandPalette";
+import { useCommandPalette } from "./discovery/useCommandPalette";
+import { buildCommands } from "./discovery/commands";
+import { mergeCatalog, popularityPrior } from "./discovery/buildCatalog";
+import type { DiscoveryBook } from "../lib/discovery/types";
+import { nextToResume } from "../lib/discovery/continueReading";
 import {
   MotionProvider,
   MotionDebugOverlay,
@@ -23,6 +30,7 @@ import {
   recentlyAdded,
   popularOnKinora,
   recommended,
+  awardWinners,
 } from "../data/books";
 import type { Book } from "../data/books";
 
@@ -60,6 +68,9 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
   const [originRect, setOriginRect] = useState<Rect | null>(null);
   const shared = useSharedElement();
 
+  // Discovery: a seeded query for the Search surface (set by the palette / nav).
+  const [searchSeed, setSearchSeed] = useState("");
+
   const handleOpen = (book: Book) => {
     // The shelf cover's rect was captured on pointer-down (capture phase).
     setOriginRect(shared.takeRect());
@@ -70,6 +81,30 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
 
   // Reading room visible (opening, reading, or flying back on close).
   const inRoom = roomOpen || selectedBook !== null;
+
+  // The ⌘K command palette (and "/") — suppressed while a book is open so the
+  // reading room owns the keyboard.
+  const palette = useCommandPalette({ isSuppressed: () => inRoom });
+
+  // The discovery catalog: the user's real backend library first (so live books
+  // win on id collision), then the demo catalogue shelves. Enriched with
+  // genre/era from the bundled manifest by `mergeCatalog`.
+  const catalog: DiscoveryBook[] = useMemo(
+    () =>
+      mergeCatalog(
+        myBooks,
+        continueReading,
+        recentlyAdded,
+        popularOnKinora,
+        recommended,
+        awardWinners,
+      ),
+    [myBooks],
+  );
+  const popularity = useMemo(
+    () => popularityPrior(catalog, popularOnKinora.map((b) => b.id)),
+    [catalog],
+  );
 
   // Pull the signed-in user's real library from the backend (cover = rendered
   // page 1) into the "Read Live · Public Domain" shelf.
@@ -125,6 +160,11 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
 
+  const openSearch = (query = "") => {
+    setSearchSeed(query);
+    setActivePage("Search");
+  };
+
   // Hidden power-user navigation (Cmd/Ctrl+1..5 tabs, arrow/Home/End scroll).
   // Deferred while the reading room owns the keyboard. Not surfaced in any UI.
   useGlobalNavShortcuts({
@@ -132,6 +172,30 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
     onSelectTab: setActivePage,
     isSuppressed: () => inRoom,
   });
+
+  // ⌘K command list: nav targets + every catalog book + global actions. Rebuilt
+  // when the catalog changes; `run` callbacks route into the existing handlers.
+  const commands = useMemo(
+    () =>
+      buildCommands({
+        navTargets: [
+          ...navItems.map((n) => ({ label: n.label })),
+          { label: "Pricing" },
+          { label: "Settings" },
+        ],
+        navigate: setActivePage,
+        books: catalog,
+        openBook: (b) => handleOpen(b),
+        openSearch,
+        resume: () => {
+          const book = nextToResume(catalog);
+          if (book) handleOpen(book);
+        },
+      }),
+    // setActivePage/handleOpen are stable enough for this demo; rebuild on catalog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [catalog],
+  );
 
   const pages: Record<string, React.ReactNode> = {
     Home: (
@@ -141,15 +205,30 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
             <Greeting />
           </div>
-          {/* Shelves animate in via their own whileInView (BookShelf internals). */}
-          {myBooks.length > 0 && (
-            <BookShelf title={t("library.readLivePublicDomain")} books={myBooks} onOpen={handleOpen} />
-          )}
-          <BookShelf title={t("library.continueReading")} books={continueReading} onOpen={handleOpen} />
-          <BookShelf title={t("library.recentlyAdded")} books={recentlyAdded} onOpen={handleOpen} />
-          <BookShelf title={t("library.popularOnKinora")} books={popularOnKinora} onOpen={handleOpen} />
-          <BookShelf title={t("library.recommended")} books={recommended} onOpen={handleOpen} />
         </div>
+        {/* Personalized, self-learning discovery surface: continue-reading +
+            recommendation rails driven by the engine in lib/discovery. Browsing
+            (hover/preview/open) feeds the taste profile for next time. */}
+        <DiscoveryHome
+          books={catalog}
+          loading={myBooks.length === 0}
+          popularity={popularity}
+          onOpenBook={handleOpen}
+          onMoreLikeThis={(b) => openSearch(b.genre ?? b.title)}
+        />
+      </main>
+    ),
+    Search: (
+      <main className="pb-8 relative z-10">
+        <div className="pt-6 px-6 max-w-[1280px] mx-auto">
+          <h1 className="font-serif text-xl font-semibold text-kinora-text mb-1">
+            {t("library.search", { defaultValue: "Search" })}
+          </h1>
+          <p className="text-[12px] text-kinora-muted mb-2">
+            Find a book by title, author, genre, era, or theme.
+          </p>
+        </div>
+        <DiscoverySearch books={catalog} initialQuery={searchSeed} onOpen={handleOpen} />
       </main>
     ),
     Library: <Suspense fallback={<PageFallback />}><LibraryPage onOpenBook={handleOpen} /></Suspense>,
@@ -180,6 +259,10 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           The room overlay lives inside the open-transition's own stacking
           context, so the fixed navbar (z-50) would otherwise paint over it. */}
       {!inRoom && <Navbar active={activePage} onNavigate={setActivePage} onLogout={onLogout} />}
+
+      {/* Global ⌘K / "/" command palette — fuzzy nav + jump-to-book + actions.
+          Suppressed while the reading room owns the keyboard. */}
+      <CommandPalette open={palette.open} commands={commands} onClose={palette.hide} />
 
       {/* Capture the tapped cover's rect (pointer-down, capture phase) so a
           subsequent onOpen can morph it. Keys off the existing `.book-cover`
