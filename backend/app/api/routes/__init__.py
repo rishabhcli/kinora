@@ -27,6 +27,7 @@ from app.api.routes import (
     workspaces,
 )
 from app.billing import routes as billing  # additive: billing & payments domain
+from app.compliance.api import router as compliance_router  # additive: compliance domain
 
 # Additive: the content-moderation & safety admin/operations surface (§9/§10).
 # The router lives under app.moderation to keep the safety domain self-contained.
@@ -61,6 +62,7 @@ ROUTERS = [
     search.router,  # server-side search engine: /search, /search/suggest, /search/reindex
     translation.router,  # content-translation subsystem (app.translation, §8/§9)
     moderation_router,  # content moderation & safety (§9/§10)
+    compliance_router,  # /compliance: consent, retention, DSAR, holds, ledger, report
 ]
 
 
