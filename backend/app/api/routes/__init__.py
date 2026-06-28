@@ -8,6 +8,7 @@ from app.api.routes import (
     director,
     events,
     films,
+    finops,
     library,
     metrics,
     optim,
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    finops.router,
 ]
 
 __all__ = ["ROUTERS"]

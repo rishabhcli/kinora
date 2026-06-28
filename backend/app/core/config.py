@@ -124,6 +124,21 @@ class Settings(BaseSettings):
     budget_per_scene_s: float = 90
     budget_low_floor_s: float = 120
 
+    # --- FinOps / cost governance (additive; see app/finops, kinora.md §11.1) ---
+    # A separate multi-tenant allocation of the global video-seconds ceiling.
+    # <= 0 means "no separate tenant cap" (single-tenant local/demo: the global
+    # ceiling is the only ceiling).
+    finops_tenant_ceiling_video_s: float = 0.0
+    # Tiered-alert fractions of any cap (info < warning < soft <= 1.0). The soft
+    # cap is the "prefer-degrade / warn loudly" line below the hard cap.
+    finops_alert_info_fraction: float = 0.50
+    finops_alert_warning_fraction: float = 0.75
+    finops_soft_cap_fraction: float = 0.90
+    # Forecast horizon: how far ahead (reading-seconds) the burn-down projects.
+    finops_forecast_horizon_s: float = 600.0
+    # Optimizer: minimum acceptable quality rung when budget-constrained (0..1).
+    finops_optimizer_min_quality: float = 0.0
+
     # --- Live video go-live gate ---
     kinora_live_video: bool = False
 

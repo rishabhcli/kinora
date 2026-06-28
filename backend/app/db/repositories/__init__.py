@@ -9,6 +9,7 @@ from app.db.repositories.budget import BudgetRepo
 from app.db.repositories.continuity import ContinuityStateRepo
 from app.db.repositories.defect import DefectRepo
 from app.db.repositories.entity import EntityRepo
+from app.db.repositories.finops import CostLedgerRepo
 from app.db.repositories.pref import PrefsRepo
 from app.db.repositories.render_job import RenderJobRepo
 from app.db.repositories.scene import SceneRepo
@@ -22,6 +23,7 @@ __all__ = [
     "BookRepo",
     "BudgetRepo",
     "ContinuityStateRepo",
+    "CostLedgerRepo",
     "DefectRepo",
     "EntityRepo",
     "PageRepo",

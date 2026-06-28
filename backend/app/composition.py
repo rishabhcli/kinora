@@ -46,6 +46,7 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.db.models.enums import BookStatus, RenderPriority
+from app.finops.tiers import BudgetTierPolicy
 from app.memory.budget_service import BudgetLimits, BudgetService
 from app.memory.interfaces import Embedder, RenderEnqueuer, ShotPlanner, ShotSpec
 from app.queue.enqueuer import RedisRenderEnqueuer
@@ -57,6 +58,7 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.finops.service import FinOpsService
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
@@ -219,6 +221,7 @@ class Container:
     scheduler_store: SchedulerStore
     keyframe_maintainer: QueueKeyframeMaintainer
     budget_limits: BudgetLimits
+    finops_policy: BudgetTierPolicy
 
     # -- overridable seams (None => lazily built real default) --------------- #
     embedder: Embedder | None = None
@@ -332,6 +335,27 @@ class Container:
         return IntentController(
             service=self.build_scheduler(session),
             store=self.scheduler_store,
+            settings=self.settings,
+        )
+
+    def build_finops(self, session: AsyncSession) -> FinOpsService:
+        """Build the §11.1 :class:`FinOpsService` over a request session.
+
+        Composes the same :class:`BudgetService` contract the scheduler/pipeline
+        use with the tenant cap, the USD cost ledger, tier alerts, forecasting,
+        the quality↔budget optimizer, and reconciliation. Bound to ``session``.
+        """
+        from app.db.repositories.book import BookRepo
+        from app.db.repositories.budget import BudgetRepo
+        from app.db.repositories.finops import CostLedgerRepo
+        from app.finops.service import FinOpsService
+
+        return FinOpsService(
+            budget_repo=BudgetRepo(session),
+            cost_repo=CostLedgerRepo(session),
+            book_repo=BookRepo(session),
+            limits=self.budget_limits,
+            policy=self.finops_policy,
             settings=self.settings,
         )
 
@@ -663,6 +687,7 @@ def build_container(settings: Settings | None = None) -> Container:
         scheduler_store=scheduler_store,
         keyframe_maintainer=keyframe_maintainer,
         budget_limits=BudgetLimits.from_settings(settings),
+        finops_policy=BudgetTierPolicy.from_settings(settings),
     )
 
 
