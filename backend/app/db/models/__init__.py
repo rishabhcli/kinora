@@ -39,6 +39,11 @@ from app.db.models.integration import (
 )
 from app.db.models.job import JobRun, ScheduledJob
 from app.db.models.pref import Pref
+from app.db.models.recommendation import (
+    BookFeatureRow,
+    BookInteraction,
+    UserTasteVector,
+)
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
 from app.db.models.search import SearchDocumentRow, SearchIndexAlias
@@ -70,6 +75,8 @@ __all__ = [
     "Base",
     "Beat",
     "BitemporalState",
+    "BookFeatureRow",
+    "BookInteraction",
     "BranchStatus",
     "Book",
     "BookStatus",
@@ -110,6 +117,7 @@ __all__ = [
     "SyncRun",
     "SyncRunStatus",
     "User",
+    "UserTasteVector",
     "Workspace",
     "WorkspaceActivity",
     "WorkspaceBook",

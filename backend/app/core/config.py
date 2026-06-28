@@ -226,6 +226,30 @@ class Settings(BaseSettings):
     search_default_limit: int = 20
     search_max_limit: int = 100
 
+    # --- Recommendations engine (server-side recsys, app.recommendations) ---
+    # Blend weights over the recsys signals (content / collaborative / taste /
+    # popularity prior); the candidate-gen → score → re-rank pipeline reads these.
+    # Defaults favour personalization with a small popularity prior. All knobs are
+    # additive and optional — the engine falls back to its own defaults if unset.
+    recs_weight_content: float = 1.0
+    recs_weight_collaborative: float = 1.0
+    recs_weight_taste: float = 1.2
+    recs_weight_popularity: float = 0.3
+    #: Candidates each recall source proposes before scoring.
+    recs_candidates_per_source: int = 50
+    #: Default recommendation list length after re-ranking.
+    recs_top_k: int = 20
+    #: MMR diversity trade-off (1.0 = pure relevance, lower = more diverse).
+    recs_mmr_lambda: float = 0.75
+    #: Recency half-life for the taste-vector decay, in days.
+    recs_taste_half_life_days: float = 30.0
+    #: Nearest neighbours the CF models consider.
+    recs_cf_neighbors: int = 40
+    #: Minimum shared-reader co-occurrence before an item-item CF edge is trusted.
+    recs_cf_min_cooccur: int = 1
+    #: Popularity damping (larger = flatter prior, big hits don't dominate).
+    recs_popularity_damping: float = 10.0
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"

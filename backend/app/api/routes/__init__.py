@@ -13,6 +13,7 @@ from app.api.routes import (
     metrics,
     optim,
     prefs,
+    recommendations,
     reports,
     search,
     sessions,
@@ -31,6 +32,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    recommendations.router,  # server-side recsys: watch-next + interaction logging
     reports.router,  # reports subsystem: document generation + signed retrieval
     integrations.router,  # third-party source import (app.integrations)
     workspaces.router,  # Workspaces & teams: collaboration ownership (§5)
