@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.providers import Providers, WanMode, WanSpec, data_uri
 from app.providers.types import TtsWord
+from app.providers.video_router import VideoBackend
 
 from .contracts import Camera, RenderMode, ShotSpec
 
@@ -174,10 +175,22 @@ def build_wan_spec(
 
 
 class Generator:
-    """Renders a shot's clip + narration via the real providers (gated by budget)."""
+    """Renders a shot's clip + narration via the real providers (gated by budget).
 
-    def __init__(self, providers: Providers) -> None:
+    The video side is a :class:`~app.providers.video_router.VideoBackend` — by
+    default the providers' single hosted :class:`~app.providers.video.VideoProvider`,
+    but any backend (notably a multi-provider
+    :class:`~app.providers.video_router.VideoRouter` with health-based failover /
+    racing) may be injected via ``video_backend`` without changing the
+    ``ClipGenerator`` seam the render pipeline depends on. Narration always rides
+    ``providers.tts``.
+    """
+
+    def __init__(self, providers: Providers, *, video_backend: VideoBackend | None = None) -> None:
         self._providers = providers
+        #: The video render seam — the injected backend (e.g. a router) or, by
+        #: default, the providers' single hosted Wan provider.
+        self._video: VideoBackend = video_backend or providers.video
 
     async def render(
         self,
@@ -203,7 +216,7 @@ class Generator:
             reference_image_bytes=reference_image_bytes,
             prev_last_frame_bytes=prev_last_frame_bytes,
         )
-        video = await self._providers.video.render(wan_spec)
+        video = await self._video.render(wan_spec)
         narration = await self._providers.tts.synthesize(narration_text, voice_id=voice_id)
         return GeneratorOutput(
             clip_bytes=video.clip_bytes,

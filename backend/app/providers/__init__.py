@@ -9,6 +9,7 @@ renders are gated behind ``settings.kinora_live_video``.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.core.config import Settings, get_settings
@@ -53,6 +54,16 @@ from .types import (
     WanSpec,
 )
 from .video import VideoPollConfig, VideoProvider
+from .video_router import (
+    BackendHealth,
+    BackendStatus,
+    BackendTier,
+    RouteMode,
+    RouterPolicy,
+    VideoBackend,
+    VideoRouter,
+    order_for_budget,
+)
 from .vl import VLProvider
 
 
@@ -133,9 +144,36 @@ def create_providers(
     )
 
 
+def create_video_router(
+    client: ProviderClient,
+    *,
+    model_ids: Sequence[str],
+    policy: RouterPolicy | None = None,
+) -> VideoRouter:
+    """Build a :class:`VideoRouter` over several hosted Wan model ids on one client.
+
+    Each id becomes a :class:`VideoProvider` whose ``WanSpec.model`` defaults to
+    that id (the router passes the spec through unchanged, so each backend resolves
+    its own configured id only when the spec leaves ``model`` unset — callers that
+    want a per-backend pin set ``spec.model`` accordingly). The first id is the
+    preferred backend; the rest are failover/race candidates. All share the one
+    resilient transport, so the budget/cost sink stays unified.
+
+    This is the additive seam Phase 9 wires into ``create_providers`` behind a
+    setting; today it is opt-in so the default single-backend path is unchanged.
+    """
+    if not model_ids:
+        raise ValueError("create_video_router requires at least one model id")
+    backends = [VideoProvider(client, name=f"video:{model_id}") for model_id in model_ids]
+    return VideoRouter(backends, policy=policy)
+
+
 __all__ = [
     "EMBED_DIM",
     "AuthenticationError",
+    "BackendHealth",
+    "BackendStatus",
+    "BackendTier",
     "BreakerState",
     "ChatProvider",
     "ChatResult",
@@ -155,6 +193,8 @@ __all__ = [
     "RateLimited",
     "ResilienceConfig",
     "ResponseParseError",
+    "RouteMode",
+    "RouterPolicy",
     "TokenBucket",
     "ToolCall",
     "TransientProviderError",
@@ -165,14 +205,18 @@ __all__ = [
     "UsageSink",
     "UsageTotals",
     "VLProvider",
+    "VideoBackend",
     "VideoPollConfig",
     "VideoProvider",
     "VideoResult",
+    "VideoRouter",
     "WanMode",
     "WanSpec",
     "classify_status",
     "cosine",
     "create_providers",
+    "create_video_router",
     "data_uri",
+    "order_for_budget",
     "sdk_get",
 ]

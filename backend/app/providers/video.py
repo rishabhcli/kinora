@@ -75,12 +75,43 @@ class VideoPollConfig:
 
 
 class VideoProvider:
-    """Async Wan render client (gated) + cheap model verification."""
+    """Async Wan render client (gated) + cheap model verification.
 
-    def __init__(self, client: ProviderClient, *, poll: VideoPollConfig | None = None) -> None:
+    Satisfies the :class:`~app.providers.video_router.VideoBackend` protocol — it
+    exposes a ``name`` and an ``async healthy()`` probe — so a single hosted Wan
+    id is a drop-in member of a :class:`~app.providers.video_router.VideoRouter`
+    (failover / racing across several backends) with no caller changes.
+    """
+
+    def __init__(
+        self,
+        client: ProviderClient,
+        *,
+        poll: VideoPollConfig | None = None,
+        name: str | None = None,
+    ) -> None:
         self._client = client
         self._settings = client.settings
         self._poll = poll or VideoPollConfig.from_settings(client.settings)
+        #: A stable identity for routing/telemetry; defaults to the configured t2v
+        #: model id so a single-backend router still has a meaningful name.
+        self.name = name or f"video:{client.settings.video_model}"
+
+    async def healthy(self) -> bool:
+        """Cheap liveness probe for the router (NO render, honours the gate).
+
+        Returns ``True`` without any network call when the live gate is off — a
+        gated-off backend is "available" for routing purposes (the gate, not the
+        backend, is what blocks the render); the deliberate ``LiveVideoDisabled``
+        is surfaced at :meth:`render`, never here. With the gate on, defers to the
+        cheap :meth:`verify_model_available` (empty-input task, no render spend).
+        """
+        if not self._settings.kinora_live_video:
+            return True
+        try:
+            return await self.verify_model_available()
+        except ProviderError:
+            return False
 
     # -- model id resolution per mode ------------------------------------- #
 
