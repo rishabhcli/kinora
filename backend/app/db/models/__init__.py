@@ -69,6 +69,7 @@ from app.db.models.user import User
 # Base.metadata so Alembic autogenerate + create_all see it. Imported here rather
 # than in app.reports to keep the single table-registration entry point.
 from app.reports.db_model import ReportArtifact
+
 # Workspaces & teams subsystem (additive; registers its tables on Base.metadata).
 from app.workspaces.models import (
     Collection,
@@ -82,6 +83,7 @@ from app.workspaces.models import (
     WorkspaceInvitation,
     WorkspaceMember,
 )
+
 # Content-translation subsystem tables (app.translation). Imported here so they
 # register on ``Base.metadata`` for Alembic autogenerate + relationship
 # resolution, exactly like every other aggregate. Additive: the translation
@@ -93,6 +95,18 @@ from app.translation.artifacts import (
     TranslationGlossaryRow,
     TranslationReview,
     TranslationSegment,
+)
+
+# --- Additive: content-moderation & safety subsystem (app.moderation, §9/§10) ---
+# Importing here registers the moderation tables on Base.metadata so Alembic
+# autogenerate and create_all see them. The models live under app.moderation to
+# keep the safety domain self-contained; this import is the single additive hook.
+from app.moderation.models import (
+    ModerationAuditEntry,
+    ModerationEvent,
+    ModerationTenantPolicy,
+    ReviewItem,
+    ViolationCounter,
 )
 
 __all__ = [
@@ -128,6 +142,9 @@ __all__ = [
     "ImportedItem",
     "JobRun",
     "MfaMethod",
+    "ModerationAuditEntry",
+    "ModerationEvent",
+    "ModerationTenantPolicy",
     "Organization",
     "OwnershipTransfer",
     "Page",
@@ -144,6 +161,7 @@ __all__ = [
     "RoleBinding",
     "RolePermission",
     "ReviewStatus",
+    "ReviewItem",
     "Scene",
     "ScheduledJob",
     "SearchDocumentRow",
@@ -162,6 +180,7 @@ __all__ = [
     "TranslationSegment",
     "User",
     "UserTasteVector",
+    "ViolationCounter",
     "Workspace",
     "WorkspaceActivity",
     "WorkspaceBook",

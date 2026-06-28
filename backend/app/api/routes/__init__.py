@@ -21,6 +21,10 @@ from app.api.routes import (
     workspaces,
 )
 
+# Additive: the content-moderation & safety admin/operations surface (§9/§10).
+# The router lives under app.moderation to keep the safety domain self-contained.
+from app.moderation.routes import router as moderation_router
+
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
 ROUTERS = [
     auth.router,
@@ -39,6 +43,7 @@ ROUTERS = [
     workspaces.router,  # Workspaces & teams: collaboration ownership (§5)
     search.router,  # server-side search engine: /search, /search/suggest, /search/reindex
     translation.router,  # content-translation subsystem (app.translation, §8/§9)
+    moderation_router,  # content moderation & safety (§9/§10)
 ]
 
 

@@ -48,6 +48,7 @@ from app.core.logging import get_logger
 from app.db.models.enums import BookStatus, RenderPriority
 from app.memory.budget_service import BudgetLimits, BudgetService
 from app.memory.interfaces import Embedder, RenderEnqueuer, ShotPlanner, ShotSpec
+from app.moderation.service import ModerationFactory, ModerationService
 from app.queue.enqueuer import RedisRenderEnqueuer
 from app.queue.redis_queue import RedisRenderQueue, book_channel, library_channel, session_channel
 from app.redis.client import RedisClient
@@ -251,6 +252,12 @@ class Container:
     # seam. Additive: nothing else in the container depends on it.
     translation_provider: TranslationProvider | None = None
 
+    #: Content-moderation factory (app.moderation). Overridable seam: tests inject
+    #: one built on the deterministic keyword classifier so no model is ever
+    #: called. ``None`` => lazily built from providers (or the keyword fake when
+    #: providers are unavailable). See :meth:`build_moderation`.
+    moderation_factory: ModerationFactory | None = None
+
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
@@ -321,6 +328,26 @@ class Container:
             self.providers, settings=self.settings, session_factory=self.session_factory
         )
         return self.shot_planner
+
+    # -- content moderation (app.moderation, §9/§10) ------------------------- #
+
+    def _moderation_factory(self) -> ModerationFactory:
+        """The process-wide moderation factory (constructed lazily on first use).
+
+        Builds the model-backed classifier from the providers when available, else
+        the deterministic keyword fake — so a no-key / no-network boot (and the
+        health check) never forces a provider dependency. Tests override
+        :attr:`moderation_factory` with a keyword-backed factory directly.
+        """
+        if self.moderation_factory is None:
+            self.moderation_factory = ModerationFactory(
+                providers=self.providers, settings=self.settings
+            )
+        return self.moderation_factory
+
+    def build_moderation(self, session: AsyncSession) -> ModerationService:
+        """Build a session-bound :class:`ModerationService` (the gate façade)."""
+        return self._moderation_factory().build(session)
 
     # -- the MCP tool layer: the single DI-seam satisfaction point ----------- #
 
