@@ -151,6 +151,27 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # --- Third-party integrations & import (app.integrations; all optional) ---
+    # Token at-rest sealing key. When set (and ``cryptography`` is installed) the
+    # OAuth/token blobs in ``app_connections`` are Fernet-encrypted; absent it a
+    # clearly-labelled reversible fallback is used (fine for local dev/tests).
+    integrations_encryption_key: str | None = None
+    # Per-sync caps (cost + safety). A single sync imports at most this many items.
+    integrations_max_items_per_sync: int = 500
+    # Consecutive failed syncs before a connection is flipped to ERROR health.
+    integrations_error_threshold: int = 3
+    # OAuth2 client credentials per provider (only the ones you enable need set).
+    # Endpoints have sane public defaults; only the id/secret are secrets.
+    notion_oauth_client_id: str | None = None
+    notion_oauth_client_secret: str | None = None
+    pocket_oauth_client_id: str | None = None
+    pocket_oauth_client_secret: str | None = None
+    # The redirect URI registered with the providers (the app's OAuth callback).
+    integrations_oauth_redirect_uri: str = "http://localhost:8000/api/integrations/oauth/callback"
+    # Optional per-provider webhook signing secrets (push-based sync).
+    readwise_webhook_secret: str | None = None
+    notion_webhook_secret: str | None = None
+
     @property
     def is_local(self) -> bool:
         """True when running in the local development environment."""

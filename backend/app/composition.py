@@ -57,6 +57,8 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.integrations.http import HttpxClient
+    from app.integrations.service import IntegrationsService
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
@@ -226,11 +228,14 @@ class Container:
     comment_classifier: CommentClassifier | None = None
     regen_runner: RegenRunner | None = None
     ingest_runner: IngestRunner | None = None
+    #: Third-party integrations facade (lazily built; overridable in tests).
+    integrations: IntegrationsService | None = None
 
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
     _keyframe_service: KeyframeService | None = field(default=None, repr=False)
+    _integrations_http: HttpxClient | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -308,6 +313,63 @@ class Container:
                 settings=self.settings,
             )
         return self._keyframe_service
+
+    # -- third-party integrations (lazy; overridable seam) ------------------- #
+
+    def build_integrations(self) -> IntegrationsService:
+        """Build the §9.1-import integrations facade with the real ingest seam.
+
+        The facade is wired with a :class:`HttpxClient` (the one network seam),
+        the configured token sealer, an OAuth-config resolver over settings, and
+        a :class:`_KinoraIngestGateway` that creates books + spawns Phase-A ingest
+        exactly like ``POST /books`` does. Cached after first build; tests inject
+        a pre-built :attr:`integrations` instead.
+        """
+        if self.integrations is None:
+            from app.integrations.backoff import BackoffPolicy
+            from app.integrations.crypto import TokenSealer
+            from app.integrations.http import HttpxClient
+            from app.integrations.oauth import OAuth2Config
+            from app.integrations.registry import default_registry
+            from app.integrations.service import IntegrationsService
+
+            self._integrations_http = HttpxClient()
+            s = self.settings
+
+            def oauth_config(provider: str) -> OAuth2Config | None:
+                if provider == "notion" and s.notion_oauth_client_id:
+                    return OAuth2Config(
+                        provider="notion",
+                        client_id=s.notion_oauth_client_id or "",
+                        client_secret=s.notion_oauth_client_secret or "",
+                        authorize_endpoint="https://api.notion.com/v1/oauth/authorize",
+                        token_endpoint="https://api.notion.com/v1/oauth/token",
+                        redirect_uri=s.integrations_oauth_redirect_uri,
+                        extra_authorize_params={"owner": "user"},
+                    )
+                if provider == "pocket" and s.pocket_oauth_client_id:
+                    return OAuth2Config(
+                        provider="pocket",
+                        client_id=s.pocket_oauth_client_id or "",
+                        client_secret=s.pocket_oauth_client_secret or "",
+                        authorize_endpoint="https://getpocket.com/auth/authorize",
+                        token_endpoint="https://getpocket.com/v3/oauth/authorize",
+                        redirect_uri=s.integrations_oauth_redirect_uri,
+                    )
+                return None
+
+            self.integrations = IntegrationsService(
+                session_factory=self.session_factory,
+                ingest=_KinoraIngestGateway(self),
+                http=self._integrations_http,
+                sealer=TokenSealer(s.integrations_encryption_key),
+                registry=default_registry(),
+                oauth_config=oauth_config,
+                backoff=BackoffPolicy(),
+                max_items_per_sync=s.integrations_max_items_per_sync,
+                error_threshold=s.integrations_error_threshold,
+            )
+        return self.integrations
 
     # -- per-request scheduler stack (bound to a request DB session) --------- #
 
@@ -613,12 +675,67 @@ class Container:
                 await task
         with suppress(Exception):
             await self.redis.close()
+        if self._integrations_http is not None:
+            with suppress(Exception):
+                await self._integrations_http.aclose()
         if self._providers is not None:
             with suppress(Exception):
                 await self._providers.aclose()
         with suppress(Exception):
             await self.engine.dispose()
         logger.info("container.shutdown")
+
+
+class _KinoraIngestGateway:
+    """The integrations → §9.1 ingest seam, mirroring ``POST /books``.
+
+    Given rendered PDF bytes from an imported source item, it creates the
+    ``importing`` book row (owned by the reader), persists the PDF under the
+    canonical ``pdfs/`` key, and spawns Phase-A ingest out-of-band — the same
+    durable path a manual upload takes. Returns the new book id.
+    """
+
+    def __init__(self, container: Container) -> None:
+        self._c = container
+
+    async def import_pdf(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        author: str | None,
+        pdf_bytes: bytes,
+        source: str,
+    ) -> str:
+        import anyio
+
+        from app.db.base import new_id
+        from app.db.repositories.book import BookRepo
+        from app.queue.redis_queue import book_progress_key
+        from app.storage.object_store import keys
+
+        book_id = new_id()
+        pdf_key = keys.pdf(book_id)
+        await anyio.to_thread.run_sync(
+            self._c.object_store.put_bytes, pdf_key, pdf_bytes, "application/pdf"
+        )
+        async with self._c.session_factory() as session:
+            await BookRepo(session).create(
+                title=title[:512] or "Untitled",
+                author=(author or None),
+                user_id=user_id,
+                source_pdf_key=pdf_key,
+                status=BookStatus.IMPORTING,
+                art_direction=None,
+                book_id=book_id,
+            )
+        await self._c.redis.set_json(
+            book_progress_key(book_id), {"stage": "importing", "pct": 0.0}
+        )
+        # Phase A out-of-band — the imported book becomes a first-class book.
+        self._c.spawn(self._c.run_ingest(book_id, pdf_bytes, None))
+        logger.info("integrations.import.book_created", book_id=book_id, source=source)
+        return book_id
 
 
 def build_container(settings: Settings | None = None) -> Container:

@@ -29,6 +29,13 @@ from app.db.models.enums import (
     SessionMode,
     ShotStatus,
 )
+from app.db.models.integration import (
+    AppConnection,
+    ConnectionStatus,
+    ImportedItem,
+    SyncRun,
+    SyncRunStatus,
+)
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -37,6 +44,7 @@ from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
 __all__ = [
+    "AppConnection",
     "AuditAction",
     "Base",
     "Beat",
@@ -48,12 +56,16 @@ __all__ = [
     "BudgetLedger",
     "CanonAudit",
     "CanonBranch",
+    "ConnectionStatus",
     "ContinuityState",
     "Defect",
     "Entity",
     "EntityType",
+    "ImportedItem",
     "Page",
     "Pref",
+    "SyncRun",
+    "SyncRunStatus",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
