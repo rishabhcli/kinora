@@ -1,0 +1,121 @@
+{
+  "language": {
+    "name": "Idioma",
+    "description": "O idioma que o Kinora usa em todo o aplicativo."
+  },
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "zh": "中文",
+    "hi": "हिन्दी"
+  },
+  "nav": {
+    "home": "Início",
+    "library": "Biblioteca",
+    "watch": "Assistir",
+    "favorites": "Favoritos",
+    "notes": "Notas"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "open": "Abrir",
+    "back": "Voltar",
+    "restore": "Restaurar",
+    "clear": "Limpar",
+    "cleared": "Limpo",
+    "loading": "Carregando…",
+    "oneMoment": "Um momento…"
+  },
+  "login": {
+    "signIn": "Entrar",
+    "signUp": "Cadastrar-se",
+    "welcomeBack": "Bem-vindo de volta à sua biblioteca",
+    "startWatching": "Comece a assistir livros como filmes",
+    "emailPlaceholder": "Endereço de e-mail",
+    "passwordPlaceholder": "Senha",
+    "rememberMe": "Lembrar de mim",
+    "forgotPassword": "Esqueceu a senha?",
+    "createAccount": "Criar conta",
+    "or": "ou",
+    "continueWith": "Continuar com {{provider}}",
+    "exploreDemo": "Explorar a biblioteca de demonstração →",
+    "newToKinora": "Novo no Kinora?",
+    "alreadyHaveAccount": "Já tem uma conta?",
+    "tagline": "Onde as histórias ganham vida.",
+    "heroTitle": "Onde as histórias ganham vida.",
+    "heroSubtitle": "Sua biblioteca, reimaginada como cinema. Livros viram filmes, páginas viram cenas — assistidos no silêncio de uma noite.",
+    "heroKicker": "A leitura, reescrita"
+  },
+  "library": {
+    "continueReading": "Continuar lendo",
+    "recentlyAdded": "Adicionados recentemente",
+    "popularOnKinora": "Populares no Kinora",
+    "recommended": "Recomendados para você",
+    "readLivePublicDomain": "Ler ao vivo · Domínio público"
+  },
+  "reading": {
+    "back": "Voltar",
+    "closeReader": "Fechar o leitor e voltar",
+    "readingSettings": "Configurações de leitura",
+    "bufferedAhead": "{{seconds}}s armazenados à frente",
+    "generatingAhead": "Gerando à frente…",
+    "readingAria": "Lendo {{title}}"
+  },
+  "settings": {
+    "title": "Configurações",
+    "searchPlaceholder": "Buscar configurações",
+    "noMatches": "Nenhum resultado.",
+    "categoriesAria": "Categorias de configurações",
+    "sections": {
+      "general": "Geral",
+      "appearance": "Aparência",
+      "reading": "Leitura",
+      "playback": "Reprodução",
+      "notifications": "Notificações",
+      "privacy": "Privacidade",
+      "account": "Conta",
+      "about": "Sobre"
+    },
+    "general": {
+      "subtitle": "Como o Kinora inicia e se comporta.",
+      "openTo": "Abrir o Kinora em",
+      "openToDesc": "A tela que o Kinora mostra ao iniciar.",
+      "soundEffects": "Efeitos sonoros",
+      "soundEffectsDesc": "Sons sutis de virar página e de interface.",
+      "reset": "Redefinir",
+      "restoreDefaults": "Restaurar todos os padrões",
+      "restoreDefaultsDesc": "Redefinir cada configuração do Kinora ao valor original.",
+      "restoreConfirm": "Restaurar todas as configurações do Kinora aos padrões?"
+    },
+    "appearance": {
+      "subtitle": "Substituições de acessibilidade aplicadas a todo o aplicativo.",
+      "reduceMotion": "Reduzir movimento",
+      "reduceMotionDesc": "Minimizar animações e transições.",
+      "reduceTransparency": "Reduzir transparência",
+      "reduceTransparencyDesc": "Trocar o desfoque de vidro fosco por superfícies sólidas.",
+      "increaseContrast": "Aumentar contraste",
+      "increaseContrastDesc": "Clarear o texto secundário e reforçar as bordas.",
+      "themesHint": "Os temas de leitura (Escuro, Sépia, Papel…) ficam em Leitura."
+    },
+    "override": {
+      "system": "Sistema",
+      "on": "Ligado",
+      "off": "Desligado"
+    }
+  },
+  "icu": {
+    "shotsRendered": "{count, plural, =0 {Nenhuma tomada ainda} one {# tomada renderizada} other {# tomadas renderizadas}}",
+    "booksInLibrary": "{count, plural, one {{count} livro} other {{count} livros}} na sua biblioteca",
+    "readerGreeting": "{gender, select, female {Bem-vinda de volta, ela está lendo} male {Bem-vindo de volta, ele está lendo} other {Bem-vindo de volta, estão lendo}}",
+    "addedOn": "Adicionado em {date, date, long}",
+    "bufferAhead": "{seconds, number} segundos em buffer à frente",
+    "renderProgress": "{percent, number, percent} renderizado",
+    "creditsLeft": "{amount, number, ::currency/USD} de créditos restantes",
+    "lastOpened": "Aberto pela última vez {when}",
+    "rankedNth": "Seu {n, selectordinal, other {#º}} livro este mês"
+  }
+}

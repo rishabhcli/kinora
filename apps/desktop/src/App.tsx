@@ -3,6 +3,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import LoginPage from "./components/LoginPage";
 import { api } from "./lib/api";
 import { useReducedMotionPref } from "./a11y/useReducedMotionPref";
+// ADDITIVE (i18n domain): the typed ICU intl engine's React provider. It only
+// installs a React context + syncs <html lang/dir>; it renders NO DOM wrapper, so
+// layout is unchanged. Existing react-i18next consumers are unaffected — new code
+// can adopt `useT()` (src/i18n/useT.ts) at its own pace. Safe to remove if the
+// engine isn't adopted. See src/i18n/DESIGN.md.
+import { IntlProvider } from "./i18n/IntlProvider";
 
 const HomePage = lazy(() => import("./components/HomePage"));
 
@@ -18,7 +24,7 @@ export default function App() {
   // it would become the containing block for HomePage's `position: fixed` navbar
   // and break its anchor. A brief warm flash carries the "library opens" beat over.
   return (
-    <>
+    <IntlProvider>
       <AnimatePresence mode="wait">
         {!entered ? (
           <motion.div
@@ -59,6 +65,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-    </>
+    </IntlProvider>
   );
 }

@@ -1,0 +1,121 @@
+{
+  "language": {
+    "name": "言語",
+    "description": "Kinora がアプリ全体で使用する言語。"
+  },
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "zh": "中文",
+    "hi": "हिन्दी"
+  },
+  "nav": {
+    "home": "ホーム",
+    "library": "ライブラリ",
+    "watch": "観る",
+    "favorites": "お気に入り",
+    "notes": "メモ"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "open": "開く",
+    "back": "戻る",
+    "restore": "復元",
+    "clear": "消去",
+    "cleared": "消去しました",
+    "loading": "読み込み中…",
+    "oneMoment": "少々お待ちください…"
+  },
+  "login": {
+    "signIn": "サインイン",
+    "signUp": "新規登録",
+    "welcomeBack": "ライブラリへおかえりなさい",
+    "startWatching": "本を映画として観はじめましょう",
+    "emailPlaceholder": "メールアドレス",
+    "passwordPlaceholder": "パスワード",
+    "rememberMe": "ログイン状態を保持",
+    "forgotPassword": "パスワードをお忘れですか？",
+    "createAccount": "アカウントを作成",
+    "or": "または",
+    "continueWith": "{{provider}} で続ける",
+    "exploreDemo": "デモライブラリを見る →",
+    "newToKinora": "Kinora は初めてですか？",
+    "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
+    "tagline": "物語が動き出す場所。",
+    "heroTitle": "物語が動き出す場所。",
+    "heroSubtitle": "あなたのライブラリを映画として再構築。本は映画に、ページはシーンに——静かな夜にゆっくりと。",
+    "heroKicker": "読書を、書き換える"
+  },
+  "library": {
+    "continueReading": "続きを読む",
+    "recentlyAdded": "最近追加",
+    "popularOnKinora": "Kinora で人気",
+    "recommended": "あなたへのおすすめ",
+    "readLivePublicDomain": "ライブで読む · パブリックドメイン"
+  },
+  "reading": {
+    "back": "戻る",
+    "closeReader": "リーダーを閉じて戻る",
+    "readingSettings": "読書設定",
+    "bufferedAhead": "{{seconds}} 秒先までバッファ済み",
+    "generatingAhead": "先読み生成中…",
+    "readingAria": "{{title}} を読書中"
+  },
+  "settings": {
+    "title": "設定",
+    "searchPlaceholder": "設定を検索",
+    "noMatches": "一致する項目はありません。",
+    "categoriesAria": "設定カテゴリ",
+    "sections": {
+      "general": "一般",
+      "appearance": "外観",
+      "reading": "読書",
+      "playback": "再生",
+      "notifications": "通知",
+      "privacy": "プライバシー",
+      "account": "アカウント",
+      "about": "情報"
+    },
+    "general": {
+      "subtitle": "Kinora の起動と動作。",
+      "openTo": "起動時に開く画面",
+      "openToDesc": "Kinora を起動したときに表示する画面。",
+      "soundEffects": "効果音",
+      "soundEffectsDesc": "ページめくりや UI の控えめな音。",
+      "reset": "リセット",
+      "restoreDefaults": "すべてを初期設定に戻す",
+      "restoreDefaultsDesc": "Kinora のすべての設定を元の値に戻します。",
+      "restoreConfirm": "Kinora のすべての設定を初期値に戻しますか？"
+    },
+    "appearance": {
+      "subtitle": "アプリ全体に適用されるアクセシビリティの上書き。",
+      "reduceMotion": "視差効果を減らす",
+      "reduceMotionDesc": "アニメーションとトランジションを最小限に。",
+      "reduceTransparency": "透明度を下げる",
+      "reduceTransparencyDesc": "すりガラスのぼかしを不透明な面に置き換えます。",
+      "increaseContrast": "コントラストを上げる",
+      "increaseContrastDesc": "補助テキストを明るくし、境界をはっきりさせます。",
+      "themesHint": "読書テーマ（ダーク、セピア、ペーパー…）は「読書」にあります。"
+    },
+    "override": {
+      "system": "システム",
+      "on": "オン",
+      "off": "オフ"
+    }
+  },
+  "icu": {
+    "shotsRendered": "{count, plural, =0 {まだショットはありません} other {# ショットをレンダリングしました}}",
+    "booksInLibrary": "ライブラリに {count, plural, other {{count} 冊}} の本があります",
+    "readerGreeting": "{gender, select, female {おかえりなさい、彼女が読んでいます} male {おかえりなさい、彼が読んでいます} other {おかえりなさい、読書中です}}",
+    "addedOn": "{date, date, long} に追加",
+    "bufferAhead": "{seconds, number} 秒先までバッファ済み",
+    "renderProgress": "{percent, number, percent} レンダリング済み",
+    "creditsLeft": "残りクレジット {amount, number, ::currency/USD}",
+    "lastOpened": "最終アクセス {when}",
+    "rankedNth": "今月 {n, selectordinal, other {#}} 冊目の本です"
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "language": {
+    "name": "اللغة",
+    "description": "اللغة التي يستخدمها Kinora في جميع أنحاء التطبيق."
+  },
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "zh": "中文",
+    "hi": "हिन्दी"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "library": "المكتبة",
+    "watch": "مشاهدة",
+    "favorites": "المفضلة",
+    "notes": "الملاحظات"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "open": "فتح",
+    "back": "رجوع",
+    "restore": "استعادة",
+    "clear": "مسح",
+    "cleared": "تم المسح",
+    "loading": "جارٍ التحميل…",
+    "oneMoment": "لحظة من فضلك…"
+  },
+  "login": {
+    "signIn": "تسجيل الدخول",
+    "signUp": "إنشاء حساب",
+    "welcomeBack": "مرحبًا بعودتك إلى مكتبتك",
+    "startWatching": "ابدأ بمشاهدة الكتب كأفلام",
+    "emailPlaceholder": "البريد الإلكتروني",
+    "passwordPlaceholder": "كلمة المرور",
+    "rememberMe": "تذكّرني",
+    "forgotPassword": "هل نسيت كلمة المرور؟",
+    "createAccount": "إنشاء حساب",
+    "or": "أو",
+    "continueWith": "المتابعة باستخدام {{provider}}",
+    "exploreDemo": "استكشف مكتبة العرض التجريبي ←",
+    "newToKinora": "جديد على Kinora؟",
+    "alreadyHaveAccount": "هل لديك حساب بالفعل؟",
+    "tagline": "حيث تنبض القصص بالحياة.",
+    "heroTitle": "حيث تنبض القصص بالحياة.",
+    "heroSubtitle": "مكتبتك، مُعاد تصوّرها كسينما. تتحوّل الكتب إلى أفلام، وتصبح الصفحات مشاهد — تُشاهَد في هدوء المساء.",
+    "heroKicker": "القراءة، مُعاد كتابتها"
+  },
+  "library": {
+    "continueReading": "متابعة القراءة",
+    "recentlyAdded": "أُضيف حديثًا",
+    "popularOnKinora": "رائج على Kinora",
+    "recommended": "موصى به لك",
+    "readLivePublicDomain": "قراءة مباشرة · ملكية عامة"
+  },
+  "reading": {
+    "back": "رجوع",
+    "closeReader": "إغلاق القارئ والعودة",
+    "readingSettings": "إعدادات القراءة",
+    "bufferedAhead": "تم التخزين المؤقت لـ {{seconds}} ثانية مسبقًا",
+    "generatingAhead": "جارٍ التوليد مسبقًا…",
+    "readingAria": "قراءة {{title}}"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "searchPlaceholder": "ابحث في الإعدادات",
+    "noMatches": "لا توجد نتائج.",
+    "categoriesAria": "فئات الإعدادات",
+    "sections": {
+      "general": "عام",
+      "appearance": "المظهر",
+      "reading": "القراءة",
+      "playback": "التشغيل",
+      "notifications": "الإشعارات",
+      "privacy": "الخصوصية",
+      "account": "الحساب",
+      "about": "حول"
+    },
+    "general": {
+      "subtitle": "كيف يبدأ Kinora ويتصرّف.",
+      "openTo": "افتح Kinora على",
+      "openToDesc": "العرض الذي يظهره Kinora عند بدء التشغيل.",
+      "soundEffects": "المؤثرات الصوتية",
+      "soundEffectsDesc": "أصوات خفيفة لتقليب الصفحات وواجهة المستخدم.",
+      "reset": "إعادة تعيين",
+      "restoreDefaults": "استعادة كل الإعدادات الافتراضية",
+      "restoreDefaultsDesc": "إعادة كل إعداد في Kinora إلى قيمته الأصلية.",
+      "restoreConfirm": "استعادة كل إعدادات Kinora إلى الافتراضية؟"
+    },
+    "appearance": {
+      "subtitle": "تجاوزات إمكانية الوصول المطبّقة على التطبيق بأكمله.",
+      "reduceMotion": "تقليل الحركة",
+      "reduceMotionDesc": "تقليل الرسوم المتحركة والانتقالات.",
+      "reduceTransparency": "تقليل الشفافية",
+      "reduceTransparencyDesc": "استبدال ضبابية الزجاج المصنفر بأسطح صلبة.",
+      "increaseContrast": "زيادة التباين",
+      "increaseContrastDesc": "تفتيح النص الثانوي وتقوية الحدود.",
+      "themesHint": "سمات القراءة (داكن، بنّي داكن، ورقي…) موجودة ضمن القراءة."
+    },
+    "override": {
+      "system": "النظام",
+      "on": "تشغيل",
+      "off": "إيقاف"
+    }
+  },
+  "icu": {
+    "shotsRendered": "{count, plural, =0 {لا توجد لقطات بعد} zero {لا لقطات} one {تم تقديم لقطة واحدة} two {تم تقديم لقطتين} few {تم تقديم # لقطات} many {تم تقديم # لقطة} other {تم تقديم # لقطة}}",
+    "booksInLibrary": "{count, plural, zero {لا كتب} one {كتاب واحد} two {كتابان} few {{count} كتب} many {{count} كتابًا} other {{count} كتاب}} في مكتبتك",
+    "readerGreeting": "{gender, select, female {مرحبًا بعودتك، إنها تقرأ} male {مرحبًا بعودتك، إنه يقرأ} other {مرحبًا بعودتك، إنهم يقرؤون}}",
+    "addedOn": "أُضيف في {date, date, long}",
+    "bufferAhead": "تم التخزين المؤقت لـ {seconds, number} ثانية مسبقًا",
+    "renderProgress": "تم تقديم {percent, number, percent}",
+    "creditsLeft": "يتبقى {amount, number, ::currency/USD} من الرصيد",
+    "lastOpened": "آخر فتح {when}",
+    "rankedNth": "كتابك رقم {n, selectordinal, other {#}} هذا الشهر"
+  }
+}

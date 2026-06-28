@@ -106,5 +106,16 @@
       "on": "开",
       "off": "关"
     }
+  },
+  "icu": {
+    "shotsRendered": "{count, plural, =0 {还没有镜头} other {已渲染 # 个镜头}}",
+    "booksInLibrary": "你的图书馆中有 {count, plural, other {{count} 本书}}",
+    "readerGreeting": "{gender, select, female {欢迎回来，她正在阅读} male {欢迎回来，他正在阅读} other {欢迎回来，正在阅读}}",
+    "addedOn": "添加于 {date, date, long}",
+    "bufferAhead": "已预缓冲 {seconds, number} 秒",
+    "renderProgress": "已渲染 {percent, number, percent}",
+    "creditsLeft": "剩余额度 {amount, number, ::currency/USD}",
+    "lastOpened": "上次打开 {when}",
+    "rankedNth": "这是你本月的第 {n, selectordinal, other {#}} 本书"
   }
 }
