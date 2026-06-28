@@ -29,6 +29,7 @@ from app import __version__
 from app.api.errors import install_exception_handlers
 from app.api.middleware import SecurityHeadersMiddleware
 from app.api.routes import ROUTERS, root_routers
+from app.auth.middleware import CsrfMiddleware
 from app.composition import Container, build_container
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
@@ -152,6 +153,16 @@ def create_app() -> FastAPI:
     )
     # Security headers on every response (HSTS only outside local, §12).
     app.add_middleware(SecurityHeadersMiddleware, hsts=not settings.is_local)
+    # CSRF double-submit guard for cookie-authenticated writes (§12). A no-op for
+    # the Bearer/API-key callers Kinora actually uses, so it adds defence in depth
+    # without affecting the desktop app or headless integrations.
+    app.add_middleware(
+        CsrfMiddleware,
+        enabled=settings.csrf_enabled,
+        cookie_name=settings.csrf_cookie_name,
+        header_name=settings.csrf_header_name,
+        secure_cookie=not settings.is_local,
+    )
 
     set_app_info(service=settings.service_name, version=__version__, env=settings.app_env)
     install_exception_handlers(app)

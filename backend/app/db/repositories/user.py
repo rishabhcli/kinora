@@ -29,3 +29,12 @@ class UserRepo(BaseRepository):
         """Fetch a user by their unique email (the auth lookup)."""
         stmt = select(User).where(User.email == email)
         return (await self.session.execute(stmt)).scalars().first()
+
+    async def set_password(self, user_id: str, hashed_password: str) -> User | None:
+        """Update a user's stored password hash (change / reset / transparent rehash)."""
+        user = await self.get(user_id)
+        if user is None:
+            return None
+        user.hashed_password = hashed_password
+        await self.session.flush()
+        return user

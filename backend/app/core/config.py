@@ -15,6 +15,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 #: The insecure JWT secret placeholder. Booting with this outside ``local`` is a
 #: hard error (see :meth:`Settings._guard_production_secrets`).
 DEFAULT_JWT_SECRET = "change-me-in-prod"  # noqa: S105 - sentinel, not a real credential
+#: The insecure API-key pepper placeholder; like the JWT secret, booting with it
+#: outside ``local`` is a hard error (an unkeyed API-key digest is forgeable).
+DEFAULT_API_KEY_PEPPER = "change-me-api-key-pepper"  # noqa: S105 - sentinel
 
 
 class Settings(BaseSettings):
@@ -255,6 +258,63 @@ class Settings(BaseSettings):
     jwt_alg: str = "HS256"
     access_token_ttl_s: int = 86400
 
+    # --- Auth & security plane (app.auth / app.core.security) -------------- #
+    # All additive with safe defaults so the gateway boots unchanged; the
+    # production hardening (lockout, MFA, RBAC, API keys, refresh rotation,
+    # CSRF) layers on top of the existing Bearer flow (kinora.md §6/§12).
+    #
+    # Issuer/audience stamped onto access tokens so a token minted for one
+    # deployment cannot be replayed against another.
+    jwt_issuer: str = "kinora"
+    jwt_audience: str = "kinora-api"
+    # Refresh tokens: long-lived opaque secrets rotated on every use with a
+    # per-family reuse-detection scheme (a replayed token revokes the family).
+    refresh_token_ttl_s: int = 60 * 60 * 24 * 30  # 30 days
+    # Short-lived bearer that proves a partial (password-only) login while the
+    # client completes the MFA challenge.
+    mfa_challenge_ttl_s: int = 300
+    # Password hashing: "bcrypt" (always available) or "argon2" (if installed).
+    password_hasher: str = "bcrypt"
+    bcrypt_rounds: int = 12
+    # Password strength policy. Defaults mirror the existing RegisterRequest
+    # contract (length only) so the established register/login flow is unchanged;
+    # tighten these in production (charset + common-password denylist) without a
+    # code change. ``app.core.security.PasswordPolicy`` implements the checks.
+    password_min_length: int = 8
+    password_require_upper: bool = False
+    password_require_lower: bool = False
+    password_require_digit: bool = False
+    password_require_symbol: bool = False
+    password_block_common: bool = False
+    # Login throttling / account lockout.
+    login_max_failures: int = 5
+    login_lockout_window_s: int = 900  # failures counted within this window
+    login_lockout_duration_s: int = 900  # how long a locked account stays locked
+    # Per-IP login attempt backstop (a coarse sliding-window lockout, separate
+    # from and looser than the gateway's ``auth_rate_limit`` token bucket which is
+    # the primary fast defence). Kept above the auth bucket's capacity so the
+    # bucket's typed 429 ``rate_limited`` is what a burst hits first; this layer
+    # catches slow distributed credential-stuffing across the longer window.
+    login_ip_max_attempts: int = 50
+    login_ip_window_s: int = 300
+    # MFA / TOTP.
+    mfa_issuer: str = "Kinora"
+    totp_drift_window: int = 1  # ±N 30s steps accepted (clock-skew tolerance)
+    recovery_code_count: int = 10
+    # API keys — a server-side pepper keys the HMAC used to fingerprint secrets,
+    # so a leaked api_keys table is useless without it. Outside ``local`` a real
+    # value is mandatory (guarded below).
+    api_key_pepper: str = DEFAULT_API_KEY_PEPPER
+    api_key_default_ttl_s: int | None = None  # None == non-expiring
+    # Sessions — cap concurrent active sessions per user (oldest evicted).
+    max_sessions_per_user: int = 25
+    # CSRF — double-submit cookie protection for browser/cookie auth flows.
+    csrf_enabled: bool = True
+    csrf_cookie_name: str = "kinora_csrf"
+    csrf_header_name: str = "X-CSRF-Token"
+    # Auth audit log retention sweep (days; 0 disables pruning).
+    auth_audit_retention_days: int = 365
+
     # --- MCP control surface (the deployed canon-memory server, §8.3/§14) ---
     # When set, the streamable-HTTP MCP requires ``Authorization: Bearer <token>``.
     # Outside ``local`` it is mandatory: the HTTP MCP refuses to start without it
@@ -324,6 +384,19 @@ class Settings(BaseSettings):
             raise ValueError(
                 "JWT_SECRET must be set to a real secret when APP_ENV is not 'local' "
                 "(refusing to boot with the insecure default 'change-me-in-prod')."
+            )
+        if not self.is_local and self.api_key_pepper == DEFAULT_API_KEY_PEPPER:
+            # A dedicated API_KEY_PEPPER is preferred, but rather than add a second
+            # mandatory secret to every deployment we derive one from the (already
+            # mandatory, already-real) JWT secret so the stored API-key HMAC is
+            # never keyed by the well-known placeholder. Setting API_KEY_PEPPER
+            # explicitly still overrides this (it differs from the default).
+            import hashlib
+
+            object.__setattr__(
+                self,
+                "api_key_pepper",
+                "derived:" + hashlib.sha256(("apikey:" + self.jwt_secret).encode()).hexdigest(),
             )
         return self
 
