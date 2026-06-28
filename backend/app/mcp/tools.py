@@ -22,15 +22,32 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.enums import EntityType, RenderPriority, ShotStatus
+from app.db.repositories.bitemporal import (
+    BitemporalStateRepo,
+    CanonAuditRepo,
+    CanonBranchRepo,
+)
 from app.db.repositories.budget import BudgetRepo
 from app.db.repositories.pref import PrefsRepo
 from app.db.repositories.render_job import RenderJobRepo
 from app.db.repositories.shot import ShotCacheRepo, ShotRepo
 from app.db.session import get_session
 from app.mcp import schemas
+from app.memory.audit_log import AuditLog
+from app.memory.bitemporal_vault import BitemporalVault
+from app.memory.branch_service import BranchService
 from app.memory.budget_service import BudgetExceeded, BudgetLimits, BudgetService
 from app.memory.cache_service import CacheService
 from app.memory.canon_service import CanonService
+from app.memory.compaction import TemporalCompactor
+from app.memory.contracts import (
+    AuditChain,
+    BranchDiff,
+    BranchInfo,
+    CanonReadView,
+    FactHistory,
+    MergeResult,
+)
 from app.memory.episodic_service import EpisodicService
 from app.memory.interfaces import (
     BlobStore,
@@ -42,6 +59,7 @@ from app.memory.interfaces import (
     ShotSpec,
 )
 from app.memory.prefs_service import PreferencePrior, PreferencePriors, PrefsService
+from app.memory.temporal_state_service import TemporalStateService
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
@@ -104,6 +122,26 @@ class MemoryTools:
     def _prefs(self, session: AsyncSession) -> PrefsService:
         return PrefsService(prefs=PrefsRepo(session))
 
+    def _temporal(
+        self, session: AsyncSession, *, actor_id: str = "system"
+    ) -> TemporalStateService:
+        return TemporalStateService(
+            BitemporalStateRepo(session),
+            AuditLog(CanonAuditRepo(session)),
+            actor_id=actor_id,
+        )
+
+    def _branches(
+        self, session: AsyncSession, *, actor_id: str = "system"
+    ) -> BranchService:
+        return BranchService(
+            BitemporalStateRepo(session),
+            CanonBranchRepo(session),
+            AuditLog(CanonAuditRepo(session)),
+            self._temporal(session, actor_id=actor_id),
+            actor_id=actor_id,
+        )
+
     # --- canon.* ------------------------------------------------------------ #
 
     async def canon_query(self, inp: schemas.CanonQueryInput) -> schemas.CanonSlice:
@@ -164,6 +202,178 @@ class MemoryTools:
             await self._canon(session).retire_state(inp.state_id, inp.valid_to_beat)
         return schemas.CanonRetireStateOutput(
             state_id=inp.state_id, valid_to_beat=inp.valid_to_beat
+        )
+
+    # --- canon.* bitemporal (VALID-time AND TRANSACTION-time, §8) ----------- #
+
+    async def canon_assert_fact(
+        self, inp: schemas.CanonAssertFactInput
+    ) -> schemas.BitemporalFact:
+        async with self._sf() as session:
+            return await self._temporal(session, actor_id=inp.actor_id).assert_fact(
+                book_id=inp.book_id,
+                subject_entity_key=inp.subject_entity_key,
+                predicate=inp.predicate,
+                object_value=inp.object_value,
+                valid_from_beat=inp.valid_from_beat,
+                branch=inp.branch,
+                fact_key=inp.fact_key,
+                source_span=inp.source_span,
+            )
+
+    async def canon_correct_fact(
+        self, inp: schemas.CanonCorrectFactInput
+    ) -> schemas.BitemporalFact:
+        async with self._sf() as session:
+            return await self._temporal(session, actor_id=inp.actor_id).correct_fact(
+                book_id=inp.book_id,
+                fact_key=inp.fact_key,
+                new_object=inp.new_object,
+                branch=inp.branch,
+                new_valid_from_beat=inp.new_valid_from_beat,
+                source_span=inp.source_span,
+            )
+
+    async def canon_retire_fact(
+        self, inp: schemas.CanonRetireFactInput
+    ) -> schemas.BitemporalFact:
+        async with self._sf() as session:
+            return await self._temporal(session, actor_id=inp.actor_id).retire_fact(
+                book_id=inp.book_id,
+                fact_key=inp.fact_key,
+                valid_to_beat=inp.valid_to_beat,
+                branch=inp.branch,
+            )
+
+    async def canon_facts_as_of(
+        self, inp: schemas.CanonFactsAsOfInput
+    ) -> schemas.CanonFactsAsOfOutput:
+        async with self._sf() as session:
+            facts = await self._temporal(session).as_of(
+                book_id=inp.book_id,
+                beat=inp.beat,
+                as_of_tx=inp.as_of_tx,
+                branch=inp.branch,
+                subject_entity_key=inp.subject_entity_key,
+            )
+        return schemas.CanonFactsAsOfOutput(facts=facts)
+
+    async def canon_fact_history(self, inp: schemas.CanonFactHistoryInput) -> FactHistory:
+        async with self._sf() as session:
+            return await self._temporal(session).history(
+                book_id=inp.book_id, fact_key=inp.fact_key, branch=inp.branch
+            )
+
+    async def canon_fork(self, inp: schemas.CanonForkInput) -> BranchInfo:
+        async with self._sf() as session:
+            return await self._branches(session, actor_id=inp.actor_id).fork(
+                book_id=inp.book_id,
+                name=inp.name,
+                base_beat=inp.base_beat,
+                base_tx=inp.base_tx,
+                parent=inp.parent,
+                note=inp.note,
+            )
+
+    async def canon_diff(self, inp: schemas.CanonDiffInput) -> BranchDiff:
+        async with self._sf() as session:
+            return await self._branches(session).diff(
+                book_id=inp.book_id, branch_a=inp.branch_a, branch_b=inp.branch_b
+            )
+
+    async def canon_merge(self, inp: schemas.CanonMergeInput) -> MergeResult:
+        async with self._sf() as session:
+            return await self._branches(session, actor_id=inp.actor_id).merge(
+                book_id=inp.book_id, source=inp.source, target=inp.target
+            )
+
+    async def canon_audit(self, inp: schemas.CanonAuditInput) -> AuditChain:
+        async with self._sf() as session:
+            return await AuditLog(CanonAuditRepo(session)).replay(
+                inp.book_id, limit=inp.limit
+            )
+
+    async def canon_view(self, inp: schemas.CanonViewInput) -> CanonReadView:
+        from app.memory.bitemporal import LATEST_BEAT
+
+        beat = LATEST_BEAT if inp.beat is None else inp.beat
+        async with self._sf() as session:
+            temporal = self._temporal(session)
+            facts = await temporal.as_of(
+                book_id=inp.book_id, beat=beat, as_of_tx=inp.as_of_tx, branch=inp.branch
+            )
+            branches = await self._branches(session).list_branches(inp.book_id)
+            chain = await AuditLog(CanonAuditRepo(session)).replay(
+                inp.book_id, limit=inp.audit_tail
+            )
+        return CanonReadView(
+            book_id=inp.book_id,
+            branch=inp.branch,
+            beat=beat,
+            as_of_tx=inp.as_of_tx,
+            facts=facts,
+            branches=branches,
+            audit_tail=chain.entries,
+        )
+
+    async def canon_compact(
+        self, inp: schemas.CanonCompactInput
+    ) -> schemas.CanonCompactOutput:
+        async with self._sf() as session:
+            compactor = TemporalCompactor(BitemporalStateRepo(session))
+            if inp.dry_run:
+                plan = await compactor.plan(
+                    book_id=inp.book_id, branch=inp.branch, horizon_days=inp.horizon_days
+                )
+                return schemas.CanonCompactOutput(
+                    book_id=inp.book_id,
+                    branch=inp.branch,
+                    dry_run=True,
+                    prunable=plan.prune_count,
+                    pruned=0,
+                    facts_touched=len(plan.by_fact),
+                )
+            result = await compactor.compact(
+                book_id=inp.book_id, branch=inp.branch, horizon_days=inp.horizon_days
+            )
+        return schemas.CanonCompactOutput(
+            book_id=inp.book_id,
+            branch=inp.branch,
+            dry_run=False,
+            prunable=result.pruned,
+            pruned=result.pruned,
+            facts_touched=result.facts_touched,
+        )
+
+    async def canon_vault(self, inp: schemas.CanonVaultInput) -> schemas.CanonVaultOutput:
+        from app.memory.bitemporal import LATEST_BEAT
+
+        beat = LATEST_BEAT if inp.beat is None else inp.beat
+        async with self._sf() as session:
+            temporal = self._temporal(session)
+            facts = await temporal.as_of(book_id=inp.book_id, beat=beat, branch=inp.branch)
+            branches = await self._branches(session).list_branches(inp.book_id)
+            chain = await AuditLog(CanonAuditRepo(session)).replay(
+                inp.book_id, limit=inp.audit_tail
+            )
+            keys = inp.history_for if inp.history_for is not None else [f.fact_key for f in facts]
+            histories = [
+                await temporal.history(book_id=inp.book_id, fact_key=k, branch=inp.branch)
+                for k in keys
+            ]
+        doc = BitemporalVault().render(
+            book_id=inp.book_id,
+            branch=inp.branch,
+            facts=facts,
+            branches=branches,
+            histories=histories,
+            audit=chain,
+        )
+        return schemas.CanonVaultOutput(
+            book_id=inp.book_id,
+            branch=inp.branch,
+            markdown=doc.markdown,
+            sections=doc.sections,
         )
 
     # --- shot.* ------------------------------------------------------------- #
@@ -432,6 +642,88 @@ TOOL_DEFS: list[ToolDef] = [
         "out of active retrieval (history preserved for time-travel reads).",
         schemas.CanonRetireStateInput,
         "canon_retire_state",
+    ),
+    ToolDef(
+        "canon.assert_fact",
+        "Bitemporal assert: add a continuity fact carrying VALID-time (beat "
+        "interval) AND TRANSACTION-time (when believed), CRDT-stamped + audited.",
+        schemas.CanonAssertFactInput,
+        "canon_assert_fact",
+    ),
+    ToolDef(
+        "canon.correct_fact",
+        "Correct a belief: close the current row's transaction interval and "
+        "insert a successor (the prior belief survives for as-of-past reads).",
+        schemas.CanonCorrectFactInput,
+        "canon_correct_fact",
+    ),
+    ToolDef(
+        "canon.retire_fact",
+        "Forgetting on the bitemporal store: close a fact's valid-beat interval "
+        "(§8.5); the row survives for backward/time-travel reads.",
+        schemas.CanonRetireFactInput,
+        "canon_retire_fact",
+    ),
+    ToolDef(
+        "canon.facts_as_of",
+        "4-D time-travel read: the active facts on a branch, valid at a beat, as "
+        "the canon believed them at a transaction instant (current when omitted).",
+        schemas.CanonFactsAsOfInput,
+        "canon_facts_as_of",
+    ),
+    ToolDef(
+        "canon.fact_history",
+        "Every past belief of one logical fact (its transaction-time timeline).",
+        schemas.CanonFactHistoryInput,
+        "canon_fact_history",
+    ),
+    ToolDef(
+        "canon.fork",
+        "Create an editing branch off a base coordinate (a director edit forks a "
+        "line of canon to be diffed and merged back).",
+        schemas.CanonForkInput,
+        "canon_fork",
+    ),
+    ToolDef(
+        "canon.diff",
+        "The structural difference between two branches' current beliefs "
+        "(added/removed/changed/retired facts).",
+        schemas.CanonDiffInput,
+        "canon_diff",
+    ),
+    ToolDef(
+        "canon.merge",
+        "Three-way CRDT merge of a source branch into a target (last-writer-wins "
+        "on concurrent edits; losers reported as conflicts).",
+        schemas.CanonMergeInput,
+        "canon_merge",
+    ),
+    ToolDef(
+        "canon.audit",
+        "Replay the append-only, hash-chained canon audit log (tamper-evident).",
+        schemas.CanonAuditInput,
+        "canon_audit",
+    ),
+    ToolDef(
+        "canon.view",
+        "The inspectable read contract: active facts at a coordinate + branch "
+        "registry + a tail of the audit log, for the frontend canon editor.",
+        schemas.CanonViewInput,
+        "canon_view",
+    ),
+    ToolDef(
+        "canon.compact",
+        "Prune redundant superseded transaction-time history beyond a retention "
+        "horizon (audit-safe; dry-run by default). Bounds storage at novel scale.",
+        schemas.CanonCompactInput,
+        "canon_compact",
+    ),
+    ToolDef(
+        "canon.vault",
+        "Render the bitemporal canon (active facts + branches + fact tx-histories "
+        "+ audit trail) to inspectable markdown for the frontend canon inspector.",
+        schemas.CanonVaultInput,
+        "canon_vault",
     ),
     ToolDef(
         "shot.plan",

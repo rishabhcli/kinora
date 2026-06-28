@@ -9,34 +9,66 @@ function-call parameters (§14). Outputs reuse the memory-layer contracts
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.memory.contracts import (
+    AuditChain,
+    BitemporalFact,
+    BranchDiff,
+    BranchInfo,
+    CanonReadView,
+    FactHistory,
+    MergeResult,
+)
 from app.memory.interfaces import CanonEntitySlice, CanonSlice, EpisodicShotRef, ShotSpec
 from app.memory.prefs_service import PreferencePrior, PreferencePriors
 
 __all__ = [
+    "AuditChain",
+    "BitemporalFact",
+    "BranchDiff",
+    "BranchInfo",
     "BudgetRemainingInput",
     "BudgetRemainingOutput",
     "BudgetReserveInput",
     "BudgetReserveOutput",
+    "CanonAssertFactInput",
     "CanonAssertStateInput",
     "CanonAssertStateOutput",
+    "CanonAuditInput",
+    "CanonCompactInput",
+    "CanonCompactOutput",
+    "CanonCorrectFactInput",
+    "CanonDiffInput",
     "CanonEntitySlice",
+    "CanonFactHistoryInput",
+    "CanonFactsAsOfInput",
+    "CanonFactsAsOfOutput",
+    "CanonForkInput",
     "CanonGetEntityInput",
     "CanonGetEntityOutput",
+    "CanonMergeInput",
     "CanonQueryInput",
+    "CanonReadView",
+    "CanonRetireFactInput",
     "CanonRetireStateInput",
     "CanonRetireStateOutput",
     "CanonSlice",
     "CanonUpsertEntityInput",
     "CanonUpsertEntityOutput",
+    "CanonVaultInput",
+    "CanonVaultOutput",
+    "CanonViewInput",
     "EpisodicLogInput",
     "EpisodicLogOutput",
     "EpisodicSearchInput",
     "EpisodicSearchOutput",
     "EpisodicShotRef",
+    "FactHistory",
+    "MergeResult",
     "PreferencePrior",
     "PreferencePriors",
     "PrefsGetInput",
@@ -362,3 +394,157 @@ class PrefsUpsertInput(BaseModel):
     user_id: str | None = None
     book_id: str | None = None
     weight_delta: float = 1.0
+
+
+# --- bitemporal canon engine (§8: VALID-time AND TRANSACTION-time) -----------
+
+
+class CanonAssertFactInput(BaseModel):
+    """Args for ``canon.assert_fact`` — a bitemporal fact assert (audited + CRDT-stamped)."""
+
+    book_id: str
+    subject_entity_key: str
+    predicate: str
+    object_value: str
+    valid_from_beat: int
+    branch: str = "main"
+    fact_key: str | None = None
+    actor_id: str = "system"
+    source_span: dict[str, Any] | None = None
+
+
+class CanonCorrectFactInput(BaseModel):
+    """Args for ``canon.correct_fact`` — change a belief (close tx, insert successor)."""
+
+    book_id: str
+    fact_key: str
+    new_object: str
+    branch: str = "main"
+    new_valid_from_beat: int | None = None
+    actor_id: str = "system"
+    source_span: dict[str, Any] | None = None
+
+
+class CanonRetireFactInput(BaseModel):
+    """Args for ``canon.retire_fact`` — §8.5 forgetting on the bitemporal store."""
+
+    book_id: str
+    fact_key: str
+    valid_to_beat: int
+    branch: str = "main"
+    actor_id: str = "system"
+
+
+class CanonFactsAsOfInput(BaseModel):
+    """Args for ``canon.facts_as_of`` — the 4-D time-travel read."""
+
+    book_id: str
+    beat: int
+    as_of_tx: datetime | None = Field(
+        default=None, description="Transaction instant (UTC); current belief when omitted."
+    )
+    branch: str = "main"
+    subject_entity_key: str | None = None
+
+
+class CanonFactsAsOfOutput(BaseModel):
+    """Result of ``canon.facts_as_of`` — the active facts at the coordinate."""
+
+    facts: list[BitemporalFact] = Field(default_factory=list)
+
+
+class CanonFactHistoryInput(BaseModel):
+    """Args for ``canon.fact_history`` — every past belief of one logical fact."""
+
+    book_id: str
+    fact_key: str
+    branch: str = "main"
+
+
+class CanonForkInput(BaseModel):
+    """Args for ``canon.fork`` — create an editing branch off a base coordinate."""
+
+    book_id: str
+    name: str
+    base_beat: int | None = None
+    base_tx: datetime | None = None
+    parent: str = "main"
+    actor_id: str = "system"
+    note: str | None = None
+
+
+class CanonDiffInput(BaseModel):
+    """Args for ``canon.diff`` — the structural difference between two branches."""
+
+    book_id: str
+    branch_a: str
+    branch_b: str
+
+
+class CanonMergeInput(BaseModel):
+    """Args for ``canon.merge`` — three-way CRDT merge of ``source`` into ``target``."""
+
+    book_id: str
+    source: str
+    target: str = "main"
+    actor_id: str = "system"
+
+
+class CanonAuditInput(BaseModel):
+    """Args for ``canon.audit`` — replay (a tail of) the hash-chained audit log."""
+
+    book_id: str
+    limit: int | None = Field(default=None, description="Tail size; whole log when omitted.")
+
+
+class CanonViewInput(BaseModel):
+    """Args for ``canon.view`` — the inspectable read contract for the frontend."""
+
+    book_id: str
+    beat: int | None = Field(default=None, description="Beat ordinal; latest when omitted.")
+    as_of_tx: datetime | None = None
+    branch: str = "main"
+    audit_tail: int = 20
+
+
+class CanonCompactInput(BaseModel):
+    """Args for ``canon.compact`` — prune superseded tx-history beyond a horizon (§8.7)."""
+
+    book_id: str
+    branch: str = "main"
+    horizon_days: int = 30
+    dry_run: bool = Field(
+        default=True, description="Plan only (default); set False to actually prune."
+    )
+
+
+class CanonCompactOutput(BaseModel):
+    """Result of ``canon.compact`` — what was (or would be) pruned."""
+
+    book_id: str
+    branch: str
+    dry_run: bool
+    prunable: int
+    pruned: int
+    facts_touched: int
+
+
+class CanonVaultInput(BaseModel):
+    """Args for ``canon.vault`` — render the bitemporal canon to inspectable markdown."""
+
+    book_id: str
+    branch: str = "main"
+    beat: int | None = None
+    history_for: list[str] | None = Field(
+        default=None, description="fact_keys to include full tx-history for (all when omitted)."
+    )
+    audit_tail: int = 50
+
+
+class CanonVaultOutput(BaseModel):
+    """Result of ``canon.vault`` — the rendered markdown sections + the joined document."""
+
+    book_id: str
+    branch: str
+    markdown: str
+    sections: dict[str, str] = Field(default_factory=dict)
