@@ -167,6 +167,11 @@ from app.flags.db_models import (
 # app/compliance/DESIGN.md.
 import app.compliance.db.models  # noqa: E402, F401  (side-effect: table registration)
 
+# Media subsystem (app.media) — registered here so Alembic autogenerate and the
+# app's metadata see the media_assets table. Additive only (Media domain).
+from app.media.kinds import MediaAssetKind
+from app.media.models import MediaAsset
+
 __all__ = [
     "AnalyticsDailyRollup",
     "AnalyticsEvent",
@@ -230,6 +235,8 @@ __all__ = [
     "LLMOpsPromptVersion",
     "LLMOpsRun",
     "LegalHold",
+    "MediaAsset",
+    "MediaAssetKind",
     "MfaMethod",
     "ModerationAuditEntry",
     "ModerationEvent",

@@ -348,6 +348,20 @@ class Settings(BaseSettings):
     # records (the others stand by), keeping ids globally consistent.
     realtime_recorder_elect_leader: bool = False
 
+    # --- Media / asset service (app.media; additive — Media domain) ---
+    #: Default signed-URL lifetime for media links (clamped 60s..7d at use).
+    media_url_ttl_s: int = 3600
+    #: Target HLS/DASH segment duration (seconds) when packaging films.
+    media_segment_s: int = 4
+    #: Number of sprite-sheet tiles generated for the scrubber preview.
+    media_sprite_count: int = 20
+    #: Retention horizon (days) applied to *derived* assets (poster/sprite/HLS);
+    #: ``0`` disables auto-expiry. Primary assets (clips/source) are never
+    #: auto-collected — their removal is governed by explicit retention only.
+    media_derived_retention_days: int = 30
+    #: Max rows the lifecycle GC sweep collects per run.
+    media_gc_batch: int = 100
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"

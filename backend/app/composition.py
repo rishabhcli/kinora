@@ -72,6 +72,7 @@ if TYPE_CHECKING:
     from app.integrations.service import IntegrationsService
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
+    from app.media.service import MediaService
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
     from app.notifications.service import NotificationService
     from app.providers import Providers
@@ -298,6 +299,7 @@ class Container:
     _analytics_service: AnalyticsService | None = field(default=None, repr=False)
     _conversation_memory: ConversationMemory | None = field(default=None, repr=False)
     _llmops: Any = field(default=None, repr=False)
+    _media_service: MediaService | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -834,6 +836,21 @@ class Container:
             )
         except Exception as exc:  # noqa: BLE001 - notifications are best-effort
             logger.warning("notifications.emit_failed", event_name=event, error=str(exc))
+
+    # -- media / asset service (app.media) — additive, lazy (Media domain) --- #
+
+    @property
+    def media_service(self) -> MediaService:
+        """Content-addressed media store + ffmpeg derivations + GC (§8.7, §9)."""
+        if self._media_service is None:
+            from app.media.service import build_media_service
+
+            self._media_service = build_media_service(
+                self.settings,
+                object_store=self.object_store,
+                session_factory=self.session_factory,
+            )
+        return self._media_service
 
     # -- per-request scheduler stack (bound to a request DB session) --------- #
 

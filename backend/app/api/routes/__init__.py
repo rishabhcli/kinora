@@ -16,6 +16,7 @@ from app.api.routes import (
     integrations,
     library,
     llmops,
+    media,
     metrics,
     notifications,
     optim,
@@ -67,6 +68,7 @@ ROUTERS = [
     compliance_router,  # /compliance: consent, retention, DSAR, holds, ledger, report
     llmops.router,  # LLM-ops surface (prompt registry/eval/guardrails); 404 unless llmops_enabled
     portability.router,  # data export/import & portability (book/canon/account/backup)
+    media.router,  # Media domain: /api/media asset registry (additive)
 ]
 
 
