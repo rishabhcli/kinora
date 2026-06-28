@@ -14,6 +14,7 @@ from app.agents.contracts import RenderMode
 from app.render.continuity_qa import (
     SeamRepair,
     ShotGeometry,
+    detect_persistence_drift,
     propose_supplemental_shot,
     route_event_continuity,
     score_event_continuity,
@@ -164,3 +165,109 @@ def test_propose_supplemental_shot_bridges_two_shots() -> None:
     assert 3.0 <= bridge.duration_s <= 8.0
     assert bridge.ordinal == prev.ordinal  # inserted right after prev (stable sort key)
     assert prev.shot_id in bridge.shot_id and "supp" in bridge.shot_id
+
+
+# --------------------------------------------------------------------------- #
+# Cross-shot prop / wardrobe / setting persistence (narrative continuity).
+# --------------------------------------------------------------------------- #
+
+
+def _dressed_script() -> EventScript:
+    """The bridge script with explicit, consistent persistence dims on chained shots.
+
+    The planner derives per-beat lighting/time-of-day (and shot_02 carries a
+    motivated reversal), so we pin all four dimensions to a constant and clear
+    the reversal — a clean baseline against which a single drift stands out.
+    """
+    script = _script()
+    shots = []
+    for shot in script.shots:
+        shots.append(
+            shot.model_copy(
+                update={
+                    "directive": shot.directive.model_copy(
+                        update={
+                            "wardrobe": "blue cloak",
+                            "setting": "the great hall",
+                            "lighting": "warm torchlight",
+                            "time_of_day": "evening",
+                            "motion_reversal": False,
+                        }
+                    )
+                }
+            )
+        )
+    return script.model_copy(update={"shots": shots})
+
+
+def _two_shot_dressed() -> EventScript:
+    """A 2-shot chained slice of the dressed script (exactly one seam to reason on)."""
+    script = _dressed_script()
+    return script.model_copy(update={"shots": script.shots[:2]})
+
+
+def test_persistence_drift_clean_when_dimensions_hold() -> None:
+    report = detect_persistence_drift(_dressed_script())
+    assert report.ok is True
+    assert report.drifts == ()
+
+
+def test_persistence_drift_flags_unmotivated_wardrobe_change() -> None:
+    script = _two_shot_dressed()
+    # Shot 1 (a chained continuation) silently changes the cloak — a continuity error.
+    shots = list(script.shots)
+    shots[1] = shots[1].model_copy(
+        update={"directive": shots[1].directive.model_copy(update={"wardrobe": "red cloak"})}
+    )
+    report = detect_persistence_drift(script.model_copy(update={"shots": shots}))
+    assert report.ok is False
+    drift = next(d for d in report.drifts if d.dimension == "wardrobe")
+    assert drift.from_value == "blue cloak"
+    assert drift.to_value == "red cloak"
+    assert "without a motivated change" in drift.describe()
+
+
+def test_persistence_drift_excuses_motivated_change_via_handoff() -> None:
+    script = _two_shot_dressed()
+    shots = list(script.shots)
+    # The wardrobe changes but the hand-off names it → a motivated change, not drift.
+    shots[1] = shots[1].model_copy(
+        update={
+            "directive": shots[1].directive.model_copy(
+                update={"wardrobe": "red cloak", "hand_off": "she dons the red cloak"}
+            )
+        }
+    )
+    report = detect_persistence_drift(script.model_copy(update={"shots": shots}))
+    assert report.ok is True
+
+
+def test_persistence_drift_exempts_motion_reversal_beat() -> None:
+    script = _two_shot_dressed()
+    shots = list(script.shots)
+    # A motivated beat change (motion_reversal) may relocate / re-dress freely.
+    shots[1] = shots[1].model_copy(
+        update={
+            "directive": shots[1].directive.model_copy(
+                update={"setting": "the courtyard", "motion_reversal": True}
+            )
+        }
+    )
+    report = detect_persistence_drift(script.model_copy(update={"shots": shots}))
+    assert report.ok is True
+
+
+def test_persistence_drift_ignores_fresh_cut_relocation() -> None:
+    script = _two_shot_dressed()
+    shots = list(script.shots)
+    # Shot 1 becomes a fresh establishing cut (not chained) that relocates — allowed.
+    shots[1] = shots[1].model_copy(
+        update={
+            "render_mode": RenderMode.TEXT_TO_VIDEO,
+            "directive": shots[1].directive.model_copy(
+                update={"setting": "a different castle", "continues_from_shot_id": None}
+            ),
+        }
+    )
+    report = detect_persistence_drift(script.model_copy(update={"shots": shots}))
+    assert report.ok is True

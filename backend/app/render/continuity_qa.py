@@ -248,11 +248,106 @@ def propose_supplemental_shot(
     )
 
 
+# --------------------------------------------------------------------------- #
+# Cross-shot prop / wardrobe / setting persistence (§8.5 forgetting, narrative
+# continuity). The seam checks above are *geometric* (a resolution jump reads as
+# a cut); these are *narrative* — within a chained event a character's wardrobe,
+# the setting, the lighting and the time of day persist unless a beat motivates a
+# change, so an unmotivated flicker between consecutive chained shots is a
+# continuity error a long adaptation accumulates. Pure: reads the planned
+# directives, no ffmpeg.
+# --------------------------------------------------------------------------- #
+
+#: The persistence dimensions a chained shot inherits from its predecessor.
+_PERSISTENCE_DIMENSIONS: tuple[str, ...] = ("wardrobe", "setting", "lighting", "time_of_day")
+
+
+@dataclass(frozen=True, slots=True)
+class PersistenceDrift:
+    """An unmotivated change in a persistence dimension across a chained seam."""
+
+    from_shot_id: str
+    to_shot_id: str
+    dimension: str
+    from_value: str | None
+    to_value: str | None
+
+    def describe(self) -> str:
+        return (
+            f"{self.dimension} drifted from '{self.from_value}' to '{self.to_value}' "
+            f"between {self.from_shot_id} and {self.to_shot_id} without a motivated change"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PersistenceReport:
+    """The event's narrative-persistence verdict across all chained seams."""
+
+    event_id: str
+    drifts: tuple[PersistenceDrift, ...] = field(default_factory=tuple)
+
+    @property
+    def ok(self) -> bool:
+        return not self.drifts
+
+
+def _seam_is_chained(prev_shot: EventShot, cur_shot: EventShot) -> bool:
+    """``True`` if ``cur`` reads as a continuation of ``prev`` (vs. a fresh cut)."""
+    return (
+        cur_shot.render_mode in _CHAINED_MODES
+        and cur_shot.directive.continues_from_shot_id == prev_shot.shot_id
+    )
+
+
+def detect_persistence_drift(script: EventScript) -> PersistenceReport:
+    """Flag unmotivated wardrobe/setting/lighting/time drift across chained seams.
+
+    For each chained seam, a persistence dimension that *changes value* is a
+    drift unless the seam carries a motivated change (``motion_reversal`` reads as
+    a deliberate new beat, and a non-empty ``hand_off`` that names the change
+    excuses it). A fresh-cut seam (a new establishing shot) is exempt — a cut may
+    legitimately relocate. Output is stable, ordered by shot then dimension.
+    """
+    drifts: list[PersistenceDrift] = []
+    for prev_shot, cur_shot in zip(script.shots, script.shots[1:], strict=False):
+        if not _seam_is_chained(prev_shot, cur_shot):
+            continue
+        if cur_shot.directive.motion_reversal:
+            continue  # a motivated beat change; relocations/relight are allowed
+        for dim in _PERSISTENCE_DIMENSIONS:
+            prev_val = getattr(prev_shot.directive, dim)
+            cur_val = getattr(cur_shot.directive, dim)
+            if prev_val is None or cur_val is None:
+                continue  # an unset dimension is not a drift signal
+            if prev_val != cur_val and not _change_motivated(cur_shot, dim, cur_val):
+                drifts.append(
+                    PersistenceDrift(
+                        from_shot_id=prev_shot.shot_id,
+                        to_shot_id=cur_shot.shot_id,
+                        dimension=dim,
+                        from_value=prev_val,
+                        to_value=cur_val,
+                    )
+                )
+    return PersistenceReport(event_id=script.event_id, drifts=tuple(drifts))
+
+
+def _change_motivated(cur_shot: EventShot, dimension: str, new_value: str) -> bool:
+    """``True`` if the shot's hand-off prose names the new value (a motivated change)."""
+    handoff = (cur_shot.directive.hand_off or "").lower()
+    summary = (cur_shot.summary or "").lower()
+    needle = new_value.lower()
+    return needle in handoff or needle in summary
+
+
 __all__ = [
     "EventContinuityReport",
+    "PersistenceDrift",
+    "PersistenceReport",
     "SeamQuality",
     "SeamRepair",
     "ShotGeometry",
+    "detect_persistence_drift",
     "propose_supplemental_shot",
     "route_event_continuity",
     "score_event_continuity",
