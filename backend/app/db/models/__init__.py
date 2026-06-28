@@ -82,10 +82,23 @@ from app.workspaces.models import (
     WorkspaceInvitation,
     WorkspaceMember,
 )
+# Content-translation subsystem tables (app.translation). Imported here so they
+# register on ``Base.metadata`` for Alembic autogenerate + relationship
+# resolution, exactly like every other aggregate. Additive: the translation
+# package owns these definitions; this is only the registration point.
+from app.translation.artifacts import (
+    ArtifactStatus,
+    ReviewStatus,
+    TranslationArtifact,
+    TranslationGlossaryRow,
+    TranslationReview,
+    TranslationSegment,
+)
 
 __all__ = [
     "AppConnection",
     "ApiKey",
+    "ArtifactStatus",
     "AuditAction",
     "AuthAuditLog",
     "AuthCredential",
@@ -130,6 +143,7 @@ __all__ = [
     "Role",
     "RoleBinding",
     "RolePermission",
+    "ReviewStatus",
     "Scene",
     "ScheduledJob",
     "SearchDocumentRow",
@@ -142,6 +156,10 @@ __all__ = [
     "SourceSpanIndex",
     "SyncRun",
     "SyncRunStatus",
+    "TranslationArtifact",
+    "TranslationGlossaryRow",
+    "TranslationReview",
+    "TranslationSegment",
     "User",
     "UserTasteVector",
     "Workspace",

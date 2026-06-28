@@ -17,6 +17,7 @@ from app.api.routes import (
     reports,
     search,
     sessions,
+    translation,
     workspaces,
 )
 
@@ -37,6 +38,7 @@ ROUTERS = [
     integrations.router,  # third-party source import (app.integrations)
     workspaces.router,  # Workspaces & teams: collaboration ownership (§5)
     search.router,  # server-side search engine: /search, /search/suggest, /search/reindex
+    translation.router,  # content-translation subsystem (app.translation, §8/§9)
 ]
 
 

@@ -365,6 +365,25 @@ class Settings(BaseSettings):
     readwise_webhook_secret: str | None = None
     notion_webhook_secret: str | None = None
 
+    # --- Content translation (app.translation; distinct from UI i18n) ---
+    # The content-translation subsystem translates reader-facing material (page
+    # text, canon entity descriptions, narration scripts) into a reader's
+    # language. It is token-only (never renders video) and behind an injectable
+    # provider, so it stays OFF the live model path in tests. Defaults only —
+    # nothing here is required, and the subsystem is built lazily.
+    translation_enabled: bool = True
+    # The chat model id used by the LLM-backed translation provider; reuses the
+    # shared chat seam (DashScope/OpenAI per ``reasoning_provider``).
+    translation_model: str = "qwen3.7-plus"
+    # Quality estimate below which a segment is flagged for human post-edit.
+    translation_review_threshold: float = 0.7
+    # Translation-memory fuzzy-match similarity floor (reuse a near-identical
+    # prior translation as a suggestion instead of paying for a fresh call).
+    translation_fuzzy_threshold: float = 0.82
+    # Batch packing bounds for provider calls (count + estimated tokens).
+    translation_max_batch_size: int = 32
+    translation_max_batch_tokens: int = 6000
+
     @property
     def is_local(self) -> bool:
         """True when running in the local development environment."""

@@ -70,6 +70,8 @@ if TYPE_CHECKING:
     from app.search.index import SearchIndex as SearchIndexProto
     from app.search.pipeline import IndexingPipeline
     from app.search.service import SearchService
+    from app.translation.provider import TranslationProvider
+    from app.translation.service import TranslationService
 else:
     SearchIndexProto = object
 
@@ -242,12 +244,20 @@ class Container:
     # ``settings.search_backend`` (postgres FTS+pgvector hybrid, or in-memory).
     search_index: SearchIndexProto | None = None
 
+    # -- overridable translation seam (None => lazily built real default) ---- #
+    # The content-translation provider (app.translation). A test can inject a
+    # FakeTranslationProvider here so the whole subsystem runs with zero live
+    # calls; production lazily builds the LLM-backed provider on the shared chat
+    # seam. Additive: nothing else in the container depends on it.
+    translation_provider: TranslationProvider | None = None
+
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
     _keyframe_service: KeyframeService | None = field(default=None, repr=False)
     _integrations_http: HttpxClient | None = field(default=None, repr=False)
     _auth_service: AuthService | None = field(default=None, repr=False)
+    _translation_provider: TranslationProvider | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -499,6 +509,49 @@ class Container:
                 self.search_index = index.for_version(version)
                 return self.search_index
         return index
+
+    # -- content translation (app.translation; token-only, never video) ----- #
+
+    def _get_translation_provider(self) -> TranslationProvider:
+        """The translation provider seam (injected override > lazy LLM default).
+
+        Lazily builds the LLM-backed provider on the shared chat seam (so it
+        inherits the resilient transport + cost sink), unless an override was
+        injected — a test injects a ``FakeTranslationProvider`` for zero live
+        calls.
+        """
+        if self.translation_provider is not None:
+            return self.translation_provider
+        if self._translation_provider is None:
+            from app.translation.llm_provider import make_llm_provider_from_providers
+
+            self._translation_provider = make_llm_provider_from_providers(
+                self.providers, model=self.settings.translation_model
+            )
+        return self._translation_provider
+
+    def build_translation_service(
+        self, *, glossary: object | None = None, memory: object | None = None
+    ) -> TranslationService:
+        """Build a :class:`TranslationService` with the configured provider.
+
+        ``glossary`` is an optional :class:`~app.translation.glossary.Glossary`
+        (e.g. hydrated from a book's canon character names + persisted terms);
+        ``memory`` is an optional :class:`~app.translation.memory_store.TranslationMemory`
+        (the API layer hydrates one from the DB before translating, so prior
+        translations are served as zero-cost cache hits, §8.7). When omitted a
+        fresh in-process memory is created.
+        """
+        from app.translation.glossary import Glossary
+        from app.translation.memory_store import TranslationMemory
+        from app.translation.service import TranslationService
+
+        return TranslationService(
+            self._get_translation_provider(),
+            glossary=glossary if isinstance(glossary, Glossary) else None,
+            memory=memory if isinstance(memory, TranslationMemory) else None,
+            review_threshold=self.settings.translation_review_threshold,
+        )
 
     # -- per-request scheduler stack (bound to a request DB session) --------- #
 
