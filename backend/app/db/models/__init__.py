@@ -36,7 +36,21 @@ from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
+# Content-translation subsystem tables (app.translation). Imported here so they
+# register on ``Base.metadata`` for Alembic autogenerate + relationship
+# resolution, exactly like every other aggregate. Additive: the translation
+# package owns these definitions; this is only the registration point.
+from app.translation.artifacts import (
+    ArtifactStatus,
+    ReviewStatus,
+    TranslationArtifact,
+    TranslationGlossaryRow,
+    TranslationReview,
+    TranslationSegment,
+)
+
 __all__ = [
+    "ArtifactStatus",
     "AuditAction",
     "Base",
     "Beat",
@@ -57,6 +71,7 @@ __all__ = [
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
+    "ReviewStatus",
     "Scene",
     "Session",
     "SessionMode",
@@ -64,5 +79,9 @@ __all__ = [
     "ShotCache",
     "ShotStatus",
     "SourceSpanIndex",
+    "TranslationArtifact",
+    "TranslationGlossaryRow",
+    "TranslationReview",
+    "TranslationSegment",
     "User",
 ]

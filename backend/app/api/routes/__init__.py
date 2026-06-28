@@ -13,6 +13,7 @@ from app.api.routes import (
     optim,
     prefs,
     sessions,
+    translation,
 )
 
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    translation.router,  # content-translation subsystem (app.translation, §8/§9)
 ]
 
 __all__ = ["ROUTERS"]
