@@ -6,6 +6,8 @@ The repo owns persistence and the windowed-sum queries; the *policy* (caps,
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import ColumnElement, func, select, text
 
 from app.db.base import new_id
@@ -103,6 +105,37 @@ class BudgetRepo(BaseRepository):
         reserved = await self.outstanding_reserved_seconds(
             book_id=book_id, session_id=session_id, scene_id=scene_id
         )
+        return committed + reserved
+
+    async def used_seconds_for_books(self, book_ids: Sequence[str]) -> float:
+        """Committed + outstanding-reserved video-seconds across a set of books.
+
+        The per-tenant FinOps cap (kinora.md §11.1) is "the seconds spent across
+        all of a tenant's books". The budget ledger keys by ``book_id`` (not a
+        tenant), so the tenant total is the windowed sum over the tenant's books.
+        An empty set is 0.0 (a tenant with no books has spent nothing).
+        """
+        if not book_ids:
+            return 0.0
+        ids = list(book_ids)
+        committed_stmt = select(
+            func.coalesce(func.sum(BudgetLedger.video_seconds), 0.0)
+        ).where(
+            BudgetLedger.kind == BudgetKind.COMMIT,
+            BudgetLedger.book_id.in_(ids),
+        )
+        closed = select(BudgetLedger.reservation_id).where(
+            BudgetLedger.kind.in_((BudgetKind.COMMIT, BudgetKind.RELEASE))
+        )
+        reserved_stmt = select(
+            func.coalesce(func.sum(BudgetLedger.video_seconds), 0.0)
+        ).where(
+            BudgetLedger.kind == BudgetKind.RESERVE,
+            BudgetLedger.reservation_id.not_in(closed),
+            BudgetLedger.book_id.in_(ids),
+        )
+        committed = float((await self.session.execute(committed_stmt)).scalar_one())
+        reserved = float((await self.session.execute(reserved_stmt)).scalar_one())
         return committed + reserved
 
     async def advisory_lock(self, key: int) -> None:

@@ -7,6 +7,7 @@ from app.api.routes import (
     books,
     director,
     events,
+    finops,
     films,
     integrations,
     library,
@@ -37,6 +38,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    finops.router,
     recommendations.router,  # server-side recsys: watch-next + interaction logging
     reports.router,  # reports subsystem: document generation + signed retrieval
     integrations.router,  # third-party source import (app.integrations)

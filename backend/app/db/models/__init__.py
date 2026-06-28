@@ -43,6 +43,7 @@ from app.db.models.enums import (
     SessionMode,
     ShotStatus,
 )
+from app.db.models.finops import CostKind, CostLedger
 from app.db.models.ingest_checkpoint import IngestCheckpoint, IngestMilestone
 from app.db.models.integration import (
     AppConnection,
@@ -134,6 +135,8 @@ __all__ = [
     "CollectionItem",
     "ConnectionStatus",
     "ContinuityState",
+    "CostKind",
+    "CostLedger",
     "Defect",
     "Entity",
     "EntityType",
