@@ -73,6 +73,7 @@ if TYPE_CHECKING:
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
+    from app.notifications.service import NotificationService
     from app.providers import Providers
     from app.recommendations.store import RecommendationService
     from app.scheduler.keyframe import KeyframeService
@@ -279,6 +280,11 @@ class Container:
     #: A seam so the assistant route can be driven end-to-end with a fake chat
     #: (zero credits) while production uses the real DashScope/OpenAI provider.
     assistant_chat: ChatClient | None = None
+
+    # -- overridable seams (notifications platform) -------------------------- #
+    #: Inject a fully-built service (tests use the in-memory default); when None a
+    #: DB-backed one is built lazily from ``session_factory`` on first use.
+    notification_service: NotificationService | None = None
 
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
@@ -733,6 +739,66 @@ class Container:
             provider=self._build_billing_provider(),  # type: ignore[arg-type]
         )
 
+    # -- notifications platform (durable out-of-band notifications, §5/§12) -- #
+
+    @property
+    def notifications(self) -> NotificationService:
+        """The notifications & webhooks platform (built lazily, DB-backed).
+
+        Maps domain events (book ready, render done, budget low, conflict
+        surfaced) onto templated, localized notifications and delivers them over
+        in-app / email / push / signed-webhook channels with §12-grade reliability
+        (idempotent outbox, backoff retries, circuit breaking, dead-letter, status
+        tracking). Transports default to the no-network logging transports unless
+        overridden, so this never spends credits or sends real mail in tests.
+        """
+        if self.notification_service is None:
+            from app.notifications.factory import build_notification_service
+
+            self.notification_service = build_notification_service(
+                self.session_factory, settings=self.settings, log=logger.info
+            )
+        return self.notification_service
+
+    async def notify_event(
+        self,
+        event: str,
+        *,
+        user_id: str,
+        email: str | None = None,
+        data: dict[str, object] | None = None,
+        book_id: str | None = None,
+        session_id: str | None = None,
+        dedup_key: str | None = None,
+    ) -> None:
+        """Best-effort domain-event → notification hook (never breaks the caller).
+
+        Resolves the recipient + their preferences and fans the event out across
+        their opted-in channels. A notification failure must never break the
+        domain action that triggered it (ingest finishing, a render completing),
+        so the whole thing is guarded and logged.
+        """
+        from app.notifications.events import DomainEvent
+        from app.notifications.models import Recipient
+
+        try:
+            domain_event = DomainEvent(event)
+        except ValueError:
+            logger.warning("notifications.unknown_event", event_name=event)
+            return
+        recipient = Recipient(user_id=user_id, email=email)
+        try:
+            await self.notifications.emit(
+                domain_event,
+                recipient=recipient,
+                data=data or {},
+                book_id=book_id,
+                session_id=session_id,
+                dedup_key=dedup_key,
+            )
+        except Exception as exc:  # noqa: BLE001 - notifications are best-effort
+            logger.warning("notifications.emit_failed", event_name=event, error=str(exc))
+
     # -- per-request scheduler stack (bound to a request DB session) --------- #
 
     def build_scheduler(self, session: AsyncSession) -> SchedulerService:
@@ -1154,6 +1220,35 @@ class Container:
         """Lifecycle hook. Connections are lazy, so this only logs readiness."""
         logger.info("container.startup", env=self.settings.app_env)
         self.spawn(self._startup_recover_importing_books())
+
+    def start_notification_bridge(self) -> asyncio.Task[None] | None:
+        """Spawn the live-event → durable-notification bridge as a tracked task.
+
+        Called from the API lifespan (alongside the idle-sweeper) so it is gated
+        the same way background work is — tests that disable background tasks never
+        start it, which keeps the timing-sensitive worker/pubsub tests isolated.
+        Returns the task (or ``None`` when disabled by settings).
+        """
+        if not getattr(self.settings, "notify_bridge_enabled", False):
+            return None
+        return self.spawn(self._run_notification_bridge())
+
+    async def _run_notification_bridge(self) -> None:
+        """Subscribe to the live §5.6 channels and emit durable notifications.
+
+        Purely a consumer of the existing event bus — it never touches the
+        publishers — so adding it is additive. Fully guarded: a failure to start
+        (e.g. Redis down at boot) is logged and the API runs without it.
+        """
+        try:
+            from app.notifications.factory import build_notification_bridge
+
+            bridge = build_notification_bridge(
+                self.redis, self.notifications, self.session_factory, log=logger.info
+            )
+            await bridge.run_pattern("kinora:events:*")
+        except Exception as exc:  # noqa: BLE001 - the bridge must never crash the app
+            logger.warning("notifications.bridge.start_failed", error=str(exc))
 
     async def shutdown(self) -> None:
         """Cancel background tasks, close Redis, dispose the engine, close providers."""

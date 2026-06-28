@@ -193,6 +193,13 @@ def create_app() -> FastAPI:
             background.append(
                 asyncio.create_task(_realtime_connection_sweeper(container, stop))
             )
+        # The notifications bridge is background work too: gate it the same way
+        # so tests that disable background tasks never start it (keeps the
+        # timing-sensitive worker/pubsub tests isolated).
+        if getattr(app.state, "run_notification_bridge", True):
+            bridge_task = container.start_notification_bridge()
+            if bridge_task is not None:
+                background.append(bridge_task)
         try:
             yield
         finally:

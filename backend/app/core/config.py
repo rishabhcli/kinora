@@ -448,6 +448,24 @@ class Settings(BaseSettings):
     # Redis pub/sub channel the cache broadcasts invalidations on.
     flags_stream_channel: str = "kinora:flags:invalidate"
 
+    # --- Notifications & webhooks platform (§5 events / §12 reliability) ---
+    # Out-of-band delivery is OFF by default: with no real transport configured the
+    # platform still runs end-to-end (in-app inbox + logging transports), spends no
+    # credits, and sends no real email/push. These knobs tune the §12.1 retry +
+    # circuit-breaker behaviour for outbound webhook / email / push delivery.
+    notify_retry_max_attempts: int = 5
+    notify_retry_base_s: float = 2.0
+    notify_retry_factor: float = 4.0
+    notify_retry_max_delay_s: float = 300.0
+    notify_circuit_failure_threshold: int = 5
+    notify_circuit_reset_timeout_s: float = 30.0
+    #: HMAC replay tolerance a receiver should enforce on signed webhooks (seconds).
+    notify_webhook_tolerance_s: int = 300
+    #: Run the live-event → durable-notification bridge in-process (API role).
+    #: Subscribes to the existing §5.6 channels and emits notifications for the
+    #: notifiable events (book ready, render done, budget low, conflict surfaced).
+    notify_bridge_enabled: bool = True
+
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

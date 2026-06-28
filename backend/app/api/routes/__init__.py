@@ -16,6 +16,7 @@ from app.api.routes import (
     integrations,
     library,
     metrics,
+    notifications,
     optim,
     prefs,
     recommendations,
@@ -42,6 +43,7 @@ ROUTERS = [
     prefs.router,
     events.router,
     metrics.router,
+    notifications.router,  # notifications & webhooks platform (§5/§12)
     optim.router,
     # Realtime + API-quality layer (resumable SSE/WS, presence, cursor
     # pagination, versions). Additive — extends the §5.6 transport without

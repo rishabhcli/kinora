@@ -75,6 +75,14 @@ from app.db.models.integration import (
     SyncRunStatus,
 )
 from app.db.models.job import JobRun, ScheduledJob
+from app.db.models.notification import (
+    NotificationDeadLetter,
+    NotificationDelivery,
+    NotificationInbox,
+    NotificationOutbox,
+    NotificationPreference,
+    WebhookEndpointRow,
+)
 from app.db.models.pref import Pref
 from app.db.models.recommendation import (
     BookFeatureRow,
@@ -198,6 +206,11 @@ __all__ = [
     "ModerationAuditEntry",
     "ModerationEvent",
     "ModerationTenantPolicy",
+    "NotificationDeadLetter",
+    "NotificationDelivery",
+    "NotificationInbox",
+    "NotificationOutbox",
+    "NotificationPreference",
     "Organization",
     "OwnershipTransfer",
     "Page",
@@ -206,6 +219,7 @@ __all__ = [
     "RecoveryCode",
     "RefreshToken",
     "RenderJob",
+    "WebhookEndpointRow",
     "RenderJobStatus",
     "RenderPriority",
     "ReportArtifact",
