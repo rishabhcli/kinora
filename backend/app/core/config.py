@@ -340,6 +340,14 @@ class Settings(BaseSettings):
     analytics_rollup_interval_s: float = 300.0
     analytics_rollup_window_days: int = 2
 
+    # --- Realtime transport (SSE/WS resume, presence, recorder; §5.6) ---
+    # The event recorder tees every §5.6 event into a per-session log so a dropped
+    # SSE/WS connection can resume from a Last-Event-ID. With a single API replica
+    # (the dev/demo posture) exactly one recorder runs and ids stay clean; under
+    # horizontal scale set this true so only the recorder holding a Redis lease
+    # records (the others stand by), keeping ids globally consistent.
+    realtime_recorder_elect_leader: bool = False
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"
