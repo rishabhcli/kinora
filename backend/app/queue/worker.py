@@ -192,9 +192,7 @@ class RenderWorker:
         # stitch failure must never undo the ack or fail the render.
         await self._maybe_stitch_scene(job, result)
 
-    async def _run_with_lease_heartbeat(
-        self, job: QueuedJob, runner: ShotRunner
-    ) -> RenderResult:
+    async def _run_with_lease_heartbeat(self, job: QueuedJob, runner: ShotRunner) -> RenderResult:
         """Run the render while heartbeating its lease so the reaper can't steal it."""
         stop = asyncio.Event()
         beat = asyncio.create_task(self._lease_heartbeat(job.id, stop))
@@ -300,11 +298,7 @@ class RenderWorker:
 
     async def _publish_render_events(self, job: QueuedJob, result: RenderResult) -> None:
         """Fan out the §5.6 event(s) appropriate to this render outcome."""
-        channel = (
-            session_channel(job.session_id)
-            if job.session_id
-            else book_channel(job.book_id)
-        )
+        channel = session_channel(job.session_id) if job.session_id else book_channel(job.book_id)
         if result.status is ShotStatus.CONFLICT and result.conflict is not None:
             conflict = result.conflict.model_dump(mode="json")
             # Persist the structured conflict so the conflict_choice handler can
@@ -372,11 +366,7 @@ class RenderWorker:
             await self._publish_clip_ready(job, result)
 
     async def _publish_clip_ready(self, job: QueuedJob, result: RenderResult) -> None:
-        channel = (
-            session_channel(job.session_id)
-            if job.session_id
-            else book_channel(job.book_id)
-        )
+        channel = session_channel(job.session_id) if job.session_id else book_channel(job.book_id)
         payload = {
             "event": "clip_ready",
             "shot_id": result.shot_id,
@@ -488,18 +478,14 @@ class RenderWorker:
         from app.db.models.shot import Shot
 
         rows = list(
-            (await db.execute(select(Shot.status).where(Shot.scene_id == scene_id)))
-            .scalars()
-            .all()
+            (await db.execute(select(Shot.status).where(Shot.scene_id == scene_id))).scalars().all()
         )
         if not rows or any(status not in _TERMINAL_SHOT for status in rows):
             return False
         return any(status is ShotStatus.ACCEPTED for status in rows)
 
     async def _publish_scene_stitched(self, job: QueuedJob, stitched: StitchResult) -> None:
-        channel = (
-            session_channel(job.session_id) if job.session_id else book_channel(job.book_id)
-        )
+        channel = session_channel(job.session_id) if job.session_id else book_channel(job.book_id)
         await self._redis.publish(
             channel,
             {
@@ -568,6 +554,33 @@ class RenderWorker:
         return 2**62
 
 
+def _queue_backoff_from_settings(settings: Settings) -> Any | None:
+    """Build a jittered :class:`BackoffSchedule` from settings, or None for fixed.
+
+    ``queue_backoff_jitter == "none"`` (the default) returns None so the queue uses
+    the literal ``queue_retry_backoff_s`` schedule — fully back-compatible. Any
+    other strategy returns a seeded schedule so retries spread out (§12.1). The
+    seed is fixed in non-prod for reproducible tests and left random in prod.
+    """
+    from app.queue.backoff import BackoffSchedule, JitterStrategy
+
+    strategy = (settings.queue_backoff_jitter or "none").lower()
+    if strategy == JitterStrategy.NONE.value:
+        return None
+    try:
+        jitter = JitterStrategy(strategy)
+    except ValueError:
+        logger.warning("worker.bad_backoff_jitter", value=strategy)
+        return None
+    seed = None if settings.app_env == "prod" else 1337
+    return BackoffSchedule(
+        strategy=jitter,
+        base_s=settings.queue_backoff_base_s,
+        cap_s=settings.queue_backoff_cap_s,
+        seed=seed,
+    )
+
+
 def build_worker(
     *,
     settings: Settings | None = None,
@@ -587,6 +600,9 @@ def build_worker(
     queue = RedisRenderQueue(
         redis_client,
         retry_cap=settings.retry_cap,
+        retry_backoff_s=tuple(settings.queue_retry_backoff_s),
+        backoff=_queue_backoff_from_settings(settings),
+        backpressure_depth=settings.queue_backpressure_depth,
         session_factory=factory,
     )
     providers = create_providers(settings)

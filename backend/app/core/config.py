@@ -209,6 +209,28 @@ class Settings(BaseSettings):
     #: Max shots a DAG batch releases in parallel (caps render fan-out).
     render_max_parallel_shots: int = 4
 
+    # --- Render-queue retry backoff (kinora.md §12.1) ---
+    # Jitter strategy for the exponential-backoff retry schedule
+    # (none|full|equal|decorrelated). ``none`` keeps the literal fixed schedule
+    # below (back-compat); the others spread retries to avoid a thundering herd.
+    queue_backoff_jitter: str = "none"
+    queue_backoff_base_s: float = 2.0
+    queue_backoff_cap_s: float = 30.0
+    # The literal jitter-free schedule used when queue_backoff_jitter == "none".
+    queue_retry_backoff_s: list[float] = [2.0, 8.0, 30.0]
+
+    # --- Render-queue admission / fairness (kinora.md §12.2) ---
+    # Total queued depth past which *new speculative* enqueues are shed.
+    queue_backpressure_depth: int = 64
+    # Max concurrent renders one session may hold (per-session fairness); 0 = off.
+    queue_session_render_cap: int = 0
+
+    # --- Render-worker autoscaling (kinora.md §4.9/§12.2) ---
+    # Upper bounds for the elastic lane pools; the §4.9 caps are the lower bounds.
+    queue_autoscale_committed_max: int = 8
+    queue_autoscale_speculative_max: int = 4
+    queue_autoscale_cooldown_s: float = 30.0
+
     # --- Ingest recovery ---
     ingest_recovery_interval_s: float = 30.0
     ingest_recovery_limit: int = 25
