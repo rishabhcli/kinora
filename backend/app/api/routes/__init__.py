@@ -14,6 +14,7 @@ from app.api.routes import (
     prefs,
     sessions,
 )
+from app.billing import routes as billing  # additive: billing & payments domain
 
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
 ROUTERS = [
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    billing.router,  # billing & payments (additive)
 ]
 
 __all__ = ["ROUTERS"]

@@ -151,6 +151,22 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # --- Billing & payments (additive; owned by app.billing) ---
+    # The billing domain is the commercial mirror of the §11 video-seconds budget:
+    # it meters reader consumption (reading-minutes / render-seconds) and turns it
+    # into subscriptions + invoices. The payment provider is ALWAYS the in-memory
+    # fake here — no real Stripe/network/payment call is ever made — so the only
+    # required value is the webhook signing secret, which has a safe local default.
+    billing_provider: str = "fake"  # "fake" only; a real Stripe transport is unwired
+    billing_default_currency: str = "USD"
+    billing_invoice_prefix: str = "KIN"
+    billing_webhook_secret: str = "whsec_kinora_local_dev_secret"  # noqa: S105 - local dev default
+    billing_webhook_tolerance_s: int = 300
+    # Comma-separated retry cadence (days) for dunning on a failed payment.
+    billing_dunning_retry_days: str = "1,3,5,7"
+    # Whether finalizing a positive invoice immediately attempts payment.
+    billing_auto_charge_on_finalize: bool = True
+
     @property
     def is_local(self) -> bool:
         """True when running in the local development environment."""

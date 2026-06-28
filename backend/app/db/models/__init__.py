@@ -7,6 +7,23 @@ it so ``create_all``/relationship resolution work.
 
 from __future__ import annotations
 
+# --- Billing domain models (additive; registers billing_* tables on metadata) ---
+# Imported AFTER the core models so app.db.models.enums (used by billing/models)
+# is fully initialized — avoids a package-init circular import.
+from app.billing.models import (  # noqa: E402
+    BillingAuditLog,
+    BillingCoupon,
+    BillingCustomer,
+    BillingInvoice,
+    BillingInvoiceLine,
+    BillingPaymentAttempt,
+    BillingPlan,
+    BillingPrice,
+    BillingSubscription,
+    BillingSubscriptionItem,
+    BillingUsageRecord,
+    BillingWebhookEvent,
+)
 from app.db.base import Base
 from app.db.models.beat import Beat
 from app.db.models.bitemporal import (
@@ -40,6 +57,18 @@ __all__ = [
     "AuditAction",
     "Base",
     "Beat",
+    "BillingAuditLog",
+    "BillingCoupon",
+    "BillingCustomer",
+    "BillingInvoice",
+    "BillingInvoiceLine",
+    "BillingPaymentAttempt",
+    "BillingPlan",
+    "BillingPrice",
+    "BillingSubscription",
+    "BillingSubscriptionItem",
+    "BillingUsageRecord",
+    "BillingWebhookEvent",
     "BitemporalState",
     "BranchStatus",
     "Book",
