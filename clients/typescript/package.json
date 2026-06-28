@@ -1,0 +1,32 @@
+{
+  "name": "@kinora/sdk",
+  "version": "1.0.0",
+  "description": "Typed, isomorphic TypeScript SDK for the Kinora API (page-synced AI film generation).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src", "README.md"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["kinora", "sdk", "ai", "video", "books", "sse", "typescript"],
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "sideEffects": false
+}

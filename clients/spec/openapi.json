@@ -1,0 +1,3046 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kinora API",
+    "version": "1.0.0",
+    "description": "Kinora turns a book/PDF into a page-synced film generated a few seconds ahead of the reader. This document is generated from the single source-of-truth catalog at clients/spec/catalog.mjs. Do not edit by hand.",
+    "license": {
+      "name": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development backend"
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth"
+    },
+    {
+      "name": "books"
+    },
+    {
+      "name": "films"
+    },
+    {
+      "name": "sessions"
+    },
+    {
+      "name": "director"
+    },
+    {
+      "name": "prefs"
+    },
+    {
+      "name": "eval"
+    },
+    {
+      "name": "optim"
+    },
+    {
+      "name": "events"
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "operationId": "register",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create an account (email + password >= 8 chars).",
+        "responses": {
+          "201": {
+            "description": "Create an account (email + password >= 8 chars).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange credentials for a bearer access token.",
+        "responses": {
+          "200": {
+            "description": "Exchange credentials for a bearer access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "me",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Return the authenticated user.",
+        "responses": {
+          "200": {
+            "description": "Return the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books": {
+      "post": {
+        "operationId": "uploadBook",
+        "tags": [
+          "books"
+        ],
+        "summary": "Upload a PDF/EPUB and trigger Phase-A ingest. Multipart form.",
+        "responses": {
+          "201": {
+            "description": "Upload a PDF/EPUB and trigger Phase-A ingest. Multipart form.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "author": {
+                    "type": "string"
+                  },
+                  "art_direction": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listBooks",
+        "tags": [
+          "books"
+        ],
+        "summary": "List the books the current user owns (the shelf), newest first.",
+        "responses": {
+          "200": {
+            "description": "List the books the current user owns (the shelf), newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookResponse"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}": {
+      "get": {
+        "operationId": "getBook",
+        "tags": [
+          "books"
+        ],
+        "summary": "Fetch one book with its import status + progress.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fetch one book with its import status + progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/pages/{page_number}": {
+      "get": {
+        "operationId": "getPage",
+        "tags": [
+          "books"
+        ],
+        "summary": "A page's presigned image URL, text, and per-word boxes.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page's presigned image URL, text, and per-word boxes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/canon": {
+      "get": {
+        "operationId": "getCanon",
+        "tags": [
+          "books"
+        ],
+        "summary": "The book's canon graph: entities, continuity facts, markdown vault.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The book's canon graph: entities, continuity facts, markdown vault.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/shots": {
+      "get": {
+        "operationId": "listShots",
+        "tags": [
+          "books"
+        ],
+        "summary": "The book's shots (the shot timeline) as a bare array.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The book's shots (the shot timeline) as a bare array.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShotResponse"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/cover": {
+      "get": {
+        "operationId": "getBookCover",
+        "tags": [
+          "books"
+        ],
+        "summary": "302-redirect to the presigned cover image for an owned book.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "302-redirect to the presigned cover image for an owned book."
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/events": {
+      "get": {
+        "operationId": "listEvents",
+        "tags": [
+          "films"
+        ],
+        "summary": "Every event (scene) film — stitched URL + sync map + restore state.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every event (scene) film — stitched URL + sync map + restore state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/scenes/{scene_id}/film": {
+      "get": {
+        "operationId": "getSceneFilm",
+        "tags": [
+          "films"
+        ],
+        "summary": "One scene's film (partial load).",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scene_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One scene's film (partial load).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneFilm"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sessions": {
+      "post": {
+        "operationId": "createSession",
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Open a reading session against a book.",
+        "responses": {
+          "201": {
+            "description": "Open a reading session against a book.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}": {
+      "get": {
+        "operationId": "getSession",
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Return the Scheduler's live control state for a session.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Return the Scheduler's live control state for a session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/intent": {
+      "post": {
+        "operationId": "updateIntent",
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Apply a debounced reading-intent update and run one control tick.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Apply a debounced reading-intent update and run one control tick.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntentResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/seek": {
+      "post": {
+        "operationId": "seek",
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Jump to a word: cancel distant work, bridge keyframe, re-seed.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jump to a word: cancel distant work, bridge keyframe, re-seed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeekResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeekRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/comment": {
+      "post": {
+        "operationId": "comment",
+        "tags": [
+          "director"
+        ],
+        "summary": "Classify a Director region-comment, enqueue a regen, emit agent_activity.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Classify a Director region-comment, enqueue a regen, emit agent_activity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/{book_id}/canon_edit": {
+      "post": {
+        "operationId": "canonEdit",
+        "tags": [
+          "director"
+        ],
+        "summary": "Edit a canon entity and surgically regen only the dependent shots.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Edit a canon entity and surgically regen only the dependent shots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonEditResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CanonEditRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/conflict_choice": {
+      "post": {
+        "operationId": "conflictChoice",
+        "tags": [
+          "director"
+        ],
+        "summary": "Apply the Director's resolution of a surfaced continuity conflict.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Apply the Director's resolution of a surfaced continuity conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictChoiceResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConflictChoiceRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/conflicts": {
+      "get": {
+        "operationId": "listConflicts",
+        "tags": [
+          "director"
+        ],
+        "summary": "The session's conflict log — surfaced disputes + their resolutions.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session's conflict log — surfaced disputes + their resolutions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConflictRecordResponse"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/demo/conflict": {
+      "post": {
+        "operationId": "demoConflict",
+        "tags": [
+          "director"
+        ],
+        "summary": "DEV-ONLY: surface the canonical lost-sword conflict (local env only).",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DEV-ONLY: surface the canonical lost-sword conflict (local env only).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictRecordResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/me/prefs": {
+      "get": {
+        "operationId": "getMyPrefs",
+        "tags": [
+          "prefs"
+        ],
+        "summary": "The reader's accumulated directing style across all their books.",
+        "responses": {
+          "200": {
+            "description": "The reader's accumulated directing style across all their books.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectingStyleResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "resetMyPrefs",
+        "tags": [
+          "prefs"
+        ],
+        "summary": "Clear the reader's learned directing style everywhere.",
+        "responses": {
+          "200": {
+            "description": "Clear the reader's learned directing style everywhere.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPrefsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/{book_id}/prefs": {
+      "get": {
+        "operationId": "getBookPrefs",
+        "tags": [
+          "prefs"
+        ],
+        "summary": "The directing style learned for one book.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The directing style learned for one book.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectingStyleResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "resetBookPrefs",
+        "tags": [
+          "prefs"
+        ],
+        "summary": "Clear the directing style learned for one book.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clear the directing style learned for one book.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPrefsResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/eval/buffer-trace/{session_id}": {
+      "get": {
+        "operationId": "getBufferTrace",
+        "tags": [
+          "eval"
+        ],
+        "summary": "Recompute the watermark buffer sawtooth for a session (zero video-seconds).",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "velocity",
+            "in": "query",
+            "required": false,
+            "description": "Override reading velocity in words/sec (0 < v <= 40).",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "duration_s",
+            "in": "query",
+            "required": false,
+            "description": "Simulation horizon in seconds (10 <= d <= 1200).",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recompute the watermark buffer sawtooth for a session (zero video-seconds).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BufferTracePoint"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/eval/report/{book_id}": {
+      "get": {
+        "operationId": "getEvalReport",
+        "tags": [
+          "eval"
+        ],
+        "summary": "The cached crew-vs-baseline evaluation report for a book.",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cached crew-vs-baseline evaluation report for a book.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/optim/cost": {
+      "get": {
+        "operationId": "getCost",
+        "tags": [
+          "optim"
+        ],
+        "summary": "Per book / session / model / operation USD rollup.",
+        "responses": {
+          "200": {
+            "description": "Per book / session / model / operation USD rollup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/optim/perf": {
+      "get": {
+        "operationId": "getPerf",
+        "tags": [
+          "optim"
+        ],
+        "summary": "Compact cost/uptime summary for an in-app HUD.",
+        "responses": {
+          "200": {
+            "description": "Compact cost/uptime summary for an in-app HUD.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/events": {
+      "get": {
+        "operationId": "sessionEvents",
+        "tags": [
+          "events"
+        ],
+        "summary": "SSE stream of a session's generation events.",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "description": "Bearer token (SSE cannot set headers; pass it as a query param).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream of a session's generation events.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/books/events": {
+      "get": {
+        "operationId": "libraryEvents",
+        "tags": [
+          "events"
+        ],
+        "summary": "SSE stream of ingest progress for the signed-in user's library.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "description": "Bearer token (SSE cannot set headers; pass it as a query param).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream of ingest progress for the signed-in user's library.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed error envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ]
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "email"
+        ]
+      },
+      "BookResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "num_pages": {
+            "type": "integer",
+            "nullable": true
+          },
+          "art_direction": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "progress": {
+            "type": "number",
+            "nullable": true
+          },
+          "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "cover_url": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status"
+        ]
+      },
+      "PageResponse": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string"
+          },
+          "page_number": {
+            "type": "integer"
+          },
+          "image_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "word_boxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "book_id",
+          "page_number",
+          "word_boxes"
+        ]
+      },
+      "CanonReferenceImage": {
+        "type": "object",
+        "properties": {
+          "oss_url": {
+            "type": "string"
+          },
+          "oss_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "pose": {
+            "type": "string",
+            "nullable": true
+          },
+          "locked": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "oss_url"
+        ]
+      },
+      "CanonAppearance": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference_images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CanonReferenceImage"
+            }
+          }
+        },
+        "required": [
+          "reference_images"
+        ]
+      },
+      "CanonEntityResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "appearance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CanonAppearance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style_tokens": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "voice": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "valid_from_beat": {
+            "type": "integer",
+            "nullable": true
+          },
+          "valid_to_beat": {
+            "type": "integer",
+            "nullable": true
+          },
+          "first_appearance": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "aliases",
+          "version"
+        ]
+      },
+      "CanonStateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subject_entity_key": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "object_value": {
+            "type": "string"
+          },
+          "valid_from_beat": {
+            "type": "integer"
+          },
+          "valid_to_beat": {
+            "type": "integer",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "source_span": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "subject_entity_key",
+          "predicate",
+          "object_value",
+          "valid_from_beat",
+          "version",
+          "active"
+        ]
+      },
+      "CanonResponse": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CanonEntityResponse"
+            }
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CanonStateResponse"
+            }
+          },
+          "markdown": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "book_id",
+          "entities",
+          "states"
+        ]
+      },
+      "ShotResponse": {
+        "type": "object",
+        "properties": {
+          "shot_id": {
+            "type": "string"
+          },
+          "beat_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "scene_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_span": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "render_mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_s": {
+            "type": "number",
+            "nullable": true
+          },
+          "qa": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "clip_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference_image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "shot_id",
+          "status",
+          "reference_image_ids"
+        ]
+      },
+      "CreateSessionRequest": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string"
+          },
+          "focus_word": {
+            "type": "integer"
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "book_id",
+          "focus_word",
+          "mode"
+        ]
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "book_id": {
+            "type": "string"
+          },
+          "focus_word": {
+            "type": "integer"
+          },
+          "velocity_wps": {
+            "type": "number"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "committed_seconds_ahead": {
+            "type": "number"
+          },
+          "bursting": {
+            "type": "boolean"
+          },
+          "budget_remaining_s": {
+            "type": "number",
+            "nullable": true
+          },
+          "inflight": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "session_id",
+          "book_id",
+          "focus_word",
+          "velocity_wps",
+          "mode",
+          "committed_seconds_ahead",
+          "bursting",
+          "inflight"
+        ]
+      },
+      "IntentRequest": {
+        "type": "object",
+        "properties": {
+          "focus_word": {
+            "type": "integer"
+          },
+          "velocity": {
+            "type": "number"
+          },
+          "mode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "focus_word",
+          "velocity"
+        ]
+      },
+      "IntentResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "settled": {
+            "type": "boolean"
+          },
+          "allow_promotion": {
+            "type": "boolean"
+          },
+          "idle": {
+            "type": "boolean"
+          },
+          "bursting": {
+            "type": "boolean"
+          },
+          "committed_seconds_ahead": {
+            "type": "number"
+          },
+          "promoted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "keyframed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cancelled": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "settled",
+          "allow_promotion",
+          "idle",
+          "bursting",
+          "committed_seconds_ahead",
+          "promoted",
+          "keyframed",
+          "cancelled"
+        ]
+      },
+      "SeekRequest": {
+        "type": "object",
+        "properties": {
+          "word": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "word"
+        ]
+      },
+      "SeekResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "word": {
+            "type": "integer"
+          },
+          "cancelled": {
+            "type": "integer"
+          },
+          "bridge_beat": {
+            "type": "string",
+            "nullable": true
+          },
+          "committed_seconds_ahead": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "word",
+          "cancelled",
+          "committed_seconds_ahead"
+        ]
+      },
+      "CommentRequest": {
+        "type": "object",
+        "properties": {
+          "shot_id": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "region_png": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "shot_id",
+          "note"
+        ]
+      },
+      "CommentResponse": {
+        "type": "object",
+        "properties": {
+          "shot_id": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string"
+          },
+          "aspect": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "learned": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectingPriorView"
+            }
+          }
+        },
+        "required": [
+          "shot_id",
+          "agent",
+          "aspect",
+          "message",
+          "learned"
+        ]
+      },
+      "CanonEditRequest": {
+        "type": "object",
+        "properties": {
+          "entity_key": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "valid_from_beat": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "entity_key",
+          "changes"
+        ]
+      },
+      "CanonEditResponse": {
+        "type": "object",
+        "properties": {
+          "entity_key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "affected_shot_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped_shots": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entity_key",
+          "version",
+          "affected_shot_ids",
+          "skipped_shots"
+        ]
+      },
+      "ConflictChoiceRequest": {
+        "type": "object",
+        "properties": {
+          "conflict_id": {
+            "type": "string"
+          },
+          "option": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conflict_id",
+          "option"
+        ]
+      },
+      "ConflictChoiceResponse": {
+        "type": "object",
+        "properties": {
+          "conflict_id": {
+            "type": "string"
+          },
+          "option": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "shot_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasoning": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "conflict_id",
+          "option",
+          "status"
+        ]
+      },
+      "ConflictRecordResponse": {
+        "type": "object",
+        "properties": {
+          "conflict_id": {
+            "type": "string"
+          },
+          "shot_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "claim": {
+            "type": "string",
+            "nullable": true
+          },
+          "canon_fact": {
+            "type": "string",
+            "nullable": true
+          },
+          "raised_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "current_beat": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "chosen_option": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasoning": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "conflict_id",
+          "options",
+          "resolved"
+        ]
+      },
+      "DirectingPriorView": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "bias": {
+            "type": "number"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "applied_value": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "bias",
+          "weight",
+          "label",
+          "detail",
+          "applied"
+        ]
+      },
+      "DirectingStyleResponse": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "book_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "priors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectingPriorView"
+            }
+          }
+        },
+        "required": [
+          "scope",
+          "priors"
+        ]
+      },
+      "ResetPrefsResponse": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "book_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cleared": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scope",
+          "cleared"
+        ]
+      },
+      "SyncWord": {
+        "type": "object",
+        "properties": {
+          "word_index": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          },
+          "t_start": {
+            "type": "number"
+          },
+          "t_end": {
+            "type": "number"
+          },
+          "bbox": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "nullable": true
+          }
+        },
+        "required": [
+          "word_index",
+          "text",
+          "t_start",
+          "t_end"
+        ]
+      },
+      "FilmSyncSegment": {
+        "type": "object",
+        "properties": {
+          "shot_id": {
+            "type": "string"
+          },
+          "scene_id": {
+            "type": "string"
+          },
+          "word_range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "t_start_s": {
+            "type": "number"
+          },
+          "t_end_s": {
+            "type": "number"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "page_turn_at_s": {
+            "type": "number"
+          },
+          "words": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncWord"
+            }
+          }
+        },
+        "required": [
+          "shot_id",
+          "scene_id",
+          "word_range",
+          "t_start_s",
+          "t_end_s",
+          "page",
+          "page_turn_at_s",
+          "words"
+        ]
+      },
+      "FilmSyncMap": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string"
+          },
+          "duration_s": {
+            "type": "number"
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilmSyncSegment"
+            }
+          }
+        },
+        "required": [
+          "scene_id",
+          "duration_s",
+          "segments"
+        ]
+      },
+      "SceneRef": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string"
+          },
+          "scene_index": {
+            "type": "integer"
+          },
+          "word_range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stitched": {
+            "type": "boolean"
+          },
+          "duration_s": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "scene_id",
+          "scene_index",
+          "word_range",
+          "stitched"
+        ]
+      },
+      "SceneFilm": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "book_id": {
+            "type": "string"
+          },
+          "scene_index": {
+            "type": "integer"
+          },
+          "event_index": {
+            "type": "integer"
+          },
+          "page_start": {
+            "type": "integer"
+          },
+          "page_end": {
+            "type": "integer"
+          },
+          "word_range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stitched": {
+            "type": "boolean"
+          },
+          "oss_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "url_expires_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_s": {
+            "type": "number",
+            "nullable": true
+          },
+          "shot_count": {
+            "type": "integer"
+          },
+          "sync_map": {
+            "$ref": "#/components/schemas/FilmSyncMap"
+          }
+        },
+        "required": [
+          "scene_id",
+          "event_id",
+          "book_id",
+          "scene_index",
+          "event_index",
+          "page_start",
+          "page_end",
+          "word_range",
+          "stitched",
+          "shot_count",
+          "sync_map"
+        ]
+      },
+      "EventFilm": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "event_index": {
+            "type": "integer"
+          },
+          "book_id": {
+            "type": "string"
+          },
+          "page_start": {
+            "type": "integer"
+          },
+          "page_end": {
+            "type": "integer"
+          },
+          "word_range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stitched": {
+            "type": "boolean"
+          },
+          "oss_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "url_expires_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_s": {
+            "type": "number",
+            "nullable": true
+          },
+          "shot_count": {
+            "type": "integer"
+          },
+          "sync_map": {
+            "$ref": "#/components/schemas/FilmSyncMap"
+          },
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SceneRef"
+            }
+          }
+        },
+        "required": [
+          "event_id",
+          "event_index",
+          "book_id",
+          "page_start",
+          "page_end",
+          "word_range",
+          "stitched",
+          "shot_count",
+          "sync_map",
+          "scenes"
+        ]
+      },
+      "RestoreState": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "focus_word": {
+            "type": "integer"
+          },
+          "current_event_index": {
+            "type": "integer",
+            "nullable": true
+          },
+          "current_scene_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "focus_word",
+          "mode"
+        ]
+      },
+      "EventsResponse": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string"
+          },
+          "url_ttl_s": {
+            "type": "integer"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventFilm"
+            }
+          },
+          "restore": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestoreState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "book_id",
+          "url_ttl_s",
+          "events"
+        ]
+      },
+      "BufferTracePoint": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "number"
+          },
+          "committed_seconds_ahead": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          },
+          "high": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "t",
+          "committed_seconds_ahead",
+          "low",
+          "high"
+        ]
+      },
+      "EvalReport": {
+        "type": "object",
+        "properties": {
+          "ccs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "efficiency": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "regen_rate": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "style_drift": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "runs": {
+            "type": "integer"
+          },
+          "thresholds": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "per_character_ccs": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "ccs",
+          "efficiency",
+          "regen_rate",
+          "style_drift",
+          "runs",
+          "thresholds",
+          "per_character_ccs"
+        ]
+      },
+      "CostReport": {
+        "type": "object",
+        "properties": {
+          "priced_models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "rollup": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "priced_models",
+          "rollup"
+        ]
+      },
+      "PerfReport": {
+        "type": "object",
+        "properties": {
+          "uptime_s": {
+            "type": "number"
+          },
+          "priced_model_count": {
+            "type": "integer"
+          },
+          "totals": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "by_operation": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "uptime_s",
+          "priced_model_count",
+          "totals",
+          "by_operation"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    }
+  },
+  "x-kinora-prefix": "/api",
+  "x-kinora-events": [
+    {
+      "name": "buffer_state",
+      "summary": "Live committed-buffer state from one Scheduler control tick.",
+      "fields": [
+        "committed_seconds_ahead",
+        "bursting",
+        "idle",
+        "velocity_wps",
+        "budget_remaining_s"
+      ],
+      "channels": [
+        "session"
+      ]
+    },
+    {
+      "name": "clip_ready",
+      "summary": "A shot's clip finished rendering and is playable.",
+      "fields": [
+        "shot_id",
+        "oss_url",
+        "video_seconds"
+      ],
+      "channels": [
+        "session"
+      ]
+    },
+    {
+      "name": "keyframe_ready",
+      "summary": "A speculative keyframe still was generated for a beat.",
+      "fields": [
+        "shot_id",
+        "beat_id",
+        "oss_url"
+      ],
+      "channels": [
+        "session"
+      ]
+    },
+    {
+      "name": "scene_stitched",
+      "summary": "A scene's accepted shots were stitched into one continuous film.",
+      "fields": [
+        "scene_id",
+        "oss_url",
+        "sync_map"
+      ],
+      "channels": [
+        "session",
+        "book"
+      ]
+    },
+    {
+      "name": "event_stitched",
+      "summary": "An event-level film rollup (event == scene today).",
+      "fields": [
+        "event_id",
+        "oss_url",
+        "sync_map"
+      ],
+      "channels": [
+        "session",
+        "book"
+      ]
+    },
+    {
+      "name": "agent_activity",
+      "summary": "A crew agent did something visible (routing, canon write, arbitration).",
+      "fields": [
+        "agent",
+        "aspect",
+        "message",
+        "shot_id",
+        "job_id",
+        "conflict"
+      ],
+      "channels": [
+        "session",
+        "book"
+      ]
+    },
+    {
+      "name": "regen_done",
+      "summary": "A targeted regeneration completed; the fresh clip closes the loop.",
+      "fields": [
+        "shot_id",
+        "oss_url",
+        "qa"
+      ],
+      "channels": [
+        "session",
+        "book"
+      ]
+    },
+    {
+      "name": "budget_low",
+      "summary": "The video-second budget is running low.",
+      "fields": [
+        "budget_remaining_s",
+        "scope"
+      ],
+      "channels": [
+        "session"
+      ]
+    },
+    {
+      "name": "conflict_choice",
+      "summary": "A continuity conflict was surfaced for the Director to resolve.",
+      "fields": [
+        "conflict_id",
+        "options",
+        "claim",
+        "canon_fact",
+        "current_beat",
+        "raised_by",
+        "shot_id"
+      ],
+      "channels": [
+        "session"
+      ]
+    },
+    {
+      "name": "ingest_progress",
+      "summary": "Phase-A ingest progress for a book on the user's library channel.",
+      "fields": [
+        "book_id",
+        "stage",
+        "pct"
+      ],
+      "channels": [
+        "library",
+        "book"
+      ]
+    }
+  ],
+  "x-kinora-websocket": {
+    "path": "/ws/sessions/{session_id}",
+    "summary": "Bidirectional Director channel: fans out the same SSE events and accepts client->backend messages (intent_update, seek, comment).",
+    "clientMessages": [
+      "intent_update",
+      "seek",
+      "comment"
+    ],
+    "auth": "Bearer header or ?token= query parameter."
+  },
+  "x-kinora-error-types": [
+    {
+      "type": "validation_error",
+      "status": 422,
+      "summary": "Request body/params failed validation."
+    },
+    {
+      "type": "invalid_credentials",
+      "status": 401,
+      "summary": "Wrong email or password."
+    },
+    {
+      "type": "unauthorized",
+      "status": 401,
+      "summary": "Missing or invalid bearer token."
+    },
+    {
+      "type": "email_taken",
+      "status": 409,
+      "summary": "An account with this email already exists."
+    },
+    {
+      "type": "book_not_found",
+      "status": 404,
+      "summary": "No such book for this user."
+    },
+    {
+      "type": "page_not_found",
+      "status": 404,
+      "summary": "No such page."
+    },
+    {
+      "type": "session_not_found",
+      "status": 404,
+      "summary": "No such session for this user."
+    },
+    {
+      "type": "shot_not_found",
+      "status": 404,
+      "summary": "No such shot in this session's book."
+    },
+    {
+      "type": "entity_not_found",
+      "status": 404,
+      "summary": "No such canon entity."
+    },
+    {
+      "type": "scene_not_found",
+      "status": 404,
+      "summary": "No such scene."
+    },
+    {
+      "type": "book_quota_exceeded",
+      "status": 429,
+      "summary": "Per-user book limit reached."
+    },
+    {
+      "type": "file_too_large",
+      "status": 413,
+      "summary": "Upload exceeds the size limit."
+    },
+    {
+      "type": "too_many_pages",
+      "status": 413,
+      "summary": "Document exceeds the per-book page limit."
+    },
+    {
+      "type": "unsupported_media_type",
+      "status": 415,
+      "summary": "Expected a PDF or EPUB upload."
+    },
+    {
+      "type": "budget_exceeded",
+      "status": 402,
+      "summary": "Video budget cap reached."
+    },
+    {
+      "type": "live_video_disabled",
+      "status": 409,
+      "summary": "Live video generation is gated off."
+    },
+    {
+      "type": "provider_error",
+      "status": 502,
+      "summary": "An upstream model failure."
+    },
+    {
+      "type": "forbidden",
+      "status": 403,
+      "summary": "Action not permitted in this environment."
+    },
+    {
+      "type": "internal_error",
+      "status": 500,
+      "summary": "Unexpected server error (scrubbed in prod)."
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+[
+  {
+    "title": "Getting started",
+    "items": [
+      { "slug": "index", "title": "Overview" },
+      { "slug": "getting-started", "title": "Quickstart" },
+      { "slug": "authentication", "title": "Authentication" },
+      { "slug": "errors-and-retries", "title": "Errors & retries" }
+    ]
+  },
+  {
+    "title": "Guides",
+    "items": [
+      { "slug": "guide-generation-on-scroll", "title": "Generation-on-scroll" },
+      { "slug": "guide-events", "title": "Streaming events" },
+      { "slug": "guide-director", "title": "Director tools" },
+      { "slug": "guide-uploading-books", "title": "Uploading books" }
+    ]
+  },
+  {
+    "title": "Reference",
+    "items": [
+      { "slug": "api-reference", "title": "API reference" },
+      { "slug": "typescript-sdk", "title": "TypeScript SDK" },
+      { "slug": "python-sdk", "title": "Python SDK" },
+      { "slug": "architecture", "title": "The six-agent architecture" }
+    ]
+  },
+  {
+    "title": "Recipes",
+    "items": [
+      { "slug": "recipes", "title": "Examples & recipes" },
+      { "slug": "changelog", "title": "Changelog & versioning" }
+    ]
+  }
+]
