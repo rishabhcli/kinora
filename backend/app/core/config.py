@@ -148,6 +148,19 @@ class Settings(BaseSettings):
     # (an unauthenticated control surface must never run in prod, §12).
     mcp_auth_token: str | None = None
 
+    # --- Feature flags & experimentation (app.flags) ---
+    # The flag platform's pure evaluator needs none of these; they only tune the
+    # service layer (cache freshness + bucketing namespace + the Redis stream
+    # channel). Defaults preserve current behavior (no flags defined → every gate
+    # falls through to its caller-provided default).
+    flags_enabled: bool = True
+    flags_cache_ttl_s: float = 30.0
+    # Namespacing salt mixed into every flag's rollout bucketing so bucket
+    # assignments are stable for THIS deployment and uncorrelated across flags.
+    flags_default_salt: str = "kinora"
+    # Redis pub/sub channel the cache broadcasts invalidations on.
+    flags_stream_channel: str = "kinora:flags:invalidate"
+
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

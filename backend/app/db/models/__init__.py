@@ -36,6 +36,15 @@ from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
+# Feature-flags & experimentation platform tables (app.flags). Imported here so
+# Alembic autogenerate + create_all register them on Base.metadata.
+from app.flags.db_models import (
+    FeatureFlag,
+    FlagAudit,
+    FlagExperiment,
+    FlagExposure,
+)
+
 __all__ = [
     "AuditAction",
     "Base",
@@ -52,6 +61,10 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "FeatureFlag",
+    "FlagAudit",
+    "FlagExperiment",
+    "FlagExposure",
     "Page",
     "Pref",
     "RenderJob",

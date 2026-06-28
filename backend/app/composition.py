@@ -57,6 +57,7 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.flags.service import FlagService
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
@@ -231,6 +232,7 @@ class Container:
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
     _keyframe_service: KeyframeService | None = field(default=None, repr=False)
+    _flag_service: FlagService | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -243,6 +245,27 @@ class Container:
 
             self._providers = create_providers(self.settings)
         return self._providers
+
+    @property
+    def flag_service(self) -> FlagService:
+        """The feature-flags & experimentation service (lazy; needs no network).
+
+        Bound to THIS container's unit of work + Redis so flag reads/writes hit
+        the same database and the cache invalidations ride the same Redis the
+        rest of the container uses. The pure evaluator inside it works even with
+        no infra; the service merely persists/caches definitions.
+        """
+        if self._flag_service is None:
+            from app.flags.service import FlagService
+
+            self._flag_service = FlagService(
+                self.session_factory,
+                redis=self.redis,
+                default_salt=self.settings.flags_default_salt,
+                cache_ttl_s=self.settings.flags_cache_ttl_s,
+                channel=self.settings.flags_stream_channel,
+            )
+        return self._flag_service
 
     def _embedder(self) -> Embedder:
         return self.embedder if self.embedder is not None else self.providers.embeddings
