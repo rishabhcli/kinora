@@ -72,6 +72,44 @@ class RenderJobStatus(enum.StrEnum):
     DEADLETTER = "deadletter"
 
 
+class MfaMethod(enum.StrEnum):
+    """The kind of second factor configured on an account (kinora.md §6)."""
+
+    TOTP = "totp"
+    RECOVERY = "recovery"
+
+
+class AuthEventType(enum.StrEnum):
+    """Categories recorded in the security audit log (kinora.md §12)."""
+
+    REGISTER = "register"
+    LOGIN_SUCCESS = "login_success"
+    LOGIN_FAILURE = "login_failure"
+    LOGIN_LOCKED = "login_locked"
+    LOGOUT = "logout"
+    LOGOUT_ALL = "logout_all"
+    TOKEN_REFRESH = "token_refresh"
+    TOKEN_REUSE = "token_reuse_detected"
+    PASSWORD_CHANGE = "password_change"
+    PASSWORD_RESET_REQUEST = "password_reset_request"
+    PASSWORD_RESET = "password_reset"
+    MFA_ENROLL = "mfa_enroll"
+    MFA_ENABLE = "mfa_enable"
+    MFA_DISABLE = "mfa_disable"
+    MFA_CHALLENGE_SUCCESS = "mfa_challenge_success"
+    MFA_CHALLENGE_FAILURE = "mfa_challenge_failure"
+    RECOVERY_CODE_USED = "recovery_code_used"
+    RECOVERY_CODES_REGENERATED = "recovery_codes_regenerated"
+    API_KEY_CREATE = "api_key_create"
+    API_KEY_REVOKE = "api_key_revoke"
+    API_KEY_USED = "api_key_used"
+    SESSION_REVOKE = "session_revoke"
+    ROLE_GRANT = "role_grant"
+    ROLE_REVOKE = "role_revoke"
+    ACCOUNT_DISABLED = "account_disabled"
+    ACCOUNT_ENABLED = "account_enabled"
+
+
 def str_enum(enum_cls: type[enum.Enum], name: str) -> SAEnum:
     """Build a VARCHAR+CHECK column type for ``enum_cls`` storing member values.
 

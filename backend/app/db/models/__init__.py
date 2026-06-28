@@ -8,6 +8,18 @@ it so ``create_all``/relationship resolution work.
 from __future__ import annotations
 
 from app.db.base import Base
+from app.db.models.auth import (
+    ApiKey,
+    AuthAuditLog,
+    AuthCredential,
+    AuthSession,
+    Permission,
+    RecoveryCode,
+    RefreshToken,
+    Role,
+    RoleBinding,
+    RolePermission,
+)
 from app.db.models.beat import Beat
 from app.db.models.bitemporal import (
     AuditAction,
@@ -22,8 +34,10 @@ from app.db.models.continuity import ContinuityState
 from app.db.models.defect import Defect
 from app.db.models.entity import Entity
 from app.db.models.enums import (
+    AuthEventType,
     BookStatus,
     EntityType,
+    MfaMethod,
     RenderJobStatus,
     RenderPriority,
     SessionMode,
@@ -37,7 +51,12 @@ from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
 __all__ = [
+    "ApiKey",
     "AuditAction",
+    "AuthAuditLog",
+    "AuthCredential",
+    "AuthEventType",
+    "AuthSession",
     "Base",
     "Beat",
     "BitemporalState",
@@ -52,11 +71,18 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "MfaMethod",
     "Page",
+    "Permission",
     "Pref",
+    "RecoveryCode",
+    "RefreshToken",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
+    "Role",
+    "RoleBinding",
+    "RolePermission",
     "Scene",
     "Session",
     "SessionMode",

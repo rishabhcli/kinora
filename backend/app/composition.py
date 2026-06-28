@@ -57,6 +57,7 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.auth.service import AuthService
     from app.mcp.authz import BookScopedAuthorizer
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
@@ -231,6 +232,7 @@ class Container:
     _providers: Providers | None = field(default=None, repr=False)
     _tools: MemoryTools | None = field(default=None, repr=False)
     _keyframe_service: KeyframeService | None = field(default=None, repr=False)
+    _auth_service: AuthService | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -243,6 +245,42 @@ class Container:
 
             self._providers = create_providers(self.settings)
         return self._providers
+
+    # -- auth & security plane (lazy; DB + Redis only, no providers, §6/§12) -- #
+
+    @property
+    def auth_service(self) -> AuthService:
+        """The production auth orchestrator (constructed on first use).
+
+        Composes the pluggable password hasher, the JWT/refresh token service
+        (backed by the Redis access-token revocation store), the per-IP login
+        throttle, and the auth repositories. Pure DB + Redis — no DashScope — so
+        it works under the offline test harness and the ``DASHSCOPE_API_KEY=test``
+        boot path.
+        """
+        if self._auth_service is None:
+            from app.auth.lockout import LoginThrottle, RevocationStore
+            from app.auth.service import AuthService
+            from app.auth.tokens import TokenService
+            from app.core.security import build_password_hasher
+
+            revocations = RevocationStore(self.redis)
+            hasher = build_password_hasher(
+                self.settings.password_hasher, rounds=self.settings.bcrypt_rounds
+            )
+            self._auth_service = AuthService(
+                settings=self.settings,
+                session_factory=self.session_factory,
+                hasher=hasher,
+                tokens=TokenService(self.settings, revocations=revocations),
+                throttle=LoginThrottle(
+                    self.redis,
+                    max_attempts=self.settings.login_ip_max_attempts,
+                    window_s=self.settings.login_ip_window_s,
+                ),
+                revocations=revocations,
+            )
+        return self._auth_service
 
     def _embedder(self) -> Embedder:
         return self.embedder if self.embedder is not None else self.providers.embeddings

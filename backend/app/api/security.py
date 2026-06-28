@@ -1,27 +1,30 @@
-"""Auth primitives — password hashing (bcrypt) and JWT issue/verify (kinora.md §6).
+"""Auth primitives — legacy-compatible JWT + password helpers (kinora.md §6).
 
-Passwords are hashed with **bcrypt** (the ``bcrypt`` library from the declared
-``passlib[bcrypt]`` extra, called directly — passlib 1.7.4's backend probe is
-incompatible with bcrypt ≥ 4.1 and crashes on import). Access tokens are signed
-JWTs (HS256 by default) carrying the user id (``sub``), issued-at, and expiry,
-using ``settings.jwt_secret`` / ``settings.jwt_alg`` / ``settings.access_token_ttl_s``.
-The transport layer (``api.deps.get_current_user``) verifies the Bearer token and
-loads the user; this module owns the crypto only.
+This module is the **stable, backward-compatible surface** the gateway and the
+SSE/WS transports already import (``app.api.deps``, ``app.api.routes.events``).
+Its signatures must not change. The richer production crypto now lives in
+:mod:`app.core.security` (pluggable hashing, password policy, TOTP, recovery
+codes, API-key fingerprinting) and the stateful token machinery in
+:mod:`app.auth.tokens`; this module re-exports the password helpers from there so
+there is exactly one hashing implementation, and keeps the simple HS256
+access-token issue/verify the existing Bearer flow relies on.
+
+Tokens minted here carry only ``sub``/``iat``/``exp`` and remain interoperable
+with :class:`app.auth.tokens.TokenService` (which reads the same claims and adds
+optional ones).
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import bcrypt
 import jwt
 from pydantic import BaseModel
 
+# Re-export the single password-hashing implementation (pluggable, bcrypt by
+# default). Keeping these names here means every existing importer is unchanged.
 from app.core.config import Settings
-
-# bcrypt hashes at most the first 72 bytes; longer inputs are truncated to it so
-# registration never errors on a long passphrase (bcrypt ≥ 4.1 raises otherwise).
-_BCRYPT_MAX_BYTES = 72
+from app.core.security import hash_password, verify_password
 
 
 class TokenError(Exception):
@@ -36,27 +39,14 @@ class TokenData(BaseModel):
     iat: int
 
 
-def _truncate(password: str) -> bytes:
-    return password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
-
-
-def hash_password(password: str) -> str:
-    """Return a bcrypt hash of ``password`` (safe for storage)."""
-    return bcrypt.hashpw(_truncate(password), bcrypt.gensalt()).decode("ascii")
-
-
-def verify_password(password: str, hashed: str) -> bool:
-    """Verify ``password`` against a stored bcrypt ``hashed`` value."""
-    try:
-        return bcrypt.checkpw(_truncate(password), hashed.encode("ascii"))
-    except (ValueError, TypeError):
-        return False
-
-
 def create_access_token(
     subject: str, settings: Settings, *, expires_in_s: int | None = None
 ) -> str:
-    """Issue a signed JWT for ``subject`` (the user id)."""
+    """Issue a signed JWT for ``subject`` (the user id) — legacy-compatible.
+
+    Carries only the claims the existing verifier reads. For the richer claim set
+    (session id, roles, scopes, tenant) use :class:`app.auth.tokens.TokenService`.
+    """
     now = datetime.now(UTC)
     ttl = settings.access_token_ttl_s if expires_in_s is None else expires_in_s
     expire = now + timedelta(seconds=ttl)
@@ -65,9 +55,19 @@ def create_access_token(
 
 
 def decode_access_token(token: str, settings: Settings) -> TokenData:
-    """Decode and validate an access token; raise :class:`TokenError` on failure."""
+    """Decode and validate an access token; raise :class:`TokenError` on failure.
+
+    Tolerates tokens that carry an ``aud``/``iss`` (minted by the new
+    :class:`TokenService`): audience verification is disabled here so both issuers
+    interoperate, and only the ``sub``/``exp``/``iat`` core is required.
+    """
     try:
-        claims = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_alg])
+        claims = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_alg],
+            options={"verify_aud": False},
+        )
     except jwt.ExpiredSignatureError as exc:
         raise TokenError("token expired") from exc
     except jwt.PyJWTError as exc:
