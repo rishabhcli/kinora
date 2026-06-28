@@ -36,6 +36,20 @@ from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
+# Workspaces & teams subsystem (additive; registers its tables on Base.metadata).
+from app.workspaces.models import (
+    Collection,
+    CollectionItem,
+    Organization,
+    OwnershipTransfer,
+    ResourceShare,
+    Workspace,
+    WorkspaceActivity,
+    WorkspaceBook,
+    WorkspaceInvitation,
+    WorkspaceMember,
+)
+
 __all__ = [
     "AuditAction",
     "Base",
@@ -48,15 +62,20 @@ __all__ = [
     "BudgetLedger",
     "CanonAudit",
     "CanonBranch",
+    "Collection",
+    "CollectionItem",
     "ContinuityState",
     "Defect",
     "Entity",
     "EntityType",
+    "Organization",
+    "OwnershipTransfer",
     "Page",
     "Pref",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
+    "ResourceShare",
     "Scene",
     "Session",
     "SessionMode",
@@ -65,4 +84,9 @@ __all__ = [
     "ShotStatus",
     "SourceSpanIndex",
     "User",
+    "Workspace",
+    "WorkspaceActivity",
+    "WorkspaceBook",
+    "WorkspaceInvitation",
+    "WorkspaceMember",
 ]
