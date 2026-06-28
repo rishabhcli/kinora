@@ -36,9 +36,15 @@ from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
+# Additive (reports subsystem): registering the report-artifact index table on
+# Base.metadata so Alembic autogenerate + create_all see it. Imported here rather
+# than in app.reports to keep the single table-registration entry point.
+from app.reports.db_model import ReportArtifact
+
 __all__ = [
     "AuditAction",
     "Base",
+    "ReportArtifact",
     "Beat",
     "BitemporalState",
     "BranchStatus",

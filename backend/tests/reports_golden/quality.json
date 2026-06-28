@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "footer": "Kinora operations · §13 metrics · 28 Jun 2026",
+    "generated_at": "28 Jun 2026 12:00 UTC",
+    "kind": "quality",
+    "subject": null,
+    "subtitle": "Book · The Tinderbox",
+    "tags": [],
+    "title": "Quality Report"
+  },
+  "sections": [
+    {
+      "blocks": [
+        {
+          "block_type": "heading",
+          "level": 1,
+          "text": "The §13 proof"
+        },
+        {
+          "block_type": "paragraph",
+          "muted": true,
+          "text": "Kinora's bet: consistency is a memory problem. The crew + shared canon should beat a single-agent baseline on both accepted-footage efficiency and character consistency. The numbers below are measured over rendered shots."
+        },
+        {
+          "block_type": "spacer",
+          "size": 6
+        },
+        {
+          "block_type": "keyvalue",
+          "columns": 3,
+          "items": [
+            {
+              "emphasis": true,
+              "label": "Accepted-footage efficiency",
+              "stat": {
+                "display": "90.0%",
+                "value": 90.0
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Regeneration rate",
+              "stat": {
+                "display": "15.0%",
+                "value": 15.0
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Mean CCS",
+              "stat": {
+                "display": "0.910",
+                "value": 0.91
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Shots accepted",
+              "stat": {
+                "display": "18",
+                "value": 18
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Shots total",
+              "stat": {
+                "display": "20",
+                "value": 20
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Defects",
+              "stat": {
+                "display": "2",
+                "value": 2
+              }
+            }
+          ]
+        },
+        {
+          "block_type": "badge",
+          "text": "PASS",
+          "tone": "success"
+        },
+        {
+          "block_type": "chart",
+          "height": 210,
+          "kind": "donut",
+          "labels": [],
+          "series": [
+            {
+              "name": "Accepted",
+              "values": [
+                18
+              ]
+            },
+            {
+              "name": "Degraded",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "Conflict",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "Other",
+              "values": [
+                1
+              ]
+            }
+          ],
+          "title": "Shot outcomes"
+        }
+      ],
+      "page_break_before": false,
+      "title": null
+    },
+    {
+      "blocks": [
+        {
+          "block_type": "chart",
+          "height": 200,
+          "kind": "bar",
+          "labels": [
+            "qa_fail"
+          ],
+          "series": [
+            {
+              "name": "count",
+              "values": [
+                2
+              ]
+            }
+          ],
+          "title": "Defects by kind"
+        },
+        {
+          "block_type": "table",
+          "columns": [
+            {
+              "align": "left",
+              "key": "kind",
+              "kind": "text",
+              "label": "Defect kind"
+            },
+            {
+              "align": "right",
+              "key": "count",
+              "kind": "number",
+              "label": "Count"
+            }
+          ],
+          "rows": [
+            {
+              "count": "2",
+              "kind": "qa_fail"
+            }
+          ],
+          "total_row": {
+            "count": "2",
+            "kind": "Total"
+          }
+        }
+      ],
+      "page_break_before": false,
+      "title": "Defects"
+    }
+  ]
+}

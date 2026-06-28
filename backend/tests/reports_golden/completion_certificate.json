@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "footer": "Kinora · 28 Jun 2026 · No. 0042",
+    "generated_at": "28 Jun 2026 12:00 UTC",
+    "kind": "completion_certificate",
+    "subject": "Aesop's Fable",
+    "subtitle": "Aesop's Fable",
+    "tags": [],
+    "title": "Certificate of Completion"
+  },
+  "sections": [
+    {
+      "blocks": [
+        {
+          "block_type": "spacer",
+          "size": 10
+        },
+        {
+          "block_type": "badge",
+          "text": "COMPLETED",
+          "tone": "success"
+        },
+        {
+          "block_type": "spacer",
+          "size": 6
+        },
+        {
+          "block_type": "heading",
+          "level": 3,
+          "text": "This certifies that"
+        },
+        {
+          "block_type": "heading",
+          "level": 1,
+          "text": "Ada Lovelace"
+        },
+        {
+          "block_type": "paragraph",
+          "muted": true,
+          "text": "has watched and read to the end of"
+        },
+        {
+          "block_type": "heading",
+          "level": 1,
+          "text": "“Aesop's Fable”"
+        },
+        {
+          "block_type": "paragraph",
+          "muted": true,
+          "text": "by Aesop — 8 pages, 10 shots of generated film, 1.6 min of viewing."
+        },
+        {
+          "block_type": "spacer",
+          "size": 12
+        },
+        {
+          "block_type": "keyvalue",
+          "columns": 3,
+          "items": [
+            {
+              "emphasis": false,
+              "label": "Pages",
+              "stat": {
+                "display": "8",
+                "value": 8
+              }
+            },
+            {
+              "emphasis": true,
+              "label": "Film",
+              "stat": {
+                "display": "1.6 min",
+                "value": 95.0
+              }
+            },
+            {
+              "emphasis": false,
+              "label": "Completed",
+              "stat": {
+                "display": "28 Jun 2026",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "block_type": "spacer",
+          "size": 10
+        },
+        {
+          "block_type": "callout",
+          "text": "Every shot in this film was kept visually consistent by Kinora's shared canon — one story, one look, start to finish.",
+          "tone": "neutral"
+        }
+      ],
+      "page_break_before": false,
+      "title": null
+    }
+  ]
+}

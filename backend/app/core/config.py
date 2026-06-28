@@ -151,10 +151,31 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # --- Reports subsystem (additive) ---
+    # Emails allowed to generate operator-facing reports (budget/quality/
+    # throughput/library). Empty + ``local`` ⇒ any authenticated user may (dev
+    # convenience); empty + non-local ⇒ nobody, so operator dashboards are
+    # locked down by default in production until an allowlist is configured.
+    report_operator_emails: list[str] = []
+    # Signed report-download URL lifetime (seconds).
+    report_url_ttl_s: int = 3600
+
     @property
     def is_local(self) -> bool:
         """True when running in the local development environment."""
         return self.app_env.lower() == "local"
+
+    def is_report_operator(self, email: str) -> bool:
+        """Whether ``email`` may generate operator-facing reports.
+
+        Locked down by default outside ``local``: an empty allowlist denies all
+        operator reports in production but permits them in local development so
+        the dashboards are usable out of the box.
+        """
+        allow = {e.strip().lower() for e in self.report_operator_emails if e.strip()}
+        if allow:
+            return email.strip().lower() in allow
+        return self.is_local
 
     @model_validator(mode="after")
     def _guard_production_secrets(self) -> Settings:

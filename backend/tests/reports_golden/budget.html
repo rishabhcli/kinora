@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Budget Report</title><style>:root {
+  --bg: #0d1117; --surface: #161b22; --surface-alt: #1c2330;
+  --border: #2a3242; --text: #e6edf3; --muted: #9da7b3;
+  --heading: #ffffff; --accent: #7c6cff; --accent-soft: #a99bff;
+  --info: #4aa3ff; --success: #3fb950; --warning: #d29922; --danger: #f85149;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size:10.5pt; line-height:1.55; }
+.kn-doc { max-width: 820px; margin: 0 auto; padding: 40px 28px 64px; }
+.kn-cover { display:flex; align-items:center; gap:16px; padding-bottom:18px;
+  border-bottom:1px solid var(--border); margin-bottom:28px; }
+.kn-mark { color:var(--accent); flex:0 0 auto; }
+.kn-title { font-size:30.0pt; font-weight:700; color:var(--heading);
+  margin:0; letter-spacing:-0.5px; }
+.kn-subtitle { font-size:15.0pt; color:var(--muted); margin:4px 0 0; }
+.kn-brandline { font-size:9.0pt; color:var(--muted); text-transform:uppercase;
+  letter-spacing:1.5px; margin:0 0 2px; }
+.kn-section { margin: 30px 0; }
+.kn-section > h2.kn-section-title { font-size:20.0pt; color:var(--heading);
+  margin:0 0 14px; font-weight:650; }
+h3.kn-h { font-size:16.0pt; color:var(--heading); margin:18px 0 8px; font-weight:600; }
+h4.kn-h { font-size:13.0pt; color:var(--heading); margin:14px 0 6px; font-weight:600; }
+h5.kn-h { font-size:11.5pt; color:var(--heading); margin:12px 0 6px; font-weight:600; }
+p.kn-p { margin: 8px 0; }
+p.kn-muted { color: var(--muted); }
+.kn-kv { display:grid; gap:14px; margin:14px 0; }
+.kn-kv-cell { background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px; }
+.kn-kv-cell.kn-emph { border-color:var(--accent); }
+.kn-kv-stat { font-size:24.0pt; font-weight:700; color:var(--heading);
+  line-height:1.1; }
+.kn-kv-label { font-size:8.5pt; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.6px; margin-top:4px; }
+table.kn-table { width:100%; border-collapse:collapse; margin:12px 0;
+  font-size:9.0pt; }
+table.kn-table caption { caption-side:top; text-align:left; color:var(--muted);
+  font-size:9.0pt; margin-bottom:6px; }
+table.kn-table th { text-align:left; color:var(--muted); font-weight:600;
+  padding:7px 10px; border-bottom:1px solid var(--border);
+  text-transform:uppercase; letter-spacing:0.5px; font-size:8pt; }
+table.kn-table td { padding:7px 10px; border-bottom:1px solid var(--border); }
+table.kn-table tr:last-child td { border-bottom:none; }
+table.kn-table tfoot td { font-weight:700; color:var(--heading);
+  border-top:2px solid var(--border); }
+.kn-r { text-align:right; } .kn-c { text-align:center; } .kn-l { text-align:left; }
+.kn-chart { margin:14px 0; background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:10px; }
+.kn-callout { border-radius:10px; padding:12px 16px; margin:14px 0;
+  border-left:4px solid var(--muted); background:var(--surface); }
+.kn-callout-title { font-weight:650; color:var(--heading); margin-bottom:3px; }
+.kn-callout.info { border-left-color:var(--info); }
+.kn-callout.success { border-left-color:var(--success); }
+.kn-callout.warning { border-left-color:var(--warning); }
+.kn-callout.danger { border-left-color:var(--danger); }
+.kn-callout.neutral { border-left-color:var(--muted); }
+.kn-badge { display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:9.0pt; font-weight:650; margin:6px 0; }
+.kn-badge.info { background:var(--info); color:#fff; }
+.kn-badge.success { background:var(--success); color:#fff; }
+.kn-badge.warning { background:var(--warning); color:#1b1b1b; }
+.kn-badge.danger { background:var(--danger); color:#fff; }
+.kn-badge.accent { background:var(--accent); color:#fff; }
+.kn-badge.neutral { background:var(--surface-alt); color:var(--text); }
+.kn-divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+.kn-footer { margin-top:40px; padding-top:16px; border-top:1px solid var(--border);
+  color:var(--muted); font-size:9.0pt; }</style></head><body><main class="kn-doc"><header class="kn-cover"><div class="kn-mark"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="40" height="40" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="24" cy="7.5" r="2.4" fill="currentColor"/><circle cx="40.5" cy="24" r="2.4" fill="currentColor"/><circle cx="24" cy="40.5" r="2.4" fill="currentColor"/><circle cx="7.5" cy="24" r="2.4" fill="currentColor"/><path d="M19 16 L34 24 L19 32 Z" fill="currentColor"/></svg></div><div><p class="kn-brandline">Kinora · watch the book</p><h1 class="kn-title">Budget Report</h1><p class="kn-subtitle">Fleet-wide</p></div></header><section class="kn-section"><h2 class="kn-section-title">Video-second budget</h2><p class="kn-p kn-muted">Video-seconds are Kinora&#x27;s hard-capped currency (§11). Every render reserves before it runs and commits its actual cost on completion.</p><div style="height:6px"></div><div class="kn-kv" style="grid-template-columns:repeat(3,1fr)"><div class="kn-kv-cell"><div class="kn-kv-stat">27m 30s</div><div class="kn-kv-label">Ceiling</div></div><div class="kn-kv-cell kn-emph"><div class="kn-kv-stat">7m</div><div class="kn-kv-label">Committed</div></div><div class="kn-kv-cell"><div class="kn-kv-stat">30s</div><div class="kn-kv-label">Reserved</div></div><div class="kn-kv-cell"><div class="kn-kv-stat">20m</div><div class="kn-kv-label">Remaining</div></div><div class="kn-kv-cell"><div class="kn-kv-stat">27.3%</div><div class="kn-kv-label">Used</div></div><div class="kn-kv-cell"><div class="kn-kv-stat">5</div><div class="kn-kv-label">Reservations</div></div></div><div class="kn-chart"><svg viewBox="0 0 640 44" width="640" height="44" xmlns="http://www.w3.org/2000/svg" role="img"><rect x="8" y="13" width="624" height="18" rx="9" fill="#1c2330"/><rect x="8" y="13" width="170.18" height="18" rx="9" fill="#7c6cff"/><text x="320" y="27" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Inter, Roboto, Helvetica, Arial, sans-serif">27.3% of 27m 30s used</text></svg></div><div class="kn-callout success"><div class="kn-callout-title">Status</div><div>20m of video budget remain (72.7% free).</div></div></section><section class="kn-section"><h2 class="kn-section-title">Where it went</h2><div class="kn-chart"><svg viewBox="0 0 640 200" width="640" height="200" xmlns="http://www.w3.org/2000/svg" role="img"><text x="320" y="13" text-anchor="middle" fill="#ffffff" font-size="11" font-family="-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Inter, Roboto, Helvetica, Arial, sans-serif" font-weight="600">Budget split</text><path d="M 320 25 A 82 82 0 0 1 401.97 109.34 L 367.54 108.36 A 47.56 47.56 0 0 0 320 59.44 Z" fill="#7c6cff"/><path d="M 401.97 109.34 A 82 82 0 0 1 401.17 118.67 L 367.08 113.77 A 47.56 47.56 0 0 0 367.54 108.36 Z" fill="#4aa3ff"/><path d="M 401.17 118.67 A 82 82 0 1 1 320 25 L 320 59.44 A 47.56 47.56 0 1 0 367.08 113.77 Z" fill="#3fb950"/><rect x="410" y="25" width="9" height="9" rx="2" fill="#7c6cff"/><text x="423" y="33" fill="#9da7b3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Inter, Roboto, Helvetica, Arial, sans-serif">Committed · 25.5%</text><rect x="410" y="40" width="9" height="9" rx="2" fill="#4aa3ff"/><text x="423" y="48" fill="#9da7b3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Inter, Roboto, Helvetica, Arial, sans-serif">Reserved · 1.8%</text><rect x="410" y="55" width="9" height="9" rx="2" fill="#3fb950"/><text x="423" y="63" fill="#9da7b3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Inter, Roboto, Helvetica, Arial, sans-serif">Free · 72.7%</text></svg></div></section><section class="kn-section"><h2 class="kn-section-title">Top spenders</h2><table class="kn-table"><caption>Committed video-seconds by book</caption><thead><tr><th class="kn-l">Book</th><th class="kn-r">Video</th><th class="kn-r">Minutes</th></tr></thead><tbody><tr><td class="kn-l">The Tinderbox</td><td class="kn-r">5m</td><td class="kn-r">5.0 min</td></tr><tr><td class="kn-l">Aesop&#x27;s Fable</td><td class="kn-r">2m</td><td class="kn-r">2.0 min</td></tr></tbody><tfoot><tr><td class="kn-l">Total committed</td><td class="kn-r">7m</td><td class="kn-r">7.0 min</td></tr></tfoot></table></section><footer class="kn-footer">Kinora operations · budget · 28 Jun 2026</footer></main></body></html>
