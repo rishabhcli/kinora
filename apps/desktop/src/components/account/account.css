@@ -1,0 +1,579 @@
+/* ============================================================
+   components/account/account.css — OWNER: auth-account agent
+   Styles for the account-management surface, the onboarding flow,
+   and the extended auth controls (passkey / OAuth-stack / MFA).
+   Reuses the --auth-* design tokens defined in styles/login.css so
+   the palette stays consistent; imported directly by AccountPage /
+   OnboardingFlow (the SettingsPage.tsx precedent), never via the
+   shared styles/index.css aggregator.
+   ============================================================ */
+
+/* ---- shared helpers ---------------------------------------------------- */
+.acct-sr-only,
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- extended auth controls (passkey, oauth stack) --------------------- */
+.acct-oauth-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.acct-oauth-btn,
+.acct-passkey-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--auth-text, #e8e2d8);
+  background: rgba(246, 240, 231, 0.05);
+  border: 1px solid rgba(246, 240, 231, 0.16);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.14s ease;
+}
+.acct-oauth-btn:hover:not(:disabled),
+.acct-passkey-btn:hover:not(:disabled) {
+  background: rgba(246, 240, 231, 0.1);
+  border-color: rgba(246, 240, 231, 0.24);
+}
+.acct-oauth-btn:active:not(:disabled),
+.acct-passkey-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.acct-oauth-btn:disabled,
+.acct-passkey-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- password requirements checklist ----------------------------------- */
+.acct-pw-reqs {
+  list-style: none;
+  margin: 6px 2px 2px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+  font-size: 11.5px;
+  color: var(--auth-subtle, #8a8074);
+}
+.acct-pw-reqs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.acct-pw-reqs li svg {
+  flex: 0 0 auto;
+  color: var(--auth-subtle, #8a8074);
+}
+.acct-pw-reqs li.is-met {
+  color: var(--auth-good, #8fb573);
+}
+.acct-pw-reqs li.is-met svg {
+  color: var(--auth-good, #8fb573);
+}
+
+/* ---- account page shell ------------------------------------------------ */
+.acct-page {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  gap: 28px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 32px 28px 64px;
+  color: var(--auth-text, #e8e2d8);
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.acct-nav {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.acct-nav-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px 16px;
+}
+.acct-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--auth-muted, #b3a99d);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.acct-nav-item:hover {
+  background: rgba(246, 240, 231, 0.05);
+  color: var(--auth-text, #e8e2d8);
+}
+.acct-nav-item.is-active {
+  background: rgba(212, 164, 78, 0.12);
+  color: var(--auth-gold-bright, #e8c878);
+}
+.acct-nav-item svg {
+  flex: 0 0 auto;
+}
+
+.acct-main {
+  min-width: 0;
+}
+.acct-section {
+  margin-bottom: 40px;
+}
+.acct-section-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+  color: var(--auth-ink, #f4efe6);
+  margin: 0 0 4px;
+}
+.acct-section-sub {
+  font-size: 13px;
+  color: var(--auth-muted, #b3a99d);
+  margin: 0 0 18px;
+}
+
+/* ---- cards + rows ------------------------------------------------------ */
+.acct-card {
+  border-radius: 16px;
+  background: rgba(20, 17, 15, 0.7);
+  border: 1px solid rgba(246, 240, 231, 0.1);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+.acct-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--auth-ink, #f4efe6);
+  margin: 0 0 2px;
+}
+.acct-card-desc {
+  font-size: 12.5px;
+  color: var(--auth-muted, #b3a99d);
+  margin: 0;
+}
+.acct-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(246, 240, 231, 0.07);
+}
+.acct-row:last-child {
+  border-bottom: none;
+}
+.acct-row-main {
+  min-width: 0;
+}
+.acct-row-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--auth-text, #e8e2d8);
+}
+.acct-row-meta {
+  font-size: 12px;
+  color: var(--auth-subtle, #8a8074);
+  margin-top: 2px;
+}
+
+/* ---- buttons ----------------------------------------------------------- */
+.acct-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(246, 240, 231, 0.18);
+  background: rgba(246, 240, 231, 0.05);
+  color: var(--auth-text, #e8e2d8);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.14s ease;
+}
+.acct-btn:hover:not(:disabled) {
+  background: rgba(246, 240, 231, 0.1);
+}
+.acct-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.acct-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.acct-btn--primary {
+  background: linear-gradient(180deg, var(--auth-gold-bright, #e8c878), var(--auth-gold, #d4a44e));
+  color: var(--auth-abyss, #0a0908);
+  border: none;
+  font-weight: 600;
+}
+.acct-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.acct-btn--danger {
+  color: var(--auth-danger, #e88c6a);
+  border-color: rgba(232, 140, 106, 0.4);
+}
+.acct-btn--danger:hover:not(:disabled) {
+  background: rgba(232, 140, 106, 0.12);
+}
+.acct-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--auth-muted, #b3a99d);
+}
+.acct-btn--ghost:hover:not(:disabled) {
+  color: var(--auth-text, #e8e2d8);
+  background: rgba(246, 240, 231, 0.05);
+}
+
+/* ---- avatar ------------------------------------------------------------ */
+.acct-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  flex: 0 0 auto;
+  overflow: hidden;
+  user-select: none;
+}
+.acct-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---- toggle switch ----------------------------------------------------- */
+.acct-switch {
+  position: relative;
+  width: 40px;
+  height: 23px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: none;
+  background: rgba(246, 240, 231, 0.16);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.acct-switch[aria-checked="true"] {
+  background: var(--auth-gold, #d4a44e);
+}
+.acct-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.acct-switch[aria-checked="true"]::after {
+  transform: translateX(17px);
+}
+.acct-switch:focus-visible {
+  outline: 2px solid rgba(212, 164, 78, 0.5);
+  outline-offset: 2px;
+}
+
+/* ---- segmented control ------------------------------------------------- */
+.acct-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(246, 240, 231, 0.06);
+  border: 1px solid rgba(246, 240, 231, 0.1);
+}
+.acct-seg-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--auth-muted, #b3a99d);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.acct-seg-btn.is-active {
+  background: rgba(246, 240, 231, 0.1);
+  color: var(--auth-ink, #f4efe6);
+}
+
+/* ---- badges ------------------------------------------------------------ */
+.acct-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.acct-badge--good {
+  color: var(--auth-good, #8fb573);
+  background: rgba(143, 181, 115, 0.14);
+}
+.acct-badge--warn {
+  color: var(--auth-gold-bright, #e8c878);
+  background: rgba(212, 164, 78, 0.14);
+}
+.acct-badge--muted {
+  color: var(--auth-subtle, #8a8074);
+  background: rgba(246, 240, 231, 0.07);
+}
+.acct-badge--current {
+  color: var(--auth-good, #8fb573);
+  background: rgba(143, 181, 115, 0.14);
+}
+
+/* ---- mono code blocks (recovery codes / secret) ------------------------ */
+.acct-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 18px;
+  margin: 12px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(10, 9, 8, 0.6);
+  border: 1px solid rgba(246, 240, 231, 0.1);
+  font-family: "SF Mono", ui-monospace, "Roboto Mono", monospace;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--auth-text, #e8e2d8);
+}
+.acct-secret {
+  font-family: "SF Mono", ui-monospace, "Roboto Mono", monospace;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: var(--auth-ink, #f4efe6);
+  word-break: break-all;
+}
+
+/* ---- plan cards (billing) ---------------------------------------------- */
+.acct-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.acct-plan {
+  position: relative;
+  border-radius: 16px;
+  padding: 20px 18px;
+  background: rgba(20, 17, 15, 0.7);
+  border: 1px solid rgba(246, 240, 231, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.acct-plan.is-current {
+  border-color: rgba(212, 164, 78, 0.5);
+}
+.acct-plan.is-highlighted {
+  border-color: rgba(212, 164, 78, 0.35);
+  background: rgba(28, 23, 16, 0.8);
+}
+.acct-plan-ribbon {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--auth-abyss, #0a0908);
+  background: linear-gradient(180deg, var(--auth-gold-bright, #e8c878), var(--auth-gold, #d4a44e));
+}
+.acct-plan-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--auth-ink, #f4efe6);
+}
+.acct-plan-tagline {
+  font-size: 12px;
+  color: var(--auth-muted, #b3a99d);
+}
+.acct-plan-price {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--auth-ink, #f4efe6);
+}
+.acct-plan-price small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--auth-subtle, #8a8074);
+}
+.acct-plan-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--auth-text, #e8e2d8);
+  flex: 1;
+}
+.acct-plan-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.acct-plan-features li svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--auth-good, #8fb573);
+}
+
+/* ---- onboarding flow --------------------------------------------------- */
+.onb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(40, 33, 24, 0.5), transparent 60%),
+    linear-gradient(180deg, rgba(10, 9, 8, 0.94), rgba(14, 12, 11, 0.97));
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--auth-text, #e8e2d8);
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.onb-card {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 24px;
+  padding: 30px 32px 26px;
+  background: rgba(20, 17, 15, 0.92);
+  border: 0.5px solid rgba(246, 240, 231, 0.14);
+  box-shadow: 0 34px 90px -22px rgba(6, 5, 4, 0.85);
+}
+.onb-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(246, 240, 231, 0.08);
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.onb-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--auth-gold, #d4a44e), var(--auth-gold-bright, #e8c878));
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.onb-step-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--auth-gold, #d4a44e);
+  margin-bottom: 10px;
+}
+.onb-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  color: var(--auth-ink, #f4efe6);
+  margin: 0 0 6px;
+}
+.onb-blurb {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--auth-muted, #b3a99d);
+  margin: 0 0 22px;
+}
+.onb-body {
+  margin-bottom: 24px;
+}
+.onb-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.onb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.onb-chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(246, 240, 231, 0.16);
+  background: rgba(246, 240, 231, 0.04);
+  color: var(--auth-text, #e8e2d8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+}
+.onb-chip:hover {
+  background: rgba(246, 240, 231, 0.08);
+}
+.onb-chip.is-selected {
+  background: rgba(212, 164, 78, 0.16);
+  border-color: rgba(212, 164, 78, 0.5);
+  color: var(--auth-gold-bright, #e8c878);
+}
+.onb-chip:active {
+  transform: scale(0.96);
+}
+
+/* ---- responsive -------------------------------------------------------- */
+@media (max-width: 760px) {
+  .acct-page {
+    grid-template-columns: 1fr;
+  }
+  .acct-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .acct-plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acct-switch::after,
+  .onb-progress-fill {
+    transition: none;
+  }
+}
