@@ -30,6 +30,7 @@ from app.core.logging import get_logger
 from .base import ProviderClient, data_uri
 from .base import sdk_get as _get
 from .errors import ProviderBadRequest, ProviderError, ResponseParseError
+from .prosody import ProsodyPlan, plan_prosody
 from .types import TtsResult, TtsWord, Usage
 
 logger = get_logger("app.providers.tts")
@@ -291,6 +292,17 @@ class TtsProvider:
                 Usage(model=_ASR_MODEL, operation="asr", request_id=_get(rsp, "request_id"))
             )
         return words
+
+    @staticmethod
+    def plan_prosody(text: str) -> ProsodyPlan:
+        """Deterministic prosody plan for ``text`` (emphasis + breaks, §9.4).
+
+        Pure, no model call, no spend — see :func:`app.providers.prosody.plan_prosody`.
+        The plan's ``style_instruction`` can drive a future opt-in instruct-model
+        synthesis; its per-token stress feeds the sync-map highlight pulse. Exposed
+        here so callers reach narration prosody through the narration provider.
+        """
+        return plan_prosody(text)
 
 
 __all__ = ["TtsProvider", "proportional_alignment", "resolve_tts_model"]

@@ -64,3 +64,41 @@ async def test_render_propagates_live_video_disabled_when_gated_off() -> None:
             await generator.render(spec, narration_text="A quiet meadow.", voice_id="Cherry")
     finally:
         await gated.aclose()
+
+
+async def test_generator_accepts_an_injected_video_backend_router() -> None:
+    """A multi-backend ``VideoRouter`` drops in behind the Generator: the gate is
+    still propagated unchanged (no clip fabricated, no second backend tried)."""
+    from app.providers import VideoRouter, create_video_router
+
+    gated = make_providers(live_video=False)
+    try:
+        router = create_video_router(
+            gated.client, model_ids=["wan2.1-t2v-turbo", "wan2.5-t2v-preview"]
+        )
+        assert isinstance(router, VideoRouter)
+        generator = Generator(gated, video_backend=router)
+        spec = ShotSpec(shot_id="s6", render_mode=RenderMode.TEXT_TO_VIDEO, prompt="a meadow")
+        with pytest.raises(LiveVideoDisabled):
+            await generator.render(spec, narration_text="A quiet meadow.", voice_id="Cherry")
+        # The gate is not a fault → the preferred backend stays healthy.
+        assert router.health("video:wan2.1-t2v-turbo").total_failures == 0
+    finally:
+        await gated.aclose()
+
+
+async def test_video_provider_satisfies_video_backend_protocol() -> None:
+    """The single hosted ``VideoProvider`` is a drop-in ``VideoBackend`` (name +
+    render + healthy), so wrapping one in a router needs no adapter; ``healthy()``
+    is a no-network ``True`` while the gate is off."""
+    from app.providers import VideoProvider
+    from app.providers.video_router import VideoBackend
+
+    gated = make_providers(live_video=False)
+    try:
+        assert isinstance(gated.video, VideoProvider)
+        assert isinstance(gated.video, VideoBackend)  # runtime_checkable protocol
+        assert gated.video.name.startswith("video:")
+        assert await gated.video.healthy() is True  # gated-off probe is a no-op True
+    finally:
+        await gated.aclose()

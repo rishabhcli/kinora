@@ -33,6 +33,7 @@ from app.db.models.beat import Beat
 from app.db.models.enums import ShotStatus
 from app.db.models.shot import Shot
 from app.db.repositories.scene import SceneRepo
+from app.render.color_match import grade_filter, plan_scene_grades
 from app.render.degrade import (
     DEFAULT_FPS,
     FILM_SIZE,
@@ -41,7 +42,7 @@ from app.render.degrade import (
     inspect,
     run_ffmpeg,
 )
-from app.render.sync_map import SyncSegment
+from app.render.sync_map import SyncSegment, SyncWord
 from app.storage.object_store import ObjectStore, keys
 
 logger = get_logger("app.render.stitch")
@@ -118,21 +119,36 @@ def merge_sync_segments(
                 video_end_s=round(end, 3),
                 page=seg.page,
                 page_turn_at_s=round(seg.page_turn_at_s + shift, 3),
-                words=[
-                    word.model_copy(
-                        update={
-                            "t_start": round(word.t_start + shift, 3),
-                            "t_end": round(word.t_end + shift, 3),
-                        }
-                    )
-                    for word in seg.words
-                ],
+                words=[_shift_word(word, shift) for word in seg.words],
             )
         )
         # The next shot crossfades into this one's tail (overlap), so it begins early.
         start = end - overlap_s
     duration = round(merged[-1].video_end_s, 3) if merged else 0.0
     return SceneSyncMap(scene_id=scene_id, duration_s=duration, segments=merged)
+
+
+def _shift_word(word: SyncWord, shift: float) -> SyncWord:
+    """Shift a word — and any sub-word phoneme timings — onto the scene timeline.
+
+    Phoneme timings are absolute on the same playhead as the word, so they ride the
+    same cumulative ``shift`` so sub-word karaoke stays exact across a stitch seam.
+    """
+    return word.model_copy(
+        update={
+            "t_start": round(word.t_start + shift, 3),
+            "t_end": round(word.t_end + shift, 3),
+            "phonemes": [
+                phoneme.model_copy(
+                    update={
+                        "t_start": round(phoneme.t_start + shift, 3),
+                        "t_end": round(phoneme.t_end + shift, 3),
+                    }
+                )
+                for phoneme in word.phonemes
+            ],
+        }
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -257,11 +273,16 @@ def _xfade_concat(
     return scene
 
 
-def _normalize_segment(clip: bytes, *, size: tuple[int, int], fps: int) -> bytes:
+def _normalize_segment(
+    clip: bytes, *, size: tuple[int, int], fps: int, grade: str | None = None
+) -> bytes:
     """Re-encode one clip to a common geometry/fps + stereo AAC (silence if mute).
 
     Uniform parameters are what let the concat filter join a degraded Ken-Burns
-    rung and a full Wan clip without artefacts.
+    rung and a full Wan clip without artefacts. An optional ``grade`` (a comma-joined
+    ffmpeg colour filter from :func:`app.render.color_match.grade_filter`) is appended
+    so a per-clip colour-match correction is baked in during normalisation — joining
+    colour-consistent clips before the dissolve/concat (§9.6 shot-to-shot match).
     """
     ffmpeg = get_ffmpeg_exe()
     out_w, out_h = size
@@ -269,6 +290,8 @@ def _normalize_segment(clip: bytes, *, size: tuple[int, int], fps: int) -> bytes
         f"scale={out_w}:{out_h}:force_original_aspect_ratio=decrease,"
         f"pad={out_w}:{out_h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p"
     )
+    if grade:
+        vf = f"{vf},{grade}"
     has_audio = _safe_has_audio(clip)
     duration = 0.0
     try:
@@ -323,12 +346,19 @@ def _normalize_segment(clip: bytes, *, size: tuple[int, int], fps: int) -> bytes
         return out_path.read_bytes()
 
 
+def _scene_grades(clips: Sequence[bytes]) -> list[str | None]:
+    """Per-clip colour-match filter chains toward the first clip (or ``None``)."""
+    corrections = plan_scene_grades(list(clips))
+    return [grade_filter(correction) for correction in corrections]
+
+
 def concat_clips(
     clips: Sequence[bytes],
     *,
     size: tuple[int, int] | None = None,
     fps: int = DEFAULT_FPS,
     crossfade_s: float = 0.0,
+    color_match: bool = False,
 ) -> bytes:
     """Concatenate clips into one mp4, normalising then re-encoding (§9.6).
 
@@ -343,6 +373,11 @@ def concat_clips(
             acrossfade of this length (clamped to 45 % of the shortest clip) for a
             continuous event film with no hard cuts; 0 is a straight (hard-cut)
             concat. Either way the audio is level-normalised.
+        color_match: when ``True``, measure each clip's colour and bake a gentle,
+            clamped grade toward the **first** clip (the scene reference) into the
+            per-clip normalisation, so a degraded rung and a full Wan clip read as
+            one continuous look across the cut (§9.6 shot-to-shot match). Off by
+            default — it adds a probe pass, so the render pipeline opts in.
 
     Raises:
         ValueError: when ``clips`` is empty.
@@ -351,7 +386,11 @@ def concat_clips(
     if not clips:
         raise ValueError("concat_clips requires at least one clip")
     out_size = size or FILM_SIZE
-    normalized = [_normalize_segment(clip, size=out_size, fps=fps) for clip in clips]
+    grades = _scene_grades(clips) if color_match else [None] * len(clips)
+    normalized = [
+        _normalize_segment(clip, size=out_size, fps=fps, grade=grade)
+        for clip, grade in zip(clips, grades, strict=True)
+    ]
     if len(normalized) == 1:
         return normalized[0]
 
@@ -425,12 +464,19 @@ class SceneStitcher:
         object_store: ObjectStore,
         url_ttl: int = 3600,
         fps: int = DEFAULT_FPS,
+        color_match: bool = False,
+        crossfade_s: float = 0.0,
     ) -> None:
         self._session = session
         self._scenes = SceneRepo(session)
         self._store = object_store
         self._ttl = url_ttl
         self._fps = fps
+        #: Opt-in shot-to-shot colour match (§9.6) — off by default (adds a probe
+        #: pass per clip); the render pipeline enables it for the offline stitch.
+        self._color_match = color_match
+        #: Optional per-seam crossfade for the cinematic event stitch (0 = hard cut).
+        self._crossfade_s = crossfade_s
 
     async def stitch_scene(self, scene_id: str) -> StitchResult:
         """Fetch accepted shots in order, concat, merge sync maps, upload, return.
@@ -459,8 +505,20 @@ class SceneStitcher:
         if not clips:
             raise ValueError(f"scene {scene_id} has no accepted shots with clips to stitch")
 
-        scene_clip = await anyio.to_thread.run_sync(lambda: concat_clips(clips, fps=self._fps))
-        sync_map = merge_sync_segments(segments, scene_id=scene_id, durations=durations)
+        scene_clip = await anyio.to_thread.run_sync(
+            lambda: concat_clips(
+                clips,
+                fps=self._fps,
+                crossfade_s=self._crossfade_s,
+                color_match=self._color_match,
+            )
+        )
+        # The merged sync timeline must account for any crossfade overlap so the
+        # karaoke/page-turn timecodes match the xfade'd clip the client plays.
+        overlap = effective_crossfade(durations, self._crossfade_s) if self._crossfade_s else 0.0
+        sync_map = merge_sync_segments(
+            segments, scene_id=scene_id, durations=durations, overlap_s=overlap
+        )
 
         clip_key = keys.clip(scene.book_id, scene_id)
         await anyio.to_thread.run_sync(self._store.put_bytes, clip_key, scene_clip, "video/mp4")

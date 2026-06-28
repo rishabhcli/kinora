@@ -39,6 +39,25 @@ _DEFAULT_PAGE_TURN_LEAD_S = 0.2
 # --------------------------------------------------------------------------- #
 
 
+class SyncPhoneme(BaseModel):
+    """One sub-word timing chunk inside a narrated word (§9.4 richer sync).
+
+    Phonemes let the karaoke highlight animate *within* a long word and give future
+    viseme / mouth-shape work (Phase 10) a per-chunk anchor. Timings are absolute on
+    the same playhead as the parent :class:`SyncWord` (so they shift in lockstep when
+    a segment is merged onto a scene timeline). Produced by :func:`split_phonemes`,
+    which distributes the word's real ``[t_start, t_end]`` across grapheme chunks —
+    never inventing duration, exactly like the proportional word aligner.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: The grapheme chunk (a rough phoneme/syllable unit), e.g. ``"st"`` of "stood".
+    text: str
+    t_start: float
+    t_end: float
+
+
 class SyncWord(BaseModel):
     """One narrated word: its timing plus the page geometry to highlight it."""
 
@@ -51,6 +70,10 @@ class SyncWord(BaseModel):
     #: Normalized ``[x, y, w, h]`` page-box for the highlight layer (``None`` when
     #: the page has no box for this word).
     bbox: list[float] | None = None
+    #: Optional sub-word phoneme timings (empty by default → backwards compatible;
+    #: a client that doesn't read them is unaffected). Filled when the segment is
+    #: built with ``phoneme_timing=True``.
+    phonemes: list[SyncPhoneme] = Field(default_factory=list)
 
 
 class SyncSegment(BaseModel):
@@ -73,9 +96,15 @@ class SyncSegment(BaseModel):
 
 @runtime_checkable
 class _HasTiming(Protocol):
-    text: str
-    t_start: float
-    t_end: float
+    # Read-only members (properties) so the protocol accepts BOTH a mutable pydantic
+    # ``TtsWord`` and a frozen dataclass like :class:`TimedWord` — mutable protocol
+    # attributes are invariant and would reject a read-only (frozen) field.
+    @property
+    def text(self) -> str: ...
+    @property
+    def t_start(self) -> float: ...
+    @property
+    def t_end(self) -> float: ...
 
 
 NarratedWord = _HasTiming | Mapping[str, Any]
@@ -157,6 +186,78 @@ def normalize_token(text: str) -> str:
     return _TOKEN_STRIP.sub("", text.lower())
 
 
+_VOWELS = frozenset("aeiouy")
+
+
+def grapheme_chunks(word: str) -> list[str]:
+    """Split a word into rough phoneme/syllable chunks (deterministic, pure).
+
+    Not a true phonemiser (that needs a pronunciation dict / model); a *grapheme*
+    heuristic good enough to drive sub-word highlight + viseme anchors: each chunk is
+    a run of leading consonants followed by a run of vowels (an onset+nucleus), with a
+    trailing consonant run attached to the last chunk. Punctuation is stripped first.
+    Always returns at least one chunk for a non-empty word; an empty/punctuation-only
+    word yields ``[]``.
+
+    Examples:
+        ``"stood"`` → ``["stoo", "d"]``  (onset ``st`` + nucleus ``oo``, coda ``d``)
+        ``"meadow"`` → ``["mea", "dow"]``
+        ``"a"`` → ``["a"]``
+    """
+    core = _TOKEN_STRIP.sub("", word.lower())
+    if not core:
+        return []
+    chunks: list[str] = []
+    i = 0
+    n = len(core)
+    while i < n:
+        start = i
+        # Onset: leading consonants.
+        while i < n and core[i] not in _VOWELS:
+            i += 1
+        # Nucleus: the vowel run.
+        while i < n and core[i] in _VOWELS:
+            i += 1
+        # If we consumed only consonants (no vowel followed, e.g. trailing "d"),
+        # attach them to the previous chunk rather than emitting a vowel-less chunk.
+        chunk = core[start:i]
+        if not any(c in _VOWELS for c in chunk) and chunks:
+            chunks[-1] += chunk
+        else:
+            chunks.append(chunk)
+    return chunks or [core]
+
+
+def split_phonemes(text: str, t_start: float, t_end: float) -> list[SyncPhoneme]:
+    """Distribute a word's ``[t_start, t_end]`` across its grapheme chunks (pure).
+
+    Anchored to the real word timing — the chunks' spans always sum back to the
+    word's duration, weighted by chunk length (longer chunks get proportionally more
+    time), so a long word's highlight sweeps smoothly. Returns ``[]`` for a
+    zero/negative duration or a chunk-less (punctuation-only) word.
+    """
+    if t_end <= t_start:
+        return []
+    chunks = grapheme_chunks(text)
+    if not chunks:
+        return []
+    weights = [len(c) for c in chunks]
+    total = sum(weights) or len(chunks)
+    span = t_end - t_start
+    phonemes: list[SyncPhoneme] = []
+    cursor = t_start
+    for idx, (chunk, weight) in enumerate(zip(chunks, weights, strict=True)):
+        portion = span * (weight / total)
+        start = cursor
+        # Snap the final chunk's end exactly to t_end (no float drift past the word).
+        end = t_end if idx == len(chunks) - 1 else min(t_end, start + portion)
+        phonemes.append(
+            SyncPhoneme(text=chunk, t_start=round(start, 3), t_end=round(end, 3))
+        )
+        cursor = end
+    return phonemes
+
+
 @dataclass(frozen=True, slots=True)
 class WordAlignment:
     """The chosen narrated→source mapping and how it was derived.
@@ -212,6 +313,52 @@ def page_turn_at(
 
 
 # --------------------------------------------------------------------------- #
+# Narration ↔ clip retiming
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class TimedWord:
+    """A minimal retimed word (the shape ``build_sync_segment`` accepts as input)."""
+
+    text: str
+    t_start: float
+    t_end: float
+
+
+def rescale_word_timings(
+    word_timestamps: Sequence[NarratedWord],
+    *,
+    target_duration_s: float,
+) -> list[TimedWord]:
+    """Linearly rescale narrated word timings to fit a target clip duration (pure).
+
+    The TTS narration rarely lands at exactly the rendered clip's length; if the
+    karaoke timings ran on the *narration* clock they would drift against the video.
+    This rescales every word time by ``target / narration_span`` so the last word
+    ends exactly at ``target_duration_s`` and the highlight stays locked to the
+    clip (§9.4). A zero/empty narration span returns the words unchanged (nothing to
+    anchor to). The relative spacing of words is preserved — only the global tempo
+    is stretched/compressed.
+    """
+    words = [_narrated_tuple(w) for w in word_timestamps]
+    if not words or target_duration_s <= 0:
+        return [TimedWord(t, a, b) for t, a, b in words]
+    narration_span = max(t_end for _, _, t_end in words)
+    if narration_span <= 0:
+        return [TimedWord(t, a, b) for t, a, b in words]
+    factor = target_duration_s / narration_span
+    return [
+        TimedWord(
+            text=text,
+            t_start=round(t0 * factor, 3),
+            t_end=round(min(target_duration_s, t1 * factor), 3),
+        )
+        for text, t0, t1 in words
+    ]
+
+
+# --------------------------------------------------------------------------- #
 # The builder
 # --------------------------------------------------------------------------- #
 
@@ -251,6 +398,7 @@ def build_sync_segment(
     video_start_s: float = 0.0,
     duration_s: float | None = None,
     page_turn_lead_s: float = _DEFAULT_PAGE_TURN_LEAD_S,
+    phoneme_timing: bool = False,
 ) -> SyncSegment:
     """Assemble the §9.4 :class:`SyncSegment` for one shot (pure).
 
@@ -264,6 +412,10 @@ def build_sync_segment(
         duration_s: the clip duration; when ``None`` it is taken from the last
             narrated word's ``t_end``.
         page_turn_lead_s: how far before the end to flip the page.
+        phoneme_timing: when ``True``, each word is split into grapheme/phoneme
+            sub-chunks (:func:`split_phonemes`) so the karaoke highlight can animate
+            within a long word and viseme work has anchors. Off by default (the
+            field stays empty → backwards compatible).
     """
     narrated = [_narrated_tuple(w) for w in word_timestamps]
     duration = _resolve_duration(duration_s, narrated)
@@ -289,13 +441,19 @@ def build_sync_segment(
             word_index = span_start + i
             painted = text
             bbox = None
+        word_start = round(min(video_end_s, video_start_s + t0), 3)
+        word_end = round(min(video_end_s, video_start_s + t1), 3)
+        phonemes = (
+            split_phonemes(painted, word_start, word_end) if phoneme_timing else []
+        )
         words.append(
             SyncWord(
                 word_index=word_index,
                 text=painted,
-                t_start=round(min(video_end_s, video_start_s + t0), 3),
-                t_end=round(min(video_end_s, video_start_s + t1), 3),
+                t_start=word_start,
+                t_end=word_end,
                 bbox=bbox,
+                phonemes=phonemes,
             )
         )
 
@@ -312,12 +470,17 @@ def build_sync_segment(
 __all__ = [
     "NarratedWord",
     "SourceWord",
+    "SyncPhoneme",
     "SyncSegment",
     "SyncWord",
+    "TimedWord",
     "WordAlignment",
     "align_words",
     "build_sync_segment",
+    "grapheme_chunks",
     "normalize_token",
     "page_turn_at",
+    "rescale_word_timings",
     "source_words_in_span",
+    "split_phonemes",
 ]
