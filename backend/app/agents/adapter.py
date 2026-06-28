@@ -7,9 +7,17 @@ declares as a seam: :meth:`plan_scene` reads a scene's beats and returns the
 render-queue shot specs.
 
 ``analyze_page`` is the only LLM call here (page → beats, with the §10 "never
-invent a character" guardrail). ``plan_shots`` is deterministic, so the
-beat→shot decomposition is unit-testable without a network; ``plan_scene`` wraps
-it over the persisted beats (read via ``BeatRepo``).
+invent a character" guardrail). Every beat is then run through the deep
+literary-comprehension engine (:mod:`app.agents.comprehension`) — a set of PURE,
+network-free passes that add multi-POV / unreliable-narrator tagging,
+free-indirect-discourse + interiority detection, dialogue attribution + speaker
+diarization, literary-device → visual-intent translation, pacing-aware tempo, and
+(across a sequence) non-linear timeline reconstruction (narrative-time vs
+story-time). ``plan_shots`` is deterministic AND pacing-aware: shot density and
+per-shot duration vary with each beat's tempo, so a dramatised scene gets denser
+coverage than a summarised span — and the whole beat→shot decomposition is still
+unit-testable without a network. ``plan_scene`` wraps it over the persisted beats
+(read via ``BeatRepo``).
 """
 
 from __future__ import annotations
@@ -19,6 +27,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -29,6 +38,15 @@ from app.memory.interfaces import ShotSpec as RenderShotSpec
 from app.providers import Providers
 
 from .base import BaseAgent
+from .comprehension import (
+    BeatComprehension,
+    analyze_beat,
+    build_shot_intent,
+    duration_bias,
+    enrich_sequence,
+    merge_comprehension,
+    words_per_shot_for,
+)
 from .contracts import (
     AnalyzePageRequest,
     AnalyzePageResponse,
@@ -37,7 +55,7 @@ from .contracts import (
     ShotListItem,
     SourceSpan,
 )
-from .prompts import ADAPTER
+from .prompts import ADAPTER, ADAPTER_COMPREHEND
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 BeatsLoader = Callable[[str], Awaitable[Sequence[Any]]]
@@ -97,13 +115,20 @@ class Adapter(BaseAgent):
         detected_illustrations: list[str] | None = None,
         known_entities: set[str] | None = None,
         max_tokens: int | None = None,
+        comprehend: bool = True,
     ) -> list[Beat]:
-        """Segment a page into beats; assign canonical ids and resolve entities.
+        """Segment a page into beats; assign ids, resolve entities, comprehend.
 
         When ``known_entities`` is given, any entity the model named that is not
         in the canon is moved to ``unresolved_entities`` — a deterministic
         enforcement of the §10 "never invent a character" guardrail. ``max_tokens``
         bounds the (potentially large) multi-beat JSON generation.
+
+        Unless ``comprehend`` is False, each beat is then enriched in place by the
+        deep literary-comprehension engine (POV/discourse/dialogue/devices/tempo).
+        Per-beat comprehension is order-free, so it is safe to run page-by-page;
+        the cross-beat *story-time* reconstruction is a separate pass over the
+        whole book (:meth:`comprehend_sequence`) the ingest phase calls once.
         """
         request = AnalyzePageRequest(
             page=page,
@@ -120,19 +145,81 @@ class Adapter(BaseAgent):
             index = beat_index_start + offset
             entities, unresolved = self._resolve_entities(raw, known_entities)
             span = raw.source_span.model_copy(update={"page": raw.source_span.page or page})
-            beats.append(
-                raw.model_copy(
-                    update={
-                        "beat_id": f"beat_{index:04d}",
-                        "beat_index": index,
-                        "scene_id": raw.scene_id or scene_id,
-                        "entities": entities,
-                        "unresolved_entities": unresolved,
-                        "source_span": span,
-                    }
-                )
+            beat = raw.model_copy(
+                update={
+                    "beat_id": f"beat_{index:04d}",
+                    "beat_index": index,
+                    "scene_id": raw.scene_id or scene_id,
+                    "entities": entities,
+                    "unresolved_entities": unresolved,
+                    "source_span": span,
+                }
             )
+            if comprehend:
+                beat = analyze_beat(beat, canon_names=known_entities)
+            beats.append(beat)
         return beats
+
+    def comprehend_sequence(
+        self,
+        beats: Sequence[Beat],
+        *,
+        known_entities: set[str] | None = None,
+    ) -> list[Beat]:
+        """Deeply comprehend a whole book's beat sequence (pure, no network).
+
+        Runs the per-beat passes *and* the book-level non-linear timeline
+        reconstruction so each beat carries a ``story_time`` (narrative-order vs
+        story-order, flashback/flash-forward position). Called once by the ingest
+        phase after all pages are segmented — flashbacks span pages, so story-time
+        can only be resolved across the full ordered sequence. Re-running it on
+        already-comprehended beats is idempotent for the per-beat fields and only
+        refines ``story_time`` with the full neighbour context.
+        """
+        return enrich_sequence(beats, canon_names=known_entities)
+
+    async def enrich_beat_llm(
+        self,
+        beat: Beat,
+        *,
+        known_entities: set[str] | None = None,
+        max_tokens: int | None = 600,
+    ) -> Beat:
+        """Refine ONE beat's comprehension with a bounded LLM pass over the floor.
+
+        The deterministic heuristic runs first (the floor); the model is then
+        shown the beat text + the heuristic verdict and asked to correct it only
+        where the text plainly disagrees. The reply is merged CONSERVATIVELY and
+        canon-guarded (:func:`merge_comprehension`) — a refined POV character or
+        dialogue speaker absent from ``known_entities`` is dropped (§10 no-invent).
+        On any model/validation failure the heuristic beat is returned unchanged,
+        so the LLM pass can only improve, never regress.
+        """
+        floor = analyze_beat(beat, canon_names=known_entities)
+        payload = {
+            "text": f"{floor.summary} {floor.described_visuals or ''}".strip(),
+            "known_entities": sorted(known_entities) if known_entities else [],
+            "heuristic": {
+                "pov": floor.pov.value,
+                "pov_character": floor.pov_character,
+                "unreliable": floor.unreliable,
+                "discourse": floor.discourse.value,
+                "tempo": floor.tempo.value,
+                "dialogue": [d.model_dump() for d in floor.dialogue],
+                "devices": [d.model_dump() for d in floor.devices],
+            },
+        }
+        try:
+            refined = await self.run_json(
+                payload,
+                BeatComprehension,
+                temperature=0.1,
+                max_tokens=max_tokens,
+                system=ADAPTER_COMPREHEND.system,
+            )
+        except (ValidationError, ValueError):
+            return floor
+        return merge_comprehension(floor, refined, known_entities=known_entities)
 
     @staticmethod
     def _resolve_entities(
@@ -150,18 +237,31 @@ class Adapter(BaseAgent):
     # -- beats → shots (deterministic, §4.2) --------------------------------- #
 
     def plan_shots(self, beats: Sequence[Beat]) -> list[ShotListItem]:
-        """Split each beat into shots; the planner sets each shot's own duration.
+        """Split each beat into shots; pacing-aware density + per-shot duration.
 
-        ``target_duration_s`` is decided per-shot from that shot's narration
-        length (§4.3 reading pace) rather than a fixed constant, then clamped to
+        The split is PURE and deterministic but pacing-aware (§4.2): a beat's
+        :class:`SceneTempo` sets how many narration words one shot covers
+        (``words_per_shot_for`` — a dramatised SCENE keeps the baseline density,
+        a SUMMARY/ELLIPSIS packs a long span into a single clip) and biases each
+        shot's screen-time (``duration_bias`` — a held PAUSE lingers). A neutral
+        ``SceneTempo.SCENE`` beat reproduces the legacy behaviour exactly.
+
+        ``target_duration_s`` is decided per-shot from that shot's own narration
+        length (§4.3 reading pace) times the tempo bias, then clamped to
         ``[MIN_SHOT_SECONDS, MAX_SHOT_SECONDS]``. ``est_cost.video_seconds`` —
         the scarce, hard-capped budget unit — matches the shot's own duration.
         """
         items: list[ShotListItem] = []
         for beat in beats:
-            for shot_index, span in enumerate(self._split_span(beat.source_span)):
-                words = max(span.word_range[1] - span.word_range[0], 0) or WORDS_PER_SHOT
-                duration = self._duration_for_words(words)
+            tempo = beat.tempo
+            per_shot = words_per_shot_for(tempo, WORDS_PER_SHOT)
+            bias = duration_bias(tempo)
+            # The beat's comprehension-derived staging brief is shared by all of
+            # its shots (one beat → one continuous moment, just split for length).
+            intent = build_shot_intent(beat)
+            for shot_index, span in enumerate(self._split_span(beat.source_span, per_shot)):
+                words = max(span.word_range[1] - span.word_range[0], 0) or per_shot
+                duration = self._duration_for_words(words, bias)
                 items.append(
                     ShotListItem(
                         shot_id=f"{beat.beat_id or 'beat'}_shot_{shot_index:02d}",
@@ -173,26 +273,29 @@ class Adapter(BaseAgent):
                             video_seconds=duration,
                             tokens=BASE_SHOT_TOKENS + words * TOKENS_PER_WORD,
                         ),
+                        intent=intent,
                     )
                 )
         return items
 
     @staticmethod
-    def _duration_for_words(words: int) -> float:
-        """Per-shot target seconds: words / reading-pace, clamped to sane bounds.
+    def _duration_for_words(words: int, bias: float = 1.0) -> float:
+        """Per-shot target seconds: words / reading-pace × tempo bias, clamped.
 
         Deterministic (no LLM): a denser shot earns more screen-time, a sparse
-        one less, but never outside ``[MIN_SHOT_SECONDS, MAX_SHOT_SECONDS]``.
+        one less; the ``bias`` lets a held PAUSE linger and a SCENE stay brisk.
+        Never outside ``[MIN_SHOT_SECONDS, MAX_SHOT_SECONDS]``.
         """
-        seconds = max(words, 0) / SCREEN_WORDS_PER_SECOND
+        seconds = (max(words, 0) / SCREEN_WORDS_PER_SECOND) * bias
         clamped = min(max(seconds, MIN_SHOT_SECONDS), MAX_SHOT_SECONDS)
         return round(clamped, 1)
 
     @staticmethod
-    def _split_span(span: SourceSpan) -> list[SourceSpan]:
+    def _split_span(span: SourceSpan, words_per_shot: int = WORDS_PER_SHOT) -> list[SourceSpan]:
         start, end = span.word_range
         words = max(end - start, 0)
-        count = max(1, math.ceil(words / WORDS_PER_SHOT)) if words else 1
+        per = max(1, words_per_shot)
+        count = max(1, math.ceil(words / per)) if words else 1
         if count == 1:
             return [span]
         step = words / count

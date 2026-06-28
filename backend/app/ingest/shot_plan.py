@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents.adapter import Adapter
+from app.agents.comprehension import ComprehensionReport, summarize_comprehension
 from app.agents.contracts import Beat, SourceSpan
 from app.core.logging import get_logger
 from app.db.models.enums import ShotStatus
@@ -314,6 +315,8 @@ class ShotPlanResult(BaseModel):
     beat_ranges: dict[str, tuple[int, int]] = Field(default_factory=dict)
     #: shot_id -> (global_start, global_end_exclusive)
     shot_ranges: dict[str, tuple[int, int]] = Field(default_factory=dict)
+    #: Book-level deep-comprehension telemetry (POV/timeline/tempo/dialogue).
+    comprehension: ComprehensionReport = Field(default_factory=ComprehensionReport)
 
 
 @dataclass(frozen=True)
@@ -415,6 +418,15 @@ async def plan_and_persist(
         span = beat.source_span.model_copy(update={"word_range": (start, end)})
         reconciled.append(beat.model_copy(update={"source_span": span}))
 
+    # --- Book-level deep comprehension (non-linear timeline, §4.2) ----------- #
+    # ``analyze_page`` already ran the per-beat literary passes; the cross-beat
+    # *story-time* reconstruction (flashbacks/flash-forwards span pages) can only
+    # resolve over the full ordered sequence, so it runs once here. This also
+    # firms up each beat's pacing ``tempo``, which the pacing-aware ``plan_shots``
+    # below reads to vary shot density by scene rhythm. Pure + network-free.
+    known_entities = {e.name for e in canon.entities} | set(canon.alias_index)
+    reconciled = adapter.comprehend_sequence(reconciled, known_entities=known_entities)
+
     # --- Persist beats with resolved canon entity_keys ----------------------- #
     for beat in reconciled:
         await repos.beats.create(
@@ -460,6 +472,7 @@ async def plan_and_persist(
 
     num_spans = await repos.spans.bulk_insert(span_rows) if span_rows else 0
 
+    comprehension = summarize_comprehension(reconciled)
     result = ShotPlanResult(
         book_id=book_id,
         scene_ids=[scope_id(book_id, g.scene_id) for g in groups],
@@ -468,6 +481,7 @@ async def plan_and_persist(
         num_spans=num_spans,
         beat_ranges=beat_ranges,
         shot_ranges=shot_ranges,
+        comprehension=comprehension,
     )
     logger.info(
         "ingest.shot_plan.done",
@@ -476,6 +490,9 @@ async def plan_and_persist(
         beats=result.num_beats,
         shots=result.num_shots,
         spans=result.num_spans,
+        multi_pov=comprehension.multi_pov,
+        nonlinear=not comprehension.linear,
+        flashbacks=comprehension.flashback_beats,
     )
     return result
 
@@ -487,6 +504,7 @@ def _span_dict(span: SourceSpan) -> dict[str, object]:
 
 __all__ = [
     "BeatSpanInput",
+    "ComprehensionReport",
     "PageWords",
     "SceneGroup",
     "ShotPlanResult",
