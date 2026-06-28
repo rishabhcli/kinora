@@ -39,6 +39,12 @@ dependencies = [
     "mcp>=1.2",
 ]
 
+# Console scripts. ``kinora-admin`` is the operations CLI (see app/cli/): book,
+# budget, queue, canon, user, render-job, and maintenance ops over the wired
+# composition Container. ``python -m app.cli`` is the equivalent module form.
+[project.scripts]
+kinora-admin = "app.cli.main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.2",
