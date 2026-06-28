@@ -137,6 +137,22 @@ class Settings(BaseSettings):
     ingest_recovery_interval_s: float = 30.0
     ingest_recovery_limit: int = 25
 
+    # --- Search & indexing service (app/search) ---
+    # The server-side corpus search engine (kinora.md §8 — search complements the
+    # canon). ``search_backend`` selects the pluggable index: ``postgres`` (FTS +
+    # pgvector hybrid over ``search_documents``) or ``memory`` (the in-memory
+    # engine, for zero-infra / offline). ``search_alias`` is the stable alias a
+    # bulk reindex atomically swaps; ``search_default_version`` is used before an
+    # alias has been set. Hybrid fusion + arm weights are RRF defaults.
+    search_backend: str = "postgres"
+    search_alias: str = "kinora_current"
+    search_default_version: str = "v1"
+    search_rrf_k: int = 60
+    search_lexical_weight: float = 1.0
+    search_semantic_weight: float = 1.0
+    search_default_limit: int = 20
+    search_max_limit: int = 100
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"

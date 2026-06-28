@@ -12,6 +12,7 @@ from app.api.routes import (
     metrics,
     optim,
     prefs,
+    search,
     sessions,
 )
 
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    search.router,  # server-side search engine: /search, /search/suggest, /search/reindex
 ]
 
 __all__ = ["ROUTERS"]

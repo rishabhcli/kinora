@@ -62,6 +62,12 @@ if TYPE_CHECKING:
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
     from app.providers import Providers
     from app.scheduler.keyframe import KeyframeService
+    from app.search.alias import AliasRegistry
+    from app.search.index import SearchIndex as SearchIndexProto
+    from app.search.pipeline import IndexingPipeline
+    from app.search.service import SearchService
+else:
+    SearchIndexProto = object
 
 logger = get_logger("app.composition")
 
@@ -226,6 +232,9 @@ class Container:
     comment_classifier: CommentClassifier | None = None
     regen_runner: RegenRunner | None = None
     ingest_runner: IngestRunner | None = None
+    # The server-side search index (app/search). None => lazily built per
+    # ``settings.search_backend`` (postgres FTS+pgvector hybrid, or in-memory).
+    search_index: SearchIndexProto | None = None
 
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
@@ -308,6 +317,72 @@ class Container:
                 settings=self.settings,
             )
         return self._keyframe_service
+
+    # -- server-side search engine (app/search, kinora.md §8) ---------------- #
+
+    def build_search_index(self) -> SearchIndexProto:
+        """The pluggable search index per ``settings.search_backend``.
+
+        ``postgres`` => :class:`PostgresIndex` (FTS + pgvector hybrid over
+        ``search_documents``) bound to this container's unit of work; ``memory``
+        => the in-memory engine. Cached on ``search_index`` (also the test seam).
+        """
+        if self.search_index is None:
+            if self.settings.search_backend.lower() == "memory":
+                from app.search.memory_backend import InMemoryIndex
+
+                self.search_index = InMemoryIndex()
+            else:
+                from app.search.postgres_backend import PostgresIndex
+
+                self.search_index = PostgresIndex(
+                    self.session_factory,
+                    index_version=self.settings.search_default_version,
+                )
+        return self.search_index
+
+    def search_alias_registry(self) -> AliasRegistry:
+        """The alias→version registry for the versioned-index swap (reindex)."""
+        if self.settings.search_backend.lower() == "memory":
+            from app.search.alias import InMemoryAliasRegistry
+
+            return InMemoryAliasRegistry(
+                {self.settings.search_alias: self.settings.search_default_version}
+            )
+        from app.search.alias import PostgresAliasRegistry
+
+        return PostgresAliasRegistry(self.session_factory)
+
+    def build_search_pipeline(self) -> IndexingPipeline:
+        """The indexing pipeline (project canon/library rows → the index)."""
+        from app.search.pipeline import IndexingPipeline
+
+        return IndexingPipeline(session_factory=self.session_factory, embedder=self._embedder())
+
+    def build_search_service(self) -> SearchService:
+        """The orchestration service (parse → embed → search → suggest)."""
+        from app.search.service import SearchService
+
+        return SearchService(self.build_search_index(), embedder=self._embedder())
+
+    async def resolve_search_index(self) -> SearchIndexProto:
+        """Resolve the live search index version from the alias (Postgres backend).
+
+        For the Postgres backend this points the index at whatever version the
+        alias currently names (so reads follow a reindex swap); for the in-memory
+        backend it returns the single in-process index unchanged.
+        """
+        index = self.build_search_index()
+        if self.settings.search_backend.lower() == "memory":
+            return index
+        from app.search.postgres_backend import PostgresIndex
+
+        if isinstance(index, PostgresIndex):
+            version = await self.search_alias_registry().resolve(self.settings.search_alias)
+            if version and version != index.index_version:
+                self.search_index = index.for_version(version)
+                return self.search_index
+        return index
 
     # -- per-request scheduler stack (bound to a request DB session) --------- #
 

@@ -32,6 +32,7 @@ from app.db.models.enums import (
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
+from app.db.models.search import SearchDocumentRow, SearchIndexAlias
 from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
@@ -58,6 +59,8 @@ __all__ = [
     "RenderJobStatus",
     "RenderPriority",
     "Scene",
+    "SearchDocumentRow",
+    "SearchIndexAlias",
     "Session",
     "SessionMode",
     "Shot",
