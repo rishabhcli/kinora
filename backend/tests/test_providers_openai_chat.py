@@ -11,6 +11,7 @@ import pytest
 
 from app.core.config import Settings
 from app.providers import create_providers
+from app.providers.base import ProviderClient
 from app.providers.chat import ChatProvider, OpenAIChatProvider
 from tests.test_providers_base import make_client
 
@@ -42,7 +43,7 @@ class _Capture:
         return httpx.Response(200, json=self.body)
 
 
-def _openai_client(handler: _Capture):
+def _openai_client(handler: _Capture) -> ProviderClient:
     return make_client(
         handler,
         base_url_override="https://api.openai.com/v1",
