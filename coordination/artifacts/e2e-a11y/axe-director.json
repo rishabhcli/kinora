@@ -1,0 +1,10 @@
+{
+  "url": "http://localhost:5173/e2e/harness/director.html",
+  "screen": "director",
+  "scannedAt": "2026-06-28T12:40:37.516Z",
+  "counts": {
+    "total": 0,
+    "serious": 0
+  },
+  "violations": []
+}

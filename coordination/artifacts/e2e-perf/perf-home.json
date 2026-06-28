@@ -1,0 +1,19 @@
+{
+  "name": "home",
+  "capturedAt": "2026-06-28T12:40:56.425Z",
+  "budget": {
+    "fcp": 4000,
+    "lcp": 6000,
+    "totalLongTaskMs": 2500
+  },
+  "metrics": {
+    "ttfb": 47.899999998509884,
+    "fcp": 1052,
+    "lcp": 1052,
+    "dcl": 982,
+    "load": 983.3999999985099,
+    "longTasks": 1,
+    "totalLongTaskMs": 12,
+    "jsHeapBytes": 14300000
+  }
+}

@@ -17,7 +17,17 @@
     "test": "vitest run && node src/test/run-node-tests.mjs",
     "test:watch": "vitest",
     "test:a11y": "playwright test",
-    "test:reading": "node src/test/run-node-tests.mjs"
+    "test:reading": "node src/test/run-node-tests.mjs",
+    "e2e": "playwright test -c e2e/playwright.e2e.config.ts",
+    "e2e:ui": "playwright test -c e2e/playwright.e2e.config.ts --ui",
+    "e2e:headed": "playwright test -c e2e/playwright.e2e.config.ts --headed",
+    "e2e:smoke": "playwright test -c e2e/playwright.e2e.config.ts --grep @smoke",
+    "e2e:visual": "playwright test -c e2e/playwright.e2e.config.ts e2e/specs/visual.spec.ts",
+    "e2e:update-snapshots": "playwright test -c e2e/playwright.e2e.config.ts --update-snapshots",
+    "e2e:live": "KINORA_E2E_MOCK=0 KINORA_E2E_LIVE=1 playwright test -c e2e/playwright.e2e.config.ts",
+    "e2e:typecheck": "tsc -p e2e/tsconfig.json --noEmit",
+    "e2e:report": "playwright show-report test-results/e2e-report",
+    "e2e:install-browsers": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "framer-motion": "^12.41.0",

@@ -1,0 +1,10 @@
+{
+  "url": "http://localhost:5173/",
+  "screen": "reading-room",
+  "scannedAt": "2026-06-28T12:40:41.983Z",
+  "counts": {
+    "total": 0,
+    "serious": 0
+  },
+  "violations": []
+}
