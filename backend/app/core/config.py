@@ -137,6 +137,32 @@ class Settings(BaseSettings):
     ingest_recovery_interval_s: float = 30.0
     ingest_recovery_limit: int = 25
 
+    # --- Ingest pipeline (Phase A) [Agent: ingest-domain, additive] ---
+    #: OCR fallback for scanned/image-only pages (§9.1). Off by default — it spends
+    #: VL tokens, so a born-digital book never pays for it; flips on for scanned
+    #: catalogues. The scanned-page heuristic still gates per-page even when on.
+    ingest_ocr_enabled: bool = False
+    #: Page word-count floor below which a page is OCR-candidate (image-only).
+    ingest_ocr_word_floor: int = 12
+    #: Max tokens for one OCR page transcription.
+    ingest_ocr_max_tokens: int = 2048
+    #: Multi-column / reading-order re-threading of extracted words (§9.1). On by
+    #: default — it is a pure, cheap transform and a no-op for single-column pages.
+    ingest_layout_reorder: bool = True
+    #: Durable checkpointed milestones so a crashed ingest resumes instead of
+    #: recomputing completed stages. On by default; degrades gracefully if the
+    #: checkpoint table is absent (treated as "no checkpoint").
+    ingest_checkpoints_enabled: bool = True
+    #: Token-bucket rate limit for the per-page VL analyse calls (requests/sec).
+    #: 0 disables the limiter (pure semaphore concurrency only).
+    ingest_analyze_rate_per_s: float = 0.0
+    #: Burst size for the analyse token bucket (max calls that can fire at once).
+    ingest_analyze_rate_burst: int = 8
+    #: Per-page analyse retry attempts on a transient (e.g. 429) provider error.
+    ingest_analyze_max_attempts: int = 3
+    #: Base backoff (seconds) for the analyse retry; grows exponentially + jitter.
+    ingest_analyze_backoff_base_s: float = 1.0
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"

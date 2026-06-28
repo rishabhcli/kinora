@@ -29,6 +29,7 @@ from app.db.models.enums import (
     SessionMode,
     ShotStatus,
 )
+from app.db.models.ingest_checkpoint import IngestCheckpoint, IngestMilestone
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -52,6 +53,8 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "IngestCheckpoint",
+    "IngestMilestone",
     "Page",
     "Pref",
     "RenderJob",

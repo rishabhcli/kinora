@@ -32,6 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.logging import get_logger
 from app.ingest.pdf_extract import PageExtract
+from app.ingest.ratelimit import TokenBucket, retrying
 from app.memory.interfaces import BlobStore
 from app.providers import Providers
 
@@ -127,14 +128,34 @@ async def _analyze_one(
     semaphore: asyncio.Semaphore,
     max_tokens: int,
     model: str | None,
+    bucket: TokenBucket,
+    max_attempts: int,
+    backoff_base_s: float,
 ) -> PageAnalysis:
-    """Analyse a single page; never raises — a bad page yields an empty analysis."""
+    """Analyse a single page; never raises — a bad page yields an empty analysis.
+
+    Two layers of robustness sit over the VL call (§9.1 step 2):
+
+    * the shared :class:`TokenBucket` smooths the *rate* of calls on top of the
+      ``semaphore`` concurrency cap, so a large fan-out respects the hosted
+      endpoint's QPS instead of bursting into a ``429 Throttling.RateQuota``;
+    * :func:`retrying` retries the call on a transient error (429 / timeout /
+      5xx) with bounded exponential backoff, so a momentary quota blip does not
+      lose the page (and ultimately corrupt the canon for that span).
+    """
     async with semaphore:
         try:
             image = await anyio.to_thread.run_sync(blob_store.get_bytes, page.image_key)
             prompt = f"{_ANALYZE_PROMPT}\n\nPAGE {page.page_number} TEXT:\n{page.text}"
-            raw = await providers.vl.analyze_json(
-                [image], prompt, max_tokens=max_tokens, model=model
+
+            async def _call() -> object:
+                await bucket.acquire()
+                return await providers.vl.analyze_json(
+                    [image], prompt, max_tokens=max_tokens, model=model
+                )
+
+            raw = await retrying(
+                _call, max_attempts=max_attempts, base_delay_s=backoff_base_s
             )
             payload = raw if isinstance(raw, dict) else {}
             payload["page_number"] = page.page_number
@@ -159,20 +180,31 @@ async def analyze_pages(
     concurrency: int = DEFAULT_CONCURRENCY,
     max_tokens: int = DEFAULT_MAX_TOKENS,
     model: str | None = None,
+    rate_per_s: float = 0.0,
+    rate_burst: int = 8,
+    max_attempts: int = 3,
+    backoff_base_s: float = 1.0,
 ) -> list[PageAnalysis]:
-    """Analyse every page with bounded real concurrency; returns analyses in order.
+    """Analyse every page with bounded concurrency + rate control; ordered output.
 
     Args:
         pages: the extracted pages (each carries its image key + text).
         providers: the live provider bundle (uses ``providers.vl``).
         blob_store: object store the page PNGs were uploaded to.
-        concurrency: max simultaneous in-flight VL calls.
+        concurrency: max simultaneous in-flight VL calls (the parallelism cap).
         max_tokens: per-page generation cap.
         model: optional VL model override (defaults to ``settings.vl_model``).
+        rate_per_s: token-bucket rate (requests/sec) layered over concurrency; 0
+            disables the limiter (pure semaphore parallelism). Protects a large
+            back-catalogue ingest from the hosted endpoint's ``429`` throttle.
+        rate_burst: token-bucket burst (max calls that may fire at once).
+        max_attempts: per-page retry attempts on a transient provider error.
+        backoff_base_s: base backoff for the per-page retry.
     """
     if not pages:
         return []
     semaphore = asyncio.Semaphore(max(1, concurrency))
+    bucket = TokenBucket(rate_per_s, rate_burst)
     tasks = [
         _analyze_one(
             page,
@@ -181,6 +213,9 @@ async def analyze_pages(
             semaphore=semaphore,
             max_tokens=max_tokens,
             model=model,
+            bucket=bucket,
+            max_attempts=max_attempts,
+            backoff_base_s=backoff_base_s,
         )
         for page in pages
     ]
