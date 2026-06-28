@@ -8,6 +8,11 @@ it so ``create_all``/relationship resolution work.
 from __future__ import annotations
 
 from app.db.base import Base
+from app.db.models.analytics import (
+    AnalyticsDailyRollup,
+    AnalyticsEvent,
+    AnalyticsSession,
+)
 from app.db.models.beat import Beat
 from app.db.models.bitemporal import (
     AuditAction,
@@ -37,6 +42,9 @@ from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
 __all__ = [
+    "AnalyticsDailyRollup",
+    "AnalyticsEvent",
+    "AnalyticsSession",
     "AuditAction",
     "Base",
     "Beat",
