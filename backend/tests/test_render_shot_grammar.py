@@ -10,7 +10,10 @@ from __future__ import annotations
 
 from app.agents.contracts import Beat
 from app.render.shot_grammar import (
+    AxisViolation,
     ScreenDirection,
+    detect_axis_violations,
+    eyeline_consistent,
     is_motion_reversal,
     resolve_screen_directions,
     screen_direction_for_beat,
@@ -97,3 +100,48 @@ def test_violates_180_only_on_unmotivated_flip() -> None:
         violates_180(ScreenDirection.NEUTRAL, ScreenDirection.RIGHT_TO_LEFT, reversal=False)
         is False
     )
+
+
+# --------------------------------------------------------------------------- #
+# Axis tracking + eyeline consistency
+# --------------------------------------------------------------------------- #
+
+
+def test_detect_axis_violations_flags_unmotivated_flip() -> None:
+    beats = [
+        _beat("She sprints to the right across the bridge."),  # L2R
+        _beat("She edges leftward without turning."),  # flip to R2L, NOT motivated
+    ]
+    violations = detect_axis_violations(beats)
+    assert len(violations) == 1
+    v = violations[0]
+    assert isinstance(v, AxisViolation)
+    assert v.ordinal == 1
+    assert v.prev is ScreenDirection.LEFT_TO_RIGHT
+    assert v.cur is ScreenDirection.RIGHT_TO_LEFT
+
+
+def test_detect_axis_violations_clean_on_motivated_reversal() -> None:
+    beats = [
+        _beat("She sprints to the right across the bridge."),  # L2R
+        _beat("She turns to face the pursuers."),  # motivated reversal → clean
+    ]
+    assert detect_axis_violations(beats) == []
+
+
+def test_detect_axis_violations_clean_when_line_held() -> None:
+    # The bridge event holds its line (the one flip is a motivated "turns to face").
+    assert detect_axis_violations(_bridge_beats()) == []
+
+
+def test_eyeline_consistent_for_opposed_gazes() -> None:
+    # A correctly-blocked two-hander: A looks right, B looks left → they meet.
+    assert (
+        eyeline_consistent(ScreenDirection.LEFT_TO_RIGHT, ScreenDirection.RIGHT_TO_LEFT) is True
+    )
+    # Both looking the same way is a broken eyeline.
+    assert (
+        eyeline_consistent(ScreenDirection.LEFT_TO_RIGHT, ScreenDirection.LEFT_TO_RIGHT) is False
+    )
+    # A head-on (neutral) single never breaks the match.
+    assert eyeline_consistent(ScreenDirection.NEUTRAL, ScreenDirection.LEFT_TO_RIGHT) is True

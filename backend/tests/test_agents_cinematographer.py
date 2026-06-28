@@ -3,13 +3,18 @@ per branch) and shot design (verbatim ref selection, no invention). No network."
 
 from __future__ import annotations
 
+import json
+
 from app.agents.cinematographer import (
     Cinematographer,
     RenderModeInputs,
+    build_brief,
+    build_segment_brief,
     decide_render_mode,
     locked_reference_ids,
+    style_override_from_notes,
 )
-from app.agents.contracts import Beat, RenderMode, SourceSpan
+from app.agents.contracts import Beat, DirectorNote, RenderMode, SourceSpan
 from app.agents.prompts import SEGMENT
 from app.memory.interfaces import CanonEntitySlice, CanonSlice, EndpointFrame, RefImage
 from app.providers import Providers
@@ -206,3 +211,107 @@ async def test_design_segment_text_to_video_when_no_character(providers: Provide
     spec = await Cinematographer(providers).design_segment(_segment(), _segment_beats(), bare)
     assert spec.render_mode is RenderMode.TEXT_TO_VIDEO
     assert spec.reference_image_ids == []
+
+
+# --------------------------------------------------------------------------- #
+# Cinematic-language brief — the directorial eye + lens/lighting/grade
+# --------------------------------------------------------------------------- #
+
+
+def test_build_brief_picks_genre_profile_and_lens() -> None:
+    """A scene's genre selects its directorial eye; the beat's cues pick the lens."""
+    canon = _slice_with_locked_hero()
+    intimate = Beat(
+        beat_id="b", scene_id="scene_001", summary="a close look at her trembling hands"
+    )
+    brief = build_brief(intimate, canon)
+    assert "85mm" in brief.lens  # intimate cue → portrait lens
+    chase = Beat(
+        beat_id="b", scene_id="scene_001", summary="a frantic chase, they sprint to escape"
+    )
+    assert build_brief(chase, canon).profile.name == "kinetic_action"
+
+
+def test_build_brief_honours_canon_director_style_token() -> None:
+    """A canon ``director_style`` style token overrides the genre default eye."""
+    style = CanonEntitySlice(
+        entity_key="style",
+        type="style",
+        name="Style",
+        version=1,
+        style_tokens={"director_style": "anamorphic_symmetry"},
+        valid_from_beat=1,
+    )
+    canon = _slice_with_locked_hero().model_copy(update={"style": style})
+    beat = Beat(beat_id="b", scene_id="scene_001", summary="a frantic chase")
+    assert build_brief(beat, canon).profile.name == "anamorphic_symmetry"
+
+
+def test_build_segment_brief_infers_over_all_beats() -> None:
+    canon = _slice_with_locked_hero()
+    beats = [
+        Beat(beat_id="b0", scene_id="scene_001", summary="they share a tender embrace"),
+        Beat(beat_id="b1", scene_id="scene_001", summary="lovers, full of longing"),
+    ]
+    assert build_segment_brief(beats, canon).profile.name == "romantic_soft"
+
+
+async def test_design_shot_injects_cinematography_into_payload(providers: Providers) -> None:  # noqa: F811
+    """The agent hands the model a ``cinematography`` block (the directorial eye)."""
+    captured: dict[str, str] = {}
+
+    async def recording(messages, model, **kwargs):  # type: ignore[no-untyped-def]
+        captured["user"] = messages[1]["content"]
+        return {"prompt": "p", "seed": 1}
+
+    providers.chat.chat_json = recording  # type: ignore[method-assign]
+    beat = Beat(beat_id="beat_0001", scene_id="scene_001", summary="a frantic chase, they sprint")
+    await Cinematographer(providers).design_shot(beat, _slice_with_locked_hero())
+
+    payload = json.loads(captured["user"])
+    assert "cinematography" in payload
+    assert payload["cinematography"]["director_style"] == "kinetic_action"
+    assert payload["cinematography"]["genre"] == "action"
+    assert "lens" in payload["cinematography"]
+    assert "negative_floor" in payload["cinematography"]
+
+
+async def test_design_shot_negative_floor_is_always_present(providers: Providers) -> None:  # noqa: F811
+    """The deterministic negative floor is unioned into the spec; the model may add
+    to it but never drop the universal artifacts or the genre's look-breakers."""
+    fill = {"prompt": "p", "negative_prompt": "my custom artifact", "seed": 1}
+    providers.chat.chat_json = JsonSequencer(fill)  # type: ignore[method-assign]
+    beat = Beat(beat_id="beat_0001", scene_id="scene_001", summary="a tense, dangerous chase")
+    spec = await Cinematographer(providers).design_shot(beat, _slice_with_locked_hero())
+
+    assert spec.negative_prompt is not None
+    assert "extra fingers" in spec.negative_prompt  # the universal floor survived
+    assert "my custom artifact" in spec.negative_prompt  # the model's addition kept
+    assert "motion smear" in spec.negative_prompt  # the action-genre look-breaker
+
+
+def test_style_override_from_notes_picks_latest_named_look() -> None:
+    notes = [
+        DirectorNote(note="warmer please"),  # an axis ask → not a look
+        DirectorNote(note="actually, shoot it like noir"),  # names a look
+    ]
+    assert style_override_from_notes(notes) == "noir_chiaroscuro"
+    assert style_override_from_notes([DirectorNote(note="slower")]) is None
+
+
+async def test_design_shot_style_note_reshoots_through_named_eye(providers: Providers) -> None:  # noqa: F811
+    """A director note naming a look re-shoots the scene through that eye."""
+    captured: dict[str, str] = {}
+
+    async def recording(messages, model, **kwargs):  # type: ignore[no-untyped-def]
+        captured["user"] = messages[1]["content"]
+        return {"prompt": "p", "seed": 1}
+
+    providers.chat.chat_json = recording  # type: ignore[method-assign]
+    beat = Beat(beat_id="b", scene_id="s", summary="a frantic chase, they sprint")  # action genre
+    await Cinematographer(providers).design_shot(
+        beat, _slice_with_locked_hero(), [DirectorNote(note="shoot it like film noir")]
+    )
+    payload = json.loads(captured["user"])
+    # The action default (kinetic_action) is overridden by the noir style note.
+    assert payload["cinematography"]["director_style"] == "noir_chiaroscuro"

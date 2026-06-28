@@ -19,6 +19,7 @@ and the event director / continuity QA share one source of truth.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 
 from app.agents.contracts import Beat
@@ -140,8 +141,65 @@ def shot_sizes_for_event(beats: Sequence[Beat]) -> list[str]:
     return [shot_size_for(i, beat) for i, beat in enumerate(beats)]
 
 
+# --------------------------------------------------------------------------- #
+# Action-line axis tracking (the 180° rule, made stateful across an event)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class AxisViolation:
+    """One unmotivated screen-direction flip detected across an event (a 180° error).
+
+    ``ordinal`` is the index of the *later* shot in the offending pair; ``prev`` and
+    ``cur`` are the two screen directions that crossed the line without the text
+    motivating it. The continuity QA surfaces these so a repair (re-block, or insert
+    a neutral cut-away that re-establishes the line) can be routed.
+    """
+
+    ordinal: int
+    prev: ScreenDirection
+    cur: ScreenDirection
+
+
+def detect_axis_violations(beats: Sequence[Beat]) -> list[AxisViolation]:
+    """Find every unmotivated 180° flip across an event's resolved directions (pure).
+
+    Walks the resolved screen directions shot-to-shot: a flip across the action
+    line is fine when the beat *motivates* the reversal ("turns to face"), but an
+    unmotivated flip is the classic 180° continuity error. Returns one
+    :class:`AxisViolation` per offending seam (empty list = the line is held).
+    """
+    directions = resolve_screen_directions(beats)
+    violations: list[AxisViolation] = []
+    for ordinal in range(1, len(beats)):
+        prev, cur = directions[ordinal - 1], directions[ordinal]
+        if violates_180(prev, cur, reversal=is_motion_reversal(beats[ordinal])):
+            violations.append(AxisViolation(ordinal=ordinal, prev=prev, cur=cur))
+    return violations
+
+
+def eyeline_consistent(
+    a_looks: ScreenDirection,
+    b_looks: ScreenDirection,
+) -> bool:
+    """Whether a two-hander's singles read as a matched eyeline (they face each other).
+
+    In a correctly-blocked over-the-shoulder pair the two singles look *opposite*
+    ways (A frame-right, B frame-left) so their gazes meet across the cut. Two
+    singles looking the *same* way read as both characters facing off-screen in
+    the same direction — a broken eyeline. ``NEUTRAL`` gazes are inconclusive
+    (treated as consistent: a head-on single never breaks the match).
+    """
+    if ScreenDirection.NEUTRAL in (a_looks, b_looks):
+        return True
+    return opposite_directions(a_looks, b_looks)
+
+
 __all__ = [
+    "AxisViolation",
     "ScreenDirection",
+    "detect_axis_violations",
+    "eyeline_consistent",
     "is_motion_reversal",
     "opposite_directions",
     "resolve_screen_directions",
