@@ -21,6 +21,7 @@ unit-testable deterministically by injecting the numbers.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
@@ -31,6 +32,13 @@ from app.providers import Providers, cosine
 from .base import BaseAgent
 from .contracts import QARecord, RepairAction, Verdict
 from .prompts import CRITIC
+
+if TYPE_CHECKING:
+    from app.render.qa.aesthetic import AestheticReport
+    from app.render.qa.calibration import CriticCalibration
+    from app.render.qa.identity import CharacterCrops, IdentityReport
+    from app.render.qa.temporal import TemporalReport
+    from app.render.reward import RewardAdvice
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +90,7 @@ def decide_qa(
     textual_evolution_supported: bool = False,
     retries_exhausted: bool = False,
     thresholds: QAThresholds = DEFAULT_THRESHOLDS,
+    advice: RewardAdvice | None = None,
 ) -> tuple[Verdict, RepairAction, float]:
     """Score + route a clip per §9.5. Pure: returns ``(verdict, repair_action, score)``.
 
@@ -91,6 +100,20 @@ def decide_qa(
       * style drift -> reprompt_style;
       * motion artifact -> regen_new_seed;
       * retries exhausted -> degrade (the §9.5 retry cap → degradation ladder).
+
+    The optional ``advice`` is the learned-reward layer's advisory
+    (:class:`app.render.reward.RewardAdvice`). It is **advisory only** and never
+    overrides the pre-registered gate — keeping the §13 pre-registration honest:
+
+      * it can never *rescue* a clip the hard gate failed (routing is unchanged);
+      * it can never *silently block* a clip the hard gate passed — the verdict
+        stays ``PASS``/``ACCEPT``;
+      * its sole effect is that a gate-passing clip the learned model rates poorly
+        or finds out-of-distribution is surfaced for review on the ``QARecord``
+        (handled by :meth:`Critic.score`, which reads the same ``advice``).
+
+    Passing ``advice=None`` (the cold-start default) is byte-identical to the
+    pre-learned behaviour.
     """
     passed = (
         ccs >= thresholds.ccs_min
@@ -100,6 +123,7 @@ def decide_qa(
     )
     score = _composite_score(ccs, style_drift, timeline_ok, motion_artifact)
     if passed:
+        # The hard gate decides PASS; ``advice`` only informs (see Critic.score).
         return Verdict.PASS, RepairAction.ACCEPT, score
     if retries_exhausted:
         return Verdict.FAIL, RepairAction.DEGRADE, score
@@ -119,7 +143,15 @@ def decide_qa(
 
 
 class Critic(BaseAgent):
-    """Scores a clip against the canon and routes the repair (§9.5)."""
+    """Scores a clip against the canon and routes the repair (§9.5).
+
+    The base behaviour is the four pre-registered checks + :func:`decide_qa` routing.
+    An optional :class:`~app.render.qa.calibration.CriticCalibration` bundle adds the
+    learned-reward layer (§9.5/§13): calibrated thresholds (never looser than the
+    pre-registered floor), a per-clip learned reward + anomaly flag, and the richer
+    per-character / temporal / aesthetic QA axes. With no calibration injected and no
+    multi-character / frame inputs, ``score`` is byte-identical to the original.
+    """
 
     def __init__(
         self,
@@ -127,6 +159,7 @@ class Critic(BaseAgent):
         *,
         settings: Settings | None = None,
         thresholds: QAThresholds = DEFAULT_THRESHOLDS,
+        calibration: CriticCalibration | None = None,
     ) -> None:
         settings = settings or get_settings()
         super().__init__(
@@ -136,6 +169,34 @@ class Critic(BaseAgent):
             prompt=CRITIC,
         )
         self._thresholds = thresholds
+        self._calibration = calibration
+
+    @property
+    def calibration(self) -> CriticCalibration | None:
+        """The injected learned-reward bundle (``None`` ⇒ §9.5 defaults only)."""
+        return self._calibration
+
+    def with_calibration(self, calibration: CriticCalibration) -> Critic:
+        """Return a Critic using ``calibration`` (cheap — shares the providers/model).
+
+        The periodic :class:`~app.render.qa.calibration.CalibrationPass` produces a
+        fresh bundle per book; swapping it in adopts the new calibration without a
+        re-init, so the live render path can switch calibrations between shots. The
+        clone reuses the *already-resolved* model + prompt (it does NOT re-read
+        ``Settings``), so it works even when the environment has no API key.
+        """
+        clone = Critic.__new__(Critic)
+        BaseAgent.__init__(
+            clone,
+            self._providers,
+            name=self.name,
+            model=self.model,
+            prompt=self.prompt,
+            skills=self._skills,
+        )
+        clone._thresholds = self._thresholds
+        clone._calibration = calibration
+        return clone
 
     async def score(
         self,
@@ -148,32 +209,148 @@ class Critic(BaseAgent):
         scene_style_centroid: list[float] | None = None,
         textual_evolution_supported: bool = False,
         retries_exhausted: bool = False,
+        character_crops: list[CharacterCrops] | None = None,
     ) -> QARecord:
-        """Compute the four checks against the clip and return a routed QA record."""
-        ccs = await self._ccs(character_crop, locked_ref_image)
+        """Compute the checks against the clip and return a routed QA record.
+
+        Identity is the per-character vector (weakest-face gate, §9.5/§13) when
+        ``character_crops`` is supplied, else the single-crop CCS. Temporal coherence
+        (flicker/morph/limb) and aesthetic quality are measured from the clip frames
+        as extra axes. When a calibration bundle is present its calibrated thresholds
+        drive the gate (never looser than the pre-registered floor) and its learned
+        reward + anomaly flag are attached to the record as an advisory.
+        """
+        # -- identity: per-character vector or the single-crop CCS ----------- #
+        identity = await self._identities(character_crops)
+        if identity is not None:
+            ccs = identity.aggregate_ccs
+            per_character_ccs = identity.ccs_map() or None
+        else:
+            ccs = await self._ccs(character_crop, locked_ref_image)
+            per_character_ccs = None
+
         style_drift = await self._style_drift(clip_frames, scene_style_centroid)
         vision = await self._vision(clip_frames, canon_slice)
+
+        # -- multimodal temporal + aesthetic axes (deterministic, frame-based) - #
+        temporal_report = self._temporal(clip_frames)
+        aesthetic_report = self._aesthetic(clip_frames)
+        # Fuse the deterministic temporal artifact with the VL motion rating: take the
+        # worst (a defect either eye sees is a defect), so neither can hide the other.
+        motion_artifact = max(vision.motion_artifact, temporal_report.motion_artifact)
+
+        thresholds = self._effective_thresholds()
         verdict, action, score = decide_qa(
             ccs,
             style_drift,
             vision.timeline_ok,
-            vision.motion_artifact,
+            motion_artifact,
             textual_evolution_supported=textual_evolution_supported,
             retries_exhausted=retries_exhausted,
-            thresholds=self._thresholds,
+            thresholds=thresholds,
         )
+
+        advice = self._advise(
+            ccs=ccs,
+            style_drift=style_drift,
+            timeline_ok=vision.timeline_ok,
+            motion_artifact=motion_artifact,
+            aesthetic=aesthetic_report.aesthetic,
+            temporal=temporal_report.temporal,
+            verdict=verdict,
+        )
+
         return QARecord(
             shot_id=shot_id,
             ccs=round(ccs, 4),
             style_drift=round(style_drift, 4),
             timeline_ok=vision.timeline_ok,
             contradicting_state_id=vision.contradicting_state_id,
-            motion_artifact=round(vision.motion_artifact, 4),
+            motion_artifact=round(motion_artifact, 4),
             score=score,
             verdict=verdict,
             reason=vision.reason,
             repair_action=action,
+            learned_reward=advice.reward if advice is not None else None,
+            flagged_for_review=bool(advice.flagged_for_review) if advice is not None else False,
+            anomaly_score=advice.anomaly_score if advice is not None else None,
+            per_character_ccs=per_character_ccs,
+            temporal=temporal_report.temporal,
+            aesthetic=aesthetic_report.aesthetic,
         )
+
+    # -- learned-reward helpers (pure given the injected bundle) ------------- #
+
+    def _effective_thresholds(self) -> QAThresholds:
+        """The gate thresholds — calibrated (floored) when a bundle is present."""
+        if self._calibration is None or self._calibration.thresholds.pinned:
+            return self._thresholds
+        cal = self._calibration.thresholds
+        return QAThresholds(
+            ccs_min=cal.ccs_min,
+            style_drift_max=cal.style_drift_max,
+            motion_artifact_max=cal.motion_artifact_max,
+        )
+
+    def _advise(
+        self,
+        *,
+        ccs: float,
+        style_drift: float,
+        timeline_ok: bool,
+        motion_artifact: float,
+        aesthetic: float,
+        temporal: float,
+        verdict: Verdict,
+    ) -> RewardAdvice | None:
+        """The learned advisory for this clip, or ``None`` at cold start.
+
+        Only computed for a gate-*passing* clip (a failing clip is already being
+        repaired; its low reward is expected and uninformative), so the advisory's
+        ``flagged_for_review`` cleanly means "passed the gate but the learned model is
+        unhappy / surprised — surface it".
+        """
+        if self._calibration is None or verdict is not Verdict.PASS:
+            return None
+        return self._calibration.advise_clip(
+            ccs=ccs,
+            style_drift=style_drift,
+            timeline_ok=timeline_ok,
+            motion_artifact=motion_artifact,
+            aesthetic=aesthetic,
+            temporal=temporal,
+        )
+
+    async def _identities(
+        self, character_crops: list[CharacterCrops] | None
+    ) -> IdentityReport | None:
+        """Per-character CCS vector (weakest-face gate) when crops are supplied."""
+        if not character_crops:
+            return None
+        from app.render.qa.identity import verify_identities
+
+        ccs_min = self._effective_thresholds().ccs_min
+        return await verify_identities(
+            character_crops, embedder=self._providers.embeddings, ccs_min=ccs_min
+        )
+
+    def _temporal(self, clip_frames: list[bytes]) -> TemporalReport:
+        """Deterministic temporal-coherence report from the clip frames."""
+        from app.render.qa.temporal import TemporalReport, frames_to_gray, temporal_coherence
+
+        grids = frames_to_gray(clip_frames)
+        if not grids:
+            return TemporalReport()
+        return temporal_coherence(grids)
+
+    def _aesthetic(self, clip_frames: list[bytes]) -> AestheticReport:
+        """Deterministic perceptual-quality report from the clip frames."""
+        from app.render.qa.aesthetic import AestheticReport, aesthetic_score, frames_to_rgb
+
+        grids = frames_to_rgb(clip_frames)
+        if not grids:
+            return AestheticReport()
+        return aesthetic_score(grids)
 
     # -- the four checks ----------------------------------------------------- #
 

@@ -289,6 +289,15 @@ class QARecord(BaseModel):
 
     A verdict is ``pass`` iff all four checks hold: ``ccs >= 0.85``,
     ``style_drift <= 0.08``, ``timeline_ok`` true, ``motion_artifact <= 0.25``.
+
+    The fields below ``repair_action`` are an **additive** extension owned by the
+    learned-reward QA subsystem (``app/render/reward.py`` + ``app/render/qa``). They
+    are all optional with neutral defaults so every existing producer/consumer keeps
+    working: the pre-registered four-check gate still *decides* the verdict, while
+    the learned reward, per-character identity, temporal/aesthetic axes and the
+    anomaly score only *inform* (e.g. ``flagged_for_review`` surfaces a gate-passing
+    but low-reward / out-of-distribution clip to the director feed). See
+    ``DESIGN.md`` §6 for the recorded cross-domain contract change.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -303,6 +312,13 @@ class QARecord(BaseModel):
     verdict: Verdict
     reason: str = ""
     repair_action: RepairAction = RepairAction.ACCEPT
+    # -- learned-reward / multimodal QA extension (additive, §9.5/§13) -------- #
+    learned_reward: float | None = None
+    flagged_for_review: bool = False
+    anomaly_score: float | None = None
+    per_character_ccs: dict[str, float] | None = None
+    temporal: float | None = None
+    aesthetic: float | None = None
 
 
 # --------------------------------------------------------------------------- #
