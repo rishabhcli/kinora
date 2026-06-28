@@ -15,6 +15,10 @@ from app.api.routes import (
     sessions,
 )
 
+# Additive: the content-moderation & safety admin/operations surface (§9/§10).
+# The router lives under app.moderation to keep the safety domain self-contained.
+from app.moderation.routes import router as moderation_router
+
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
 ROUTERS = [
     auth.router,
@@ -27,6 +31,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    moderation_router,  # content moderation & safety (§9/§10)
 ]
 
 __all__ = ["ROUTERS"]

@@ -36,6 +36,18 @@ from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
 
+# --- Additive: content-moderation & safety subsystem (app.moderation, §9/§10) ---
+# Importing here registers the moderation tables on Base.metadata so Alembic
+# autogenerate and create_all see them. The models live under app.moderation to
+# keep the safety domain self-contained; this import is the single additive hook.
+from app.moderation.models import (
+    ModerationAuditEntry,
+    ModerationEvent,
+    ModerationTenantPolicy,
+    ReviewItem,
+    ViolationCounter,
+)
+
 __all__ = [
     "AuditAction",
     "Base",
@@ -52,11 +64,15 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "ModerationAuditEntry",
+    "ModerationEvent",
+    "ModerationTenantPolicy",
     "Page",
     "Pref",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
+    "ReviewItem",
     "Scene",
     "Session",
     "SessionMode",
@@ -65,4 +81,5 @@ __all__ = [
     "ShotStatus",
     "SourceSpanIndex",
     "User",
+    "ViolationCounter",
 ]
