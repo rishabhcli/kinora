@@ -13,10 +13,16 @@ network:
 * the Continuity Supervisor's §7.2 conflict construction — :func:`build_conflict`.
 
 The Generator is the one non-LLM member: the real Wan + CosyVoice render bridge.
+
+The Showrunner additionally owns **series-scale showrunning** (§7) — cross-book
+canon, multi-volume arc tracking, pacing curves, episode/act structure, recaps,
+motif planning, and a richer weighed arbitration. That policy lives, in the same
+pure-function spirit, in the :mod:`app.agents.series` package, re-exported here.
 """
 
 from __future__ import annotations
 
+from . import series
 from .adapter import Adapter
 from .base import BaseAgent
 from .cinematographer import Cinematographer, RenderModeInputs, decide_render_mode
@@ -43,5 +49,6 @@ __all__ = [
     "decide_arbitration",
     "decide_qa",
     "decide_render_mode",
+    "series",
     "wan_mode_for",
 ]
