@@ -59,6 +59,9 @@ from app.scheduler.service import QueueKeyframeMaintainer, SchedulerService
 from app.storage.object_store import ObjectStore
 
 if TYPE_CHECKING:
+    from app.analytics.service import AnalyticsService
+    from app.analytics.sink import SummarySink
+    from app.analytics.store import AnalyticsStore
     from app.auth.service import AuthService
     from app.finops.service import FinOpsService
     from app.flags.service import FlagService
@@ -266,6 +269,8 @@ class Container:
     # transport is built lazily; tests can inject a fake with scripted failures.
     # A real Stripe transport is NEVER wired here.
     billing_provider: object | None = None
+    analytics_store: AnalyticsStore | None = None
+    analytics_summary_sink_seam: SummarySink | None = None
 
     # -- private lazy caches ------------------------------------------------- #
     _providers: Providers | None = field(default=None, repr=False)
@@ -276,6 +281,7 @@ class Container:
     _translation_provider: TranslationProvider | None = field(default=None, repr=False)
     _billing_service: object | None = field(default=None, repr=False)
     _flag_service: FlagService | None = field(default=None, repr=False)
+    _analytics_service: AnalyticsService | None = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -984,6 +990,72 @@ class Container:
 
     async def _startup_recover_importing_books(self) -> None:
         await self.recover_importing_books(limit=self.settings.ingest_recovery_limit)
+
+    # -- product analytics (app/analytics/, additive seam) ------------------- #
+
+    def analytics_service(self) -> AnalyticsService:
+        """Build the product-analytics façade over the configured store (§13/§5).
+
+        Uses the injected :attr:`analytics_store` seam when set (tests pass an
+        in-memory store); otherwise the real Postgres-backed store over this
+        container's unit of work. Cached after first build. Distinct from the
+        ops-observability metrics and the §13 eval warehouse — this is the
+        human-usage event pipeline.
+        """
+        if self._analytics_service is None:
+            from datetime import timedelta
+
+            from app.analytics.service import AnalyticsService
+            from app.analytics.store import AnalyticsStore
+
+            store: AnalyticsStore
+            if self.analytics_store is not None:
+                store = self.analytics_store
+            else:
+                from app.analytics.store_pg import PostgresAnalyticsStore
+
+                store = PostgresAnalyticsStore(self.session_factory)
+            assert isinstance(store, AnalyticsStore)  # narrow for the runtime import
+            self._analytics_service = AnalyticsService(
+                store,
+                salt=self.settings.analytics_salt_effective,
+                session_gap=timedelta(seconds=self.settings.analytics_session_gap_s),
+                max_batch=self.settings.analytics_max_batch,
+            )
+        return self._analytics_service
+
+    def analytics_summary_sink(self) -> SummarySink:
+        """The summary sink the rollup worker persists into (Postgres or seam)."""
+        if self.analytics_summary_sink_seam is not None:
+            return self.analytics_summary_sink_seam
+        from app.analytics.sink_pg import PostgresSummarySink
+
+        return PostgresSummarySink(self.session_factory)
+
+    async def run_analytics_rollup(self) -> dict[str, int]:
+        """Re-aggregate the trailing analytics window into the summary tables.
+
+        Folds the configured look-back window into per-granularity rollups + the
+        derived-session upsert, idempotently. Driven by the analytics rollup
+        worker (and callable ad-hoc). Returns the row counts written.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        from app.analytics.timebucket import Granularity
+
+        now = datetime.now(UTC)
+        since = now - timedelta(days=self.settings.analytics_rollup_window_days)
+        result = await self.analytics_service().run_rollup_job(
+            self.analytics_summary_sink(),
+            since=since,
+            until=now,
+            granularities=(Granularity.DAY, Granularity.WEEK),
+        )
+        return {
+            "events": result.events,
+            "rollup_rows": result.rollup_rows,
+            "session_rows": result.session_rows,
+        }
 
     # -- targeted regen enqueue (Director comment / canon edit) -------------- #
 

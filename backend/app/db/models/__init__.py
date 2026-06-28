@@ -25,6 +25,11 @@ from app.billing.models import (  # noqa: E402
     BillingWebhookEvent,
 )
 from app.db.base import Base
+from app.db.models.analytics import (
+    AnalyticsDailyRollup,
+    AnalyticsEvent,
+    AnalyticsSession,
+)
 from app.db.models.auth import (
     ApiKey,
     AuthAuditLog,
@@ -137,6 +142,9 @@ from app.flags.db_models import (
 )
 
 __all__ = [
+    "AnalyticsDailyRollup",
+    "AnalyticsEvent",
+    "AnalyticsSession",
     "AppConnection",
     "ApiKey",
     "ArtifactStatus",

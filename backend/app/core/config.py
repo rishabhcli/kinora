@@ -319,6 +319,27 @@ class Settings(BaseSettings):
     #: Default seed for the chaos engine + deterministic load runs.
     chaos_default_seed: int = 1337
 
+    # --- Product analytics (app/analytics/) ---
+    # Distinct from ops-observability (Prometheus) and the §13 eval warehouse:
+    # the event pipeline that answers "how do humans use the product?".
+    analytics_enabled: bool = True
+    # Gap-based sessionization: events more than this far apart start a new
+    # reading session (seconds). 30 minutes is the web-analytics standard.
+    analytics_session_gap_s: float = 1800.0
+    # Hard cap on events accepted in a single ingest batch.
+    analytics_max_batch: int = 500
+    # Days of raw events to retain before a (future) prune job drops them.
+    analytics_retention_days: int = 365
+    # Salt for the deterministic identifier pseudonymisation (HMAC). Defaults to
+    # the JWT secret so a fresh deployment still anonymises; override to rotate
+    # anon ids independently of auth.
+    analytics_salt: str | None = None
+    # Rollup worker cadence (seconds) and the look-back window it re-aggregates
+    # each tick (re-aggregating a trailing window keeps late-arriving events
+    # correct; idempotent upserts make the overlap harmless).
+    analytics_rollup_interval_s: float = 300.0
+    analytics_rollup_window_days: int = 2
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"
@@ -503,6 +524,11 @@ class Settings(BaseSettings):
         if allow:
             return email.strip().lower() in allow
         return self.is_local
+
+    @property
+    def analytics_salt_effective(self) -> str:
+        """The salt to feed the analytics scrubber (falls back to the JWT secret)."""
+        return self.analytics_salt or self.jwt_secret
 
     @model_validator(mode="after")
     def _guard_production_secrets(self) -> Settings:
