@@ -11,6 +11,7 @@ from app.api.routes import (
     library,
     metrics,
     optim,
+    portability,
     prefs,
     sessions,
 )
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    portability.router,  # data export/import & portability (book/canon/account/backup)
 ]
 
 __all__ = ["ROUTERS"]
