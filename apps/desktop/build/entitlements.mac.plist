@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the notarized macOS build.
+
+  Electron + the V8 JIT need the JIT / unsigned-executable-memory entitlements.
+  Network client is required to reach the cloud FastAPI backend. The
+  user-selected file entitlement backs the native "Add Book" picker. We do NOT
+  request camera/mic/location — the reading room never needs them, so omitting
+  them keeps the privacy prompts (and attack surface) minimal.
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+  </dict>
+</plist>
