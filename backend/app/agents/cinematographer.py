@@ -23,6 +23,17 @@ from app.memory.prefs_signals import (
     prompt_hints,
 )
 from app.providers import Providers
+from app.render.cinematic_language import (
+    StyleProfile,
+    color_grade_for,
+    infer_genre,
+    infer_style_override,
+    lens_for,
+    lighting_for,
+    negative_prompt_for,
+    select_style_profile,
+    style_prompt_fragment,
+)
 
 from .base import BaseAgent
 from .contracts import (
@@ -109,6 +120,105 @@ def _stable_seed(beat_id: str) -> int:
     return int.from_bytes(digest, "big")
 
 
+@dataclass(frozen=True, slots=True)
+class CinematicBrief:
+    """The cinematic-language brief the Cinematographer hands the model (§10).
+
+    A deterministic, pre-computed bundle — the directorial eye (style profile),
+    the genre, and the per-beat lens/lighting/grade — so the LLM fills prose
+    *within* a fixed look instead of re-imagining the film each shot, and the
+    deterministic camera floor stays consistent with the canon's style tokens.
+    """
+
+    profile: StyleProfile
+    genre: str
+    lens: str
+    lighting: str
+    grade: str
+    negative_floor: str
+
+    def payload(self) -> dict[str, str]:
+        """The serializable block injected under ``cinematography`` in the prompt."""
+        return {
+            "director_style": self.profile.name,
+            "style_note": self.profile.note,
+            "genre": self.genre,
+            "look": style_prompt_fragment(self.profile),
+            "lens": self.lens,
+            "lighting": self.lighting,
+            "color_grade": self.grade,
+            "negative_floor": self.negative_floor,
+        }
+
+
+def style_override_from_notes(notes: list[DirectorNote]) -> str | None:
+    """The most recent director note naming a *look* → its profile id (§8.6/§10).
+
+    A note like "shoot it like noir" or "more symmetrical" re-shoots the scene
+    through that directorial eye; the last such note wins (the latest ask). A note
+    that only names an *axis* ("slower", "warmer") returns ``None`` here — those
+    stay on the §8.6 prefs path.
+    """
+    for note in reversed(notes):
+        override = infer_style_override(note.note)
+        if override is not None:
+            return override
+    return None
+
+
+def build_brief(
+    beat: Beat,
+    canon_slice: CanonSlice,
+    *,
+    profile_override: str | None = None,
+) -> CinematicBrief:
+    """Compute the cinematic brief for ``beat`` against the canon's style (pure).
+
+    The directorial eye is chosen from the scene's genre (or a canon
+    ``director_style`` style token / explicit override), and the lens/lighting/
+    grade are derived from that profile and nudged by the beat's own mood — one
+    consistent look across the film, expressive per beat.
+    """
+    style_tokens = canon_slice.style.style_tokens if canon_slice.style else None
+    profile = select_style_profile([beat], style_tokens=style_tokens, override=profile_override)
+    genre = infer_genre([beat])
+    return CinematicBrief(
+        profile=profile,
+        genre=genre.value,
+        lens=lens_for(beat, profile),
+        lighting=lighting_for(beat, profile),
+        grade=color_grade_for(beat, profile),
+        negative_floor=negative_prompt_for([beat], genre=genre),
+    )
+
+
+def build_segment_brief(
+    beats: Sequence[Beat],
+    canon_slice: CanonSlice,
+    *,
+    profile_override: str | None = None,
+) -> CinematicBrief:
+    """Compute one cinematic brief for a whole packed segment (pure).
+
+    A continuous take holds *one* look across its beats, so the directorial eye
+    and genre are inferred over the entire beat-run and the lens/lighting/grade
+    are taken from the segment's opening beat (the take's establishing register).
+    """
+    style_tokens = canon_slice.style.style_tokens if canon_slice.style else None
+    beat_list = list(beats)
+    profile = select_style_profile(beat_list, style_tokens=style_tokens, override=profile_override)
+    opener = beat_list[0] if beat_list else Beat(summary="")
+    genre = infer_genre(beat_list)
+    return CinematicBrief(
+        profile=profile,
+        genre=genre.value,
+        lens=lens_for(opener, profile),
+        lighting=lighting_for(opener, profile),
+        grade=color_grade_for(opener, profile),
+        negative_floor=negative_prompt_for(beat_list, genre=genre),
+    )
+
+
 class Cinematographer(BaseAgent):
     """Designs one shot: chooses the Wan mode, then fills prose/camera/seed/refs."""
 
@@ -150,11 +260,13 @@ class Cinematographer(BaseAgent):
         inputs = self.derive_inputs(beat, canon_slice, notes)
         mode = decide_render_mode(inputs)
         candidates = locked_reference_ids(canon_slice)
+        brief = build_brief(beat, canon_slice, profile_override=style_override_from_notes(notes))
 
         payload = {
             "beat": beat.model_dump(mode="json"),
             "render_mode": mode.value,
             "style_tokens": canon_slice.style.style_tokens if canon_slice.style else None,
+            "cinematography": brief.payload(),
             "locked_reference_ids": candidates,
             "has_previous_endpoint": canon_slice.previous_endpoint is not None,
             "director_notes": [n.model_dump(mode="json") for n in notes],
@@ -169,7 +281,7 @@ class Cinematographer(BaseAgent):
             scene_id=beat.scene_id,
             render_mode=mode,
             prompt=prompt,
-            negative_prompt=fill.negative_prompt,
+            negative_prompt=self._merge_negative(fill.negative_prompt, brief.negative_floor),
             reference_image_ids=self._select_refs(mode, fill.reference_image_ids, candidates),
             camera=camera,
             seed=fill.seed if fill.seed is not None else _stable_seed(beat.beat_id or "beat"),
@@ -210,6 +322,9 @@ class Cinematographer(BaseAgent):
         )
         mode = decide_render_mode(inputs)
         candidates = locked_reference_ids(canon_slice)
+        brief = build_segment_brief(
+            beats, canon_slice, profile_override=style_override_from_notes(notes)
+        )
 
         payload = {
             "segment_id": segment.segment_id,
@@ -221,6 +336,7 @@ class Cinematographer(BaseAgent):
                 for b in beats
             ],
             "style_tokens": canon_slice.style.style_tokens if canon_slice.style else None,
+            "cinematography": brief.payload(),
             "locked_reference_ids": candidates,
             "director_notes": [n.model_dump(mode="json") for n in notes],
             "preferences": preferences_payload(priors) or None,
@@ -236,7 +352,7 @@ class Cinematographer(BaseAgent):
             scene_id=beats[0].scene_id if beats else None,
             render_mode=mode,
             prompt=prompt,
-            negative_prompt=fill.negative_prompt,
+            negative_prompt=self._merge_negative(fill.negative_prompt, brief.negative_floor),
             reference_image_ids=self._select_refs(mode, fill.reference_image_ids, candidates),
             camera=camera,
             seed=fill.seed if fill.seed is not None else _stable_seed(segment.segment_id),
@@ -302,10 +418,33 @@ class Cinematographer(BaseAgent):
         verbatim = [ref for ref in selected if ref in candidates]
         return verbatim or list(candidates)
 
+    @staticmethod
+    def _merge_negative(model_negative: str | None, floor: str) -> str:
+        """Union the model's negative prompt with the deterministic genre floor.
+
+        The §9.3/§10 negative floor (universal artifacts + the genre's
+        look-breakers) is always present; the model may *add* to it but can never
+        drop it. De-dups by the comma-separated term, preserving floor-first order.
+        """
+        floor_terms = [t.strip() for t in floor.split(",") if t.strip()]
+        extra = [t.strip() for t in (model_negative or "").split(",") if t.strip()]
+        seen: set[str] = set()
+        merged: list[str] = []
+        for term in [*floor_terms, *extra]:
+            key = term.lower()
+            if key not in seen:
+                seen.add(key)
+                merged.append(term)
+        return ", ".join(merged)
+
 
 __all__ = [
     "Cinematographer",
+    "CinematicBrief",
     "RenderModeInputs",
+    "build_brief",
+    "build_segment_brief",
     "decide_render_mode",
     "locked_reference_ids",
+    "style_override_from_notes",
 ]
