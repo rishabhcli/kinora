@@ -98,6 +98,38 @@ class Settings(BaseSettings):
     embed_model_text: str = "tongyi-embedding-vision-plus"
     embed_dim: int = 1152
 
+    # --- Provider resilience gateway (additive; round-2) ---
+    # Opt-in hardened gateway around the shared ProviderClient: per-model circuit
+    # breakers (half-open probing), an AIMD adaptive token bucket that backs off on
+    # 429s, full-jitter retries that honor Retry-After, hedged/duplicate requests for
+    # tail-latency cuts, a request-hash response cache + in-flight dedup, and a
+    # multi-cloud capability registry. OFF by default so the round-1 single-client
+    # path is byte-for-byte unchanged unless flipped on. See
+    # ``app.providers.resilience`` + DESIGN.md. None of these touch the KINORA_LIVE_VIDEO
+    # spend gate — LiveVideoDisabled is propagated unchanged and never a breaker fault.
+    provider_gateway_enabled: bool = False
+    provider_gateway_max_attempts: int = 4
+    provider_gateway_backoff_base_s: float = 0.5
+    provider_gateway_backoff_max_s: float = 8.0
+    # JitterStrategy value: "none" | "full" | "equal" | "decorrelated".
+    provider_gateway_jitter: str = "full"
+    provider_gateway_breaker_failure_threshold: int = 5
+    provider_gateway_breaker_recovery_s: float = 20.0
+    provider_gateway_breaker_half_open_max_calls: int = 1
+    # Adaptive rate limiter (AIMD).
+    provider_gateway_rate_initial: float = 8.0
+    provider_gateway_rate_max: float = 16.0
+    provider_gateway_rate_min: float = 0.5
+    provider_gateway_rate_burst: int = 8
+    provider_gateway_rate_cooldown_s: float = 5.0
+    # Response cache.
+    provider_gateway_cache_enabled: bool = True
+    provider_gateway_cache_max_entries: int = 512
+    provider_gateway_cache_ttl_s: float = 300.0
+    # Hedging (idempotent ops only; max_attempts=1 disables it). Never hedges video.
+    provider_gateway_hedge_max_attempts: int = 1
+    provider_gateway_hedge_delay_s: float = 0.75
+
     # --- Postgres (async SQLAlchemy URL) ---
     database_url: str = "postgresql+asyncpg://kinora:kinora@localhost:5432/kinora"
 
