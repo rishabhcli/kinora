@@ -27,28 +27,36 @@ const MOTES: Mote[] = [
   { left: 90, size: 2, duration: 30, delay: -20, dx: 26, opacity: 0.4 },
 ];
 
+// In the default `kinora-balanced` profile the motes are display:none and
+// the auroras are static — skip the mote DOM entirely (saves 8 React
+// elements + animation timeline allocations).
+const isBalanced =
+  typeof document !== "undefined" &&
+  document.documentElement.classList.contains("kinora-balanced");
+
 export default function AmbientBackground() {
   return (
     <div className="home-ambient" aria-hidden="true">
       <div className="home-aurora-blob home-aurora-blob--gold" />
       <div className="home-aurora-blob home-aurora-blob--amber" />
-      {MOTES.map((m, i) => (
-        <span
-          key={i}
-          className="ambient-mote"
-          style={
-            {
-              left: `${m.left}vw`,
-              width: m.size,
-              height: m.size,
-              animationDuration: `${m.duration}s`,
-              animationDelay: `${m.delay}s`,
-              "--mote-dx": `${m.dx}px`,
-              "--mote-opacity": m.opacity,
-            } as React.CSSProperties
-          }
-        />
-      ))}
+      {!isBalanced &&
+        MOTES.map((m, i) => (
+          <span
+            key={i}
+            className="ambient-mote"
+            style={
+              {
+                left: `${m.left}vw`,
+                width: m.size,
+                height: m.size,
+                animationDuration: `${m.duration}s`,
+                animationDelay: `${m.delay}s`,
+                "--mote-dx": `${m.dx}px`,
+                "--mote-opacity": m.opacity,
+              } as React.CSSProperties
+            }
+          />
+        ))}
     </div>
   );
 }

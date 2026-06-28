@@ -49,17 +49,23 @@ html.kinora-balanced .login-form-enter {
   backdrop-filter: blur(8px) saturate(120%);
 }
 
+/* Surfaces that are continuously on-screen (navbar, dock, glass cards) get
+   NO backdrop-filter in balanced mode — even a 4px blur on a permanent
+   surface forces the compositor to re-blur on every scroll/repaint and
+   accounts for most sustained GPU on the home page. Solid backgrounds at
+   the same visual weight cost zero compositor work. */
 html.kinora-balanced .glass-card,
 html.kinora-balanced .glass-input,
 html.kinora-balanced .liquid-glass-dock,
 html.kinora-balanced .surface-frosted {
-  -webkit-backdrop-filter: blur(4px) saturate(130%);
-  backdrop-filter: blur(4px) saturate(130%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: rgb(var(--k-bg-rgb) / 0.88);
 }
 
 html.kinora-balanced .footer-glass {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   background: rgb(var(--k-bg-rgb) / 0.88);
 }
 
@@ -76,13 +82,20 @@ html.kinora-balanced .liquid-glass-dock button:focus-visible {
 }
 
 html.kinora-balanced .glass-control {
-  -webkit-backdrop-filter: blur(3px) saturate(130%);
-  backdrop-filter: blur(3px) saturate(130%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: rgb(var(--k-bg-rgb) / 0.75);
 }
 
 html.kinora-balanced .nav-btn-active {
-  -webkit-backdrop-filter: blur(4px) saturate(150%);
-  backdrop-filter: blur(4px) saturate(150%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+html.kinora-balanced .nav-btn-hover:hover {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 html.kinora-balanced .comet-glare {
@@ -123,4 +136,30 @@ html.kinora-balanced .auth-grain {
 
 html.kinora-balanced .skeleton-shimmer-overlay {
   animation: none;
+}
+
+/* Kill all decorative continuous animations on login + hero in balanced mode.
+   Slides still rotate via JS setTimeout; the sweep was purely visual sugar. */
+html.kinora-balanced .hero-progress-active,
+html.kinora-balanced .aperture-blade,
+html.kinora-balanced .aperture-ring,
+html.kinora-balanced .arrow-pulse,
+html.kinora-balanced .light-sweep,
+html.kinora-balanced .mo-pulse,
+html.kinora-balanced .mo-shimmer,
+html.kinora-balanced .shelf-rail--left,
+html.kinora-balanced .shelf-rail--right {
+  animation: none !important;
+}
+
+/* The hero-banner inner blocks key-remount on every slide change. The fades
+   are nice on entrance but become noise after the first cycle — skip them
+   in balanced mode so swapping covers doesn't burn compositor cycles. */
+html.kinora-balanced .hero-fade-in,
+html.kinora-balanced .hero-slide-up,
+html.kinora-balanced .hero-cover-in,
+html.kinora-balanced .hero-line-grow {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
