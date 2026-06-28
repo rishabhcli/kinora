@@ -14,10 +14,11 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run && node src/test/run-node-tests.mjs",
+    "test": "vitest run && node src/test/run-node-tests.mjs && node electron/__tests__/run-electron-tests.mjs",
     "test:watch": "vitest",
     "test:a11y": "playwright test",
     "test:reading": "node src/test/run-node-tests.mjs",
+<<<<<<< HEAD
     "e2e": "playwright test -c e2e/playwright.e2e.config.ts",
     "e2e:ui": "playwright test -c e2e/playwright.e2e.config.ts --ui",
     "e2e:headed": "playwright test -c e2e/playwright.e2e.config.ts --headed",
@@ -27,7 +28,8 @@
     "e2e:live": "KINORA_E2E_MOCK=0 KINORA_E2E_LIVE=1 playwright test -c e2e/playwright.e2e.config.ts",
     "e2e:typecheck": "tsc -p e2e/tsconfig.json --noEmit",
     "e2e:report": "playwright show-report test-results/e2e-report",
-    "e2e:install-browsers": "playwright install --with-deps chromium"
+    "e2e:install-browsers": "playwright install --with-deps chromium",
+    "test:electron": "node electron/__tests__/run-electron-tests.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.41.0",

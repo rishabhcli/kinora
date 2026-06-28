@@ -3,3 +3,6 @@
 test-results/
 playwright-report/
 .playwright/
+
+# electron-builder packaging output (mac/win/linux installers).
+release/

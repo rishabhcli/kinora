@@ -1,0 +1,92 @@
+# electron-builder packaging config for the Kinora desktop app.
+#
+# This file is *additive*: it is consumed only when an explicit packaging step
+# (`electron-builder --config electron-builder.yml`) is run, so it does not
+# affect `pnpm build` / dev. Signing + notarization are parameterised via env
+# so a CI machine supplies real credentials while a local build can produce an
+# UNSIGNED artifact for smoke-testing.
+#
+# Required env for a SIGNED + NOTARIZED macOS build (all optional locally):
+#   CSC_LINK / CSC_KEY_PASSWORD        — Developer ID Application cert (.p12)
+#   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID  — notarization
+# Required env for a SIGNED Windows build:
+#   CSC_LINK / CSC_KEY_PASSWORD        — Authenticode cert (.pfx)
+#
+# Auto-update feed (electron-updater) is published to the `publish` target
+# below; set GH_TOKEN (GitHub Releases) in CI to upload + generate latest.yml.
+
+appId: com.kinora.desktop
+productName: Kinora
+copyright: © Kinora — Where stories come to life.
+
+# We build the renderer (vite → dist/) and the main process (tsc →
+# dist-electron/) before packaging; electron-builder only bundles the output.
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+# electron-updater needs its provider published with the build.
+publish:
+  provider: github
+  owner: rishabhcli
+  repo: kinora
+  releaseType: release
+
+# ---------------------------------------------------------------------------
+# macOS — hardened runtime + notarization (gated on env presence in CI).
+# ---------------------------------------------------------------------------
+mac:
+  category: public.app-category.entertainment
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip # zip target is what electron-updater consumes on macOS
+      arch: [arm64, x64]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # `notarize` is honoured only when APPLE_ID/APPLE_TEAM_ID are present; the
+  # team id is injected by CI. Left here as the documented switch.
+  notarize: false
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# ---------------------------------------------------------------------------
+# Windows — NSIS installer; Authenticode signing via CSC_* env.
+# ---------------------------------------------------------------------------
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  # signtoolOptions/signingHashAlgorithms are applied automatically when CSC_*
+  # are present; no cert in env => an unsigned installer for local testing.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  # Register the kinora:// protocol at install time (mirrors the runtime
+  # setAsDefaultProtocolClient call so links work before first launch).
+  include: build/installer.nsh
+
+# ---------------------------------------------------------------------------
+# Linux — AppImage for the judging surface; not the primary target.
+# ---------------------------------------------------------------------------
+linux:
+  target:
+    - AppImage
+  category: AudioVideo
+
+# Protocol registration baked into the bundle metadata (macOS Info.plist /
+# Windows registry) so `kinora://` resolves to the installed app.
+protocols:
+  - name: Kinora
+    schemes: [kinora]
