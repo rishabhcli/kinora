@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.api.routes import (
     analytics,
+    assistant,
     auth,
     books,
     director,
@@ -42,6 +43,7 @@ ROUTERS = [
     metrics.router,
     optim.router,
     analytics.router,  # product-analytics event pipeline (app/analytics/)
+    assistant.router,  # reader assistant: grounded, spoiler-aware RAG Q&A (§8)
     finops.router,
     billing.router,  # billing & payments (additive)
     flags.router,  # feature flags & experimentation platform (app.flags)
