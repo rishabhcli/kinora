@@ -133,6 +133,17 @@ class Settings(BaseSettings):
     concurrency_keyframe: int = 2
     retry_cap: int = 2
 
+    # --- Render-engine hardening (§9.7 resumability/poison; ADDITIVE) ---
+    #: Snapshot in-flight shots so a worker restart resumes mid-render instead of
+    #: re-spending video-seconds. Safe default ON (the in-memory store is a no-op
+    #: across processes until a real CheckpointStore adapter is wired).
+    render_checkpoint_enabled: bool = True
+    #: Hard render crashes a shot may accrue before it is quarantined to the
+    #: bottom rung (poison handling) so one pathological shot can't wedge a lane.
+    render_poison_threshold: int = 3
+    #: Max shots a DAG batch releases in parallel (caps render fan-out).
+    render_max_parallel_shots: int = 4
+
     # --- Ingest recovery ---
     ingest_recovery_interval_s: float = 30.0
     ingest_recovery_limit: int = 25
