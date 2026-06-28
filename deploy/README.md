@@ -94,3 +94,37 @@ shot, and record the worker rendering a real hosted Wan clip through DashScope
 and writing it to OSS. The proof should show the safe model diagnostics, one
 `clip_ready` event, the OSS object URL, and worker logs with the model id plus
 object key — then link this file in the submission (kinora.md §12.6 / §17).
+
+## Deployment orchestration (`orchestrator/`)
+
+The worker above proves Kinora *runs* on Alibaba. The `orchestrator/` package is
+the layer that decides **how a new build gets there safely** (kinora.md §12 —
+the unglamorous 30%): blue-green / canary rollout, SLO-gated automatic rollback,
+a deploy state machine + audit trail, artifact promotion across dev→staging→prod,
+smoke gating, config/secret hydration (with `KINORA_LIVE_VIDEO` refusal and
+secret redaction), and graceful drain of the §12.1 render-worker before it is
+retired.
+
+It is **cloud-agnostic and pure** — every effect (provision, traffic shift,
+health probe, metric scrape, secret fetch, queue drain) is a tiny typed
+`Protocol`. Production fills them with Alibaba ESS / SLB / CloudMonitor / KMS /
+Tair adapters; the tests and the simulator fill them with in-memory fakes. The
+package imports **no** `oss2` / `dashscope` / `boto3`, so the entire
+rollout/rollback decision logic is unit-testable with zero credits and zero
+network. See [`DESIGN.md`](DESIGN.md) for the architecture and roadmap.
+
+```bash
+# Watch the rollout/rollback logic prove itself, offline (virtual clock, no cloud):
+python -m deploy.orchestrator.simulator --scenario all
+#   happy-canary / happy-blue-green  → SUCCEEDED
+#   slo-breach                       → ROLLED_BACK (blast radius capped at 5%)
+#   health-fail / smoke-fail         → ROLLED_BACK (before/at traffic shift)
+#   stuck-drain                      → SUCCEEDED, wedged jobs released to the queue
+#   live-video-blocked               → FAILED before provisioning (safety gate)
+
+# Verify (from the repo root, with a venv carrying ruff/mypy/pytest):
+ruff check deploy/orchestrator deploy/tests deploy/conftest.py
+mypy --python-version 3.12 --disallow-untyped-defs --ignore-missing-imports \
+     deploy/orchestrator deploy/tests deploy/conftest.py
+pytest deploy/tests -q
+```
