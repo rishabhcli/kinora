@@ -37,6 +37,7 @@ from app.db.models.integration import (
     SyncRun,
     SyncRunStatus,
 )
+from app.db.models.job import JobRun, ScheduledJob
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -71,6 +72,7 @@ __all__ = [
     "IngestCheckpoint",
     "IngestMilestone",
     "ImportedItem",
+    "JobRun",
     "Page",
     "Pref",
     "SyncRun",
@@ -79,6 +81,7 @@ __all__ = [
     "RenderJobStatus",
     "RenderPriority",
     "Scene",
+    "ScheduledJob",
     "Session",
     "SessionMode",
     "Shot",
