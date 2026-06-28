@@ -35,4 +35,18 @@ ROUTERS = [
     workspaces.router,  # Workspaces & teams: collaboration ownership (§5)
 ]
 
-__all__ = ["ROUTERS"]
+
+def root_routers() -> list:
+    """Routers mounted at the application *root* (no ``/api`` prefix).
+
+    The public GraphQL gateway is its own self-contained surface at ``/graphql``,
+    deliberately separate from the internal REST API (additive — see
+    ``app/graphql/DESIGN.md``). Imported lazily so the GraphQL package's schema is
+    assembled only when this is called, keeping ``app.api.routes`` import cheap.
+    """
+    from app.graphql.app import router as graphql_router
+
+    return [graphql_router]
+
+
+__all__ = ["ROUTERS", "root_routers"]
