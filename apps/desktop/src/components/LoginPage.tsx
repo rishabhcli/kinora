@@ -15,9 +15,14 @@ export default function LoginPage({ onEnter }: { onEnter: () => void }) {
   async function enter() {
     setBusy(true);
     try {
-      await api.loginOrRegister(email, password);
+      await Promise.race([
+        api.loginOrRegister(email, password),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 6_000),
+        ),
+      ]);
     } catch {
-      /* backend down — continue in demo mode */
+      /* backend down or slow — continue in demo mode */
     }
     setBusy(false);
     onEnter();

@@ -122,16 +122,31 @@ function xhrReq<T>(url: string, method: string, headers: Record<string, string>,
   });
 }
 
-async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
+const DEFAULT_TIMEOUT_MS = 15_000;
+const AUTH_TIMEOUT_MS = 5_000;
+
+async function req<T>(path: string, opts: RequestInit = {}, timeoutMs?: number): Promise<T> {
   const headers = headerMap(opts.headers);
   const token = auth.token;
   if (token) headers.Authorization = `Bearer ${token}`;
   if (opts.body && !(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
   const url = `${BASE}${path}`;
+  const ms = timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (typeof globalThis.fetch === "function") {
-    const res = await globalThis.fetch(url, { ...opts, headers });
-    if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => res.statusText));
-    return parseBody<T>(res.status, await res.text());
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+      const res = await globalThis.fetch(url, { ...opts, headers, signal: controller.signal });
+      if (!res.ok) throw new ApiError(res.status, await res.text().catch(() => res.statusText));
+      return parseBody<T>(res.status, await res.text());
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        throw new ApiError(408, `Request timed out after ${ms}ms`);
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
   return xhrReq<T>(url, opts.method ?? "GET", headers, opts.body);
 }
@@ -221,11 +236,11 @@ export const api = {
     const t = await req<TokenResponse>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
-    });
+    }, AUTH_TIMEOUT_MS);
     auth.token = t.access_token;
   },
   async register(email: string, password: string): Promise<void> {
-    await req("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
+    await req("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }, AUTH_TIMEOUT_MS);
   },
   /** Log in, registering first if the account doesn't exist yet. */
   async loginOrRegister(email: string, password: string): Promise<void> {
