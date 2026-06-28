@@ -4,6 +4,7 @@
 // lock, a focus trap, and focus-into-the-reader on reveal.
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState, type Dispatch } from "react";
+import { useTranslation } from "react-i18next";
 import type { Book } from "../data/books";
 import { useReadingPrefs } from "../lib/readingPrefs";
 import { ScrollFilmEngine, ReadingControls } from "./producers";
@@ -72,6 +73,7 @@ export function ReadingRoomShell({
   session: FilmSession;
   reduce: boolean;
 }) {
+  const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
   const { prefs, update } = useReadingPrefs();
   const [progress, setProgress] = useState(0);
@@ -110,11 +112,11 @@ export function ReadingRoomShell({
   const showWarmUp = ["opening", "loading", "warming", "ready"].includes(state.phase);
   const pill =
     session.bufferAhead != null && session.bufferAhead > 0.5
-      ? `Buffered ${Math.round(session.bufferAhead)}s ahead`
-      : "Generating ahead…";
+      ? t("reading.bufferedAhead", { seconds: Math.round(session.bufferAhead) })
+      : t("reading.generatingAhead");
 
   return (
-    <div ref={rootRef} className="flex h-full flex-col" aria-label={`Reading ${book.title}`}>
+    <div ref={rootRef} className="flex h-full flex-col" aria-label={t("reading.readingAria", { title: book.title })}>
       {/* Top bar */}
       <div
         className="flex flex-shrink-0 items-center gap-3 px-6 py-3.5"
@@ -125,7 +127,7 @@ export function ReadingRoomShell({
       >
         <button
           onClick={onClose}
-          aria-label="Close reader and go back"
+          aria-label={t("reading.closeReader")}
           className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all duration-200"
           style={{
             background: "linear-gradient(180deg, #e8c878 0%, #d4a44e 100%)",
@@ -138,7 +140,7 @@ export function ReadingRoomShell({
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
-          Back
+          {t("reading.back")}
         </button>
         <div className="flex items-center gap-2 min-w-0">
           <span
@@ -161,7 +163,7 @@ export function ReadingRoomShell({
         <div data-controls-popover className="relative">
           <button
             onClick={() => setControlsOpen(!controlsOpen)}
-            aria-label="Reading settings"
+            aria-label={t("reading.readingSettings")}
             className="flex items-center justify-center transition-all duration-200"
             style={{
               width: 34,

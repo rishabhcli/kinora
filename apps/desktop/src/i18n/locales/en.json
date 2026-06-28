@@ -1,0 +1,110 @@
+{
+  "language": {
+    "name": "Language",
+    "description": "The language Kinora uses across the app."
+  },
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "zh": "中文",
+    "hi": "हिन्दी"
+  },
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "watch": "Watch",
+    "favorites": "Favorites",
+    "notes": "Notes"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "open": "Open",
+    "back": "Back",
+    "restore": "Restore",
+    "clear": "Clear",
+    "cleared": "Cleared",
+    "loading": "Loading…",
+    "oneMoment": "One moment…"
+  },
+  "login": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "welcomeBack": "Welcome back to your library",
+    "startWatching": "Start watching books as films",
+    "emailPlaceholder": "Email address",
+    "passwordPlaceholder": "Password",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "createAccount": "Create account",
+    "or": "or",
+    "continueWith": "Continue with {{provider}}",
+    "exploreDemo": "Explore the demo library →",
+    "newToKinora": "New to Kinora?",
+    "alreadyHaveAccount": "Already have an account?",
+    "tagline": "Where stories come to life.",
+    "heroTitle": "Where stories come to life.",
+    "heroSubtitle": "Your library, reimagined as cinema. Books become films, pages become scenes — watched in the quiet of an evening.",
+    "heroKicker": "Reading, rewritten"
+  },
+  "library": {
+    "continueReading": "Continue Reading",
+    "recentlyAdded": "Recently Added",
+    "popularOnKinora": "Popular on Kinora",
+    "recommended": "Recommended for You",
+    "readLivePublicDomain": "Read Live · Public Domain"
+  },
+  "reading": {
+    "back": "Back",
+    "closeReader": "Close reader and go back",
+    "readingSettings": "Reading settings",
+    "bufferedAhead": "Buffered {{seconds}}s ahead",
+    "generatingAhead": "Generating ahead…",
+    "readingAria": "Reading {{title}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "searchPlaceholder": "Search settings",
+    "noMatches": "No matches.",
+    "categoriesAria": "Settings categories",
+    "sections": {
+      "general": "General",
+      "appearance": "Appearance",
+      "reading": "Reading",
+      "playback": "Playback",
+      "notifications": "Notifications",
+      "privacy": "Privacy",
+      "account": "Account",
+      "about": "About"
+    },
+    "general": {
+      "subtitle": "How Kinora starts up and behaves.",
+      "openTo": "Open Kinora to",
+      "openToDesc": "The view Kinora shows when it launches.",
+      "soundEffects": "Sound effects",
+      "soundEffectsDesc": "Subtle page-turn and UI sounds.",
+      "reset": "Reset",
+      "restoreDefaults": "Restore all defaults",
+      "restoreDefaultsDesc": "Reset every Kinora setting to its original value.",
+      "restoreConfirm": "Restore all Kinora settings to defaults?"
+    },
+    "appearance": {
+      "subtitle": "Accessibility overrides applied across the whole app.",
+      "reduceMotion": "Reduce motion",
+      "reduceMotionDesc": "Minimise animations and transitions.",
+      "reduceTransparency": "Reduce transparency",
+      "reduceTransparencyDesc": "Drop the frosted-glass blur for solid surfaces.",
+      "increaseContrast": "Increase contrast",
+      "increaseContrastDesc": "Brighten secondary text and firm up borders.",
+      "themesHint": "Reading themes (Dark, Sepia, Paper…) live under Reading."
+    },
+    "override": {
+      "system": "System",
+      "on": "On",
+      "off": "Off"
+    }
+  }
+}

@@ -22,6 +22,11 @@ import os
 
 os.environ.setdefault("DASHSCOPE_API_KEY", "test")
 os.environ.setdefault("APP_ENV", "local")
+# Keep the suite hermetic: pin the reasoning provider to DashScope so a real
+# backend/.env activating OpenAI (REASONING_PROVIDER=openai) does not bleed into
+# unit tests via create_providers(). Env vars take precedence over .env, so this
+# overrides the dotenv value. Tests for the OpenAI path set it explicitly.
+os.environ.setdefault("REASONING_PROVIDER", "dashscope")
 
 import hashlib
 from collections.abc import AsyncIterator, Callable

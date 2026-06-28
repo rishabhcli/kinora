@@ -67,6 +67,19 @@ class BookRepo(BaseRepository):
         )
         return list((await self.session.execute(stmt)).scalars().all())
 
+    async def list_by_status(self, status: BookStatus, *, limit: int = 50) -> list[Book]:
+        """Return books in ``status`` order by age, oldest first.
+
+        Used by startup recovery to find interrupted imports after an API restart.
+        """
+        stmt = (
+            select(Book)
+            .where(Book.status == status)
+            .order_by(Book.created_at.asc())
+            .limit(limit)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
     async def count_for_user(self, user_id: str) -> int:
         """Count the books owned by ``user_id`` (the per-user ingest quota gate)."""
         stmt = select(func.count()).select_from(Book).where(Book.user_id == user_id)

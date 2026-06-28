@@ -38,12 +38,37 @@ class Settings(BaseSettings):
     # The OpenAI-compatible "/compatible-mode/v1" path is appended in the providers phase.
     dashscope_base_url: str = "https://dashscope-intl.aliyuncs.com"
 
+    # --- OpenAI (optional reasoning provider) ---
+    # When ``reasoning_provider="openai"`` the agent crew's chat/reasoning calls
+    # (Showrunner/Adapter/Continuity/Cinematographer + the §5.4 comment router)
+    # route to OpenAI instead of DashScope; image / TTS / Wan video stay on
+    # DashScope. Callers keep passing Qwen ids (e.g. ``chat_model_adapter``); the
+    # OpenAI chat provider ignores them and forces ``reasoning_model``.
+    # NOTE: "gpt-5.6-terra" was requested but is not available on this account
+    # (verified 2026-06-28 via /v1/models); gpt-5.5 is the latest GPT-5 reasoning
+    # model and is the default fallback.
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    reasoning_provider: str = "dashscope"  # "dashscope" | "openai"
+    reasoning_model: str = "gpt-5.5"
+    reasoning_effort: str = "high"  # OpenAI reasoning_effort: minimal|low|medium|high
+    # GPT-5 reasoning models bill reasoning tokens against the completion cap, so
+    # the chat path needs headroom beyond the visible output (callers size
+    # ``max_tokens`` for Qwen's output-only accounting). Used as a floor on
+    # ``max_completion_tokens``.
+    reasoning_max_output_tokens: int = 8192
+
     # --- Model ids ---
+    # NOTE: ids below are verified available on the DashScope-intl tier we ship
+    # against (see scripts/provider_preflight.py). Some sibling ids return
+    # 403 AllocationQuota.FreeTierOnly even when others in the same family work
+    # — notably qwen3.5-plus (use qwen3.7-plus) and qwen-image-2.0-pro
+    # (use qwen-image-plus). Do not "upgrade" these without re-running preflight.
     chat_model_max: str = "qwen3.7-max"
     chat_model_plus: str = "qwen3.7-plus"
-    chat_model_adapter: str = "qwen3.5-plus"
+    chat_model_adapter: str = "qwen3.7-plus"
     vl_model: str = "qwen-vl-max"
-    image_model: str = "qwen-image-2.0-pro"
+    image_model: str = "qwen-image-plus"
     image_edit_model: str = "qwen-image-edit-max"
     # Default narration TTS model. qwen3-tts-flash serves the PRESET voices that
     # ingest.identity_lock assigns (e.g. "Cherry", "Ryan"), so preset-voice
@@ -51,17 +76,16 @@ class Settings(BaseSettings):
     # model (it rejects preset voice ids); clone callers use ``tts_clone_model``.
     tts_model: str = "qwen3-tts-flash"
     tts_clone_model: str = "qwen3-tts-vc"
-    # NOTE: the Wan video model ids are placeholders to be confirmed in the providers phase.
-    video_model: str = "wan2.7-t2v"
-    video_model_i2v: str = "wan2.7-i2v"
-    video_model_r2v: str = "wan2.7-r2v"
+    # Hosted DashScope Wan models only. These defaults favor reliable demo
+    # latency; quality overrides are documented in .env.example / README.
+    video_model: str = "wan2.1-t2v-turbo"
+    video_model_i2v: str = "wan2.1-i2v-turbo"
+    video_model_r2v: str = "wan2.1-i2v-turbo"
 
-    # --- Video backend (TEMPORARY local-Wan2.2 switch) ---
-    # "cloud" (default) = DashScope Wan (the video_model ids above). "local" =
-    # a host-side Wan2.2 TI2V-5B server (native macOS/MPS) at ``local_wan_url``.
-    # Revert at any time with VIDEO_BACKEND=cloud — nothing else changes.
-    video_backend: str = "cloud"
-    local_wan_url: str = "http://host.docker.internal:8765"
+    # --- Wan task polling ---
+    video_poll_timeout_s: float = 600.0
+    video_poll_interval_s: float = 3.0
+    video_poll_max_interval_s: float = 15.0
 
     # --- Embeddings ---
     # ``tongyi-embedding-vision-plus`` embeds BOTH images and text into one shared
@@ -109,6 +133,10 @@ class Settings(BaseSettings):
     concurrency_keyframe: int = 2
     retry_cap: int = 2
 
+    # --- Ingest recovery ---
+    ingest_recovery_interval_s: float = 30.0
+    ingest_recovery_limit: int = 25
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"
@@ -142,6 +170,19 @@ class Settings(BaseSettings):
                 "JWT_SECRET must be set to a real secret when APP_ENV is not 'local' "
                 "(refusing to boot with the insecure default 'change-me-in-prod')."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _guard_reasoning_provider(self) -> Settings:
+        """Validate the reasoning-provider toggle and its required credentials."""
+        provider = self.reasoning_provider.lower()
+        if provider not in {"dashscope", "openai"}:
+            raise ValueError(
+                "REASONING_PROVIDER must be 'dashscope' or 'openai', "
+                f"got {self.reasoning_provider!r}."
+            )
+        if provider == "openai" and not self.openai_api_key:
+            raise ValueError("REASONING_PROVIDER='openai' requires OPENAI_API_KEY to be set.")
         return self
 
 

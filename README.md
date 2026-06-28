@@ -10,7 +10,7 @@ The book stays on screen. As the film plays, a narrator reads the text aloud, th
 | **Primary track** | Track 2 — AI Showrunner (also covers Track 1 · MemoryAgent and Track 3 · Agent Society) |
 | **Deadline** | Jul 9, 2026 · 2:00pm PDT |
 | **Deployment** | Alibaba Cloud — ECS / Function Compute · OSS · DashScope / Model Studio |
-| **Status** | **Built and runnable** — full backend + native apps (Electron desktop, a native macOS **Liquid Glass** shell, and Expo mobile), real Qwen/Wan/CosyVoice, real persistence/queue/budget. Bring up the backend with `docker compose` and the apps with `pnpm`; deploy with `infra/terraform`. |
+| **Status** | **Built and runnable** — full backend + Electron desktop, a native macOS **Liquid Glass** shell, and a browser-served renderer for judging; real Qwen/Wan/Qwen3-TTS, persistence, queue, budget, and recovery workers. Bring up the stack with `docker compose`; deploy with `infra/terraform`. |
 
 > **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → `make app-desktop-dev`. See [Run it locally](#run-it-locally).
 
@@ -58,7 +58,7 @@ Six single-purpose agents, each a separate service with a typed JSON contract, a
 | **Adapter** | PDF → screenplay → shot list (with source spans) | Qwen3.5-Plus |
 | **Continuity Supervisor** | Owns canon writes; flags inconsistencies; runs forgetting/versioning | Qwen3.7-Plus |
 | **Cinematographer** | Designs each shot: keyframe, camera, locked references, Wan mode | Qwen3.5-Plus (VL) |
-| **Generator** | Renders the clip + narration | Wan 2.7 / HappyHorse + CosyVoice |
+| **Generator** | Renders the clip + narration | Hosted Wan (`wan2.1-*` demo defaults; `wan2.5/2.2` quality overrides) + Qwen3-TTS |
 | **Critic / QA** | Scores each clip against the canon; decides pass / fix / regen | Qwen3-VL |
 
 When the Continuity Supervisor catches a contradiction (e.g. *a shot depicts the heroine drawing a sword she lost three beats ago*), it raises a **structured conflict object** and the Showrunner arbitrates under a fixed policy: evolve the canon if the text supports it, surface to the director if user-facing, otherwise honor the established truth. This negotiation is surfaced live in the demo — a thing a judge can *watch happen*.
@@ -124,21 +124,20 @@ The full diagram, the per-shot state machine, and the end-to-end sequence are in
 ## Tech & model stack
 
 - **Frontend** — two-pane workspace; PDF rendered with PyMuPDF (virtualised pages); a `SyncEngine` that bidirectionally binds scroll ↔ video ↔ word; events over SSE/WebSocket.
-- **Models (Qwen Cloud / DashScope)** — Qwen3.7-Max (orchestration), Qwen3.7-Plus / Qwen3.5-Plus (high-volume agents), Qwen3-VL (page reading + QA), Wan 2.7 (character video: reference-to-video / first-last-frame / continuation), HappyHorse 1.0 (establishing shots), CosyVoice v3-plus (narration + voice cloning + word timestamps).
-- **Backend (Alibaba Cloud)** — stateless agent services + Scheduler on ECS / Function Compute; clips, frames, audio, and the canon vault in OSS; an idempotent, cancellable, dead-lettered render queue on the managed broker.
+- **Models (Qwen Cloud / DashScope)** — Qwen3.7-Max (orchestration), Qwen3.7-Plus / Qwen3.5-Plus (high-volume agents), Qwen3-VL (page reading + QA), hosted Wan (`wan2.1-t2v-turbo` / `wan2.1-i2v-turbo` demo defaults, `wan2.5-t2v-preview` / `wan2.2-i2v-plus` quality overrides), and Qwen3-TTS narration.
+- **Backend (Alibaba Cloud)** — API, ingest recovery worker, render worker, MCP, and browser renderer on ECS; clips, frames, audio, and the canon vault in OSS; idempotent Redis/Tair queues and locks.
 
 ## Project layout
 
 ```
 backend/        FastAPI app, six-agent crew, MCP canon-memory server, render pipeline,
                 scheduler + Redis queue, budget service, eval harness, Alembic migrations
-packages/core/  shared TypeScript: SyncEngine, OpenAPI-typed API client, event schemas, stores
-apps/desktop/   Electron app (electron-vite + React + Tailwind) — the two-pane reading room
-apps/mobile/    Expo / React Native app (video + reflow read-along)
+apps/desktop/   Electron + Vite renderer (React + Tailwind) — the two-pane reading room
+apps/desktop-native/ native macOS Liquid Glass shell (showcase; separate from Electron)
 infra/          docker-compose.yml (the backend stack) + terraform/ (Alibaba Cloud IaC)
-deploy/       alibaba_render_worker.py — the §12.6 OSS + DashScope proof artifact
+deploy/         alibaba_render_worker.py — the §12.6 OSS + DashScope proof artifact
 assets/books/ the bundled public-domain demo book + its PyMuPDF build script
-Makefile      install / stack-up / migrate / worker / mcp / seed-demo / test / …
+Makefile      install / stack-up / migrate / worker / ingest-worker / mcp / provider-preflight / seed-demo / test / …
 kinora.md     the full technical design (architecture, agents, pipeline, memory, budget)
 ```
 
@@ -149,13 +148,16 @@ Every backend role is the same image with a different command (see `infra/docker
 | Service | Command | Role |
 |---|---|---|
 | `api` | `uvicorn app.main:app` | REST + SSE/WS; **runs the Scheduler in-process** + the idle-sweeper; **triggers Phase-A ingest** as a background task on upload |
+| `ingest-worker` | `python -m app.ingest.recovery` | Recovers books left `importing` after restarts from the durable `source_pdf_key` |
 | `render-worker` | `python -m app.queue.worker` | Drains the Redis priority queue; runs the per-shot pipeline / the ffmpeg degradation ladder |
 | `mcp` | `python -m app.mcp.run --http` | The canon-memory MCP server (the §8.3 tool surface) |
+| `frontend` | `nginx` over `apps/desktop/dist` | Browser-accessible judging surface for the Vite renderer |
 | `migrate` | `alembic -c alembic.ini upgrade head` | One-shot schema apply (runs before the app) |
 | `postgres` / `redis` / `minio` | — | Postgres+pgvector · Redis · S3-compatible object storage |
 
-There is **no** separate scheduler or ingest process — both run inside `api` (a one-shot
-`python -m app.ingest.worker <book_id>` CLI exists for re-ingest).
+There is **no** separate scheduler process — Scheduler control runs inside `api`.
+Upload still starts ingest immediately in `api`, while `ingest-worker` is the durable
+restart/recovery loop for interrupted imports.
 
 ## Run it locally
 
@@ -167,7 +169,7 @@ cp .env.example backend/.env
 #    edit backend/.env: set DASHSCOPE_API_KEY=sk-...   (KINORA_LIVE_VIDEO stays false)
 #    and set TTS_MODEL=qwen3-tts-flash  (preset-voice narration; see Configuration)
 
-# 2. Build + bring up the backend stack (data plane, migrate, api, render-worker, mcp).
+# 2. Build + bring up the stack (data plane, migrate, api, ingest/render workers, mcp, frontend).
 make stack-up                 # == cd infra && docker compose up -d --build
 #    migrations run automatically via the one-shot `migrate` service.
 
@@ -177,7 +179,7 @@ make seed-demo                # == python backend/scripts/seed_demo.py --via api
 # 4. Run the desktop app (it connects to the API at http://localhost:8000).
 make app-install              # pnpm install (first run only)
 make app-desktop-dev          # launches the Electron reading room
-#    API docs: http://localhost:8000/docs · Prometheus: http://localhost:9090
+#    Browser renderer: http://localhost:5173 · API docs: http://localhost:8000/docs · Prometheus: http://localhost:9090
 ```
 
 ### Local dev without Docker (venv)
@@ -189,6 +191,7 @@ make migrate                  # alembic upgrade head
 # then, in separate shells:
 cd backend && .venv/bin/uvicorn app.main:app --reload     # api (scheduler + ingest in-process)
 make worker                   # python -m app.queue.worker
+make ingest-worker            # python -m app.ingest.recovery
 make mcp                      # python -m app.mcp.run --http
 make seed-demo SEED_ARGS="--via direct"   # or run ingest in-process, no server needed
 ```
@@ -205,9 +208,10 @@ make app-desktop-dev          # == pnpm --filter @kinora/desktop dev
 #   point at another backend with:  VITE_KINORA_API_URL=https://api.example.com
 #   package signed installers (needs certs):  pnpm --filter @kinora/desktop dist
 
-# Mobile (Expo) — first set the API base in apps/mobile/src/lib/config.ts
-# (a phone/simulator can't reach "localhost"), then:
-make app-mobile-start         # == pnpm --filter @kinora/mobile start   (press i / a)
+# Browser-served renderer image for judging:
+docker build -f infra/docker/desktop.Dockerfile \
+  --build-arg VITE_KINORA_API_URL=http://localhost:8000 \
+  -t kinora-frontend:local .
 ```
 
 ## Verify the end-to-end loop
@@ -217,7 +221,7 @@ With `KINORA_LIVE_VIDEO` **off** (the default — no Wan spend), the full loop s
 1. **Ingest** — `seed-demo` uploads the demo PDF; Phase A extracts pages + per-word boxes, runs Qwen-VL page analysis, builds the versioned canon (characters/locations/props/style), plans the shot list + source-span index, and identity-locks keyframes + voices. The book reaches `status: ready`.
 2. **Session + scroll** — create a reading session and send `intent_update`s; the Scheduler fills the committed buffer under the dual-watermark and enqueues **keyframe** work across the speculative horizon (zero video-seconds).
 3. **Render** — the `render-worker` drains the queue. With the live gate off it steps down the **degradation ladder** and produces a **real Ken-Burns mp4** over the locked keyframe (muxed with CosyVoice narration), surfaced as a `clip_ready` event — **zero video-seconds spent**. The budget ledger stays at 0.
-4. **Go live** — flip `KINORA_LIVE_VIDEO=1` and the same committed lane renders **real Wan 2.7 video** through the Critic/cache/budget path, hot-swapping into the workspace; the budget service decrements and enforces the hard ceiling.
+4. **Go live** — run `make provider-preflight` first, flip `KINORA_LIVE_VIDEO=1`, and the same committed lane renders **real hosted Wan video** through the Critic/cache/budget path, persists the downloaded clip to OSS/MinIO, and hot-swaps it into the workspace; the budget service decrements and enforces the hard ceiling.
 
 This loop is exercised by the backend test suite (`make test`, against throwaway Postgres+Redis+MinIO) and by `make seed-demo`.
 
@@ -229,7 +233,8 @@ All config flows through typed settings (`backend/app/core/config.py`); see [`.e
 |---|---|---|
 | `DASHSCOPE_API_KEY` | — (**required**) | Model Studio (intl) key. Only in gitignored `backend/.env`. |
 | `KINORA_LIVE_VIDEO` | `false` | **Go-live gate (§11.1).** Off = the pipeline degrades to Ken-Burns (zero Wan spend) while you iterate. On = real Wan video renders. |
-| `TTS_MODEL` | `qwen3-tts-vc` | TTS model. **Set `TTS_MODEL=qwen3-tts-flash` for the demo** — ingest assigns *preset* Qwen3-TTS voices (Cherry, Ryan, …), which the `-flash` model serves; `-vc` is the voice-*clone* model and expects an enrolled voice. |
+| `VIDEO_MODEL` / `_I2V` / `_R2V` | `wan2.1-t2v-turbo` / `wan2.1-i2v-turbo` | Hosted Wan model ids. Quality overrides: `wan2.5-t2v-preview`, `wan2.2-i2v-plus`. Avoid `wan2.2-t2v-plus`. |
+| `TTS_MODEL` | `qwen3-tts-flash` | TTS model. `qwen3-tts-flash` serves the preset voices ingest assigns (Cherry, Ryan, …); `qwen3-tts-vc` is the voice-clone model and expects an enrolled voice. |
 | `BUDGET_CEILING_VIDEO_S` | `1650` | Hard cap on total video-seconds. Per-session/per-scene sub-caps also apply. |
 | `WATERMARK_LOW_S` / `_HIGH_S` / `COMMIT_HORIZON_S` | `25 / 75 / 45` | Scheduler buffer + promotion horizons. |
 
@@ -239,7 +244,7 @@ The budget service enforces the ceiling with a real append-only ledger and a tra
 
 ## Deploy to Alibaba Cloud
 
-`infra/terraform/` is ready-to-apply IaC (validated with `terraform validate` + `terraform fmt`; **not** applied — it needs your credentials). It provisions VPC + security groups, **OSS** (object storage), **ApsaraDB RDS for PostgreSQL** (pgvector), **Tair/Redis**, and **ECS** nodes for `api` + `render-worker` + `mcp` — each running the same image with its role command via cloud-init.
+`infra/terraform/` is ready-to-apply IaC (validated with `terraform validate` + `terraform fmt`; **not** applied — it needs your credentials). It provisions VPC + security groups, **OSS** (object storage), **ApsaraDB RDS for PostgreSQL** (pgvector), **Tair/Redis**, and **ECS** nodes for `frontend`, `api`, `ingest-worker`, `render-worker`, and `mcp`.
 
 ```bash
 cd infra/terraform
@@ -259,7 +264,7 @@ terraform init && terraform validate && terraform plan && terraform apply
 
 The **MCP port (8765) is intra-VPC only** (never internet-facing); the bearer token is defense-in-depth on top. cloud-init writes these into each node's env **without** shell tracing, so secrets never land in `cloud-init-output.log`. Read back the generated secrets with `terraform output -raw jwt_secret` / `-raw mcp_auth_token`. For real prod, prefer KMS / Secrets Manager / OOS over user_data.
 
-The **apps** ([`apps/desktop`](./apps/desktop), [`apps/mobile`](./apps/mobile)) ship as native binaries rather than a served site: build signed desktop installers with `pnpm --filter @kinora/desktop dist` (electron-builder → `.dmg`/`.exe`/AppImage) and mobile builds via EAS ([`apps/mobile/eas.json`](./apps/mobile/eas.json)). Both reach the deployed API over HTTPS (`VITE_KINORA_API_URL` for desktop; `apps/mobile/src/lib/config.ts` for mobile).
+The **Electron app** ([`apps/desktop`](./apps/desktop)) is the primary local product. For judging, build the browser renderer image from [`infra/docker/desktop.Dockerfile`](./infra/docker/desktop.Dockerfile) with `VITE_KINORA_API_URL` pointed at the deployed API and push it to `frontend_container_image`.
 
 The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py), kinora.md §12.6) is a real render worker that demonstrably uses **OSS** + **DashScope** — it reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than duplicating logic. See [`deploy/README.md`](./deploy/README.md) and [`infra/terraform/README.md`](./infra/terraform/README.md).
 
@@ -267,7 +272,7 @@ The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./depl
 
 | Path | What it is |
 |---|---|
-| [`backend/`](./backend) · [`apps/`](./apps) · [`packages/core`](./packages/core) | The built application (FastAPI backend · Electron + Expo apps · shared TS core). |
+| [`backend/`](./backend) · [`apps/desktop`](./apps/desktop) · [`apps/desktop-native`](./apps/desktop-native) | The built application (FastAPI backend · Electron/Vite renderer · native macOS showcase). |
 | [`infra/`](./infra) · [`deploy/`](./deploy) · [`assets/`](./assets) | Local stack + Alibaba IaC · §12.6 proof artifact · demo book. |
 | [`kinora.md`](./kinora.md) | The full technical design — architecture, agents, pipeline, memory, budget. |
 | [`what-is-kinora.md`](./what-is-kinora.md) | Plain-English explainer. **Start here if you're non-technical.** |

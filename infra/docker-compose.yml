@@ -4,10 +4,12 @@
 # Schema:      migrate (one-shot `alembic upgrade head`, runs before the app)
 # App plane:   api (FastAPI; runs the Scheduler in-process + the idle-sweeper and
 #              triggers Phase-A ingest as a background task on upload),
+#              ingest-worker (`python -m app.ingest.recovery`, recovers stuck
+#              imports from the durable source_pdf_key after restarts),
 #              render-worker (`python -m app.queue.worker`, drains the Redis
 #              priority queue and runs the real per-shot pipeline / degradation
 #              ladder), mcp (`python -m app.mcp.run --http`, the canon-memory
-#              MCP server), frontend, prometheus.
+#              MCP server), frontend (Vite renderer served by Nginx), prometheus.
 #
 # NOTE on services that DON'T exist as separate processes (kept honest):
 #   * scheduler  — there is no standalone scheduler process: the Scheduler control
@@ -196,6 +198,24 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Durable Phase-A recovery worker: scans for books left importing after a
+  # crash/restart and re-runs ingest from the persisted source_pdf_key.
+  ingest-worker:
+    <<: *backend
+    command: ["python", "-m", "app.ingest.recovery"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   # The MCP canon-memory server over streamable-HTTP (the §8.3 tool surface).
   mcp:
     <<: *backend
@@ -211,6 +231,22 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/docker/desktop.Dockerfile
+      args:
+        VITE_KINORA_API_URL: http://localhost:8000
+    image: kinora-frontend:local
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - kinora
     restart: unless-stopped
 
   prometheus:

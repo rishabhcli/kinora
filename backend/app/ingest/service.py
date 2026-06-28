@@ -71,7 +71,10 @@ class IngestOptions:
     poses: tuple[str, ...] = ("front",)
     #: A character is identity-locked when it appears in ≥ this many beats.
     min_beats: int = 2
-    keyframe_size: str = "1024*1024"
+    #: qwen-image-plus only accepts a fixed size set
+    #: (1664*928, 1472*1104, 1328*1328, 1104*1472, 928*1664); 928*1664 is the
+    #: 9:16 option matching the vertical FILM_SIZE (720x1280).
+    keyframe_size: str = "928*1664"
     #: Re-run even if the book is already ``ready``.
     force: bool = False
 

@@ -4,6 +4,12 @@ import { useHighContrastPref, useReducedTransparencyPref } from "./displayPrefs"
 import { registerShortcut } from "./keyboard";
 import { ShortcutCheatSheet } from "./ShortcutCheatSheet";
 import { settingsStore } from "../lib/settings";
+import {
+  READING_PREFS_EVENT,
+  applyThemeAttribute,
+  loadReadingPrefs,
+  resolveEffectiveTheme,
+} from "./readingPrefs";
 
 // Mounted once (wrapping <App/> in main.tsx) so it also covers the login screen.
 // Reflects the three a11y display preferences onto <html> for a11y.css, hosts the
@@ -13,6 +19,29 @@ function useHtmlClass(cls: string, on: boolean): void {
   useEffect(() => {
     document.documentElement.classList.toggle(cls, on);
   }, [cls, on]);
+}
+
+/** Reflect the reader's chosen theme onto `html[data-theme]` so the ENTIRE app
+ *  (chrome, cards, login, reading pane) re-themes — driven by tokens.css. Stays
+ *  in sync across components via the reading-prefs change event + cross-tab
+ *  storage, and re-resolves on a slow timer so autoNight flips at dusk/dawn. */
+function useGlobalReadingTheme(): void {
+  const [theme, setTheme] = useState(() => resolveEffectiveTheme(loadReadingPrefs()));
+  useEffect(() => {
+    const sync = () => setTheme(resolveEffectiveTheme(loadReadingPrefs()));
+    sync();
+    window.addEventListener(READING_PREFS_EVENT, sync);
+    window.addEventListener("storage", sync);
+    const timer = window.setInterval(sync, 60_000); // autoNight boundary
+    return () => {
+      window.removeEventListener(READING_PREFS_EVENT, sync);
+      window.removeEventListener("storage", sync);
+      window.clearInterval(timer);
+    };
+  }, []);
+  useEffect(() => {
+    applyThemeAttribute(theme);
+  }, [theme]);
 }
 
 function SkipLink() {
@@ -63,6 +92,7 @@ export function A11yProvider({ children }: A11yProviderProps) {
   useHtmlClass("kinora-high-contrast", highContrast);
   useHtmlClass("kinora-increase-contrast", highContrast);
   useHtmlClass("kinora-reduce-transparency", reduceTransparency);
+  useGlobalReadingTheme();
 
   const [sheetOpen, setSheetOpen] = useState(false);
   useEffect(

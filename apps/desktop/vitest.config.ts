@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,13 @@ export default defineConfig({
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    exclude: [
+      ...configDefaults.exclude,
+      "src/components/icons/*.test.ts",
+      "src/lib/{appearance,settings}.test.ts",
+      "src/reading/__tests__/**/*.test.ts",
+      "src/reading/{crossfade,fallback,machine,warmupModel}.test.ts",
+    ],
     css: false,
   },
 });

@@ -5,7 +5,7 @@ This is the **real, runnable** Alibaba Cloud render worker — the deployable fo
 of the spec's §12.6 sketch. It runs on **ECS / Function Compute** as a long-lived
 **queue worker** (§12.1): it consumes the Redis priority render queue and, for
 each claimed shot, renders through the production pipeline — calling **DashScope /
-Model Studio** (Wan 2.7 video synthesis, CosyVoice narration, the Qwen crew) and
+Model Studio** (hosted Wan video synthesis, CosyVoice narration, the Qwen crew) and
 persisting clips/keyframes/audio to **OSS** object storage.
 
 It deliberately **reuses the application's real code** rather than duplicating
@@ -14,7 +14,7 @@ logic, so this file is an honest proof, not a parallel implementation:
 * ``app.storage.object_store.ObjectStore`` — the one boto3 S3v4 client used
   everywhere; pointed at OSS's S3-compatible endpoint in production (MinIO
   locally). This is the OSS integration.
-* ``app.providers.video.VideoProvider`` — the real DashScope Wan 2.7 async
+* ``app.providers.video.VideoProvider`` — the real DashScope hosted Wan async
   video-synthesis client (submit → poll → fetch). This is the DashScope
   integration. It is gated by ``KINORA_LIVE_VIDEO`` so deploying never silently
   spends video-seconds.
@@ -27,7 +27,7 @@ Two entrypoints:
   this is what the ECS instance / FC service executes (see ``deploy/Dockerfile``
   and ``infra/terraform``).
 * ``render_shot_to_oss(spec)`` is the **minimal §12.6 demonstration**: it renders
-  one shot with DashScope Wan and writes the clip to OSS, mirroring the spec's
+  one shot with hosted DashScope Wan and writes the clip to OSS, mirroring the spec's
   ``render_shot`` signature while using the real providers + ObjectStore.
 
 Run locally (from the repo root)::
@@ -82,9 +82,9 @@ def _apply_oss_aliases() -> None:
 
 
 async def render_shot_to_oss(spec: dict[str, Any]) -> dict[str, Any]:
-    """Render one shot with DashScope Wan and write the clip to OSS (the §12.6 core).
+    """Render one shot with hosted DashScope Wan and write the clip to OSS.
 
-    Demonstrably uses **DashScope** (``VideoProvider.render`` → Wan 2.7
+    Demonstrably uses **DashScope** (``VideoProvider.render`` → hosted Wan
     video-synthesis) and **OSS** (``ObjectStore.put_bytes`` via the S3-compatible
     endpoint). Honest about spend: the render is gated by ``KINORA_LIVE_VIDEO``;
     when the gate is off ``LiveVideoDisabled`` is raised and **no** Wan task is
@@ -92,10 +92,10 @@ async def render_shot_to_oss(spec: dict[str, Any]) -> dict[str, Any]:
 
     Args:
         spec: ``{shot_id, prompt, negative_prompt?, reference_urls?, seed?,
-            target_duration_s?, book_id?}`` — mirrors the §12.6 sample shape.
+            target_duration_s?, book_id?, model?}`` — mirrors the §12.6 sample shape.
 
     Returns:
-        ``{clip_url, task_id, video_seconds}`` with the ``oss://`` clip URL.
+        ``{clip_url, task_id, video_seconds, model}`` with the ``oss://`` clip URL.
     """
     _apply_oss_aliases()
     from app.core.config import get_settings
@@ -107,14 +107,16 @@ async def render_shot_to_oss(spec: dict[str, Any]) -> dict[str, Any]:
     providers = create_providers(settings)
     store = ObjectStore.from_settings(settings)
     try:
+        refs = list(spec.get("reference_urls", []))
         wan = WanSpec(
-            mode=WanMode.REFERENCE_TO_VIDEO,  # reference-to-video, the consistency engine
+            mode=WanMode.REFERENCE_TO_VIDEO if refs else WanMode.TEXT_TO_VIDEO,
             prompt=str(spec["prompt"]),
             negative_prompt=spec.get("negative_prompt"),
-            reference_image_urls=list(spec.get("reference_urls", [])),
+            reference_image_urls=refs,
             seed=spec.get("seed"),
             duration_s=int(spec.get("target_duration_s", 5)),
             shot_id=spec.get("shot_id"),
+            model=spec.get("model"),
         )
         result = await providers.video.render(wan)  # → DashScope Wan (Model Studio)
         clip_bytes = result.clip_bytes or b""
@@ -124,6 +126,7 @@ async def render_shot_to_oss(spec: dict[str, Any]) -> dict[str, Any]:
             "clip_url": f"oss://{store.bucket}/{key}",
             "task_id": result.provider_task_id,
             "video_seconds": result.duration_s,
+            "model": result.model,
         }
     finally:
         await providers.aclose()

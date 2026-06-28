@@ -134,7 +134,8 @@ async def test_synthesize_returns_audio_and_proportional_timestamps(
     assert result.sample_rate == 24000
     assert result.alignment == "proportional"
     assert len(result.word_timestamps) == 4
-    assert result.model == "qwen3-tts-flash"
+    # qwen3-tts-flash resolves to its free-tier snapshot (see _TTS_MODEL_SNAPSHOTS).
+    assert result.model == "qwen3-tts-flash-2025-09-18"
     totals = client.usage_totals
     assert totals is not None and totals.audio_seconds > 0
     await client.aclose()

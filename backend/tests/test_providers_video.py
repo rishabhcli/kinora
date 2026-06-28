@@ -11,7 +11,7 @@ from app.core.config import Settings
 from app.providers.base import ProviderClient, ResilienceConfig
 from app.providers.errors import LiveVideoDisabled
 from app.providers.types import WanMode, WanSpec
-from app.providers.video import VideoPollConfig, VideoProvider
+from app.providers.video import VideoModelProfile, VideoPollConfig, VideoProtocol, VideoProvider
 from tests.test_providers_base import FAST
 
 
@@ -36,18 +36,14 @@ def _ok(request: httpx.Request) -> httpx.Response:
 # --------------------------------------------------------------------------- #
 
 
-async def test_render_raises_when_live_video_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    import dashscope
-
+async def test_render_raises_when_live_video_disabled() -> None:
     submitted = {"called": False}
 
-    def _tripwire(**kwargs: object) -> object:
+    def _tripwire(request: httpx.Request) -> httpx.Response:
         submitted["called"] = True
-        raise AssertionError("async_call must NOT be invoked when the gate is closed")
+        raise AssertionError("video endpoint must NOT be invoked when the gate is closed")
 
-    monkeypatch.setattr(dashscope.VideoSynthesis, "async_call", _tripwire)
-
-    client = _client(_ok, live=False)
+    client = _client(_tripwire, live=False)
     provider = VideoProvider(client)
     with pytest.raises(LiveVideoDisabled):
         await provider.render(WanSpec(mode=WanMode.TEXT_TO_VIDEO, prompt="a quiet meadow"))
@@ -75,56 +71,88 @@ def test_model_for_mode_resolution() -> None:
     )
 
 
-def test_submit_kwargs_per_mode() -> None:
+def test_submit_body_per_mode_legacy_profile() -> None:
     client = _client(_ok, live=True)
     provider = VideoProvider(client)
+    profile = VideoModelProfile("wan2.1-i2v-turbo", VideoProtocol.LEGACY)
 
-    t2v = provider._submit_kwargs(
-        WanSpec(mode=WanMode.TEXT_TO_VIDEO, prompt="p", negative_prompt="bad", seed=3), "wan2.7-t2v"
+    t2v = provider._submit_body(
+        WanSpec(mode=WanMode.TEXT_TO_VIDEO, prompt="p", negative_prompt="bad", seed=3), profile
     )
-    assert t2v["prompt"] == "p" and t2v["negative_prompt"] == "bad" and t2v["seed"] == 3
-    assert "img_url" not in t2v and "media" not in t2v
+    assert t2v["input"]["prompt"] == "p"
+    assert t2v["parameters"]["negative_prompt"] == "bad"
+    assert t2v["parameters"]["seed"] == 3
+    assert "img_url" not in t2v["input"] and "media" not in t2v["input"]
 
-    i2v = provider._submit_kwargs(
-        WanSpec(mode=WanMode.IMAGE_TO_VIDEO, image_url="https://x/first.png"), "wan2.7-i2v"
+    i2v = provider._submit_body(
+        WanSpec(mode=WanMode.IMAGE_TO_VIDEO, image_url="https://x/first.png"), profile
     )
-    assert i2v["img_url"] == "https://x/first.png"
+    assert i2v["input"]["img_url"] == "https://x/first.png"
 
-    flf = provider._submit_kwargs(
+    flf = provider._submit_body(
         WanSpec(
             mode=WanMode.FIRST_LAST_FRAME,
             first_frame_url="https://x/a.png",
             last_frame_url="https://x/b.png",
         ),
-        "wan2.7-i2v",
+        profile,
     )
-    assert flf["first_frame_url"] == "https://x/a.png"
-    assert flf["last_frame_url"] == "https://x/b.png"
+    assert flf["input"]["first_frame_url"] == "https://x/a.png"
+    assert flf["input"]["last_frame_url"] == "https://x/b.png"
 
-    r2v = provider._submit_kwargs(
+    r2v = provider._submit_body(
         WanSpec(
             mode=WanMode.REFERENCE_TO_VIDEO,
             reference_image_urls=["https://x/ref1.png", "https://x/ref2.png"],
             reference_voice_url="https://x/voice.mp3",
         ),
-        "wan2.7-r2v",
+        profile,
     )
-    assert r2v["media"][0] == {
-        "type": "reference_image",
-        "url": "https://x/ref1.png",
-        "reference_voice": "https://x/voice.mp3",
-    }
-    assert r2v["media"][1] == {"type": "reference_image", "url": "https://x/ref2.png"}
+    assert r2v["input"]["img_url"] == "https://x/ref1.png"
+    assert r2v["input"]["reference_image_urls"] == ["https://x/ref1.png", "https://x/ref2.png"]
+    assert r2v["input"]["reference_voice_url"] == "https://x/voice.mp3"
 
-    edit = provider._submit_kwargs(
+    edit = provider._submit_body(
         WanSpec(
             mode=WanMode.INSTRUCTION_EDIT,
             prompt="make it red",
             source_video_url="https://x/clip.mp4",
         ),
-        "wan2.7-i2v",
+        profile,
     )
-    assert edit["media"] == [{"type": "video", "url": "https://x/clip.mp4"}]
+    assert edit["input"]["video_url"] == "https://x/clip.mp4"
+
+
+def test_submit_body_per_mode_media_profile() -> None:
+    client = _client(_ok, live=True)
+    provider = VideoProvider(client)
+    profile = VideoModelProfile("wan2.7-i2v", VideoProtocol.MEDIA)
+
+    flf = provider._submit_body(
+        WanSpec(
+            mode=WanMode.FIRST_LAST_FRAME,
+            first_frame_url="https://x/a.png",
+            last_frame_url="https://x/b.png",
+        ),
+        profile,
+    )
+    assert flf["input"]["media"] == [
+        {"type": "first_frame", "url": "https://x/a.png"},
+        {"type": "last_frame", "url": "https://x/b.png"},
+    ]
+
+    continuation = provider._submit_body(
+        WanSpec(
+            mode=WanMode.VIDEO_CONTINUATION,
+            image_url="https://x/frame.png",
+            source_video_url="https://x/clip.mp4",
+        ),
+        profile,
+    )
+    assert continuation["input"]["media"] == [
+        {"type": "first_frame", "url": "https://x/frame.png"},
+        {"type": "first_clip", "url": "https://x/clip.mp4"},
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -151,7 +179,7 @@ async def test_verify_model_available_true_and_cancels() -> None:
 
     client = _client(handler, live=False)  # verify works regardless of the gate
     provider = VideoProvider(client)
-    assert await provider.verify_model_available("wan2.7-t2v") is True
+    assert await provider.verify_model_available("wan2.1-t2v-turbo") is True
     assert state["submitted"] is True
     assert state["cancelled"] is True  # recognized model -> doomed task cancelled
     await client.aclose()
@@ -172,27 +200,24 @@ async def test_verify_model_available_false_on_unknown_model() -> None:
 # --------------------------------------------------------------------------- #
 
 
-async def test_render_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    import dashscope
-
-    class _Sub:
-        status_code = 200
-        code = None
-        message = None
-        request_id = "sub-1"
-        output = {"task_id": "task-9", "task_status": "PENDING"}
-
-    class _Done:
-        status_code = 200
-        code = None
-        message = None
-        request_id = "done-1"
-        output = {"task_status": "SUCCEEDED", "video_url": "https://assets.test/clip.mp4"}
-
-    monkeypatch.setattr(dashscope.VideoSynthesis, "async_call", lambda **kw: _Sub())
-    monkeypatch.setattr(dashscope.VideoSynthesis, "fetch", lambda task_id, **kw: _Done())
-
+async def test_render_success_path() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/video-synthesis"):
+            return httpx.Response(
+                200,
+                json={"request_id": "sub-1", "output": {"task_id": "task-9"}},
+            )
+        if request.url.path.endswith("/tasks/task-9"):
+            return httpx.Response(
+                200,
+                json={
+                    "request_id": "done-1",
+                    "output": {
+                        "task_status": "SUCCEEDED",
+                        "results": [{"url": "https://assets.test/clip.mp4"}],
+                    },
+                },
+            )
         if request.url.host == "assets.test":
             return httpx.Response(200, content=b"MP4-CLIP-BYTES")
         return httpx.Response(200, json={})

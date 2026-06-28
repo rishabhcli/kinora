@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./icons";
 import { SETTINGS_SECTIONS } from "./settings/sections";
 import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 import "./settings/settings.css";
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const reduce = useReducedMotionPref();
   const [activeId, setActiveId] = useState(SETTINGS_SECTIONS[0].id);
   const [query, setQuery] = useState("");
@@ -15,9 +17,12 @@ export default function SettingsPage() {
     const q = query.trim().toLowerCase();
     if (!q) return SETTINGS_SECTIONS;
     return SETTINGS_SECTIONS.filter(
-      (s) => s.label.toLowerCase().includes(q) || s.keywords.toLowerCase().includes(q),
+      (s) =>
+        s.label.toLowerCase().includes(q) ||
+        t(s.labelKey).toLowerCase().includes(q) ||
+        s.keywords.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, t]);
 
   // Keep a valid selection when the filter changes.
   useEffect(() => {
@@ -48,9 +53,9 @@ export default function SettingsPage() {
     <div className="pt-12 pb-8 px-6 max-w-[1100px] mx-auto relative z-10">
       {/* Header */}
       <div className="mb-8 pt-4">
-        <p className="text-[11px] font-medium text-kinora-muted mb-2 tracking-wide uppercase">Settings</p>
+        <p className="text-[11px] font-medium text-kinora-muted mb-2 tracking-wide uppercase">{t("settings.title")}</p>
         <div className="flex items-end justify-between gap-4">
-          <h1 className="font-serif text-3xl font-semibold text-kinora-text">Settings</h1>
+          <h1 className="font-serif text-3xl font-semibold text-kinora-text">{t("settings.title")}</h1>
           <div className="relative" style={{ width: 240 }}>
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-kinora-subtle pointer-events-none">
               <Icon name="magnifyingglass" size={14} />
@@ -59,8 +64,8 @@ export default function SettingsPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search settings"
-              aria-label="Search settings"
+              placeholder={t("settings.searchPlaceholder")}
+              aria-label={t("settings.searchPlaceholder")}
               className="glass-input w-full pl-8 pr-3 py-2 rounded-xl text-[12.5px] text-kinora-text"
             />
           </div>
@@ -71,12 +76,12 @@ export default function SettingsPage() {
         {/* Sidebar */}
         <nav
           role="tablist"
-          aria-label="Settings categories"
+          aria-label={t("settings.categoriesAria")}
           aria-orientation="vertical"
           onKeyDown={onSidebarKey}
           className="w-[210px] shrink-0 sticky top-16"
         >
-          {filtered.length === 0 && <p className="text-[12px] text-kinora-muted px-3 py-2">No matches.</p>}
+          {filtered.length === 0 && <p className="text-[12px] text-kinora-muted px-3 py-2">{t("settings.noMatches")}</p>}
           {filtered.map((s) => {
             const selected = s.id === activeId;
             return (
@@ -100,7 +105,7 @@ export default function SettingsPage() {
                 <span style={{ color: selected ? "#e8c878" : undefined }}>
                   <Icon name={selected ? s.activeIcon : s.icon} size={17} weight={selected ? "medium" : "regular"} />
                 </span>
-                <span className="font-medium">{s.label}</span>
+                <span className="font-medium">{t(s.labelKey)}</span>
               </button>
             );
           })}

@@ -9,7 +9,7 @@
 
 **Liquid Glass:** real Liquid Glass is a **native macOS 26 API only** (SwiftUI `.glassEffect` / AppKit `NSGlassEffectView`). CSS `backdrop-filter`/SVG-displacement is an imitation — **do not call it Liquid Glass.** Building the SwiftUI app needs the **Xcode toolchain** (the Command Line Tools lack the `SwiftUIMacros` plugin, so `@State`/`.glassEffect` won't compile); `make app-native` auto-sets `DEVELOPER_DIR` to the installed Xcode.
 
-**Wan video (DashScope intl endpoint):** the model ids in `backend/app/core/config.py` were placeholders (`wan2.7-t2v` → "Model not exist"). **Working ids** (set in `backend/.env`): t2v `wan2.5-t2v-preview` or `wan2.1-t2v-turbo`; i2v `wan2.2-i2v-plus` or `wan2.1-i2v-turbo`. `wan2.2-t2v-plus` accepts the submit but **fails at render — avoid it.** The `429 Throttling.RateQuota` is on the **image** model (`qwen-image-2.0-pro`), **not** video, so t2v sidesteps it. Films are **vertical 720×1280** (short-drama). Generated clips are saved to `~/Documents/Kinora-Generated-Videos/`.
+**Wan video (DashScope intl endpoint):** Kinora is hosted-Qwen/DashScope only; do **not** add a local Wan backend. Default demo ids are t2v `wan2.1-t2v-turbo`, i2v/r2v `wan2.1-i2v-turbo`. Quality overrides are t2v `wan2.5-t2v-preview` and i2v/r2v `wan2.2-i2v-plus`. `wan2.2-t2v-plus` accepts the submit but **fails at render — avoid it.** The `429 Throttling.RateQuota` is on the **image** model (`qwen-image-2.0-pro`), **not** video, so t2v sidesteps it. Films are **vertical 720×1280** (short-drama). Successful provider videos are downloaded and persisted to object storage by the render pipeline because provider task URLs expire.
 
 **Local infra:** host Postgres is remapped to **5433** in `infra/docker-compose.yml` (5432 collides with a non-Kinora `admitly-postgres`); in-cluster services still use `postgres:5432`. Set `S3_PUBLIC_BASE_URL=http://localhost:9000/kinora` so MinIO media URLs are browser-reachable; the client also rewrites `minio:9000`→`localhost:9000` (`toBrowserUrl` in `lib/api.ts`). Demo creds `demo@kinora.local` / `demo-password-123` own a ready book.
 
@@ -28,9 +28,11 @@ Kinora is a Python backend plus a pnpm/Turborepo desktop workspace. `backend/app
 - `make app-install` — `pnpm install` for the monorepo.
 - `make app-desktop-dev` / `make app-desktop-build` — run / build the Electron app.
 - `pnpm --filter @kinora/desktop run typecheck` / `test` / `build` — desktop TypeScript, Vitest, and build checks.
+- `make provider-preflight` — safe hosted Qwen/DashScope model preflight (add `PREFLIGHT_ARGS=--spend-smoke` only when intentionally spending tiny smoke-test credits).
+- `make ingest-worker` — run the durable ingest recovery worker locally.
 - `make app-native` — run the native SwiftUI Liquid Glass shell (requires Xcode and the renderer dev server on `:5173`).
 - `make app-native-bundle` — build and open `apps/desktop-native/KinoraGlass.app`.
-- Avoid stale targets until they are repaired: `make app-typecheck`, `make app-test`, `make app-mobile-start`, `pnpm --filter @kinora/core ...`, and `pnpm --filter @kinora/mobile ...`.
+- Avoid stale targets that reference removed workspaces: `make app-mobile-start`, `pnpm --filter @kinora/core ...`, and `pnpm --filter @kinora/mobile ...`.
 
 ## Coding Style & Naming Conventions
 

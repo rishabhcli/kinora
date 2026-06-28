@@ -47,9 +47,18 @@ redis_engine_version = "7.0"
 # --- ECS app tier ---
 ecs_instance_type   = "ecs.g7.large"
 ecs_password        = "Change-This-Str0ng-Passw0rd"
+ingest_worker_count = 1
 render_worker_count = 2
 
 # --- Application runtime ---
-container_image   = "registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest"
-dashscope_api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-kinora_live_video = false  # flip to true only when you intend to spend Wan video-seconds
+container_image          = "registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest"
+frontend_container_image = "registry.ap-southeast-1.aliyuncs.com/kinora/frontend:latest"
+dashscope_api_key        = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+kinora_live_video        = false # flip to true only when you intend to spend Wan video-seconds
+
+# --- Hosted Wan video models (verified available on the DashScope-intl tier) ---
+# Defaults are wan2.7; turbo (wan2.1-t2v-turbo / wan2.1-i2v-turbo) trades quality
+# for lower latency. r2v rides the i2v model. Verify with provider_preflight.
+video_model     = "wan2.7-t2v"
+video_model_i2v = "wan2.7-i2v"
+video_model_r2v = "wan2.7-i2v"

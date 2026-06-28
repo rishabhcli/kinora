@@ -94,6 +94,9 @@ export interface ShortcutOpts {
   whenInputFocused?: boolean;
   /** Call preventDefault() when the combo matches. Default false. */
   preventDefault?: boolean;
+  /** Functional but intentionally omitted from the `?` cheat-sheet / any UI
+   *  surface (power-user navigation we don't advertise). Default false. */
+  hidden?: boolean;
 }
 
 export interface RegisteredShortcut {
@@ -107,6 +110,7 @@ interface Entry extends RegisteredShortcut {
   handler: (e: KeyboardEvent) => void;
   whenInputFocused: boolean;
   preventDefault: boolean;
+  hidden: boolean;
 }
 
 const entries: Entry[] = [];
@@ -188,6 +192,7 @@ export function registerShortcut(
     description: opts.description,
     whenInputFocused: opts.whenInputFocused ?? false,
     preventDefault: opts.preventDefault ?? false,
+    hidden: opts.hidden ?? false,
   };
   entries.push(entry);
   ensureListening();
@@ -198,9 +203,12 @@ export function registerShortcut(
   };
 }
 
-/** All currently-registered shortcuts (for the `?` cheat-sheet). */
+/** Currently-registered shortcuts for the `?` cheat-sheet. Hidden shortcuts
+ *  (power-user navigation we don't advertise) are intentionally excluded. */
 export function getRegisteredShortcuts(): RegisteredShortcut[] {
-  return entries.map(({ combo, description, scope }) => ({ combo, description, scope }));
+  return entries
+    .filter((e) => !e.hidden)
+    .map(({ combo, description, scope }) => ({ combo, description, scope }));
 }
 
 /** Remove every shortcut + the listener (HMR / teardown). */

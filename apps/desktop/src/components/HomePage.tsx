@@ -1,7 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import type React from "react";
+import { useTranslation } from "react-i18next";
 import { api, toUiBook, toBrowserUrl, ApiError, type BookResponse } from "../lib/api";
 import Navbar, { navItems } from "./Navbar";
+import { useGlobalNavShortcuts } from "../a11y/useNavShortcuts";
 import Greeting from "./Greeting";
 import BookShelf from "./BookShelf";
 import HeroBanner from "./HeroBanner";
@@ -46,6 +48,7 @@ const PageFallback = () => (
 );
 
 export default function HomePage({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation();
   const [activePage, setActivePageState] = useState("Home");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [myBooks, setMyBooks] = useState<Book[]>([]);
@@ -122,6 +125,14 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
 
+  // Hidden power-user navigation (Cmd/Ctrl+1..5 tabs, arrow/Home/End scroll).
+  // Deferred while the reading room owns the keyboard. Not surfaced in any UI.
+  useGlobalNavShortcuts({
+    tabs: navItems.map((n) => n.label),
+    onSelectTab: setActivePage,
+    isSuppressed: () => inRoom,
+  });
+
   const pages: Record<string, React.ReactNode> = {
     Home: (
       <main className="pb-8 relative z-10">
@@ -132,12 +143,12 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           </div>
           {/* Shelves animate in via their own whileInView (BookShelf internals). */}
           {myBooks.length > 0 && (
-            <BookShelf title="Read Live · Public Domain" books={myBooks} onOpen={handleOpen} />
+            <BookShelf title={t("library.readLivePublicDomain")} books={myBooks} onOpen={handleOpen} />
           )}
-          <BookShelf title="Continue Reading" books={continueReading} onOpen={handleOpen} />
-          <BookShelf title="Recently Added" books={recentlyAdded} onOpen={handleOpen} />
-          <BookShelf title="Popular on Kinora" books={popularOnKinora} onOpen={handleOpen} />
-          <BookShelf title="Recommended for You" books={recommended} onOpen={handleOpen} />
+          <BookShelf title={t("library.continueReading")} books={continueReading} onOpen={handleOpen} />
+          <BookShelf title={t("library.recentlyAdded")} books={recentlyAdded} onOpen={handleOpen} />
+          <BookShelf title={t("library.popularOnKinora")} books={popularOnKinora} onOpen={handleOpen} />
+          <BookShelf title={t("library.recommended")} books={recommended} onOpen={handleOpen} />
         </div>
       </main>
     ),

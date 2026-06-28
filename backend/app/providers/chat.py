@@ -160,8 +160,8 @@ class ChatProvider:
 
     # -- payload / transport ---------------------------------------------- #
 
-    @staticmethod
     def _build_payload(
+        self,
         messages: Messages,
         model: str,
         temperature: float | None,
@@ -318,4 +318,88 @@ class ChatProvider:
         return "" if content is None else str(content)
 
 
-__all__ = ["ChatProvider", "extract_json"]
+class OpenAIChatProvider(ChatProvider):
+    """Chat/reasoning over OpenAI's native ``/v1/chat/completions`` (GPT-5 line).
+
+    Bound to a :class:`ProviderClient` whose base URL + bearer key point at
+    OpenAI (built by :func:`create_providers` when ``reasoning_provider=openai``).
+    The agent crew passes DashScope model ids (e.g. ``qwen3.7-plus``); this
+    provider ignores them and forces the configured ``reasoning_model`` so a
+    single toggle swaps the brain without touching any caller. It reshapes the
+    Qwen-flavoured payload for GPT-5 reasoning models:
+
+    * ``max_tokens`` -> ``max_completion_tokens``, floored to ``max_output_tokens``
+      so reasoning tokens (billed against the completion cap) have headroom;
+    * adds ``reasoning_effort``;
+    * drops ``temperature`` (reasoning models reject a non-default value) and
+      ``enable_thinking`` (a Qwen-only passthrough OpenAI would reject).
+
+    Streaming, JSON-repair, tool-call assembly, and usage accounting are all
+    inherited unchanged — OpenAI's chat-completions wire format matches.
+    """
+
+    def __init__(
+        self,
+        client: ProviderClient,
+        *,
+        model: str,
+        reasoning_effort: str = "high",
+        max_output_tokens: int = 8192,
+    ) -> None:
+        super().__init__(client)
+        self._model = model
+        self._reasoning_effort = reasoning_effort
+        self._max_output_tokens = max_output_tokens
+
+    async def chat(
+        self,
+        messages: Messages,
+        model: str,
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        response_format: dict[str, Any] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        timeout: float | None = None,
+        stream: bool | None = None,
+        enable_thinking: bool | None = None,
+    ) -> ChatResult:
+        # Force the configured reasoning model (callers pass Qwen ids); this also
+        # ensures usage is recorded under the model actually billed.
+        return await super().chat(
+            messages,
+            self._model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format=response_format,
+            tools=tools,
+            timeout=timeout,
+            stream=stream,
+            enable_thinking=enable_thinking,
+        )
+
+    def _build_payload(
+        self,
+        messages: Messages,
+        model: str,
+        temperature: float | None,
+        max_tokens: int | None,
+        response_format: dict[str, Any] | None,
+        tools: list[dict[str, Any]] | None,
+        enable_thinking: bool | None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "reasoning_effort": self._reasoning_effort,
+            "max_completion_tokens": max(max_tokens or 0, self._max_output_tokens),
+        }
+        if response_format is not None:
+            payload["response_format"] = response_format
+        if tools:
+            payload["tools"] = tools
+        # temperature and enable_thinking are intentionally omitted (see docstring).
+        return payload
+
+
+__all__ = ["ChatProvider", "OpenAIChatProvider", "extract_json"]

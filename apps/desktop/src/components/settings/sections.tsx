@@ -1,5 +1,8 @@
 import { type ComponentType, useEffect, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { useSettings } from "../../lib/useSettings";
+import { SUPPORTED_LANGUAGES, currentLanguage, setLanguage, type LanguageCode } from "../../i18n";
 import {
   useReadingPrefs,
   READING_THEMES,
@@ -15,14 +18,11 @@ import { api } from "../../lib/api";
 import { diffFromDefaults, type SystemOverride } from "../../lib/settings";
 import { settingsStore } from "../../lib/settings";
 import { Icon, type IconName } from "../icons";
-import { Row, RowButton, SectionTitle, Segmented, SettingsGroup, Slider, Switch } from "./controls";
+import { Row, RowButton, SectionTitle, Segmented, Select, SettingsGroup, Slider, Switch } from "./controls";
 import ProfileEditor from "./ProfileEditor";
 
-const OVERRIDE_OPTS: { value: SystemOverride; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "on", label: "On" },
-  { value: "off", label: "Off" },
-];
+/** Override segmented options — labels are translated at render in each section. */
+const OVERRIDE_VALUES: SystemOverride[] = ["system", "on", "off"];
 
 function useVoices(): SpeechSynthesisVoice[] {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -38,35 +38,47 @@ function useVoices(): SpeechSynthesisVoice[] {
 
 /* ── General ────────────────────────────────────────────────────────────── */
 function GeneralSection() {
+  const { t } = useTranslation();
   const { settings, set, reset } = useSettings();
+  // NOTE: launchView values are the English page-identity strings ("Home", …)
+  // that HomePage's `pages` map keys off — only the displayed label is translated.
   const launchOpts: { value: typeof settings.launchView; label: string }[] = [
-    { value: "Home", label: "Home" },
-    { value: "Library", label: "Library" },
-    { value: "Watch", label: "Watch" },
-    { value: "Favorites", label: "Favorites" },
-    { value: "Notes", label: "Notes" },
+    { value: "Home", label: t("nav.home") },
+    { value: "Library", label: t("nav.library") },
+    { value: "Watch", label: t("nav.watch") },
+    { value: "Favorites", label: t("nav.favorites") },
+    { value: "Notes", label: t("nav.notes") },
   ];
+  const langOpts = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.name }));
   return (
     <div>
-      <SectionTitle icon="gearshape" title="General" subtitle="How Kinora starts up and behaves." />
+      <SectionTitle icon="gearshape" title={t("settings.sections.general")} subtitle={t("settings.general.subtitle")} />
       <SettingsGroup>
-        <Row icon="house" label="Open Kinora to" description="The view Kinora shows when it launches.">
-          <Segmented value={settings.launchView} options={launchOpts} onChange={(v) => set({ launchView: v })} ariaLabel="Launch view" />
+        <Row icon="globe" label={t("language.name")} description={t("language.description")}>
+          <Select
+            value={currentLanguage()}
+            options={langOpts}
+            onChange={(v) => setLanguage(v as LanguageCode)}
+            ariaLabel={t("language.name")}
+          />
         </Row>
-        <Row icon="bell" label="Sound effects" description="Subtle page-turn and UI sounds.">
-          <Switch checked={settings.soundEffects} onChange={(v) => set({ soundEffects: v })} label="Sound effects" />
+        <Row icon="house" label={t("settings.general.openTo")} description={t("settings.general.openToDesc")}>
+          <Segmented value={settings.launchView} options={launchOpts} onChange={(v) => set({ launchView: v })} ariaLabel={t("settings.general.openTo")} />
+        </Row>
+        <Row icon="bell" label={t("settings.general.soundEffects")} description={t("settings.general.soundEffectsDesc")}>
+          <Switch checked={settings.soundEffects} onChange={(v) => set({ soundEffects: v })} label={t("settings.general.soundEffects")} />
         </Row>
       </SettingsGroup>
-      <SettingsGroup title="Reset">
-        <Row icon="arrow.counterclockwise" label="Restore all defaults" description="Reset every Kinora setting to its original value.">
+      <SettingsGroup title={t("settings.general.reset")}>
+        <Row icon="arrow.counterclockwise" label={t("settings.general.restoreDefaults")} description={t("settings.general.restoreDefaultsDesc")}>
           <RowButton
             tone="accent"
             icon="arrow.counterclockwise"
             onClick={() => {
-              if (window.confirm("Restore all Kinora settings to defaults?")) reset();
+              if (window.confirm(t("settings.general.restoreConfirm"))) reset();
             }}
           >
-            Restore
+            {t("common.restore")}
           </RowButton>
         </Row>
       </SettingsGroup>
@@ -76,23 +88,28 @@ function GeneralSection() {
 
 /* ── Appearance ─────────────────────────────────────────────────────────── */
 function AppearanceSection() {
+  const { t } = useTranslation();
   const { settings, set } = useSettings();
+  const overrideOpts = OVERRIDE_VALUES.map((value) => ({
+    value,
+    label: t(`settings.override.${value}` as const),
+  }));
   return (
     <div>
-      <SectionTitle icon="paintbrush" title="Appearance" subtitle="Accessibility overrides applied across the whole app." />
+      <SectionTitle icon="paintbrush" title={t("settings.sections.appearance")} subtitle={t("settings.appearance.subtitle")} />
       <SettingsGroup>
-        <Row icon="sparkles" label="Reduce motion" description="Minimise animations and transitions.">
-          <Segmented value={settings.reduceMotion} options={OVERRIDE_OPTS} onChange={(v) => set({ reduceMotion: v })} ariaLabel="Reduce motion" />
+        <Row icon="sparkles" label={t("settings.appearance.reduceMotion")} description={t("settings.appearance.reduceMotionDesc")}>
+          <Segmented value={settings.reduceMotion} options={overrideOpts} onChange={(v) => set({ reduceMotion: v })} ariaLabel={t("settings.appearance.reduceMotion")} />
         </Row>
-        <Row icon="circle.lefthalf.filled" label="Reduce transparency" description="Drop the frosted-glass blur for solid surfaces.">
-          <Segmented value={settings.reduceTransparency} options={OVERRIDE_OPTS} onChange={(v) => set({ reduceTransparency: v })} ariaLabel="Reduce transparency" />
+        <Row icon="circle.lefthalf.filled" label={t("settings.appearance.reduceTransparency")} description={t("settings.appearance.reduceTransparencyDesc")}>
+          <Segmented value={settings.reduceTransparency} options={overrideOpts} onChange={(v) => set({ reduceTransparency: v })} ariaLabel={t("settings.appearance.reduceTransparency")} />
         </Row>
-        <Row icon="eye" label="Increase contrast" description="Brighten secondary text and firm up borders.">
-          <Segmented value={settings.increaseContrast} options={OVERRIDE_OPTS} onChange={(v) => set({ increaseContrast: v })} ariaLabel="Increase contrast" />
+        <Row icon="eye" label={t("settings.appearance.increaseContrast")} description={t("settings.appearance.increaseContrastDesc")}>
+          <Segmented value={settings.increaseContrast} options={overrideOpts} onChange={(v) => set({ increaseContrast: v })} ariaLabel={t("settings.appearance.increaseContrast")} />
         </Row>
       </SettingsGroup>
       <p className="text-[11.5px] text-kinora-subtle ml-1 -mt-2">
-        Reading themes (Dark, Sepia, Paper…) live under <span className="text-kinora-muted">Reading</span>.
+        {t("settings.appearance.themesHint")}
       </p>
     </div>
   );
@@ -453,7 +470,10 @@ function AboutSection() {
 /* ── Registry (drives the sidebar + search) ─────────────────────────────── */
 export interface SettingsSectionDef {
   id: string;
+  /** English label — kept stable for search keyword matching. */
   label: string;
+  /** i18n key for the displayed sidebar label (translated at render). */
+  labelKey: ParseKeys;
   icon: IconName;
   activeIcon: IconName;
   keywords: string;
@@ -461,12 +481,12 @@ export interface SettingsSectionDef {
 }
 
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
-  { id: "general", label: "General", icon: "gearshape", activeIcon: "gearshape.fill", keywords: "launch startup sound effects reset defaults", Component: GeneralSection },
-  { id: "appearance", label: "Appearance", icon: "paintbrush", activeIcon: "paintbrush", keywords: "motion transparency contrast accessibility glass", Component: AppearanceSection },
-  { id: "reading", label: "Reading", icon: "textformat", activeIcon: "textformat", keywords: "theme dark sepia paper font size spacing line width night dyslexia brightness voice read aloud", Component: ReadingSection },
-  { id: "playback", label: "Playback", icon: "film", activeIcon: "film.fill", keywords: "film autoplay captions scrub sensitivity video player", Component: PlaybackSection },
-  { id: "notifications", label: "Notifications", icon: "bell", activeIcon: "bell.fill", keywords: "reminders digest alerts push test", Component: NotificationsSection },
-  { id: "privacy", label: "Privacy", icon: "lock.shield", activeIcon: "lock.shield", keywords: "analytics crash reports clear data tracking", Component: PrivacySection },
-  { id: "account", label: "Account", icon: "person.crop.circle", activeIcon: "person.crop.circle.fill", keywords: "profile name email bio genre goal sign out logout avatar", Component: AccountSection },
-  { id: "about", label: "About", icon: "info.circle", activeIcon: "info.circle.fill", keywords: "version credits github links terms privacy policy", Component: AboutSection },
+  { id: "general", label: "General", labelKey: "settings.sections.general", icon: "gearshape", activeIcon: "gearshape.fill", keywords: "launch startup sound effects reset defaults language locale", Component: GeneralSection },
+  { id: "appearance", label: "Appearance", labelKey: "settings.sections.appearance", icon: "paintbrush", activeIcon: "paintbrush", keywords: "motion transparency contrast accessibility glass", Component: AppearanceSection },
+  { id: "reading", label: "Reading", labelKey: "settings.sections.reading", icon: "textformat", activeIcon: "textformat", keywords: "theme dark sepia paper font size spacing line width night dyslexia brightness voice read aloud", Component: ReadingSection },
+  { id: "playback", label: "Playback", labelKey: "settings.sections.playback", icon: "film", activeIcon: "film.fill", keywords: "film autoplay captions scrub sensitivity video player", Component: PlaybackSection },
+  { id: "notifications", label: "Notifications", labelKey: "settings.sections.notifications", icon: "bell", activeIcon: "bell.fill", keywords: "reminders digest alerts push test", Component: NotificationsSection },
+  { id: "privacy", label: "Privacy", labelKey: "settings.sections.privacy", icon: "lock.shield", activeIcon: "lock.shield", keywords: "analytics crash reports clear data tracking", Component: PrivacySection },
+  { id: "account", label: "Account", labelKey: "settings.sections.account", icon: "person.crop.circle", activeIcon: "person.crop.circle.fill", keywords: "profile name email bio genre goal sign out logout avatar", Component: AccountSection },
+  { id: "about", label: "About", labelKey: "settings.sections.about", icon: "info.circle", activeIcon: "info.circle.fill", keywords: "version credits github links terms privacy policy", Component: AboutSection },
 ];

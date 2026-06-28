@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore, type CSSProperties } from "react";
 import type { Book } from "../data/books";
 import { api, toBrowserUrl, type ShotResponse } from "../lib/api";
 import {
@@ -9,10 +9,22 @@ import {
   type ReadingPrefs,
   type ReadingTheme,
 } from "../lib/readingPrefs";
-import { buildTimeline, type SegmentInput, type Timeline } from "./timeline";
+import {
+  buildTimeline,
+  nextSegmentToPreload,
+  resolvePlayhead,
+  type SegmentInput,
+  type Timeline,
+} from "./timeline";
 import { FilmPane, type FilmPaneHandle } from "./FilmPane";
 import { useScrollFilm, type ScrollFrame } from "./useScrollFilm";
+import { ClipCache } from "./clipCache";
 import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
+
+// How far ahead/behind (in words) to keep neighbour clips warm so a cut in either
+// direction is instant. Scroll-BACK is the priority: the previous shot's element
+// stays decoded in the FilmPane pool, the previous clip's bytes stay in the cache.
+const PRELOAD_LOOKAHEAD_WORDS = 240;
 
 const FILM_W = 320;
 const PARALLAX_PX = 12; // film drift over the full scroll (GPU translate; off when reduced)
@@ -58,17 +70,27 @@ function timelineFromProps(
   clips: Record<string, string>,
   live: boolean,
   fallbackFilm: string,
+  cache: ClipCache,
 ): Timeline {
   if (live) {
     const segs: SegmentInput[] = shots
       .filter((s) => s.source_span)
-      .map((s) => ({
-        id: s.shot_id,
-        wordStart: s.source_span!.word_range[0],
-        wordEnd: s.source_span!.word_range[1],
-        src: clips[s.shot_id] ?? toBrowserUrl(s.clip_url) ?? "",
-        duration: s.duration_s ?? undefined,
-      }));
+      .map((s) => {
+        // The clip URL for this shot: the live SSE map first, else the persisted
+        // clip_url from getShots (already browser-ready in the seed; defensively
+        // rewritten here too). Resolve it THROUGH the cache so a clip whose bytes
+        // are already in memory plays back from its stable blob URL — instant
+        // replay on scroll-back, no network round-trip — while an uncached clip
+        // keeps its network URL (and the cache warms it in the background).
+        const url = clips[s.shot_id] ?? toBrowserUrl(s.clip_url) ?? "";
+        return {
+          id: s.shot_id,
+          wordStart: s.source_span!.word_range[0],
+          wordEnd: s.source_span!.word_range[1],
+          src: cache.resolve(url),
+          duration: s.duration_s ?? undefined,
+        };
+      });
     if (segs.length > 0) return buildTimeline(segs);
   }
   // Fallback (or live with no shots yet): one continuous film. totalWords cancels
@@ -102,9 +124,24 @@ export function ScrollFilmEngine({
     fallbackFilm ??
     FALLBACK_FILMS[[...book.id].reduce((a, c) => a + c.charCodeAt(0), 0) % FALLBACK_FILMS.length];
 
+  // Per-mount clip cache: holds each shot's mp4 bytes as a stable blob URL so a
+  // scroll-BACK to an earlier shot replays the same clip instantly. Lives for the
+  // engine's lifetime; cleared (blob URLs revoked) on unmount/book-change.
+  const cacheRef = useRef<ClipCache | null>(null);
+  if (!cacheRef.current) cacheRef.current = new ClipCache();
+  const cache = cacheRef.current;
+  // Re-resolve the timeline when the cache's blob-URL set changes (a clip finished
+  // caching), so segments switch from their network URL to the cached blob URL.
+  const cacheVersion = useSyncExternalStore(
+    (cb) => cache.subscribe(cb),
+    () => cache.version(),
+    () => 0,
+  );
+  useEffect(() => () => cache.clear(), [cache]); // revoke all blob URLs on unmount
+
   const timeline = useMemo(
-    () => timelineFromProps(shots, clips, live, film),
-    [shots, clips, live, film],
+    () => timelineFromProps(shots, clips, live, film, cache),
+    [shots, clips, live, film, cache, cacheVersion],
   );
 
   const themeKey = effectiveTheme ?? resolveEffectiveTheme(prefs);
@@ -125,7 +162,12 @@ export function ScrollFilmEngine({
   const railDotRef = useRef<HTMLDivElement>(null);
   const scrubRef = useRef<HTMLDivElement>(null);
   const paraAt = useRef(0);
+  const preloadAt = useRef(0);
   const restored = useRef(false);
+  // Latest timeline in a ref so the per-frame preload reads the current segments
+  // (the onFrame callback is recreated each render, but keep this cheap + explicit).
+  const timelineRef = useRef(timeline);
+  timelineRef.current = timeline;
   // Cached paragraph metrics for the scroll-paint hot path [D1]: content-relative
   // tops measured once (and on resize / layout-pref change), so a fast flick never
   // reads layout (getBoundingClientRect) per node per frame.
@@ -227,6 +269,31 @@ export function ScrollFilmEngine({
     if (now - paraAt.current >= PARA_THROTTLE_MS) {
       paraAt.current = now;
       paintParagraph();
+    }
+    // Keep neighbour clips warm so a cut in EITHER direction is instant: prefetch
+    // their bytes into the cache and pre-mount their decoded <video> in the
+    // FilmPane pool. Throttled (cheap, idempotent) and direction-agnostic — the
+    // previous shot is preloaded too, which is what makes scroll-BACK seamless.
+    if (now - preloadAt.current >= PARA_THROTTLE_MS) {
+      preloadAt.current = now;
+      preloadNeighbours(frame.focusWord);
+    }
+  };
+
+  // Warm the segments adjacent to the reader (prev + next) in the cache and the
+  // FilmPane element pool, so transitions don't stall and scroll-back replays the
+  // exact same decoded clip.
+  const preloadNeighbours = (focusWord: number) => {
+    const tl = timelineRef.current;
+    if (!live || tl.segments.length === 0) return;
+    const head = resolvePlayhead(tl, focusWord);
+    if (!head) return;
+    const prev = tl.segments[head.index - 1];
+    const next = nextSegmentToPreload(tl, focusWord, PRELOAD_LOOKAHEAD_WORDS);
+    for (const seg of [prev, next]) {
+      if (!seg?.src) continue;
+      cache.prefetch(seg.src); // warm the bytes (no-op if already cached)
+      filmRef.current?.warm(seg.src); // pre-mount the decoded element off-screen
     }
   };
 

@@ -18,6 +18,10 @@ export interface FilmPaneHandle {
   /** The active `<video>`'s duration (s), once known — for the unknown-length
    *  bundled fallback film. 0 until metadata loads. */
   getActiveDuration(): number;
+  /** Warm an off-screen `<video>` with `src` so a (forward or backward) cut to it
+   *  is instant — no re-create, no re-decode flicker. No-op for the active src or
+   *  one already warm. The engine calls this for neighbour shots. */
+  warm(src: string): void;
 }
 
 interface FilmPaneProps {
@@ -27,9 +31,13 @@ interface FilmPaneProps {
   generating?: boolean;
   className?: string;
   style?: CSSProperties;
+  /** Max distinct decoded <video> elements kept warm for instant scroll-back.
+   *  The 2 active crossfade layers always count toward this. */
+  poolSize?: number;
 }
 
-interface Layer {
+interface Slot {
+  /** stable identity for this src — a returning src reuses its decoded element */
   key: number;
   src: string;
 }
@@ -37,31 +45,56 @@ interface Layer {
 const SEEK_EPSILON = 1 / 30; // don't re-seek within ~1 frame — avoids seek thrash
 const SCRUB_SEEK_INTERVAL_MS = 34; // cap live scrub seeks to roughly 30Hz
 const FADE_S = 0.5; // event/scene crossfade when settling (not while scrubbing)
+const DEFAULT_POOL = 4; // active 2 + ~2 neighbours kept warm for scroll-back
 
-/** The vertical AI film. Holds ≤2 `<video>` layers and crossfades (opacity only)
- *  when the `src` changes *and* we're settling — i.e. at event/scene boundaries.
- *  While scrubbing (or under reduced motion) it hard-cuts, like a real scrubber.
- *  Segments that share a `src` (a stitched event film) never trigger a layer
- *  change — they're scrubbed by `currentTime` alone. */
+/** The vertical AI film. Holds ≤2 *visible* `<video>` layers and crossfades
+ *  (opacity only) when the `src` changes *and* we're settling — i.e. at
+ *  event/scene boundaries. While scrubbing (or under reduced motion) it
+ *  hard-cuts, like a real scrubber. Segments that share a `src` (a stitched
+ *  event film) never trigger a layer change — they're scrubbed by `currentTime`
+ *  alone.
+ *
+ *  Beyond the visible layers it keeps a small POOL of recently-shown `<video>`
+ *  elements mounted but hidden, each keyed by its `src`, so scrolling BACK to an
+ *  earlier shot replays the SAME decoded element instantly — no element
+ *  re-create, no re-fetch, no flash of empty video. The pool is an LRU capped at
+ *  `poolSize`; the oldest non-visible element is dropped when it overflows. */
 export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmPane(
-  { poster, reducedMotion, generating, className, style },
+  { poster, reducedMotion, generating, className, style, poolSize = DEFAULT_POOL },
   ref,
 ) {
-  const [layers, setLayers] = useState<Layer[]>([]);
-  // `revealKey` is the layer currently at opacity 1 (the other fades under it).
+  // The mounted set: 2 active crossfade layers + warm (hidden) neighbours, all
+  // keyed by src so React reuses each decoded <video> across scroll-back.
+  const [slots, setSlots] = useState<Slot[]>([]);
+  // Identity of the layer currently revealed (opacity 1); -1 = none yet.
   const [revealKey, setRevealKey] = useState(-1);
+  // Identity of the *previous* visible layer that's fading under the incoming one
+  // during a crossfade. Both it and the incoming layer render visibly until the
+  // fade ends; everything else in the pool is hidden (opacity 0, kept warm).
+  const [fadingKey, setFadingKey] = useState(-1);
 
   const keySeq = useRef(0);
+  const keyForSrc = useRef(new Map<string, number>()); // stable src → element key
   const els = useRef(new Map<number, HTMLVideoElement>());
-  const layersRef = useRef<Layer[]>([]); // synchronous mirror of `layers`
-  layersRef.current = layers;
+  const slotsRef = useRef<Slot[]>([]); // synchronous mirror of `slots`
+  slotsRef.current = slots;
   const targetSrc = useRef("");
   const pendingTime = useRef(0);
   const lastSeekAt = useRef(0);
 
+  // Stable identity for a src — the same src always maps to the same <video>.
+  const keyOf = useCallback((src: string): number => {
+    let k = keyForSrc.current.get(src);
+    if (k == null) {
+      k = ++keySeq.current;
+      keyForSrc.current.set(src, k);
+    }
+    return k;
+  }, []);
+
   const activeEl = useCallback((): HTMLVideoElement | undefined => {
-    const ls = layersRef.current;
-    return ls.length ? els.current.get(ls[ls.length - 1].key) : undefined;
+    const k = keyForSrc.current.get(targetSrc.current);
+    return k != null ? els.current.get(k) : undefined;
   }, []);
 
   const seek = (el: HTMLVideoElement, time: number) => {
@@ -86,6 +119,29 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
     }
   };
 
+  // Insert/raise `key` in the LRU pool, evicting the oldest non-visible slot when
+  // we exceed `poolSize`. The 2 visible layers (`keep`) are never evicted.
+  const ensureSlot = useCallback(
+    (prev: Slot[], key: number, src: string, keep: Set<number>): Slot[] => {
+      const without = prev.filter((s) => s.key !== key);
+      const next = [...without, { key, src }]; // most-recently-used at the end
+      const cap = Math.max(2, poolSize);
+      if (next.length <= cap) return next;
+      const survivors: Slot[] = [];
+      let toDrop = next.length - cap;
+      for (const s of next) {
+        if (toDrop > 0 && s.key !== key && !keep.has(s.key)) {
+          toDrop--;
+          keyForSrc.current.delete(s.src);
+          continue; // evicted — React unmounts its <video>
+        }
+        survivors.push(s);
+      }
+      return survivors;
+    },
+    [poolSize],
+  );
+
   useImperativeHandle(
     ref,
     (): FilmPaneHandle => ({
@@ -94,10 +150,10 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
         if (src === targetSrc.current) {
           // A flick that interrupts a settle-crossfade hard-cuts to the active layer
           // (scrubbing shows frames, not fades).
-          if (scrub && layersRef.current.length === 2) {
-            const top = layersRef.current[1];
-            setLayers([top]);
-            setRevealKey(top.key);
+          if (scrub && fadingKey !== -1) {
+            const activeKey = keyForSrc.current.get(src);
+            if (activeKey != null) setRevealKey(activeKey);
+            setFadingKey(-1);
           }
           applyActive(time, scrub); // same film → imperative seek/play, no re-render
           return;
@@ -106,52 +162,82 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
         targetSrc.current = src;
         pendingTime.current = time;
         lastSeekAt.current = 0;
-        const key = ++keySeq.current;
-        const top = layersRef.current[layersRef.current.length - 1];
-        if (reducedMotion || scrub || !top) {
-          // Hard cut: a single layer. (Scrubbing through scenes shows frames, not
-          // crossfades; reduced motion never crossfades; nor does the first film.)
-          setLayers([{ key, src }]);
+        const key = keyOf(src);
+        const outgoing = revealKey;
+        const reused = els.current.has(key); // already decoded → instant replay
+
+        if (reducedMotion || scrub || outgoing === -1) {
+          // Hard cut: reveal the target immediately. (Scrubbing through scenes
+          // shows frames, not crossfades; reduced motion never crossfades; nor
+          // does the first film.) A reused element is already decoded, so this is
+          // a flash-free instant cut — the whole point of the warm pool.
           setRevealKey(key);
+          setFadingKey(-1);
+          setSlots((prev) => ensureSlot(prev, key, src, new Set([key])));
+          if (reused) applyActive(time, scrub);
         } else {
-          // Settling onto a new scene → crossfade: keep the current layer (it stays
-          // revealed), fade the incoming one in once it has decoded the target frame.
-          setLayers([top, { key, src }]);
+          // Settling onto a new scene → crossfade: the current layer stays
+          // revealed (fading out) while the incoming one fades in once decoded.
+          setFadingKey(outgoing);
+          setSlots((prev) => ensureSlot(prev, key, src, new Set([key, outgoing])));
+          if (reused) {
+            applyActive(time, scrub); // already decoded → seek/play to the target frame
+            onReady(key); // …and start the fade now (no decode wait)
+          }
         }
       },
       getActiveDuration() {
         const d = activeEl()?.duration;
         return d && Number.isFinite(d) ? d : 0;
       },
+      warm(src) {
+        if (!src || src === targetSrc.current) return;
+        const key = keyOf(src);
+        if (els.current.has(key)) return; // already warm
+        // Mount it hidden (kept out of the crossfade) so its bytes decode ahead of
+        // the reader; never evict the active/fading layers to make room.
+        const keep = new Set<number>();
+        if (revealKey !== -1) keep.add(revealKey);
+        if (fadingKey !== -1) keep.add(fadingKey);
+        setSlots((prev) => (prev.some((s) => s.key === key) ? prev : ensureSlot(prev, key, src, keep)));
+      },
     }),
-    // applyActive/activeEl are stable; reducedMotion is read live.
-    [reducedMotion], // eslint-disable-line react-hooks/exhaustive-deps
+    // applyActive/activeEl/keyOf/ensureSlot are stable; reducedMotion + the reveal
+    // keys are read live.
+    [reducedMotion, revealKey, fadingKey], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // A newly-mounted incoming layer decoded its target frame → reveal it (start the
-  // crossfade). We deliberately do NOT touch currentTime here: `onSeeked` fires on
-  // EVERY seek, including the rAF loop's live scrub seeks, so re-seeking here would
-  // yank the playhead back to the entry frame and defeat scrubbing. `currentTime` is
-  // owned solely by `applyActive`; initial play by the `autoPlay` attribute.
+  // A mounted layer decoded its target frame → if it's the incoming crossfade
+  // layer, reveal it (start the fade). We deliberately do NOT touch currentTime
+  // here: `onSeeked` fires on EVERY seek, including the rAF loop's live scrub
+  // seeks, so re-seeking here would yank the playhead back to the entry frame and
+  // defeat scrubbing. `currentTime` is owned solely by `applyActive`; initial play
+  // by the `autoPlay` attribute.
   const onReady = (key: number) => {
-    const ls = layersRef.current;
-    if (ls.length === 2 && ls[1].key === key) setRevealKey(key); // begin fade-in
+    setRevealKey((cur) => {
+      // Only promote the layer that matches the current target src (the incoming
+      // crossfade layer). Warm pool elements firing canplay must not steal reveal.
+      if (key === keyForSrc.current.get(targetSrc.current)) return key;
+      return cur;
+    });
   };
 
-  // Seek the incoming layer to the target frame as soon as it can.
+  // Seek a layer to the target frame as soon as it has metadata — but only the
+  // active target layer (warm-pool neighbours seek when they become active).
   const onMeta = (key: number) => {
+    if (key !== keyForSrc.current.get(targetSrc.current)) return;
     const el = els.current.get(key);
     if (el && Number.isFinite(pendingTime.current)) seek(el, pendingTime.current);
   };
 
-  // Crossfade finished → drop the outgoing layer (cap at the single visible one).
+  // Crossfade finished → the incoming layer is fully revealed; clear the fading
+  // marker so the outgoing layer drops back to the hidden warm pool (it stays
+  // mounted for instant scroll-back, just no longer visible).
   const onFadeEnd = (key: number) => {
-    setLayers((prev) =>
-      prev.length === 2 && prev[1].key === key && key === revealKey ? [prev[1]] : prev,
-    );
+    setFadingKey((f) => (key === revealKey ? -1 : f));
   };
 
-  if (layers.length === 0) {
+  if (slots.length === 0) {
     return generating ? (
       <div className={className} style={style}>
         <div className="absolute inset-0 grid place-items-center bg-black/60">
@@ -166,41 +252,50 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
     );
   }
 
-  // The visible layer. Normally `revealKey`, but if a rapid second src change has
-  // dropped that layer, fall back to the oldest still-mounted one (most likely
-  // already decoded) so a layer is *always* visible — never a blank/black pane.
-  const shownKey = layers.some((l) => l.key === revealKey) ? revealKey : layers[0]?.key;
+  // A layer is visible iff it's the revealed one or the one currently fading out
+  // under it. Everything else is a warm pool member, mounted at opacity 0 so it
+  // stays decoded for instant scroll-back without painting over the film.
+  // Fallback: if the revealed key somehow isn't mounted (rapid src churn), reveal
+  // the newest slot so a layer is ALWAYS visible — never a blank/black pane.
+  const revealedMounted = slots.some((s) => s.key === revealKey);
+  const shownKey = revealedMounted ? revealKey : slots[slots.length - 1]?.key;
 
   return (
     <div className={className} style={style}>
-      {layers.map((l) => (
-        <video
-          key={l.key}
-          ref={(el) => {
-            if (el) els.current.set(l.key, el);
-            else els.current.delete(l.key);
-          }}
-          src={l.src}
-          poster={poster}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          onLoadedMetadata={() => onMeta(l.key)}
-          onCanPlay={() => onReady(l.key)}
-          onSeeked={() => onReady(l.key)}
-          onTransitionEnd={(e) => {
-            if (e.propertyName === "opacity") onFadeEnd(l.key);
-          }}
-          className="absolute inset-0 h-full w-full bg-black object-cover"
-          style={{
-            opacity: layers.length === 1 || l.key === shownKey ? 1 : 0,
-            transition: reducedMotion ? "none" : `opacity ${FADE_S}s ease`,
-            willChange: "opacity",
-          }}
-        />
-      ))}
+      {slots.map((s) => {
+        const visible = s.key === shownKey || s.key === fadingKey;
+        return (
+          <video
+            key={s.key}
+            ref={(el) => {
+              if (el) els.current.set(s.key, el);
+              else els.current.delete(s.key);
+            }}
+            src={s.src}
+            poster={poster}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            onLoadedMetadata={() => onMeta(s.key)}
+            onCanPlay={() => onReady(s.key)}
+            onSeeked={() => onReady(s.key)}
+            onTransitionEnd={(e) => {
+              if (e.propertyName === "opacity") onFadeEnd(s.key);
+            }}
+            className="absolute inset-0 h-full w-full bg-black object-cover"
+            style={{
+              opacity: visible && s.key === shownKey ? 1 : 0,
+              // Hidden warm-pool members are non-interactive and out of the paint
+              // path as much as possible; only the visible/fading layers transition.
+              transition: reducedMotion || !visible ? "none" : `opacity ${FADE_S}s ease`,
+              willChange: visible ? "opacity" : undefined,
+              pointerEvents: "none",
+            }}
+          />
+        );
+      })}
     </div>
   );
 });

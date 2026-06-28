@@ -48,7 +48,7 @@ logger = get_logger("app.ingest.identity_lock")
 #: Concrete Model-Studio preset model the preset voices below belong to.
 PRESET_TTS_MODEL = "qwen3-tts-flash"
 _PNG_CONTENT_TYPE = "image/png"
-_DEFAULT_KEYFRAME_SIZE = "1024*1024"
+_DEFAULT_KEYFRAME_SIZE = "928*1664"  # 9:16, in qwen-image-plus's allowed size set
 _KEYFRAME_NEGATIVE = (
     "extra fingers, deformed hands, warped face, multiple people, crowd, text, "
     "watermark, logo, inconsistent design, blurry, low quality"
@@ -65,19 +65,19 @@ class PresetVoice:
 
 
 #: Real preset Qwen3-TTS voice ids (Model Studio), English-first ordering.
+#: Restricted to voices verified available on the hosted ``qwen3-tts-flash``
+#: snapshot we pin (see app.providers.tts._TTS_MODEL_SNAPSHOTS). The snapshot's
+#: supported set is a subset of the alias's — Serena/Aiden/Chelsie/Vivian/Arthur
+#: return 400 InvalidParameter, so they are omitted here (the TTS provider also
+#: falls back to a known-good voice as defense in depth).
 PRESET_VOICES: tuple[PresetVoice, ...] = (
     PresetVoice("Cherry", "female"),
     PresetVoice("Ryan", "male"),
-    PresetVoice("Serena", "female"),
-    PresetVoice("Aiden", "male"),
-    PresetVoice("Chelsie", "female"),
-    PresetVoice("Eric", "male"),
     PresetVoice("Jennifer", "female"),
-    PresetVoice("Dylan", "male"),
+    PresetVoice("Eric", "male"),
     PresetVoice("Katerina", "female"),
+    PresetVoice("Dylan", "male"),
     PresetVoice("Elias", "male"),
-    PresetVoice("Vivian", "female"),
-    PresetVoice("Arthur", "male"),
 )
 #: A warm, energetic voice reserved for narration (kept out of the principal pool).
 NARRATOR_VOICE = PresetVoice("Ethan", "male")

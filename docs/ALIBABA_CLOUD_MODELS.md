@@ -1,6 +1,10 @@
-# Alibaba Cloud / DashScope — Complete Model Catalog (Verified June 2026)
+# Alibaba Cloud / DashScope — Model Catalog Notes (June 2026)
 
-> All model names verified against official Alibaba Cloud Model Studio documentation. **Only models available in the Singapore (International) region are listed as available** — that's the hackathon endpoint.
+> Kinora's repo defaults use hosted DashScope/Qwen Cloud only. The judge demo
+> defaults are `wan2.1-t2v-turbo` for text-to-video and `wan2.1-i2v-turbo` for
+> image/reference-to-video, with quality overrides `wan2.5-t2v-preview` and
+> `wan2.2-i2v-plus`. Avoid `wan2.2-t2v-plus`: it submits but fails at render in
+> the current account setup.
 
 ---
 
@@ -17,7 +21,7 @@ The original `kinora.md` design doc used model names like "Qwen3.7-Max", "Qwen3-
 | Qwen3-VL-Plus | `qwen3.6-plus` or `qwen3.5-plus` (both have vision) | ✅ Vision is now in main models |
 | CosyVoice v3-plus | `cosyvoice-v3-plus` | ✅ Correct for Singapore |
 | CosyVoice v3.5-plus | `cosyvoice-v3.5-plus` | ❌ **Beijing only — NOT available in Singapore!** |
-| Wan 2.7 | `wan2.7-i2v` / `wan2.7-t2v` | ✅ Current |
+| Wan video | `wan2.1-t2v-turbo` / `wan2.1-i2v-turbo`; quality: `wan2.5-t2v-preview` / `wan2.2-i2v-plus` | ✅ Kinora defaults |
 | HappyHorse 1.0 | `happyhorse-1.0-t2v` / `happyhorse-1.0-i2v` | ✅ Current |
 
 ---
@@ -90,7 +94,21 @@ You no longer need a separate VL model. `qwen3.6-plus`, `qwen3.6-flash`, `qwen3.
 
 ## Video Generation Models (Singapore Region)
 
-### Wan 2.7 Series (Current — Recommended)
+### Hosted Wan Defaults Used by Kinora
+
+| Model ID | Task | Key Features | Notes |
+|---|---|---|---|
+| `wan2.1-t2v-turbo` | Text-to-Video | Text prompt → video | Fast judge-demo default |
+| `wan2.1-i2v-turbo` | Image-to-Video | First-frame/reference inputs | Fast judge-demo default for i2v/r2v |
+| `wan2.5-t2v-preview` | Text-to-Video | Higher-quality T2V | Quality override |
+| `wan2.2-i2v-plus` | Image-to-Video | Higher-quality I2V | Quality override |
+
+Do **not** use `wan2.2-t2v-plus` for Kinora demos: it accepts submission but
+fails at render in the tested account. Provider result URLs are temporary, so
+the render pipeline downloads every successful hosted video and persists it to
+OSS/MinIO immediately.
+
+### Wan 2.7 Series (Supported Protocol Profile When Enabled)
 
 | Model ID | Task | Key Features | Duration | Resolution |
 |---|---|---|---|---|
@@ -235,15 +253,15 @@ POST https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings
 | **Adapter** | `qwen3.5-plus` | PDF → screenplay → shot list | 1M context, cheaper than 3.6, still powerful |
 | **Continuity Supervisor** | `qwen3.6-plus` | Canon writes, inconsistency detection | Needs thinking mode for complex reasoning |
 | **Cinematographer** | `qwen3.6-plus` | Shot design (needs vision for reference images) | Vision built-in, 1M context, function calling |
-| **Generator (video)** | `wan2.7-i2v` | Image-to-video (primary) | First-frame, first-and-last-frame, continuation |
-| **Generator (fallback video)** | `wan2.7-t2v` | Text-to-video (establishing shots) | When no reference image available |
+| **Generator (video)** | `wan2.1-i2v-turbo` | Image-to-video (primary) | Fast judge-demo default |
+| **Generator (fallback video)** | `wan2.1-t2v-turbo` | Text-to-video (establishing shots) | Fast judge-demo default |
+| **Generator (quality video)** | `wan2.2-i2v-plus` / `wan2.5-t2v-preview` | Higher-quality hosted Wan render | Use when demo timing allows |
 | **Generator (alt video)** | `happyhorse-1.0-i2v` | Alternative I2V | Different style, fallback |
 | **Generator (narration)** | `cosyvoice-v3-plus` | TTS + voice cloning + word timestamps | **Only TTS with timestamps in Singapore** |
 | **Critic / QA** | `qwen3.6-plus` | Visual QA scoring (needs vision) | Vision built-in, 1M context, can analyze video |
 | **Production Manager** | `qwen3.6-flash` | Routing, classification, quality gates | Cheap, fast, 1M context, function calling |
 | **Production Manager (complex)** | `qwen3.6-plus` | Budget strategy, content safety decisions | When flash isn't enough |
-| **Keyframe generation** | `wan2.7-image-pro` | Character reference images, keyframes | Latest image gen, highest quality |
-| **Keyframe (alt)** | `qwen-image-2.0-pro` | Alternative image gen | Strong text rendering in images |
+| **Keyframe generation** | `qwen-image-2.0-pro` | Character reference images, keyframes | Current configured image provider |
 | **Episodic store embeddings** | `text-embedding-v4` | Shot record embeddings for retrieval | Best text embedding, up to 2048 dims |
 | **CCS embeddings** | `tongyi-embedding-vision-plus` | Character consistency (image embeddings) | Multimodal: text + image + video |
 | **Reranking** | `qwen3-rerank` | Rerank retrieved shots | Better retrieval quality |

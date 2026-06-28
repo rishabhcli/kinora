@@ -1,0 +1,110 @@
+{
+  "language": {
+    "name": "语言",
+    "description": "Kinora 在整个应用中使用的语言。"
+  },
+  "languages": {
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "zh": "中文",
+    "hi": "हिन्दी"
+  },
+  "nav": {
+    "home": "主页",
+    "library": "书库",
+    "watch": "观看",
+    "favorites": "收藏",
+    "notes": "笔记"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "open": "打开",
+    "back": "返回",
+    "restore": "恢复",
+    "clear": "清除",
+    "cleared": "已清除",
+    "loading": "加载中…",
+    "oneMoment": "请稍候…"
+  },
+  "login": {
+    "signIn": "登录",
+    "signUp": "注册",
+    "welcomeBack": "欢迎回到你的书库",
+    "startWatching": "开始把书当作电影来观看",
+    "emailPlaceholder": "电子邮箱",
+    "passwordPlaceholder": "密码",
+    "rememberMe": "记住我",
+    "forgotPassword": "忘记密码？",
+    "createAccount": "创建账户",
+    "or": "或",
+    "continueWith": "使用 {{provider}} 继续",
+    "exploreDemo": "浏览演示书库 →",
+    "newToKinora": "初次使用 Kinora？",
+    "alreadyHaveAccount": "已有账户？",
+    "tagline": "让故事活起来。",
+    "heroTitle": "让故事活起来。",
+    "heroSubtitle": "你的书库，重新构想为电影。书化作影片，书页化作场景 — 在静谧的夜晚观看。",
+    "heroKicker": "重写阅读"
+  },
+  "library": {
+    "continueReading": "继续阅读",
+    "recentlyAdded": "最近添加",
+    "popularOnKinora": "Kinora 热门",
+    "recommended": "为你推荐",
+    "readLivePublicDomain": "实时阅读 · 公有领域"
+  },
+  "reading": {
+    "back": "返回",
+    "closeReader": "关闭阅读器并返回",
+    "readingSettings": "阅读设置",
+    "bufferedAhead": "已缓冲 {{seconds}} 秒",
+    "generatingAhead": "正在提前生成…",
+    "readingAria": "正在阅读 {{title}}"
+  },
+  "settings": {
+    "title": "设置",
+    "searchPlaceholder": "搜索设置",
+    "noMatches": "没有匹配项。",
+    "categoriesAria": "设置类别",
+    "sections": {
+      "general": "通用",
+      "appearance": "外观",
+      "reading": "阅读",
+      "playback": "播放",
+      "notifications": "通知",
+      "privacy": "隐私",
+      "account": "账户",
+      "about": "关于"
+    },
+    "general": {
+      "subtitle": "Kinora 的启动方式与行为。",
+      "openTo": "打开 Kinora 时进入",
+      "openToDesc": "Kinora 启动时显示的视图。",
+      "soundEffects": "音效",
+      "soundEffectsDesc": "轻微的翻页与界面声音。",
+      "reset": "重置",
+      "restoreDefaults": "恢复所有默认设置",
+      "restoreDefaultsDesc": "将每项 Kinora 设置恢复为原始值。",
+      "restoreConfirm": "将所有 Kinora 设置恢复为默认值？"
+    },
+    "appearance": {
+      "subtitle": "应用于整个应用的无障碍覆盖设置。",
+      "reduceMotion": "减弱动态效果",
+      "reduceMotionDesc": "尽量减少动画与过渡效果。",
+      "reduceTransparency": "降低透明度",
+      "reduceTransparencyDesc": "用不透明表面替代磨砂玻璃模糊。",
+      "increaseContrast": "提高对比度",
+      "increaseContrastDesc": "提亮次要文字并加强边框。",
+      "themesHint": "阅读主题（深色、棕褐、纸张…）位于「阅读」中。"
+    },
+    "override": {
+      "system": "跟随系统",
+      "on": "开",
+      "off": "关"
+    }
+  }
+}

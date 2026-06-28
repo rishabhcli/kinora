@@ -58,7 +58,7 @@ class ImageProvider:
         self,
         prompt: str,
         *,
-        size: str = "1024*1024",
+        size: str = "1328*1328",  # qwen-image-plus allowed size; callers override
         n: int = 1,
         negative_prompt: str | None = None,
         reference_images: list[ImageInput] | None = None,

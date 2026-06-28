@@ -45,7 +45,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
-from app.db.models.enums import RenderPriority
+from app.db.models.enums import BookStatus, RenderPriority
 from app.memory.budget_service import BudgetLimits, BudgetService
 from app.memory.interfaces import Embedder, RenderEnqueuer, ShotPlanner, ShotSpec
 from app.queue.enqueuer import RedisRenderEnqueuer
@@ -66,6 +66,21 @@ if TYPE_CHECKING:
 logger = get_logger("app.composition")
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
+INGEST_RECOVERY_LIMIT = 25
+# A single ingest can run for many minutes (slow chat/image calls), so the
+# single-flight lock TTL must exceed worst-case ingest. With no heartbeat this
+# also bounds how long a crashed ingest's lock lingers before recovery retries.
+INGEST_RECOVERY_LOCK_TTL_MS = 30 * 60 * 1000
+
+
+def ingest_active_lock_key(book_id: str) -> str:
+    """Single-flight key shared by upload-triggered ingest and the recovery worker.
+
+    Both the API (ingest-on-upload) and the recovery worker can target the same
+    ``importing`` book; this lock makes them mutually exclusive so they never
+    double-ingest and collide on the scenes/shots primary keys.
+    """
+    return f"kinora:ingest:active:{book_id}"
 
 
 # --------------------------------------------------------------------------- #
@@ -423,11 +438,30 @@ class Container:
     async def run_ingest(
         self, book_id: str, pdf_bytes: bytes, session_id: str | None = None
     ) -> None:
-        """Run Phase A ingest for a book, publishing progress events (or the seam)."""
+        """Run Phase A ingest for a book, publishing progress events (or the seam).
+
+        Single-flight per book: the upload path ingests in-process while the
+        recovery worker independently scans for ``importing`` rows, so without a
+        shared lock both can ingest the same book at once and collide on the
+        scenes/shots primary keys (UniqueViolation -> the book is marked failed).
+        A Redis ``SET NX`` lock makes the two paths mutually exclusive.
+        """
         if self.ingest_runner is not None:
             await self.ingest_runner(book_id, pdf_bytes, session_id)
             return
-        await self._default_run_ingest(book_id, pdf_bytes, session_id)
+        lock = self.redis.lock(
+            ingest_active_lock_key(book_id),
+            ttl_ms=INGEST_RECOVERY_LOCK_TTL_MS,
+            blocking=False,
+        )
+        if not await lock.acquire():
+            logger.info("ingest.skip_active", book_id=book_id)
+            return
+        try:
+            await self._default_run_ingest(book_id, pdf_bytes, session_id)
+        finally:
+            with suppress(Exception):
+                await lock.release()
 
     async def _default_run_ingest(
         self, book_id: str, pdf_bytes: bytes, session_id: str | None
@@ -476,6 +510,51 @@ class Container:
             cover_image=cover_image,
         )
 
+    # -- durable ingest recovery -------------------------------------------- #
+
+    async def recover_importing_books(self, *, limit: int = INGEST_RECOVERY_LIMIT) -> int:
+        """Respawn Phase-A ingest for books left ``importing`` after a restart.
+
+        Upload already persists the normalized source PDF before creating the
+        durable ``books`` row. This recovery path leans on that existing artifact:
+        find stuck rows, reload ``source_pdf_key`` from object storage, and run
+        the same ingest code path. A short Redis lock prevents duplicate recovery
+        when several API instances boot together.
+        """
+        from app.db.repositories.book import BookRepo
+
+        try:
+            async with self.session_factory() as db:
+                books = await BookRepo(db).list_by_status(BookStatus.IMPORTING, limit=limit)
+        except Exception as exc:  # noqa: BLE001 - startup recovery is best-effort
+            logger.warning("ingest.recovery.scan_failed", error=str(exc))
+            return 0
+
+        spawned = 0
+        for book in books:
+            if not book.source_pdf_key:
+                logger.warning("ingest.recovery.missing_source", book_id=book.id)
+                continue
+            self.spawn(self._recover_ingest_book(book.id, book.source_pdf_key))
+            spawned += 1
+        if spawned:
+            logger.info("ingest.recovery.spawned", count=spawned)
+        return spawned
+
+    async def _recover_ingest_book(self, book_id: str, pdf_key: str) -> None:
+        # No separate lock here: run_ingest holds the shared single-flight lock,
+        # so a book that is already being ingested (by an upload or another
+        # recovery) is skipped inside run_ingest rather than double-ingested.
+        try:
+            pdf_bytes = await asyncio.to_thread(self.object_store.get_bytes, pdf_key)
+            await self.run_ingest(book_id, pdf_bytes, None)
+            logger.info("ingest.recovery.done", book_id=book_id)
+        except Exception as exc:  # noqa: BLE001 - retain row for a later retry
+            logger.warning("ingest.recovery.failed", book_id=book_id, error=str(exc))
+
+    async def _startup_recover_importing_books(self) -> None:
+        await self.recover_importing_books(limit=self.settings.ingest_recovery_limit)
+
     # -- targeted regen enqueue (Director comment / canon edit) -------------- #
 
     async def enqueue_regen(self, spec: ShotSpec, *, cancel_token: str | None = None) -> str:
@@ -523,6 +602,7 @@ class Container:
     async def startup(self) -> None:
         """Lifecycle hook. Connections are lazy, so this only logs readiness."""
         logger.info("container.startup", env=self.settings.app_env)
+        self.spawn(self._startup_recover_importing_books())
 
     async def shutdown(self) -> None:
         """Cancel background tasks, close Redis, dispose the engine, close providers."""
