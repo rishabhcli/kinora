@@ -178,7 +178,10 @@ async def test_mcp_protocol_roundtrip(maker: async_sessionmaker[AsyncSession]) -
         listed = await client.list_tools()
         names = {tool.name for tool in listed.tools}
         assert {"canon.query", "budget.remaining", "shot.render"} <= names
-        assert len(names) == len(TOOL_DEFS) == 15
+        # Bitemporal canon engine (§8) added 12 tools through the same dispatch path.
+        assert {"canon.assert_fact", "canon.fork", "canon.merge", "canon.view"} <= names
+        assert {"canon.compact", "canon.vault"} <= names
+        assert len(names) == len(TOOL_DEFS) == 27
 
         result = await client.call_tool(
             "canon.query", {"book_id": book_id, "beat_id": beat_id}
