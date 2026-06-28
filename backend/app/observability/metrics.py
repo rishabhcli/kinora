@@ -209,6 +209,44 @@ cancellations_total: Counter = Counter(
 )
 
 # --------------------------------------------------------------------------- #
+# Render-engine hardening telemetry (§9.7 resumability/poison; ADDITIVE)
+# --------------------------------------------------------------------------- #
+
+render_checkpoints_total: Counter = Counter(
+    "kinora_render_checkpoints_total",
+    "Shot render checkpoints written (resumability snapshots, §9.7).",
+    registry=registry,
+)
+
+render_resumes_total: Counter = Counter(
+    "kinora_render_resumes_total",
+    "In-flight shot renders resumed from a checkpoint after a restart.",
+    registry=registry,
+)
+
+render_steps_skipped_total: Counter = Counter(
+    "kinora_render_steps_skipped_total",
+    "Idempotent render steps skipped because the step ledger already recorded "
+    "them done (no double-spend / double-write on resume).",
+    labelnames=("step",),
+    registry=registry,
+)
+
+render_poison_total: Counter = Counter(
+    "kinora_render_poison_total",
+    "Shots quarantined as poison after repeated hard render crashes (forced to "
+    "the bottom rung so one pathological shot can't wedge a lane).",
+    registry=registry,
+)
+
+render_dag_batch_size: Histogram = Histogram(
+    "kinora_render_dag_batch_size",
+    "Size of each ready-batch the render DAG scheduler released (parallelism).",
+    buckets=(1, 2, 3, 4, 6, 8, 12, 16, 24, 32),
+    registry=registry,
+)
+
+# --------------------------------------------------------------------------- #
 # Provider telemetry (DashScope calls; §11/§12.5)
 # --------------------------------------------------------------------------- #
 
@@ -317,6 +355,38 @@ def inc_conflict() -> None:
 def inc_conflict_resolved(option: str) -> None:
     """Count one §7.2 conflict resolution, by the chosen policy option."""
     conflicts_resolved_total.labels(option=option).inc()
+
+
+# --------------------------------------------------------------------------- #
+# Render-engine hardening emit helpers (ADDITIVE)
+# --------------------------------------------------------------------------- #
+
+
+def inc_render_checkpoint(count: int = 1) -> None:
+    """Count ``count`` shot-render checkpoints written."""
+    if count > 0:
+        render_checkpoints_total.inc(count)
+
+
+def inc_render_resume() -> None:
+    """Count one in-flight shot render resumed from a checkpoint."""
+    render_resumes_total.inc()
+
+
+def inc_render_step_skipped(step: str) -> None:
+    """Count one idempotent render step skipped (already done on resume)."""
+    render_steps_skipped_total.labels(step=step).inc()
+
+
+def inc_render_poison() -> None:
+    """Count one shot quarantined as poison."""
+    render_poison_total.inc()
+
+
+def observe_dag_batch(size: int) -> None:
+    """Record the size of one DAG ready-batch (render parallelism)."""
+    if size > 0:
+        render_dag_batch_size.observe(size)
 
 
 # --------------------------------------------------------------------------- #

@@ -135,8 +135,14 @@ class ShotStateMachine:
     on_transition: OnTransition | None = None
     history: list[TransitionEvent] = field(default_factory=list)
 
-    async def transition(self, dst: RenderState) -> RenderState:
-        """Move to ``dst`` if the edge is legal; log it and fire the persist hook.
+    def step(self, dst: RenderState) -> RenderState:
+        """Validate + apply a transition synchronously (no persist hook).
+
+        The pure core of :meth:`transition`: enforces the §9.7 edge, records the
+        history entry, and logs — but does **not** fire the async ``on_transition``
+        hook. This is what the deterministic, IO-free pipeline simulator
+        (:mod:`app.render.simulator`) uses to walk the §9.7 diagram without an
+        event loop or a persistence seam.
 
         Raises:
             IllegalTransitionError: when ``state -> dst`` is not a §9.7 edge.
@@ -153,6 +159,18 @@ class ShotStateMachine:
             shot_id=self.shot_id,
             **{"from": src.value, "to": dst.value},
         )
+        return dst
+
+    async def transition(self, dst: RenderState) -> RenderState:
+        """Move to ``dst`` if the edge is legal; log it and fire the persist hook.
+
+        Raises:
+            IllegalTransitionError: when ``state -> dst`` is not a §9.7 edge.
+        """
+        if dst == self.state:
+            return self.state
+        # ``step`` validates + applies + logs the edge; we only add the async hook.
+        self.step(dst)
         if self.on_transition is not None:
             await self.on_transition(dst, to_status(dst))
         return dst
