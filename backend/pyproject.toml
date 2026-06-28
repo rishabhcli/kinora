@@ -87,6 +87,11 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # conftest must set environment variables before importing the app/Settings.
 "tests/conftest.py" = ["E402"]
+# The compliance subsystem registers its tables via a deliberately LAST,
+# side-effect-only import that must not be reordered to the top (doing so
+# re-introduces an import cycle through this package __init__). See
+# app/compliance/DESIGN.md.
+"app/db/models/__init__.py" = ["E402", "I001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

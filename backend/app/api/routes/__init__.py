@@ -14,6 +14,7 @@ from app.api.routes import (
     prefs,
     sessions,
 )
+from app.compliance.api import router as compliance_router  # additive: compliance domain
 
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
 ROUTERS = [
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    compliance_router,  # /compliance: consent, retention, DSAR, holds, ledger, report
 ]
 
 __all__ = ["ROUTERS"]
