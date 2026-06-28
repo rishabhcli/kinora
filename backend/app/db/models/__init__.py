@@ -29,6 +29,7 @@ from app.db.models.enums import (
     SessionMode,
     ShotStatus,
 )
+from app.db.models.job import JobRun, ScheduledJob
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
@@ -52,12 +53,14 @@ __all__ = [
     "Defect",
     "Entity",
     "EntityType",
+    "JobRun",
     "Page",
     "Pref",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
     "Scene",
+    "ScheduledJob",
     "Session",
     "SessionMode",
     "Shot",
