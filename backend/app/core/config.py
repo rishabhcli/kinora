@@ -148,6 +148,25 @@ class Settings(BaseSettings):
     # (an unauthenticated control surface must never run in prod, §12).
     mcp_auth_token: str | None = None
 
+    # --- MCP protocol layer (the spec-compliant server around the §8.3 tools) ---
+    # Tool versioning: when on, the server honours a per-call ``_meta`` version pin
+    # and rejects an incompatible served version (forward-compatible API evolution).
+    mcp_versioning_enabled: bool = True
+    # Response validation: gate the server-contract check of each tool result
+    # against its declared output JSON Schema (off => skip on the hot path in prod).
+    mcp_validate_responses: bool = True
+    # Resource subscriptions: advertise + serve ``resources/updated`` change
+    # notifications (the inspectable, live canon, §8). When on, the streamable-HTTP
+    # transport runs stateful so per-session subscriptions work end-to-end.
+    mcp_resource_subscriptions: bool = True
+    # Per-client scoping (§12): a JSON map of bearer-token -> grant, e.g.
+    # ``{"tok_ro": {"subject": "judge", "scopes": ["read"]},
+    #    "tok_full": {"scopes": ["read","write","render"], "books": ["book_1"]}}``.
+    # Empty => the single shared ``mcp_auth_token`` (+ open scope locally) is the
+    # only control; non-empty => unrecognised tokens are denied and each token is
+    # confined to its scopes/books.
+    mcp_client_scopes: dict[str, dict[str, object]] = {}
+
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

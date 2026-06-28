@@ -32,7 +32,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -294,6 +294,55 @@ class Container:
                 return await BookRepo(db).get(book_id) is not None
 
         return BookScopedAuthorizer(book_exists=_book_exists)
+
+    def build_mcp_catalog(self) -> Any:
+        """The versioned, scoped tool catalog for the MCP protocol layer (§8.3).
+
+        The single source of tool metadata (version + scope tags + output schema)
+        that the protocol server, validator, capabilities and client all share.
+        """
+        from app.mcp.registry import default_catalog
+
+        return default_catalog()
+
+    def build_mcp_resource_provider(self) -> Any:
+        """The canon :class:`ResourceProvider` over the deployed tools (§8 resources).
+
+        Reads canon resources through the same :class:`MemoryTools` (the single
+        execution path), so a resource read is the same validated/authorized path
+        as a tool call.
+        """
+        from app.mcp.resources import ResourceProvider
+
+        return ResourceProvider(self.build_tools())
+
+    def build_mcp_identity_resolver(self) -> Any:
+        """The per-client identity resolver from the configured token→grant table (§12).
+
+        Anonymous fallback is allowed only in ``local`` *and* only when no token
+        table is configured — issuing scoped tokens locks the surface down.
+        """
+        from app.mcp.identity import StaticIdentityResolver
+
+        return StaticIdentityResolver.from_config(
+            self.settings.mcp_client_scopes or None,
+            allow_anonymous=self.settings.is_local,
+        )
+
+    def build_scoped_authorizer(self) -> Any:
+        """The §12 scope-enforcing authorizer, chained after the book-existence check.
+
+        Composes :class:`ScopedAuthorizer` (per-client scope + book allowlist)
+        with the existing :class:`BookScopedAuthorizer` (book existence). The
+        caller binds it to an identity per session via ``for_identity``.
+        """
+        from app.mcp.identity import ScopedAuthorizer
+
+        book_authz = self.build_mcp_authorizer()
+        return ScopedAuthorizer(
+            catalog=self.build_mcp_catalog(),
+            next_authorizer=book_authz.authorize,
+        )
 
     @property
     def keyframe_service(self) -> KeyframeService:

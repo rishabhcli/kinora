@@ -99,3 +99,47 @@ async def test_streamable_http_app_rejects_unauthenticated_request() -> None:
                 "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"}
             )
             assert resp.status_code == 401
+
+
+# --------------------------------------------------------------------------- #
+# build_http_app wires the per-client scoping when a token table is configured
+# --------------------------------------------------------------------------- #
+
+
+def test_build_http_app_without_scopes_uses_book_authorizer(monkeypatch: Any) -> None:
+    # No MCP_CLIENT_SCOPES -> the deployed app keeps the book-existence authorizer
+    # and no identity middleware (the historical shared-token surface).
+    from app.core.config import get_settings
+    from app.mcp import run as run_mod
+
+    monkeypatch.delenv("MCP_CLIENT_SCOPES", raising=False)
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "topsecret")
+    get_settings.cache_clear()
+    try:
+        app = run_mod.build_http_app()
+        names = {m.cls.__name__ for m in app.user_middleware}
+        assert "BearerAuthMiddleware" in names
+        assert "IdentityMiddleware" not in names
+    finally:
+        get_settings.cache_clear()
+
+
+def test_build_http_app_with_scopes_wires_identity(monkeypatch: Any) -> None:
+    import json as _json
+
+    from app.core.config import get_settings
+    from app.mcp import run as run_mod
+
+    monkeypatch.setenv(
+        "MCP_CLIENT_SCOPES", _json.dumps({"tok_ro": {"subject": "judge", "scopes": ["read"]}})
+    )
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "topsecret")
+    get_settings.cache_clear()
+    try:
+        app = run_mod.build_http_app()
+        # Both the identity middleware and the shared door gate are present.
+        names = {m.cls.__name__ for m in app.user_middleware}
+        assert "IdentityMiddleware" in names
+        assert "BearerAuthMiddleware" in names
+    finally:
+        get_settings.cache_clear()

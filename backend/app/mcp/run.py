@@ -35,15 +35,28 @@ def build_default_tools() -> MemoryTools:
 
 
 def build_http_app() -> Any:
-    """The streamable-HTTP MCP app with the §12 book-scoped authorizer wired on.
+    """The streamable-HTTP MCP app with §12 authorization + protocol layer wired on.
 
     The authorizer needs the same container the tools came from, so this builds
-    both from one container (cheap to reuse — DI seams are lazy).
+    both from one container (cheap to reuse — DI seams are lazy). When a
+    per-client token table (``MCP_CLIENT_SCOPES``) is configured, the full
+    per-client scoping is wired: a :class:`ContextScopedAuthorizer` reads the
+    request identity that :class:`IdentityMiddleware` resolves from the bearer
+    (so a read-only token cannot call a write/render tool). Otherwise the
+    deployment keeps the book-existence authorizer + shared bearer.
     """
+    from app.mcp.identity import ContextScopedAuthorizer
+
     container = build_container()
-    return build_streamable_http_app(
-        container.build_tools(), authorizer=container.build_mcp_authorizer()
-    )
+    tools = container.build_tools()
+    settings = container.settings
+    if settings.mcp_client_scopes:
+        return build_streamable_http_app(
+            tools,
+            authorizer=ContextScopedAuthorizer(container.build_scoped_authorizer()),
+            identity_resolver=container.build_mcp_identity_resolver(),
+        )
+    return build_streamable_http_app(tools, authorizer=container.build_mcp_authorizer())
 
 
 def main(argv: list[str] | None = None) -> None:
