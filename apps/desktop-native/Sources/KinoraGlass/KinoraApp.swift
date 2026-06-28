@@ -1,26 +1,21 @@
 import SwiftUI
+import KinoraGlassKit
 
-// MARK: - Model
+// MARK: - Model bridge
+//
+// The showcase UI is written against a local `KBook` alias of the kit's `Book` so the
+// existing views read naturally. The kit owns the canonical model + demo catalogue.
+typealias KBook = Book
 
-struct KBook: Identifiable, Hashable {
-    let id: String
-    let title: String
-    let author: String
-    let isbn: String
-    let film: String
-    var coverURL: URL? { URL(string: "https://covers.openlibrary.org/b/isbn/\(isbn)-L.jpg") }
-    var filmURL: URL? { Bundle.module.url(forResource: film, withExtension: "mp4", subdirectory: "Resources/films") }
+extension Book {
+    /// Bundled demo-film URL for the showcase player.
+    var filmURL: URL? {
+        Bundle.module.url(forResource: film, withExtension: "mp4", subdirectory: "Resources/films")
+    }
 }
 
-let kBooks: [KBook] = [
-    .init(id: "frog", title: "The Frog-King", author: "Brothers Grimm", isbn: "9780525559474", film: "film-01"),
-    .init(id: "alice", title: "Alice in Wonderland", author: "Lewis Carroll", isbn: "9780553213454", film: "film-02"),
-    .init(id: "pride", title: "Pride and Prejudice", author: "Jane Austen", isbn: "9780141439518", film: "film-03"),
-    .init(id: "gatsby", title: "The Great Gatsby", author: "F. Scott Fitzgerald", isbn: "9780743273565", film: "film-04"),
-    .init(id: "atomic", title: "Atomic Habits", author: "James Clear", isbn: "9780735211292", film: "film-02"),
-    .init(id: "sapiens", title: "Sapiens", author: "Yuval Noah Harari", isbn: "9780062316097", film: "film-03"),
-    .init(id: "dune", title: "Dune", author: "Frank Herbert", isbn: "9780441172719", film: "film-04"),
-]
+/// The bundled demo catalogue, exposed under the showcase's historical name.
+let kBooks: [KBook] = Book.demoCatalogue
 
 enum Screen: String, CaseIterable, Identifiable {
     case home = "Home", library = "Library", watch = "Watch", favorites = "Favorites", settings = "Settings"
@@ -40,17 +35,41 @@ enum Screen: String, CaseIterable, Identifiable {
 
 @main
 struct KinoraApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var deepLinks = DeepLinkBus.shared
+
     var body: some Scene {
-        WindowGroup {
-            RootView()
+        WindowGroup(id: "shell") {
+            ShellContainerView(deepLinkBus: deepLinks)
                 .frame(minWidth: 1060, minHeight: 720)
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentMinSize)
+        .commands { KinoraCommands(deepLinks: deepLinks) }
+
+        // A dedicated, simpler scene for opening one book in its own window (multi-window).
+        WindowGroup(id: "book", for: String.self) { $bookID in
+            ShellContainerView(deepLinkBus: deepLinks)
+                .frame(minWidth: 1060, minHeight: 720)
+                .preferredColorScheme(.dark)
+                .task(id: bookID) {
+                    if let bookID { deepLinks.send(.openBook(id: bookID)) }
+                }
+        }
+        .windowStyle(.hiddenTitleBar)
+
+        Settings {
+            ShellPreferencesView()
+        }
     }
 }
 
-struct RootView: View {
+// MARK: - Showcase root (offline fallback; the original self-contained native UI)
+
+/// The self-contained native showcase — used when no renderer is reachable so the app
+/// is never a blank window. Every control is real Liquid Glass.
+struct ShowcaseRootView: View {
     @State private var screen: Screen = .home
     @State private var openBook: KBook?
     @State private var nowPlaying: KBook?
@@ -143,6 +162,7 @@ struct GlassTopBar: View {
     @State private var query = ""
     var body: some View {
         HStack(spacing: 10) {
+            Spacer().frame(width: 72)
             Image(systemName: "book.pages.fill").foregroundStyle(Color(red: 0.83, green: 0.64, blue: 0.31))
             Text("Kinora").font(.system(.title3, design: .serif).weight(.semibold)).foregroundStyle(.white)
             Spacer()
@@ -156,7 +176,7 @@ struct GlassTopBar: View {
                 .buttonStyle(.glass).buttonBorderShape(.circle)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 34)
+        .padding(.top, 14)
         .padding(.bottom, 14)
     }
 }

@@ -1,3 +1,5 @@
 .build/
 *.xcodeproj
 .swiftpm/
+# Built app bundle (produced by build-app.sh / make app-native-bundle)
+KinoraGlass.app/

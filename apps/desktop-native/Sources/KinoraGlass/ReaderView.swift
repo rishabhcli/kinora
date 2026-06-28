@@ -102,9 +102,18 @@ struct ReaderView: View {
             player.replaceCurrentItem(with: AVPlayerItem(url: u))
             player.isMuted = true
             player.actionAtItemEnd = .none
-            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
-                player.seek(to: .zero)
-                player.play()
+            // Capture the player into a Sendable box so the loop-on-end observer doesn't
+            // reach back into main-actor `self.player` from a Sendable closure (Swift 6).
+            let loopingPlayer = player
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: player.currentItem,
+                queue: .main
+            ) { _ in
+                MainActor.assumeIsolated {
+                    loopingPlayer.seek(to: .zero)
+                    loopingPlayer.play()
+                }
             }
             player.play()
         }
