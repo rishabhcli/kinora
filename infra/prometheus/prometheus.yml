@@ -1,13 +1,48 @@
-# Prometheus scrape configuration for the Kinora stack.
+# Prometheus scrape + rules + Alertmanager configuration for the Kinora stack.
+#
+# Loaded by the `prometheus` service in docker-compose.yml. The rule files and
+# the Alertmanager wiring only take effect when the observability layer
+# (docker-compose.observability.yml) is also up; with just the base stack,
+# Prometheus still scrapes the API and evaluates the recording/alerting rules
+# (alerts simply have nowhere to route until Alertmanager is present).
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    monitor: kinora
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
+  # The API exposes the full §12.5/§13 metric surface at /metrics.
   - job_name: "kinora-api"
     metrics_path: /metrics
     static_configs:
       - targets: ["api:8000"]
         labels:
           service: kinora
+
+  # Prometheus self-scrape (rule-eval + scrape health).
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Optional component exporters — present only when the observability layer is
+  # up. Prometheus tolerates DOWN targets, so listing them here is harmless on
+  # the base stack and saves editing this file when the layer is added.
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]

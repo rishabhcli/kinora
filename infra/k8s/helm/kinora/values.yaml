@@ -1,0 +1,232 @@
+# ---------------------------------------------------------------------------- #
+# Kinora Helm chart — default values.
+#
+# The backend roles all run the SAME image with a different command (the §process
+# model). Per-role blocks under `roles:` only override what differs (command,
+# replicas, resources, scaling, whether it's behind a Service/Ingress).
+# ---------------------------------------------------------------------------- #
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: registry.ap-southeast-1.aliyuncs.com/kinora/backend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+frontendImage:
+  repository: registry.ap-southeast-1.aliyuncs.com/kinora/frontend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# --- Non-secret runtime env (the ConfigMap). Mirrors docker-compose x-backend. --
+config:
+  APP_ENV: "production"
+  S3_REGION: "ap-southeast-1"
+  S3_BUCKET: "kinora-assets"
+  S3_ENDPOINT_URL: "https://oss-ap-southeast-1.aliyuncs.com"
+  DASHSCOPE_BASE_URL: "https://dashscope-intl.aliyuncs.com"
+  # Go-live gate (kinora.md §11.1) — STAYS OFF. Flip deliberately per environment.
+  KINORA_LIVE_VIDEO: "false"
+  VIDEO_MODEL: "wan2.7-t2v"
+  VIDEO_MODEL_I2V: "wan2.7-i2v"
+  VIDEO_MODEL_R2V: "wan2.7-i2v"
+  # Credentialed CORS — explicit origin(s), never "*".
+  CORS_ORIGINS: "https://app.kinora.example.com"
+
+# --- Secrets. Either let the chart create a Secret from `secrets.values` (dev /
+#     simple installs) or point at an existing/ExternalSecret-managed Secret. ---
+secrets:
+  # When create=true the chart renders a Secret from the values below. For prod
+  # prefer create=false + an existing Secret synced by External Secrets Operator
+  # / Vault / a cloud secrets store.
+  create: true
+  existingSecret: ""
+  values:
+    DATABASE_URL: "postgresql+asyncpg://kinora:kinora@kinora-postgres:5432/kinora"
+    REDIS_URL: "redis://kinora-redis:6379/0"
+    DASHSCOPE_API_KEY: "test"
+    JWT_SECRET: "change-me-in-prod-this-must-be-a-real-secret-32b+"
+    MCP_AUTH_TOKEN: "change-me-in-prod-mcp-bearer"
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# --- Pod-level hardening applied to every role ------------------------------- #
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Writable scratch (read-only rootfs needs a tmp + ffmpeg work dir for the
+# degradation ladder). Mounted as emptyDir on every role.
+tmpVolume:
+  enabled: true
+  sizeLimit: 2Gi
+
+# --- NetworkPolicies: default-deny + explicit allows (MCP is intra-app only) -- #
+networkPolicy:
+  enabled: true
+
+# --- Probes (shared defaults; api/mcp override the HTTP path/port) ----------- #
+probes:
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  startup:
+    periodSeconds: 5
+    failureThreshold: 30 # up to 150s for a cold start / migrations to settle
+
+# --- Ingress for api + frontend (MCP is NEVER exposed) ----------------------- #
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  host: "app.kinora.example.com"
+  tls:
+    enabled: false
+    secretName: "kinora-tls"
+
+# --- Prometheus ServiceMonitor (api /metrics, §12.5) ------------------------- #
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    namespace: ""
+    labels: {}
+
+# --- Migrate Job (alembic upgrade head) as a pre-install/pre-upgrade hook ---- #
+migrate:
+  enabled: true
+  backoffLimit: 3
+
+# --- Per-role configuration -------------------------------------------------- #
+# Each role inherits the image + config + secrets; only the listed fields differ.
+roles:
+  api:
+    enabled: true
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    replicas: 2
+    port: 8000
+    service:
+      enabled: true
+      port: 8000
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "1", memory: "1Gi" }
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 6
+      targetCPUUtilizationPercentage: 65
+    pdb:
+      enabled: true
+      minAvailable: 1
+    httpProbe:
+      path: /health
+      port: 8000
+
+  mcp:
+    enabled: true
+    command: ["python", "-m", "app.mcp.run", "--http", "--host", "0.0.0.0", "--port", "8765"]
+    replicas: 1
+    port: 8765
+    service:
+      enabled: true # ClusterIP only — never via Ingress
+      port: 8765
+    resources:
+      requests: { cpu: "100m", memory: "256Mi" }
+      limits: { cpu: "500m", memory: "512Mi" }
+    autoscaling:
+      enabled: false
+    pdb:
+      enabled: true
+      minAvailable: 1
+    # MCP has no /health route; use a TCP probe on its port.
+    tcpProbe:
+      port: 8765
+
+  render-worker:
+    enabled: true
+    command: ["python", "-m", "app.queue.worker"]
+    replicas: 1
+    port: 0 # no inbound port
+    service:
+      enabled: false
+    resources:
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "2", memory: "2Gi" }
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 70
+      # Optional: scale on Redis queue depth via a custom/external metric.
+      queueDepth:
+        enabled: false
+        metricName: kinora_render_queue_depth
+        targetAverageValue: "5"
+    pdb:
+      enabled: true
+      maxUnavailable: 1
+    # Workers have no inbound port; liveness/readiness use an exec probe that
+    # checks the process can import its app + reach Redis quickly.
+    execProbe:
+      command: ["python", "-c", "import app.queue.worker"]
+
+  ingest-worker:
+    enabled: true
+    command: ["python", "-m", "app.ingest.recovery"]
+    replicas: 1
+    port: 0
+    service:
+      enabled: false
+    resources:
+      requests: { cpu: "250m", memory: "512Mi" }
+      limits: { cpu: "1", memory: "1Gi" }
+    autoscaling:
+      enabled: false
+    pdb:
+      enabled: false
+    execProbe:
+      command: ["python", "-c", "import app.ingest.recovery"]
+
+  frontend:
+    enabled: true
+    # Uses frontendImage (Nginx over the Vite build), no command/env override.
+    replicas: 2
+    port: 80
+    service:
+      enabled: true
+      port: 80
+    resources:
+      requests: { cpu: "50m", memory: "64Mi" }
+      limits: { cpu: "250m", memory: "128Mi" }
+    autoscaling:
+      enabled: false
+    pdb:
+      enabled: true
+      minAvailable: 1
+    httpProbe:
+      path: /
+      port: 80

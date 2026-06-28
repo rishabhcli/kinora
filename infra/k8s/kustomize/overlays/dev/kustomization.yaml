@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kinora-dev
+namePrefix: ""
+
+resources:
+  - ../../base
+
+# Single replicas for dev.
+replicas:
+  - name: kinora-api
+    count: 1
+  - name: kinora-frontend
+    count: 1
+  - name: kinora-render-worker
+    count: 1
+
+# Dev env overrides (merged into the base ConfigMap).
+configMapGenerator:
+  - name: kinora-config
+    behavior: merge
+    literals:
+      - APP_ENV=dev
+      - KINORA_LIVE_VIDEO=false
+      - CORS_ORIGINS=http://localhost:5173
+
+generatorOptions:
+  disableNameSuffixHash: true

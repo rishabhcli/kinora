@@ -1,0 +1,86 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $name := include "kinora.fullname" . }}
+{{- $sel := include "kinora.selectorLabels" . }}
+---
+# Default-deny all ingress to Kinora pods; explicit allows below open the minimum.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-default-deny-ingress
+  labels:
+    {{- include "kinora.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kinora.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress"]
+---
+# api: reachable from the ingress controller namespace + (for east-west) any
+# Kinora pod. Tighten the namespaceSelector label to your ingress namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-api-ingress
+  labels:
+    {{- include "kinora.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kinora.roleSelectorLabels" (dict "root" $ "role" "api") | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              {{- include "kinora.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: 8000
+          protocol: TCP
+---
+# frontend: reachable from the ingress controller namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-frontend-ingress
+  labels:
+    {{- include "kinora.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kinora.roleSelectorLabels" (dict "root" $ "role" "frontend") | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 80
+          protocol: TCP
+---
+# mcp: the keystone rule — ingress ONLY from other Kinora pods (api/workers),
+# NEVER from the ingress controller or anywhere off-cluster. Mirrors the
+# intra-VPC-only SG rule in Terraform.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-mcp-intra-app
+  labels:
+    {{- include "kinora.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kinora.roleSelectorLabels" (dict "root" $ "role" "mcp") | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "kinora.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: 8765
+          protocol: TCP
+{{- end }}

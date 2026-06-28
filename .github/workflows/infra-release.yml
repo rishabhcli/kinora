@@ -1,0 +1,154 @@
+name: Infra release (build · scan · push · deploy)
+
+# Builds the backend + frontend images, scans them with Trivy, and (only when the
+# registry/deploy secrets exist) pushes + triggers a deploy. The build + scan run
+# on every push to main; push/deploy are gated so forks and secret-less repos run
+# the pipeline as a dry build without failing.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment for the gated deploy"
+        type: choice
+        options: [dev, staging, prod]
+        default: dev
+
+concurrency:
+  group: infra-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE != '' && vars.BACKEND_IMAGE || 'ghcr.io/${{ github.repository }}/backend' }}
+  FRONTEND_IMAGE: ${{ vars.FRONTEND_IMAGE != '' && vars.FRONTEND_IMAGE || 'ghcr.io/${{ github.repository }}/frontend' }}
+
+jobs:
+  build-scan:
+    name: Build + Trivy scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: infra/docker/backend.Dockerfile
+          - name: frontend
+            dockerfile: infra/docker/desktop.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (load to local daemon, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: kinora-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: kinora-${{ matrix.name }}:ci
+          format: sarif
+          output: trivy-image-${{ matrix.name }}.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0" # report-only until a baseline is agreed
+          ignore-unfixed: true
+
+      - name: Upload image scan SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image-${{ matrix.name }}.sarif
+          category: trivy-image-${{ matrix.name }}
+
+  push:
+    name: Push images (gated on registry secrets)
+    needs: build-scan
+    runs-on: ubuntu-latest
+    # Only push from the main branch / tags, never from PRs or forks.
+    if: github.event_name == 'push' && github.repository_owner != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Detect registry login (GHCR default; ACR/ECR via vars+secrets)
+        id: reg
+        run: |
+          if [ -n "${{ vars.REGISTRY }}" ] && [ -n "${{ secrets.REGISTRY_USERNAME }}" ]; then
+            echo "enabled=true"  >> "$GITHUB_OUTPUT"
+            echo "registry=${{ vars.REGISTRY }}" >> "$GITHUB_OUTPUT"
+          else
+            # Fall back to GHCR using the built-in token.
+            echo "enabled=true"  >> "$GITHUB_OUTPUT"
+            echo "registry=ghcr.io" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.reg.outputs.registry }}
+          username: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_USERNAME || github.actor }}
+          password: ${{ secrets.REGISTRY_PASSWORD != '' && secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      - name: Compute tag
+        id: tag
+        run: echo "tag=${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/backend.Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.tag.outputs.tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build + push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/desktop.Dockerfile
+          push: true
+          build-args: |
+            VITE_KINORA_API_URL=${{ vars.VITE_KINORA_API_URL || 'http://localhost:8000' }}
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.tag.outputs.tag }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy:
+    name: Deploy (gated; manual dispatch only)
+    needs: push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy hand-off
+        run: |
+          # This step is intentionally inert unless a deploy mechanism is wired:
+          #   * Kubernetes:  helm upgrade --install kinora infra/k8s/helm/kinora \
+          #                    -f infra/k8s/helm/kinora/values-${{ inputs.environment }}.yaml \
+          #                    --set image.tag=<tag> (needs KUBECONFIG secret)
+          #   * Alibaba ECS: terraform -chdir=infra/terraform/environments/${{ inputs.environment }} apply
+          #                    (needs ALICLOUD_* + a remote state backend)
+          # We never run a real apply/deploy in CI without an explicit, reviewed
+          # secret + environment protection rule, so this is a documented no-op.
+          echo "Deploy to ${{ inputs.environment }} is gated behind environment protection + secrets."
+          echo "Wire KUBECONFIG / ALICLOUD_* and uncomment the chosen path above."

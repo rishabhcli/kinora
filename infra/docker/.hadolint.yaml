@@ -1,0 +1,15 @@
+# hadolint config for the Kinora images.
+# Run: hadolint --config infra/docker/.hadolint.yaml infra/docker/*.Dockerfile
+
+failure-threshold: warning
+
+ignored:
+  # DL3008: pinning apt versions is brittle on Debian slim (versions roll fast and
+  # the lists are pruned); we pin the base image tag instead and rebuild often.
+  - DL3008
+  # DL3018: same rationale for Alpine apk versions in the renderer image.
+  - DL3018
+
+trustedRegistries:
+  - docker.io
+  - registry.ap-southeast-1.aliyuncs.com

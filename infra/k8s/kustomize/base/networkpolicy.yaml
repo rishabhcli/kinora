@@ -1,0 +1,17 @@
+# MCP is intra-cluster only — ingress to 8765 ONLY from other Kinora pods, never
+# from the ingress controller or off-cluster. The keystone security rule, mirrored
+# from the Terraform intra-VPC SG rule and the Helm NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kinora-mcp-intra-app
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: kinora }
+      ports:
+        - { port: 8765, protocol: TCP }

@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kinora-prod
+
+resources:
+  - ../../base
+  - pdb.yaml
+
+# HA replicas for prod.
+replicas:
+  - name: kinora-api
+    count: 3
+  - name: kinora-frontend
+    count: 2
+  - name: kinora-render-worker
+    count: 2
+  - name: kinora-mcp
+    count: 2
+
+configMapGenerator:
+  - name: kinora-config
+    behavior: merge
+    literals:
+      - APP_ENV=production
+      - KINORA_LIVE_VIDEO=false
+      - CORS_ORIGINS=https://app.kinora.example.com
+
+generatorOptions:
+  disableNameSuffixHash: true

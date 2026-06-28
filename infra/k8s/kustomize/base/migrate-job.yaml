@@ -1,0 +1,39 @@
+# One-shot Alembic migration (cluster analogue of the compose `migrate` service).
+# Also runs CREATE EXTENSION vector via the app's first migration. With Argo CD,
+# annotate as a PreSync hook; with Flux, gate the app behind its completion.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kinora-migrate
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: migrate }
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: migrate }
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest
+          command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          envFrom:
+            - configMapRef: { name: kinora-config }
+            - secretRef: { name: kinora-secret }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }

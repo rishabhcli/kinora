@@ -1,0 +1,7 @@
+{{- /* One Deployment per enabled role, all from the same workload template. */ -}}
+{{- range $role, $cfg := .Values.roles }}
+{{- if $cfg.enabled }}
+---
+{{ include "kinora.deployment" (dict "root" $ "role" $role "cfg" $cfg) }}
+{{- end }}
+{{- end }}

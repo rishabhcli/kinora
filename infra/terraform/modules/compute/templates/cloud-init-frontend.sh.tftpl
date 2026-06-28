@@ -1,0 +1,14 @@
+#!/bin/bash
+# Kinora frontend ECS node bootstrap. Serves the Vite renderer via Nginx.
+set -euo pipefail
+
+dnf install -y docker || yum install -y docker
+systemctl enable --now docker
+
+docker pull "${image}"
+docker rm -f kinora-frontend 2>/dev/null || true
+docker run -d --name kinora-frontend \
+  --restart always \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+  -p 80:80 \
+  "${image}"

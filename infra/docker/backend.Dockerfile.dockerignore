@@ -1,0 +1,30 @@
+# Per-Dockerfile ignore (BuildKit honors <dockerfile>.dockerignore over the
+# context-root one). Keeps the backend build context tiny + secret-free even
+# though the build context is the repo root.
+#
+# Everything, then re-include only what the backend image needs.
+*
+
+!backend/pyproject.toml
+!backend/README.md
+!backend/app
+!backend/alembic.ini
+!backend/migrations
+!backend/scripts
+
+# Never ship secrets / local state / caches even if a glob above would catch them.
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/node_modules
+**/.git
+**/.DS_Store
+backend/.env
+backend/tests

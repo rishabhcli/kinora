@@ -1,0 +1,158 @@
+name: Infra validate
+
+# Validates everything under infra/ — Terraform (fmt + validate across every
+# module and environment, with a local backend, no cloud creds), Dockerfiles
+# (hadolint), Kubernetes (helm lint + template | kubeconform, kustomize build),
+# YAML (yamllint), shell (shellcheck), and docker compose config. Additive to the
+# app `ci.yml`; only runs when infra/, the Dockerfiles, or this file change.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-validate.yml"
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-validate.yml"
+
+concurrency:
+  group: infra-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform fmt + validate (modules + envs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: terraform fmt (check, recursive)
+        run: terraform -chdir=infra/terraform fmt -check -recursive
+
+      - name: Validate every environment + standalone module
+        run: |
+          set -euo pipefail
+          # Each env / module is its own root; init with a local backend (no creds)
+          # then validate. Modules with provider requirements validate standalone.
+          roots=$(find infra/terraform -type f -name versions.tf -exec dirname {} \; | sort -u)
+          for d in $roots; do
+            # Skip the modules/secrets-only dirs that have no provider config to
+            # validate standalone? No — all our roots+modules validate cleanly.
+            echo "::group::validate $d"
+            terraform -chdir="$d" init -backend=false -input=false -no-color
+            terraform -chdir="$d" validate -no-color
+            echo "::endgroup::"
+          done
+
+  hadolint:
+    name: Hadolint (Dockerfiles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hadolint backend
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/docker/backend.Dockerfile
+          config: infra/docker/.hadolint.yaml
+      - name: Hadolint desktop
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/docker/desktop.Dockerfile
+          config: infra/docker/.hadolint.yaml
+
+  yaml-shell:
+    name: yamllint + shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint + shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yamllint shellcheck
+      - name: yamllint (infra YAML)
+        run: yamllint -c infra/.yamllint.yaml infra
+      - name: shellcheck (helper scripts)
+        run: |
+          if compgen -G "infra/scripts/*.sh" > /dev/null; then
+            shellcheck infra/scripts/*.sh
+          else
+            echo "no helper scripts to check"
+          fi
+
+  helm-k8s:
+    name: Helm lint + kubeconform + kustomize
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: "v3.16.2"
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+
+      - name: helm lint (default + dev + prod)
+        run: |
+          helm lint infra/k8s/helm/kinora
+          helm lint infra/k8s/helm/kinora -f infra/k8s/helm/kinora/values.yaml -f infra/k8s/helm/kinora/values-dev.yaml
+          helm lint infra/k8s/helm/kinora -f infra/k8s/helm/kinora/values.yaml -f infra/k8s/helm/kinora/values-prod.yaml
+
+      - name: helm template | kubeconform
+        run: |
+          set -euo pipefail
+          for vf in "" "-f infra/k8s/helm/kinora/values.yaml -f infra/k8s/helm/kinora/values-dev.yaml" "-f infra/k8s/helm/kinora/values.yaml -f infra/k8s/helm/kinora/values-prod.yaml"; do
+            echo "::group::kubeconform helm $vf"
+            helm template kinora infra/k8s/helm/kinora $vf \
+              | kubeconform -strict -ignore-missing-schemas -summary -
+            echo "::endgroup::"
+          done
+
+      - name: kustomize build | kubeconform
+        run: |
+          set -euo pipefail
+          for ov in dev prod; do
+            echo "::group::kubeconform kustomize $ov"
+            kubectl kustomize infra/k8s/kustomize/overlays/$ov \
+              | kubeconform -strict -ignore-missing-schemas -summary -
+            echo "::endgroup::"
+          done
+
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: compose config (base stack + observability layer)
+        run: |
+          docker compose -f infra/docker-compose.yml config -q
+          if [ -f infra/docker-compose.observability.yml ]; then
+            docker compose -f infra/docker-compose.yml -f infra/docker-compose.observability.yml config -q
+          fi
+
+  observability:
+    name: promtool + amtool + dashboard JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: promtool check (rules + config)
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/infra/prometheus:/etc/prometheus" \
+            prom/prometheus:latest check config /etc/prometheus/prometheus.yml
+      - name: amtool check (alertmanager config)
+        run: |
+          docker run --rm --entrypoint amtool -v "$PWD/infra/observability/alertmanager:/c" \
+            prom/alertmanager:latest check-config /c/alertmanager.yml
+      - name: Grafana dashboards are valid JSON
+        run: |
+          for f in infra/observability/grafana/dashboards/*.json; do
+            python3 -c "import json,sys; json.load(open('$f')); print('OK: $f')"
+          done

@@ -1,0 +1,259 @@
+# Kinora six-role process model as raw manifests. Every backend role uses the
+# same image with a different command; frontend uses the renderer image.
+# securityContext is hardened identically to the Helm chart (non-root, read-only
+# rootfs, dropped caps, RuntimeDefault seccomp).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinora-api
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: api }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: api }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api
+          image: registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest
+          command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: kinora-config }
+            - secretRef: { name: kinora-secret }
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kinora-api
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: api }
+spec:
+  type: ClusterIP
+  selector: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: api }
+  ports:
+    - { name: http, port: 8000, targetPort: 8000 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinora-mcp
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: mcp
+          image: registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest
+          command: ["python", "-m", "app.mcp.run", "--http", "--host", "0.0.0.0", "--port", "8765"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          ports:
+            - { name: http, containerPort: 8765 }
+          envFrom:
+            - configMapRef: { name: kinora-config }
+            - secretRef: { name: kinora-secret }
+          livenessProbe:
+            tcpSocket: { port: 8765 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket: { port: 8765 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kinora-mcp
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+spec:
+  type: ClusterIP
+  selector: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: mcp }
+  ports:
+    - { name: http, port: 8765, targetPort: 8765 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinora-render-worker
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: render-worker }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: render-worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: render-worker }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: render-worker
+          image: registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest
+          command: ["python", "-m", "app.queue.worker"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          envFrom:
+            - configMapRef: { name: kinora-config }
+            - secretRef: { name: kinora-secret }
+          livenessProbe:
+            exec: { command: ["python", "-c", "import app.queue.worker"] }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 500m, memory: 1Gi }
+            limits: { cpu: "2", memory: 2Gi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 2Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinora-ingest-worker
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: ingest-worker }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: ingest-worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: ingest-worker }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: ingest-worker
+          image: registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest
+          command: ["python", "-m", "app.ingest.recovery"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          envFrom:
+            - configMapRef: { name: kinora-config }
+            - secretRef: { name: kinora-secret }
+          livenessProbe:
+            exec: { command: ["python", "-c", "import app.ingest.recovery"] }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinora-frontend
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: frontend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: frontend }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: frontend }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: frontend
+          image: registry.ap-southeast-1.aliyuncs.com/kinora/frontend:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          ports:
+            - { name: http, containerPort: 80 }
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kinora-frontend
+  labels: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: frontend }
+spec:
+  type: ClusterIP
+  selector: { app.kubernetes.io/name: kinora, app.kubernetes.io/component: frontend }
+  ports:
+    - { name: http, port: 80, targetPort: 80 }

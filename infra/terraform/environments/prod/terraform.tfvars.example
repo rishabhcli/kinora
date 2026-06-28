@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (gitignored). Prod sizing is in main.tf.
+alicloud_access_key = "LTAI..."
+alicloud_secret_key = "..."
+region              = "ap-southeast-1"
+
+admin_cidr = "203.0.113.0/24"   # your LB / office egress — never 0.0.0.0/0
+ssh_cidr   = "203.0.113.10/32"  # bastion/VPN /32 — never 0.0.0.0/0
+
+dashscope_api_key = "sk-..."
+ecs_password      = "ChangeMe-Complex-1!"
+oss_bucket_name   = "kinora-prod-assets-UNIQUE"
+
+cors_origins = ["https://app.kinora.example.com"]
+
+# jwt_secret / mcp_auth_token: leave unset to auto-generate; read back with
+#   terraform output -raw jwt_secret   /   terraform output -raw mcp_auth_token
+# kinora_live_video stays false in main.tf — flip it deliberately when going live.

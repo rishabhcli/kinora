@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kinora-config
+data:
+  APP_ENV: "production"
+  S3_REGION: "ap-southeast-1"
+  S3_BUCKET: "kinora-assets"
+  S3_ENDPOINT_URL: "https://oss-ap-southeast-1.aliyuncs.com"
+  DASHSCOPE_BASE_URL: "https://dashscope-intl.aliyuncs.com"
+  # Go-live gate — stays off. Flip deliberately per overlay.
+  KINORA_LIVE_VIDEO: "false"
+  VIDEO_MODEL: "wan2.7-t2v"
+  VIDEO_MODEL_I2V: "wan2.7-i2v"
+  VIDEO_MODEL_R2V: "wan2.7-i2v"
+  CORS_ORIGINS: "https://app.kinora.example.com"

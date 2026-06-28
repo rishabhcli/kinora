@@ -1,0 +1,38 @@
+# Dev overlay: single replicas, no autoscaling, chart-managed Secret, no Ingress.
+# helm install kinora ./kinora -f values.yaml -f values-dev.yaml
+
+config:
+  APP_ENV: "dev"
+  KINORA_LIVE_VIDEO: "false"
+  CORS_ORIGINS: "http://localhost:5173"
+
+secrets:
+  create: true
+
+ingress:
+  enabled: false
+
+metrics:
+  serviceMonitor:
+    enabled: false
+
+roles:
+  api:
+    replicas: 1
+    autoscaling:
+      enabled: false
+    pdb:
+      enabled: false
+  frontend:
+    replicas: 1
+    pdb:
+      enabled: false
+  render-worker:
+    replicas: 1
+    autoscaling:
+      enabled: false
+    pdb:
+      enabled: false
+  mcp:
+    pdb:
+      enabled: false

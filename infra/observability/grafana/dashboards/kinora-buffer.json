@@ -1,0 +1,90 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "schemaVersion": 39,
+  "title": "Kinora — Buffer health & scroll (the §12.5 sawtooth)",
+  "tags": ["kinora", "buffer", "scheduler"],
+  "time": { "from": "now-3h", "to": "now" },
+  "refresh": "15s",
+  "templating": {
+    "list": [
+      {
+        "name": "session",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(kinora_buffer_occupancy_seconds, session)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Committed buffer occupancy (s) — burst-then-idle sawtooth",
+      "description": "Should ride between the low (25s) and high (75s) watermarks and stay above L >99% of the time (§12.5).",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "fillOpacity": 10, "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 25 },
+              { "color": "green", "value": 75 }
+            ]
+          }
+        }
+      },
+      "options": { "legend": { "displayMode": "table", "calcs": ["min", "mean", "max"] } },
+      "targets": [
+        { "expr": "kinora_buffer_occupancy_seconds{session=~\"$session\"}", "legendFormat": "{{session}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Sessions below low watermark (25s)",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
+      "targets": [ { "expr": "kinora:sessions_below_low_watermark", "refId": "A" } ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Watermark crossings (up/down) + promotions",
+      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "targets": [
+        { "expr": "sum(rate(kinora_watermark_crossings_total[5m])) by (direction)", "legendFormat": "crossing {{direction}}", "refId": "A" },
+        { "expr": "sum(rate(kinora_promotions_total[5m]))", "legendFormat": "promotions/s", "refId": "B" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Seek events / idle periods / cancellations",
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "targets": [
+        { "expr": "sum(rate(kinora_seek_events_total[5m]))", "legendFormat": "seeks/s", "refId": "A" },
+        { "expr": "sum(rate(kinora_idle_periods_total[5m]))", "legendFormat": "idle/s", "refId": "B" },
+        { "expr": "sum(rate(kinora_cancellations_total[5m]))", "legendFormat": "cancels/s", "refId": "C" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "render-worker logs (Loki)",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        { "expr": "{stack=\"kinora\", role=\"render-worker\"}", "refId": "A" }
+      ]
+    }
+  ]
+}
