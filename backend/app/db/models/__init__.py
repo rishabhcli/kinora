@@ -30,6 +30,11 @@ from app.db.models.enums import (
     ShotStatus,
 )
 from app.db.models.pref import Pref
+from app.db.models.recommendation import (
+    BookFeatureRow,
+    BookInteraction,
+    UserTasteVector,
+)
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
 from app.db.models.session import Session
@@ -41,6 +46,8 @@ __all__ = [
     "Base",
     "Beat",
     "BitemporalState",
+    "BookFeatureRow",
+    "BookInteraction",
     "BranchStatus",
     "Book",
     "BookStatus",
@@ -65,4 +72,5 @@ __all__ = [
     "ShotStatus",
     "SourceSpanIndex",
     "User",
+    "UserTasteVector",
 ]

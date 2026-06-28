@@ -12,6 +12,7 @@ from app.api.routes import (
     metrics,
     optim,
     prefs,
+    recommendations,
     sessions,
 )
 
@@ -27,6 +28,7 @@ ROUTERS = [
     events.router,
     metrics.router,
     optim.router,
+    recommendations.router,  # server-side recsys: watch-next + interaction logging
 ]
 
 __all__ = ["ROUTERS"]

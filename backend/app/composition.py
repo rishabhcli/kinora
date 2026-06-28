@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from app.mcp.tools import MemoryTools
     from app.memory.prefs_service import PreferencePrior, PreferencePriors
     from app.providers import Providers
+    from app.recommendations.store import RecommendationService
     from app.scheduler.keyframe import KeyframeService
 
 logger = get_logger("app.composition")
@@ -294,6 +295,21 @@ class Container:
                 return await BookRepo(db).get(book_id) is not None
 
         return BookScopedAuthorizer(book_exists=_book_exists)
+
+    def build_recommendation_service(self, session: AsyncSession) -> RecommendationService:
+        """Build the server-side recsys service bound to ``session`` (additive seam).
+
+        The recommendations engine (``app.recommendations``) ranks which *books* a
+        reader should watch next from the recsys warehouse (book_interactions /
+        book_features / user_taste_vectors). Pure-math core; this seam only does
+        the per-request I/O binding, mirroring :meth:`build_scheduler`.
+        """
+        from app.recommendations.engine import make_config_from_settings
+        from app.recommendations.store import RecommendationService
+
+        return RecommendationService(
+            session, config=make_config_from_settings(self.settings)
+        )
 
     @property
     def keyframe_service(self) -> KeyframeService:
