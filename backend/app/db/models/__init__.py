@@ -41,6 +41,7 @@ from app.db.models.job import JobRun, ScheduledJob
 from app.db.models.pref import Pref
 from app.db.models.render_job import RenderJob
 from app.db.models.scene import Scene
+from app.db.models.search import SearchDocumentRow, SearchIndexAlias
 from app.db.models.session import Session
 from app.db.models.shot import Shot, ShotCache, SourceSpanIndex
 from app.db.models.user import User
@@ -67,7 +68,6 @@ __all__ = [
     "AppConnection",
     "AuditAction",
     "Base",
-    "ReportArtifact",
     "Beat",
     "BitemporalState",
     "BranchStatus",
@@ -77,7 +77,6 @@ __all__ = [
     "BudgetLedger",
     "CanonAudit",
     "CanonBranch",
-    "ConnectionStatus",
     "Collection",
     "CollectionItem",
     "ConnectionStatus",
@@ -91,26 +90,25 @@ __all__ = [
     "JobRun",
     "Organization",
     "OwnershipTransfer",
-    "IngestCheckpoint",
-    "IngestMilestone",
-    "ImportedItem",
-    "JobRun",
     "Page",
     "Pref",
-    "SyncRun",
-    "SyncRunStatus",
     "RenderJob",
     "RenderJobStatus",
     "RenderPriority",
+    "ReportArtifact",
     "ResourceShare",
     "Scene",
     "ScheduledJob",
+    "SearchDocumentRow",
+    "SearchIndexAlias",
     "Session",
     "SessionMode",
     "Shot",
     "ShotCache",
     "ShotStatus",
     "SourceSpanIndex",
+    "SyncRun",
+    "SyncRunStatus",
     "User",
     "Workspace",
     "WorkspaceActivity",

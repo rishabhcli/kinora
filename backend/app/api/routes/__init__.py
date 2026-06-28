@@ -14,6 +14,7 @@ from app.api.routes import (
     optim,
     prefs,
     reports,
+    search,
     sessions,
     workspaces,
 )
@@ -33,6 +34,7 @@ ROUTERS = [
     reports.router,  # reports subsystem: document generation + signed retrieval
     integrations.router,  # third-party source import (app.integrations)
     workspaces.router,  # Workspaces & teams: collaboration ownership (§5)
+    search.router,  # server-side search engine: /search, /search/suggest, /search/reindex
 ]
 
 
