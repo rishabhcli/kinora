@@ -18,6 +18,7 @@ import {
 } from "./timeline";
 import { FilmPane, type FilmPaneHandle } from "./FilmPane";
 import { useScrollFilm, type ScrollFrame } from "./useScrollFilm";
+import { activeParagraphIndex, focusContentY, focusOpacity } from "./focusModel";
 import { ClipCache } from "./clipCache";
 import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
 
@@ -149,8 +150,9 @@ export function ScrollFilmEngine({
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      // Film is on the right; new width = distance from mouse to container's right edge.
-      const newWidth = rect.right - e.clientX;
+      // Film is on the LEFT; new width = distance from the container's left edge to
+      // the cursor.
+      const newWidth = e.clientX - rect.left;
       setFilmWidth(Math.max(FILM_MIN, Math.min(FILM_MAX, newWidth)));
     };
     const onUp = () => {
@@ -241,45 +243,53 @@ export function ScrollFilmEngine({
     restored.current = true;
   }, [book.id, paragraphs.length, live]);
 
-  // Paint the centred paragraph bright (others dimmed) — imperatively, so a fast
-  // flick doesn't trigger a React re-render of the whole column.
-  const setParaStyle = (p: HTMLElement, active: boolean) => {
-    p.style.color = `rgba(${theme.ink}, ${active ? 1 : 0.62})`;
-    p.style.borderLeftColor = active ? "rgba(212,164,78,0.7)" : "transparent";
+  // Paint a paragraph at its gentle focus opacity (active = 1, soft falloff toward
+  // a comfortable floor). No hard 62% dim and no gold rule — Apple-Books calm. The
+  // active paragraph keeps a barely-there weight cue via a hair-thin border.
+  const setParaStyle = (p: HTMLElement, distance: number) => {
+    p.style.color = `rgba(${theme.ink}, ${focusOpacity(distance)})`;
+    p.style.borderLeftColor = distance === 0 ? "rgba(212,164,78,0.35)" : "transparent";
   };
+
+  // The band of paragraphs whose opacity meaningfully differs from the floor; only
+  // these need repainting when the active paragraph moves by one (everything beyond
+  // is already at the floor). Keep it in sync with focusOpacity's falloff (2).
+  const FOCUS_BAND = 3;
 
   const paintParagraph = () => {
     const sc = scrollRef.current;
     const nodes = paraNodes.current;
     const tops = paraTops.current;
     if (!sc || nodes.length === 0) return;
-    // Active paragraph = last one whose top has crossed the 40% focus line, using
-    // cached content offsets + the current scroll position (no layout reads here).
-    const focusContentY = sc.scrollTop + sc.clientHeight * 0.4;
-    let bestIndex = 0;
-    for (let i = 0; i < tops.length; i++) {
-      if (tops[i] <= focusContentY) bestIndex = i;
-      else break; // paragraphs are in document order, so tops ascend
-    }
+    const bestIndex = activeParagraphIndex(tops, focusContentY(sc.scrollTop, sc.clientHeight));
     if (lastInk.current !== theme.ink) {
-      // Theme changed → every paragraph needs the new ink.
-      for (let i = 0; i < nodes.length; i++) setParaStyle(nodes[i], i === bestIndex);
+      // Theme (ink) changed → repaint every paragraph against the new ink.
+      for (let i = 0; i < nodes.length; i++) setParaStyle(nodes[i], i - bestIndex);
       lastInk.current = theme.ink;
     } else if (bestIndex !== lastActive.current) {
-      // Only the de-/re-activated paragraphs change.
-      const prev = nodes[lastActive.current];
-      if (prev) setParaStyle(prev, false);
-      setParaStyle(nodes[bestIndex], true);
+      // Repaint the focus band around BOTH the old and new active rows so the soft
+      // ramp updates without touching the whole column.
+      const lo = Math.min(bestIndex, lastActive.current) - FOCUS_BAND;
+      const hi = Math.max(bestIndex, lastActive.current) + FOCUS_BAND;
+      for (let i = Math.max(0, lo); i <= Math.min(nodes.length - 1, hi); i++) {
+        setParaStyle(nodes[i], i - bestIndex);
+      }
     }
     lastActive.current = bestIndex;
   };
 
   // Measure paragraph offsets after layout and whenever the text or a layout-
-  // affecting reading pref changes; a ResizeObserver keeps them fresh on resize.
+  // affecting reading pref changes. Resize robustness [C]: observe the scroll
+  // element AND its content wrapper (a mid-scroll reflow that doesn't resize the
+  // scroller — e.g. a font finishing loading, or the film pane resizing the row —
+  // still re-measures), plus window resize. rAF-coalesced so a burst of resize
+  // callbacks measures once per frame, never mid-paint.
   useEffect(() => {
     const sc = scrollRef.current;
     if (!sc) return;
-    const measure = () => {
+    let pending = 0;
+    const measureNow = () => {
+      pending = 0;
       const nodes = Array.from(sc.querySelectorAll<HTMLElement>("[data-para]"));
       paraNodes.current = nodes;
       const contentTop = sc.getBoundingClientRect().top - sc.scrollTop;
@@ -288,10 +298,21 @@ export function ScrollFilmEngine({
       lastInk.current = "";
       paintParagraph();
     };
-    measure();
+    const measure = () => {
+      if (pending) return;
+      pending = requestAnimationFrame(measureNow);
+    };
+    measureNow();
     const ro = new ResizeObserver(measure);
     ro.observe(sc);
-    return () => ro.disconnect();
+    const content = sc.querySelector<HTMLElement>("[data-reading-content]");
+    if (content) ro.observe(content);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      if (pending) cancelAnimationFrame(pending);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     paragraphs.length,
@@ -372,105 +393,7 @@ export function ScrollFilmEngine({
 
   return (
     <div ref={containerRef} className="mx-auto flex min-h-0 w-full max-w-[1180px] flex-1 items-stretch overflow-hidden px-8 py-8">
-      {/* Scrolling book text + reading-progress rail */}
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <div
-          ref={scrollRef}
-          tabIndex={0}
-          data-reading-scroll
-          data-testid="reading-scroll"
-          aria-label="Reading text — use arrow keys, space, or Page Up/Down to scroll"
-          className="scrollbar-slim min-h-0 flex-1 overflow-y-auto pr-6 focus:outline-none"
-        >
-          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.2em] text-kinora-muted">
-            Now Reading
-          </p>
-          <h1 className="mb-1 font-serif text-2xl font-semibold text-kinora-text">
-            {book.title}
-          </h1>
-          <p className="mb-7 text-[13px] text-kinora-muted">by {book.author}</p>
-          <div className="pb-[40vh]">
-            <div
-              className="mx-auto"
-              style={{
-                maxWidth: `${prefs.measure}ch`,
-                background: theme.pageBg,
-                color: `rgb(${theme.ink})`,
-                borderRadius: theme.panel ? 16 : 0,
-                padding: theme.panel ? "30px 34px" : 0,
-                boxShadow: theme.panel && themeKey !== "night" ? "0 24px 70px -28px rgba(0,0,0,0.7)" : undefined,
-                filter: prefs.brightness < 0.99 ? `brightness(${prefs.brightness})` : undefined,
-                transition: reduce ? "none" : "background 0.3s ease, color 0.3s ease, filter 0.2s ease",
-              }}
-            >
-              <div className="space-y-5" style={{ fontFamily: font.cssFamily }}>
-                {paragraphs.map((para, i) => (
-                  <p
-                    key={i}
-                    data-para={i}
-                    className={font.className}
-                    style={{
-                      color: `rgba(${theme.ink}, ${i === 0 ? 0.92 : 0.62})`,
-                      fontSize: `${15 * prefs.fontScale}px`,
-                      lineHeight: prefs.leading,
-                      letterSpacing: sp.letter,
-                      wordSpacing: sp.word,
-                      transition: reduce ? "none" : "color 0.4s ease",
-                    }}
-                  >
-                    {para}
-                  </p>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Read-so-far + committed-ahead rail; ticks = shots, dot = your place. */}
-        <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-1 rounded-full" aria-hidden style={{ background: "rgba(255,255,255,0.06)" }}>
-          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "rgba(232,226,216,0.35)" }} />
-          {live && (
-            <div
-              ref={railLeadRef}
-              className="absolute inset-x-0 rounded-full"
-              style={{
-                top: "0%",
-                height: `${Math.min(0.18, Math.max(0, (bufferAhead ?? 0) / 30)) * 100}%`,
-                background: "rgba(232,226,216,0.15)",
-              }}
-            />
-          )}
-          {timeline.segments.map((s) => (
-            <div
-              key={s.id}
-              className="absolute left-1/2 h-[2px] w-[7px] -translate-x-1/2 rounded-full"
-              style={{ top: `${(s.wordStart / Math.max(1, timeline.totalWords)) * 100}%`, background: "rgba(255,255,255,0.22)" }}
-            />
-          ))}
-          <div ref={railDotRef} className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ top: "0%", background: "rgba(232,226,216,0.8)" }} />
-        </div>
-      </div>
-
-      {/* Draggable splitter — drag left to expand film, right to shrink */}
-      <div
-        onMouseDown={onSplitterDown}
-        className="group relative flex-shrink-0 cursor-col-resize select-none"
-        style={{ width: 6, marginLeft: 10, marginRight: 10 }}
-        aria-label="Drag to resize video and text panels"
-        role="separator"
-        aria-orientation="vertical"
-      >
-        <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200 group-hover:bg-kinora-gold/40" style={{ background: "transparent" }} />
-        {/* Grip dots */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-[3px]">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[3px] w-[3px] rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Pinned vertical film (720×1280 / 9:16) */}
+      {/* Pinned vertical film — now on the LEFT */}
       <div className="flex-shrink-0 self-start" style={{ width: filmWidth }}>
         <div
           className="glass-card relative overflow-hidden rounded-xl"
@@ -518,6 +441,105 @@ export function ScrollFilmEngine({
         <p className="mt-2.5 text-center text-[10px] text-kinora-muted">
           {live ? "Generated as you read · Wan" : "Generated with Wan · vertical short film"}
         </p>
+      </div>
+
+      {/* Draggable splitter — drag right to expand film, left to shrink */}
+      <div
+        onMouseDown={onSplitterDown}
+        className="group relative flex-shrink-0 cursor-col-resize select-none"
+        style={{ width: 6, marginLeft: 10, marginRight: 10 }}
+        aria-label="Drag to resize video and text panels"
+        role="separator"
+        aria-orientation="vertical"
+      >
+        <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200" style={{ background: "rgba(255,255,255,0.08)" }} />
+        <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200 group-hover:bg-kinora-gold/40" style={{ background: "transparent" }} />
+        {/* Grip dots */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-[3px]">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[3px] w-[3px] rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Scrolling book text + reading-progress rail — now on the RIGHT */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          ref={scrollRef}
+          tabIndex={0}
+          data-reading-scroll
+          data-testid="reading-scroll"
+          aria-label="Reading text — use arrow keys, space, or Page Up/Down to scroll"
+          className="scrollbar-slim min-h-0 flex-1 overflow-y-auto pr-6 focus:outline-none"
+        >
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.2em] text-kinora-muted">
+            Now Reading
+          </p>
+          <h1 className="mb-1 font-serif text-2xl font-semibold text-kinora-text">
+            {book.title}
+          </h1>
+          <p className="mb-7 text-[13px] text-kinora-muted">by {book.author}</p>
+          <div className="pb-[40vh]">
+            <div
+              className="mx-auto"
+              data-reading-content
+              style={{
+                maxWidth: `${prefs.measure}ch`,
+                background: theme.pageBg,
+                color: `rgb(${theme.ink})`,
+                borderRadius: theme.panel ? 16 : 0,
+                padding: theme.panel ? "30px 34px" : 0,
+                boxShadow: theme.panel && themeKey !== "night" ? "0 24px 70px -28px rgba(0,0,0,0.7)" : undefined,
+                filter: prefs.brightness < 0.99 ? `brightness(${prefs.brightness})` : undefined,
+                transition: reduce ? "none" : "background 0.3s ease, color 0.3s ease, filter 0.2s ease",
+              }}
+            >
+              <div className="space-y-5" style={{ fontFamily: font.cssFamily }}>
+                {paragraphs.map((para, i) => (
+                  <p
+                    key={i}
+                    data-para={i}
+                    className={font.className}
+                    style={{
+                      color: `rgba(${theme.ink}, ${focusOpacity(i)})`,
+                      fontSize: `${15 * prefs.fontScale}px`,
+                      lineHeight: prefs.leading,
+                      letterSpacing: sp.letter,
+                      wordSpacing: sp.word,
+                      transition: reduce ? "none" : "color 0.25s ease",
+                    }}
+                  >
+                    {para}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Read-so-far + committed-ahead rail; ticks = shots, dot = your place. */}
+        <div className="pointer-events-none absolute right-1 top-1 bottom-1 w-1 rounded-full" aria-hidden style={{ background: "rgba(255,255,255,0.06)" }}>
+          <div ref={railFillRef} className="absolute inset-x-0 top-0 rounded-full" style={{ height: "0%", background: "rgba(232,226,216,0.35)" }} />
+          {live && (
+            <div
+              ref={railLeadRef}
+              className="absolute inset-x-0 rounded-full"
+              style={{
+                top: "0%",
+                height: `${Math.min(0.18, Math.max(0, (bufferAhead ?? 0) / 30)) * 100}%`,
+                background: "rgba(232,226,216,0.15)",
+              }}
+            />
+          )}
+          {timeline.segments.map((s) => (
+            <div
+              key={s.id}
+              className="absolute left-1/2 h-[2px] w-[7px] -translate-x-1/2 rounded-full"
+              style={{ top: `${(s.wordStart / Math.max(1, timeline.totalWords)) * 100}%`, background: "rgba(255,255,255,0.22)" }}
+            />
+          ))}
+          <div ref={railDotRef} className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full" style={{ top: "0%", background: "rgba(232,226,216,0.8)" }} />
+        </div>
       </div>
     </div>
   );

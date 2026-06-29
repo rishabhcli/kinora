@@ -45,6 +45,7 @@ from .errors import (
     TransientProviderError,
 )
 from .image import ImageProvider
+from .minimax import MiniMaxBudgetExceeded, MiniMaxVideoProvider, RedisSpendStore
 from .tts import TtsProvider
 from .types import (
     ChatResult,
@@ -85,7 +86,7 @@ class Providers:
     vl: VLProvider
     image: ImageProvider
     tts: TtsProvider
-    video: VideoProvider
+    video: VideoProvider | MiniMaxVideoProvider
     embeddings: EmbeddingProvider
     # Set only when ``reasoning_provider="openai"``: the second transport that
     # backs ``chat`` (OpenAI), sharing the main client's usage sink.
@@ -144,7 +145,13 @@ def create_providers(
         )
     else:
         chat = ChatProvider(client)
-    video = VideoProvider(client)
+    video: VideoProvider | MiniMaxVideoProvider
+    if resolved.video_backend.lower() == "minimax" and resolved.minimax_api_key:
+        # Share the main client's usage sink so MiniMax video-seconds land in the
+        # same budget accounting as everything else.
+        video = build_minimax_video_provider(resolved, usage_sink=client.usage_sink)
+    else:
+        video = VideoProvider(client)
     gateway: ResilientGateway | None = None
     registry: ProviderRegistry | None = None
     if resolved.provider_gateway_enabled:
@@ -192,6 +199,32 @@ def create_video_router(
     return VideoRouter(backends, policy=policy)
 
 
+def build_minimax_video_provider(
+    settings: Settings,
+    *,
+    usage_sink: UsageSink | None = None,
+) -> MiniMaxVideoProvider:
+    """Build a MiniMax video backend on its own MiniMax-configured client.
+
+    Uses ``base_url_override`` + ``api_key_override`` so the provider reuses the
+    shared :class:`ProviderClient` resilience (retries/breaker/rate-limit) and the
+    one usage sink (unified cost/budget), exactly like the OpenAI reasoning path.
+    A Redis-backed :class:`RedisSpendStore` persists the cumulative-USD guard
+    across restarts and across the api/render-worker processes.
+    """
+    mm_client = ProviderClient(
+        settings,
+        usage_sink=usage_sink,
+        base_url_override=settings.minimax_base_url,
+        api_key_override=settings.minimax_api_key,
+    )
+    from redis.asyncio import Redis
+
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    spend_store = RedisSpendStore(redis)
+    return MiniMaxVideoProvider(mm_client, spend_store=spend_store)
+
+
 __all__ = [
     "EMBED_DIM",
     "AuthenticationError",
@@ -207,6 +240,8 @@ __all__ = [
     "ImageProvider",
     "LiveVideoDisabled",
     "LoggingUsageSink",
+    "MiniMaxBudgetExceeded",
+    "MiniMaxVideoProvider",
     "ModelNotAvailable",
     "OpenAIChatProvider",
     "ProviderBadRequest",
@@ -236,6 +271,8 @@ __all__ = [
     "VideoRouter",
     "WanMode",
     "WanSpec",
+    "RedisSpendStore",
+    "build_minimax_video_provider",
     "classify_status",
     "cosine",
     "create_providers",

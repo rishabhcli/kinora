@@ -452,6 +452,7 @@ class ProviderClient:
         model: str,
         json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
         timeout: float | None = None,
     ) -> dict[str, Any]:
         """Resilient JSON request; raises typed errors on non-2xx / bad bodies."""
@@ -463,6 +464,7 @@ class ProviderClient:
                     method,
                     url,
                     json=json,
+                    params=params,
                     headers=self._auth_headers(headers),
                     timeout=call_timeout,
                 )

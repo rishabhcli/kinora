@@ -27,9 +27,9 @@ export interface UseScrollFilmArgs {
   onFrame?: (frame: ScrollFrame) => void;
 }
 
-const IDLE_MS = 220; // keep ticking this long after the last scroll, then settle to play
+const IDLE_MS = 140; // settle to play sooner after the last scroll → snappier scrub→play handoff
 const SCHED_THROTTLE_MS = 150; // scheduler signalling cadence (≈ ReadingRoom's 160ms)
-const VELOCITY_ALPHA = 0.35; // EMA smoothing for scrub/play decision (less flicker)
+const VELOCITY_ALPHA = 0.5; // EMA smoothing for scrub/play decision (more responsive, still de-flickered)
 
 /** Binds a scroll container to the FilmPane: scroll position scrubs one continuous
  *  film. Runs a single rAF loop while scrolling (and self-stops when idle, after a
@@ -109,8 +109,13 @@ export function useScrollFilm({
       }
 
       // Keep ticking while recently scrolled or actively scrubbing; otherwise this
-      // frame already applied play mode — stop and wait for the next scroll.
-      if (now - lastScrollAt.current < IDLE_MS || frame.mode === "scrub") {
+      // frame already applied play mode — stop and wait for the next scroll. Under
+      // reduced motion the film never plays forward (no settle), so stop as soon as
+      // scrubbing ends rather than spinning out the IDLE_MS window.
+      const keepAlive = cfg.current.reducedMotion
+        ? frame.mode === "scrub"
+        : now - lastScrollAt.current < IDLE_MS || frame.mode === "scrub";
+      if (keepAlive) {
         raf.current = requestAnimationFrame(tick);
       } else {
         running.current = false;

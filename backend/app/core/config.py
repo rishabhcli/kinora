@@ -85,6 +85,24 @@ class Settings(BaseSettings):
     video_model_i2v: str = "wan2.1-i2v-turbo"
     video_model_r2v: str = "wan2.1-i2v-turbo"
 
+    # --- Video backend selection (additive) ---
+    # Which hosted video provider the render pipeline uses. "dashscope" keeps the
+    # existing Wan provider (default, unchanged); "minimax" selects the cheaper
+    # hosted MiniMax (Hailuo) provider. The Wan provider always stays available.
+    video_backend: str = "dashscope"  # "dashscope" | "minimax"
+
+    # --- MiniMax (Hailuo) hosted video provider ---
+    # The intl host needs no GroupId. Auth is "Authorization: Bearer <key>".
+    # MINIMAX_API_KEY is already written to backend/.env (gitignored).
+    minimax_api_key: str | None = None
+    minimax_base_url: str = "https://api.minimax.io/v1"
+    # Cheapest published model @ 768P/6s ≈ $0.19/clip. Do NOT use the unverified
+    # 512P/$0.08 path.
+    minimax_video_model: str = "MiniMax-Hailuo-2.3-Fast"
+    minimax_resolution: str = "768P"
+    minimax_duration_s: int = 6
+    minimax_cost_per_clip_usd: float = 0.19
+
     # --- Wan task polling ---
     video_poll_timeout_s: float = 600.0
     video_poll_interval_s: float = 3.0
@@ -173,6 +191,10 @@ class Settings(BaseSettings):
     budget_per_session_s: float = 300
     budget_per_scene_s: float = 90
     budget_low_floor_s: float = 120
+    # Hard USD ceiling for the MiniMax provider's belt-and-suspenders spend guard
+    # (kinora.md §11.1). The primary cap is still the video-seconds ledger; this
+    # is a second, independent refusal that protects against duration/config drift.
+    budget_ceiling_usd: float = 30.0
 
     # --- FinOps / cost governance (additive; see app/finops, kinora.md §11.1) ---
     # A separate multi-tenant allocation of the global video-seconds ceiling.
