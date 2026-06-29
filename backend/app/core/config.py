@@ -384,6 +384,15 @@ class Settings(BaseSettings):
     #: Max rows the lifecycle GC sweep collects per run.
     media_gc_batch: int = 100
 
+    # --- Event sourcing / event store (app.eventsourcing.store; additive) ---
+    #: Events between aggregate snapshots (the SnapshotStrategy cadence). The
+    #: domain facet consults this to keep rehydration O(events-since-snapshot).
+    es_snapshot_every: int = 50
+    #: Rows the transactional-outbox relay claims per drain pass (§12.1).
+    es_outbox_batch: int = 100
+    #: Publish attempts before an outbox row is dead-lettered (the §12.1 DLQ).
+    es_outbox_max_attempts: int = 8
+
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_alg: str = "HS256"

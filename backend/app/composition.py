@@ -66,6 +66,7 @@ if TYPE_CHECKING:
     from app.assistant.service import AssistantService
     from app.assistant.synth import ChatClient
     from app.auth.service import AuthService
+    from app.eventsourcing.store.service import EventStoreFactory
     from app.finops.service import FinOpsService
     from app.flags.service import FlagService
     from app.integrations.http import HttpxClient
@@ -270,6 +271,13 @@ class Container:
     #: providers are unavailable). See :meth:`build_moderation`.
     moderation_factory: ModerationFactory | None = None
 
+    #: Event-sourcing event-store factory (app.eventsourcing.store). Overridable
+    #: seam: tests inject one with a custom serializer/registry; ``None`` => lazily
+    #: built from :class:`Settings`. Infra-free to construct (the lazy-composition
+    #: rule); session-bound stores are produced per unit of work. The domain &
+    #: projection facets consume the protocols it builds. See :meth:`build_event_store`.
+    event_store_factory: EventStoreFactory | None = None
+
     # Billing payment provider seam (additive). None => the in-memory fake
     # transport is built lazily; tests can inject a fake with scripted failures.
     # A real Stripe transport is NEVER wired here.
@@ -299,7 +307,14 @@ class Container:
     _analytics_service: AnalyticsService | None = field(default=None, repr=False)
     _conversation_memory: ConversationMemory | None = field(default=None, repr=False)
     _llmops: Any = field(default=None, repr=False)
+    _dataset_service: Any = field(default=None, repr=False)
     _media_service: MediaService | None = field(default=None, repr=False)
+    #: Inference request router (app.inference.router). Additive lazy seam: a
+    #: high-throughput LLM-inference scheduling brain (continuous batching, fair
+    #: share, admission/backpressure, KV-affinity) over a network-free EchoBackend
+    #: by default, so building it spends no credits (KINORA_LIVE_VIDEO stays OFF).
+    #: Nothing else in the container depends on it; see :meth:`inference_router`.
+    _inference_router: Any = field(default=None, repr=False)
     _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
@@ -312,6 +327,36 @@ class Container:
 
             self._providers = create_providers(self.settings)
         return self._providers
+
+    # -- inference router (lazy; additive; network-free by default, §11/§12) -- #
+
+    @property
+    def inference_router(self) -> Any:
+        """The multi-model inference request router (constructed on first use).
+
+        A high-throughput LLM-inference *scheduling brain* (continuous batching,
+        priority + weighted-fair-share across tenants/agents, admission +
+        backpressure + queue-time SLAs, KV-cache-affinity routing, request
+        coalescing) over the Kinora model stack (§11). Built over the
+        network-free ``EchoBackend`` by default, so constructing it spends no
+        credits and runs under ``DASHSCOPE_API_KEY=test`` with no network
+        (``KINORA_LIVE_VIDEO`` stays OFF). A caller that wants real transport
+        swaps in a ``ChatProviderBackend`` over :attr:`providers` per model.
+
+        Additive: nothing else in the container depends on this seam.
+        """
+        if self._inference_router is None:
+            from app.inference.router import build_multi_model_router
+
+            # One router per crew model (§11): orchestration/high-volume/vision.
+            self._inference_router = build_multi_model_router(
+                {
+                    self.settings.chat_model_max: 1,
+                    self.settings.chat_model_plus: 2,
+                    self.settings.vl_model: 2,
+                }
+            )
+        return self._inference_router
 
     # -- auth & security plane (lazy; DB + Redis only, no providers, §6/§12) -- #
 
@@ -408,6 +453,27 @@ class Container:
             )
         return self._llmops
 
+    # -- ML-data platform (lazy; pure + offline — app.mlplatform.datasets) --- #
+
+    @property
+    def dataset_service(self) -> Any:
+        """The wired :class:`~app.mlplatform.datasets.service.DatasetService`.
+
+        Facet A of the self-improvement ML platform: it ingests agent run-traces
+        through a read-only :class:`TraceSource` seam into a versioned, immutable
+        dataset store (dedup, PII scrub, leak-free splitting, weak-supervision
+        labels, stats / drift / diff, JSONL+columnar export). Pure + offline —
+        constructing it makes no model call and opens no connection (an in-memory
+        version registry), so it is additive and inert until a caller reaches for
+        it. The :mod:`~app.mlplatform.datasets.sources.LLMOpsTraceSource` adapts
+        ``self.llmops``'s trace store when a build is requested.
+        """
+        if self._dataset_service is None:
+            from app.mlplatform.datasets.service import DatasetService
+
+            self._dataset_service = DatasetService()
+        return self._dataset_service
+
     def _planner(self) -> ShotPlanner:
         if self.shot_planner is not None:
             return self.shot_planner
@@ -439,6 +505,30 @@ class Container:
     def build_moderation(self, session: AsyncSession) -> ModerationService:
         """Build a session-bound :class:`ModerationService` (the gate façade)."""
         return self._moderation_factory().build(session)
+
+    # -- event sourcing: the event store (app.eventsourcing.store, facet A) --- #
+
+    def event_store(self) -> EventStoreFactory:
+        """The process-wide event-store factory (constructed lazily on first use).
+
+        Built from :class:`Settings` (snapshot cadence + outbox tuning) unless a
+        test injected one. Constructing it touches no infrastructure, so the
+        health check / no-network boot is unaffected.
+        """
+        if self.event_store_factory is None:
+            from app.eventsourcing.store.service import EventStoreFactory
+
+            self.event_store_factory = EventStoreFactory.from_settings(self.settings)
+        return self.event_store_factory
+
+    def build_event_store(self, session: AsyncSession) -> object:
+        """Build a session-bound :class:`PostgresEventStore` (the append/read seam).
+
+        Returned typed as ``object`` to keep the Postgres/ORM import lazy at the
+        composition root; callers in the eventsourcing facets import the concrete
+        protocol type. The store only flushes — the caller's unit of work commits.
+        """
+        return self.event_store().store(session)
 
     # -- the MCP tool layer: the single DI-seam satisfaction point ----------- #
 

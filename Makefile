@@ -9,6 +9,7 @@ MCP_ARGS ?= --http
 
 .PHONY: help install up down stack-up stack-down migrate revision \
         worker ingest-worker mcp provider-preflight demo-pdf seed-demo lint fmt test \
+        verify-models \
         app-install app-typecheck app-test app-desktop-dev app-desktop-build \
         app-native app-native-bundle
 
@@ -29,6 +30,7 @@ help:
 	@echo "  lint         ruff check + mypy"
 	@echo "  fmt          black + ruff --fix"
 	@echo "  test         pytest"
+	@echo "  verify-models  run the explicit-state model checker over the protocol specs (§4.5/§7.2/§12)"
 	@echo "  app-install / app-typecheck / app-test                   desktop app (pnpm)"
 	@echo "  app-desktop-dev / app-desktop-build                      run/build Electron"
 	@echo "  app-native        run the native macOS Liquid Glass shell (needs app-desktop-dev for :5173)"
@@ -95,6 +97,9 @@ fmt:
 
 test:
 	cd backend && .venv/bin/pytest -q
+
+verify-models:
+	cd backend && .venv/bin/python -m app.verification.run
 
 # -- Apps (Electron desktop + browser renderer, pnpm + Turborepo) ----------- #
 

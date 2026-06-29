@@ -10,8 +10,8 @@ from app.api.routes import (
     books,
     director,
     events,
-    finops,
     films,
+    finops,
     flags,
     integrations,
     library,
@@ -35,6 +35,10 @@ from app.compliance.api import router as compliance_router  # additive: complian
 # Additive: the content-moderation & safety admin/operations surface (§9/§10).
 # The router lives under app.moderation to keep the safety domain self-contained.
 from app.moderation.routes import router as moderation_router
+
+# Additive: the sandboxed plugin/extension platform (app.platform.plugins).
+# Self-contained marketplace + lifecycle + dispatch surface under /plugins.
+from app.platform.plugins.api import router as plugins_router
 
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
 ROUTERS = [
@@ -69,6 +73,7 @@ ROUTERS = [
     llmops.router,  # LLM-ops surface (prompt registry/eval/guardrails); 404 unless llmops_enabled
     portability.router,  # data export/import & portability (book/canon/account/backup)
     media.router,  # Media domain: /api/media asset registry (additive)
+    plugins_router,  # sandboxed plugin/extension platform (app.platform.plugins)
 ]
 
 

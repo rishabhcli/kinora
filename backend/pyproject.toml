@@ -50,6 +50,9 @@ dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
+    # Property-based + stateful testing for the formal-verification suite
+    # (app/verification + tests/verification). Pure-Python, test-only.
+    "hypothesis>=6.100",
     "ruff>=0.5",
     "mypy>=1.10",
     "black>=24.4",
@@ -98,6 +101,10 @@ ignore = [
 # re-introduces an import cycle through this package __init__). See
 # app/compliance/DESIGN.md.
 "app/db/models/__init__.py" = ["E402", "I001"]
+# Formal-verification suite: bug-regression test names carry a "_BUGn" suffix and
+# truth-table assertions use SCREAMING_CASE option aliases for readability — both
+# are intentional, so pep8-naming is relaxed here. See app/verification/DESIGN.md.
+"tests/verification/*.py" = ["N802", "N806"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

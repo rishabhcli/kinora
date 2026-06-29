@@ -67,3 +67,20 @@ async def test_shot_render_enqueues_via_real_redis_queue(container: Container) -
     assert out.job_id
     # The real RedisRenderEnqueuer wrote the job into the real queue (idempotency index).
     assert await container.queue.lookup(out.shot_hash) == out.job_id
+
+
+def test_inference_router_seam_builds_network_free(container: Container) -> None:
+    """The additive inference-router seam builds over the crew model stack with a
+    network-free EchoBackend (no DashScope call, no credit spent)."""
+    from app.inference.router import MultiModelRouter
+
+    router = container.inference_router
+    assert isinstance(router, MultiModelRouter)
+    # One per-model router for each wired crew model (orchestration/high-volume/vl).
+    assert set(router.models) == {
+        container.settings.chat_model_max,
+        container.settings.chat_model_plus,
+        container.settings.vl_model,
+    }
+    # Cached: the property returns the same instance on re-access.
+    assert container.inference_router is router
