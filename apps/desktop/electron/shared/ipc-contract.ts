@@ -49,6 +49,8 @@ export interface InvokeChannels {
   "kinora:window:open": { request: { route?: string }; response: { id: number } };
   /** Open a book in its own dedicated window (deep-links to #/book/:id). */
   "kinora:book:open": { request: { bookId: string }; response: { id: number } };
+  /** Toggle the macOS traffic-light buttons (hover-reveal for the hidden title bar). */
+  "kinora:window:traffic-lights": { request: { visible: boolean }; response: { ok: boolean } };
   /** Open an external URL in the user's default browser (validated). */
   "kinora:open-external": { request: { url: string }; response: { ok: boolean } };
 }
@@ -186,6 +188,7 @@ export const INVOKE_CHANNELS = Object.freeze([
   "kinora:update:install",
   "kinora:window:open",
   "kinora:book:open",
+  "kinora:window:traffic-lights",
   "kinora:open-external",
 ] as const) satisfies ReadonlyArray<keyof InvokeChannels>;
 

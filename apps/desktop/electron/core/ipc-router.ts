@@ -155,6 +155,9 @@ export const v = {
   bookOpen: (p: unknown): p is InvokeChannels["kinora:book:open"]["request"] =>
     isObj(p) && isStr(p.bookId) && p.bookId.length > 0,
 
+  trafficLights: (p: unknown): p is InvokeChannels["kinora:window:traffic-lights"]["request"] =>
+    isObj(p) && typeof p.visible === "boolean",
+
   openExternal: (p: unknown): p is InvokeChannels["kinora:open-external"]["request"] =>
     isObj(p) && isStr(p.url),
 } as const;

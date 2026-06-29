@@ -154,6 +154,13 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
   const [profileOpen, setProfileOpen] = useState(false);
   const [scrollState, setScrollState] = useState<"top" | "middle" | "bottom">("top");
 
+  // macOS hidden-title-bar: reveal the native traffic lights only while the
+  // cursor is over the top bar (the window controls live at the top-left).
+  // No-op outside the Electron host (window.kinora is undefined in the browser).
+  const setTrafficLights = (visible: boolean) => {
+    (window as { kinora?: { setTrafficLights?: (v: boolean) => void } }).kinora?.setTrafficLights?.(visible);
+  };
+
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
@@ -188,12 +195,19 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
   return (
     <>
       {/* Top bar — clean, no glass */}
-      <header className="fixed top-0 left-0 right-0 z-50" data-profile-dropdown style={{
-        background: "rgb(var(--k-surface-raised-rgb) / 0.92)",
-      }}>
+      <header
+        className="fixed top-0 left-0 right-0 z-50"
+        data-profile-dropdown
+        onMouseEnter={() => setTrafficLights(true)}
+        onMouseLeave={() => setTrafficLights(false)}
+        style={{
+          background: "rgb(var(--k-surface-raised-rgb) / 0.92)",
+          WebkitAppRegion: "drag",
+        }}
+      >
         <div className="px-6 py-1 flex items-center justify-between max-w-[1280px] mx-auto">
           {/* Left: Logo */}
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate("Home")}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate("Home")} style={{ WebkitAppRegion: "no-drag" }}>
             <BookLogoIcon size={36} />
             <span className="font-serif text-base font-semibold text-kinora-text tracking-wide">
               Kinora
@@ -208,13 +222,14 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
               opacity: buttonsInHeader ? 1 : 0,
               transition: "opacity var(--mo-t-base) var(--mo-ease-glide)",
               pointerEvents: buttonsInHeader ? "auto" : "none",
+              WebkitAppRegion: "no-drag",
             }}
           >
             <NavButtons active={active} onNavigate={onNavigate} pillId="nav-pill-header" padding="6px 12px" />
           </nav>
 
           {/* Right: Search + Profile */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5" style={{ WebkitAppRegion: "no-drag" }}>
             <GooeySearch />
             <button
               onClick={() => setProfileOpen(!profileOpen)}
@@ -238,6 +253,7 @@ export default function Navbar({ active, onNavigate, onLogout }: { active: strin
               background: "#1a1714",
               border: "1px solid rgba(255,255,255,0.08)",
               boxShadow: "0 10px 32px -8px rgba(0,0,0,0.6)",
+              WebkitAppRegion: "no-drag",
             }}
           >
             {/* Header — flat, no gradient, no glow */}

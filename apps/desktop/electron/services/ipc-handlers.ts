@@ -109,6 +109,20 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   );
 
   router.handle(
+    "kinora:window:traffic-lights",
+    ({ visible }, ctx) => {
+      // macOS only: reveal/hide the native window buttons for the hidden title
+      // bar. Scoped to the calling window so one renderer can't toggle another's.
+      if (process.platform === "darwin") {
+        const win = deps.windows.all().find((w) => w.webContents.id === ctx.senderId);
+        win?.setWindowButtonVisibility(visible);
+      }
+      return { ok: true };
+    },
+    v.trafficLights,
+  );
+
+  router.handle(
     "kinora:open-external",
     ({ url }) => {
       // Only http(s)/mailto may escape to the OS browser.

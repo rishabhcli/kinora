@@ -106,6 +106,8 @@ const bridge = {
 
   // --- Windows -------------------------------------------------------------
   openWindow: (route?: string) => invoke("kinora:window:open", { route }),
+  /** macOS hidden-title-bar: show/hide the native traffic lights (hover-reveal). */
+  setTrafficLights: (visible: boolean) => invoke("kinora:window:traffic-lights", { visible }),
   openExternal: (url: string) => invoke("kinora:open-external", { url }),
 
   // --- Menu actions (open settings/diagnostics/…) --------------------------

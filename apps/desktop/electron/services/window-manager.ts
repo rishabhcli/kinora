@@ -99,7 +99,7 @@ export class WindowManager {
       show: false,
       frame: true,
       backgroundColor: isMac || isWin ? "#00000000" : "#1A1615",
-      ...(isMac ? { vibrancy: "under-window" as const, visualEffectState: "active" as const } : {}),
+      ...(isMac ? { vibrancy: "under-window" as const, visualEffectState: "active" as const, titleBarStyle: "hidden" as const } : {}),
       ...(isWin ? { backgroundMaterial: "acrylic" as const } : {}),
       webPreferences: {
         preload: this.deps.preloadPath,
@@ -111,6 +111,11 @@ export class WindowManager {
         spellcheck: true,
       },
     });
+
+    // macOS uses a hidden title bar (no grey title-bar strip). Hide the native
+    // traffic lights by default; the renderer reveals them on hover over the top
+    // bar via the kinora:window:traffic-lights channel. No-op on other platforms.
+    if (isMac) win.setWindowButtonVisibility(false);
 
     this.windows.add(win);
     this.hardenNavigation(win);
