@@ -152,6 +152,9 @@ export const v = {
   windowOpen: (p: unknown): p is InvokeChannels["kinora:window:open"]["request"] =>
     p === undefined || p === null || (isObj(p) && (p.route === undefined || isStr(p.route))),
 
+  bookOpen: (p: unknown): p is InvokeChannels["kinora:book:open"]["request"] =>
+    isObj(p) && isStr(p.bookId) && p.bookId.length > 0,
+
   openExternal: (p: unknown): p is InvokeChannels["kinora:open-external"]["request"] =>
     isObj(p) && isStr(p.url),
 } as const;
