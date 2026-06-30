@@ -676,8 +676,13 @@ class RenderPipeline:
             actual = float(output.duration_s or ctx.target_duration)
             await ctx.machine.transition(RenderState.QA)
             frames = await self._frames(output)
+            # QA is ADVISORY: a real AI-rendered clip is ALWAYS shipped — never
+            # repaired into credit-burning re-renders nor degraded to Ken-Burns.
+            # The Critic's score is still recorded (episodic memory / §13 metrics)
+            # but no longer gates whether a genuine render reaches the reader.
+            qa_record: QARecord | None = None
             try:
-                qa = await self._critic.score(
+                qa_record = await self._critic.score(
                     shot_id=ctx.shot_id,
                     clip_frames=frames,
                     canon_slice=ctx.canon_slice,
@@ -687,45 +692,13 @@ class RenderPipeline:
                     retries_exhausted=retries_exhausted,
                 )
             except (LiveVideoDisabled, ProviderError) as exc:
-                # The clip rendered (its seconds were really spent), but QA is
-                # unavailable. Commit the spend and ship a degraded, playable
-                # result rather than letting the worker retry into the DLQ — the
-                # film never hard-stops (§4.11/§12.4). A failed QA is a REPAIR, so
-                # step QA -> REPAIR before the ladder (the legal §9.7 edge).
-                await self._budget.commit(reservation, actual)
-                ctx.spent_video_seconds += actual
-                await ctx.machine.transition(RenderState.REPAIR)
-                return await self._degrade(
-                    ctx, cur_spec, reason=f"critic_{type(exc).__name__}", qa=None
-                )
-
-            if qa.verdict is Verdict.PASS:
-                await self._budget.commit(reservation, actual)
-                ctx.spent_video_seconds += actual
-                await ctx.machine.transition(RenderState.ACCEPTED)
-                return await self._accept(ctx, cur_spec, output, qa)
-
-            # A failed attempt still spent its seconds — charge them.
+                logger.warning("qa.unavailable", shot_id=ctx.shot_id, error=str(exc))
             await self._budget.commit(reservation, actual)
             ctx.spent_video_seconds += actual
-            await ctx.machine.transition(RenderState.REPAIR)
+            await ctx.machine.transition(RenderState.ACCEPTED)
+            return await self._accept(ctx, cur_spec, output, qa_record)
 
-            if qa.repair_action is RepairAction.DEGRADE or retries_exhausted:
-                return await self._degrade(ctx, cur_spec, reason="retries_exhausted", qa=qa)
-
-            if qa.repair_action in (RepairAction.RAISE_CONFLICT, RepairAction.EVOLVE_CANON):
-                result = await self._handle_conflict(ctx, cur_spec, qa, output)
-                if result.terminal is not None:
-                    return result.terminal
-                cur_spec = result.next_spec or cur_spec
-                cur_notes = result.next_notes or cur_notes
-                continue
-
-            cur_spec, cur_notes = await self._apply_repair(
-                ctx, qa.repair_action, cur_spec, cur_notes
-            )
-
-        # Unreachable: the final attempt always degrades via ``retries_exhausted``.
+        # Unreachable: the loop accepts a real render on the first attempt.
         return await self._degrade(ctx, cur_spec, reason="loop_exhausted", qa=None)
 
     async def _apply_repair(
@@ -825,7 +798,7 @@ class RenderPipeline:
         ctx: _RenderCtx,
         spec: AgentShotSpec,
         output: GeneratorOutput,
-        qa: QARecord,
+        qa: QARecord | None,
     ) -> RenderResult:
         """Persist an accepted shot: OSS + episodic + cache + continuation anchor."""
         duration = float(output.duration_s or ctx.target_duration)
@@ -854,7 +827,7 @@ class RenderPipeline:
             page_word_boxes=self._page_boxes(ctx.page),
             duration_s=duration,
         )
-        qa_dict = qa.model_dump(mode="json")
+        qa_dict = qa.model_dump(mode="json") if qa is not None else None
         narration = {
             "text": ctx.narration_text,
             "audio_key": audio_key,
@@ -911,7 +884,8 @@ class RenderPipeline:
         metrics.inc_video_seconds(ctx.spent_video_seconds)
         metrics.inc_shot_accepted()
         metrics.inc_render_retries(max(ctx.attempts - 1, 0))
-        metrics.observe_qa(ccs=qa.ccs, style_drift=qa.style_drift, motion=qa.motion_artifact)
+        if qa is not None:
+            metrics.observe_qa(ccs=qa.ccs, style_drift=qa.style_drift, motion=qa.motion_artifact)
         return RenderResult(
             shot_id=ctx.shot_id,
             status=ShotStatus.ACCEPTED,

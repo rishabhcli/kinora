@@ -61,6 +61,19 @@ class Settings(BaseSettings):
     # ``max_completion_tokens``.
     reasoning_max_output_tokens: int = 8192
 
+    # --- Storyboard planning (app/video/storyboard) ---
+    # Defaults for the model-agnostic prompt-to-storyboard planner (§9.1 step 4,
+    # §9.3): the pacing target a passage's shot list is fit to, the §-style
+    # shot-count ceiling, and the wan per-shot duration band. Purely additive —
+    # the planner accepts an explicit StoryboardBudget per call and only falls
+    # back to these. The planner's reasoning seam follows ``reasoning_provider``;
+    # the default is the deterministic heuristic provider (no network).
+    storyboard_target_total_s: float = 30.0
+    storyboard_tolerance_s: float = 2.0
+    storyboard_max_shots: int = 12
+    storyboard_min_shot_s: float = 3.0
+    storyboard_max_shot_s: float = 8.0
+
     # --- Model ids ---
     # NOTE: ids below are verified available on the DashScope-intl tier we ship
     # against (see scripts/provider_preflight.py). Some sibling ids return
@@ -103,10 +116,129 @@ class Settings(BaseSettings):
     minimax_duration_s: int = 6
     minimax_cost_per_clip_usd: float = 0.19
 
+    # --- Frontier hosted video adapters (additive; app/video/adapters/frontier) ---
+    # Concrete adapters for Runway / Luma / Pika / Kling / Veo / Sora behind one
+    # UniversalVideoProvider interface. EVERY real network call is gated by BOTH the
+    # global KINORA_LIVE_VIDEO spend gate AND this transport flag, which defaults OFF
+    # — with it off the transport refuses to issue any HTTP request (tests inject a
+    # fake transport instead). No keys are required to import/construct an adapter.
+    frontier_video_enabled: bool = False
+    # Per-provider bearer keys + API bases (None → that adapter is unconfigured and
+    # will refuse to submit; constructing it for capability inspection is still fine).
+    runway_api_key: str | None = None
+    runway_base_url: str = "https://api.dev.runwayml.com/v1"
+    runway_model: str = "gen4_turbo"
+    luma_api_key: str | None = None
+    luma_base_url: str = "https://api.lumalabs.ai/dream-machine/v1"
+    luma_model: str = "ray-2"
+    pika_api_key: str | None = None
+    pika_base_url: str = "https://api.pika.art/v1"
+    pika_model: str = "pika-2.2"
+    kling_api_key: str | None = None
+    kling_base_url: str = "https://api.klingai.com/v1"
+    kling_model: str = "kling-v2-master"
+    veo_api_key: str | None = None
+    veo_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    veo_model: str = "veo-3.0-generate-preview"
+    sora_api_key: str | None = None
+    sora_base_url: str = "https://api.openai.com/v1"
+    sora_model: str = "sora-2"
+    # Shared poll bounds for the frontier async-job lifecycle.
+    frontier_poll_timeout_s: float = 600.0
+    frontier_poll_interval_s: float = 5.0
+    frontier_poll_max_interval_s: float = 20.0
+    # --- Video warm-pool / cold-start optimisation (additive; app.video.warmpool) ---
+    # Per-provider pool of warm, reusable provider sessions (auth tokens + HTTP
+    # connections + signed sessions) that the render path borrows/returns under a
+    # fair lease, kept "just warm enough" by a cost-aware pre-warm scheduler driven
+    # by predicted near-term demand (reader velocity / scheduler look-ahead). Hides
+    # first-request cold-start latency so generation stays a few seconds ahead of
+    # the reader. OFF by default: when off the manager opens sessions strictly on
+    # demand (cold every time) and runs no keep-alive loop, so adopting the package
+    # changes nothing. Manages CONNECTIONS, never renders — never touches the
+    # KINORA_LIVE_VIDEO spend gate. See app/video/warmpool/DESIGN.md.
+    warmpool_enabled: bool = False
+    warmpool_min_warm: int = 1
+    warmpool_max_size: int = 4
+    warmpool_max_warm: int = 3
+    warmpool_idle_ttl_s: float = 120.0
+    warmpool_health_check_interval_s: float = 30.0
+    warmpool_max_session_age_s: float = 600.0
+    warmpool_keepalive_interval_s: float = 5.0
+    warmpool_prewarm_horizon_s: float = 8.0
+    warmpool_warm_worth_threshold_s: float = 0.5
+    warmpool_borrow_timeout_s: float = 10.0
+
     # --- Wan task polling ---
     video_poll_timeout_s: float = 600.0
     video_poll_interval_s: float = 3.0
     video_poll_max_interval_s: float = 15.0
+
+    # --- Audio backend selection (additive; provider-agnostic seam) ---
+    # Which audio (narration/music/SFX) provider the universal ``app.audio`` seam
+    # prefers. "dashscope" wraps the existing CosyVoice/Qwen3-TTS provider unchanged
+    # (default — narration behaviour is byte-for-byte identical to today). Other
+    # values ("elevenlabs" | "openai" | "azure" | "google") select a hosted adapter
+    # when its key is configured; an ``AudioRouter`` may compose several with
+    # health-based failover. None of this is wired into the live narration path until
+    # a caller injects ``app.audio.NarrationSeam`` into the Generator.
+    audio_backend: str = "dashscope"
+    # Comma-separated failover order for ``app.audio.AudioRouter`` (first = preferred);
+    # empty → single-backend (``audio_backend``) only. Pure config; no env reads here.
+    audio_router_backends: str = ""
+    # Prefer a backend that emits inline word timestamps for narration (most precise
+    # karaoke map) over priority order, when one is available in the router.
+    audio_prefer_inline_timestamps: bool = False
+    # Per-backend circuit-breaker tunables for the audio router (mirror the video
+    # router defaults).
+    audio_router_failure_threshold: int = 3
+    audio_router_cooldown_s: float = 30.0
+
+    # --- Hosted audio adapter keys (optional; absent → that adapter is unavailable) ---
+    elevenlabs_api_key: str | None = None
+    elevenlabs_model: str = "eleven_multilingual_v2"
+    openai_tts_model: str = "gpt-4o-mini-tts"  # uses OPENAI_API_KEY when present
+    azure_speech_key: str | None = None
+    azure_speech_region: str | None = None
+    google_tts_credentials_json: str | None = None
+    # --- Output normalization (app.video.normalize; additive) ---
+    # Provider clips arrive in wildly different codecs/containers/fps/resolutions
+    # /colour-spaces/loudness. The normalize pipeline transcodes any input to one
+    # canonical, stitch-ready target so clips from ANY backend are interchangeable
+    # downstream (app.render.pipeline no longer carries provider-specific shape
+    # assumptions). These defaults mirror the §4.2 vertical film geometry and the
+    # x264/yuv420p/AAC params the existing stitch path already enforces — flipping
+    # them re-targets the whole normalization layer at once.
+    normalize_target_width: int = 720
+    normalize_target_height: int = 1280
+    normalize_target_fps: int = 30
+    # "pad" (letterbox/pillarbox — never crops content) | "crop" (fill, may crop)
+    # | "stretch" (ignore aspect — distorts; discouraged) | "none" (scale only,
+    # may change aspect to exactly fit). Pad is the safe default for mixed sources.
+    normalize_aspect_strategy: str = "pad"
+    normalize_video_codec: str = "libx264"
+    normalize_pixel_format: str = "yuv420p"
+    normalize_x264_preset: str = "veryfast"
+    # Constant-rate factor for the canonical x264 encode (lower = higher quality).
+    normalize_x264_crf: int = 20
+    normalize_audio_codec: str = "aac"
+    normalize_audio_bitrate: str = "128k"
+    normalize_audio_sample_rate: int = 48000
+    normalize_audio_channels: int = 2
+    # Optional EBU R128 loudness normalisation of the audio to a target integrated
+    # loudness. 0.0 disables it (the encode keeps the source loudness). A typical
+    # streaming target is -16.0 LUFS; -23.0 is broadcast.
+    normalize_target_lufs: float = 0.0
+    normalize_loudness_true_peak: float = -1.5
+    normalize_loudness_range: float = 11.0
+    # Tag the canonical output as limited-range BT.709 so every downstream clip
+    # carries identical colour metadata (mixed-provider clips otherwise disagree).
+    normalize_color_primaries: str = "bt709"
+    normalize_color_transfer: str = "bt709"
+    normalize_color_space: str = "bt709"
+    normalize_color_range: str = "tv"  # "tv" (limited) | "pc" (full)
+    # Subprocess wall-clock ceiling for a single normalize/concat ffmpeg invocation.
+    normalize_ffmpeg_timeout_s: float = 240.0
 
     # --- Embeddings ---
     # ``tongyi-embedding-vision-plus`` embeds BOTH images and text into one shared
@@ -211,14 +343,100 @@ class Settings(BaseSettings):
     # Optimizer: minimum acceptable quality rung when budget-constrained (0..1).
     finops_optimizer_min_quality: float = 0.0
 
+    # --- Tenancy / multi-tenant isolation (additive; app.tenancy, §6/§11.1) ---
+    # Default per-tenant quota envelope for a freshly-created org. ``0`` == no
+    # tighter-than-global cap (single-tenant local/demo: the global ceiling is the
+    # only ceiling). These compose with the global video-seconds ceiling — the
+    # binding cap is always the smaller of (tenant envelope, global head-room).
+    tenancy_default_max_books: int = 0
+    tenancy_default_monthly_usd: float = 0.0
+    tenancy_default_monthly_video_seconds: float = 0.0
+    # Object-store namespace segment prefixing every tenant's assets (prefix
+    # isolation). Keeps a tenant's media partitioned under ``<segment>/<tenant>/…``.
+    tenancy_asset_namespace: str = "t"
+    # --- Speculative pre-generation engine (additive; app/video/speculate) ---
+    # An expected-value policy over the ahead-of-reader buffer (kinora.md §4.4/
+    # §4.6/§4.8): predict which upcoming shots the reader will reach, then
+    # pre-render the EV-optimal portfolio under a *separate* speculative spend cap
+    # — distinct from, and bounded under, the §11 video-seconds budget. Pure
+    # policy: gates nothing on its own (KINORA_LIVE_VIDEO stays the live gate).
+    speculate_enabled: bool = False
+    #: Hard speculative spend cap per reading session (dollars). The portfolio
+    #: optimiser never selects beyond this; cancellations refund into it.
+    speculate_budget_usd: float = 1.0
+    #: Forward window (words) a speculation must still reach to survive a §4.8
+    #: trajectory invalidation (else it is cancelled + refunded if unstarted).
+    speculate_keep_horizon_words: int = 4000
+    #: Minimum expected-value-per-dollar a candidate must clear to be eligible
+    #: (its expected hit value must beat its expected waste).
+    speculate_min_ev_per_dollar: float = 1.0
+    #: Hit-probability thresholds for probability→model routing: at/above premium
+    #: earns a premium id; at/above standard earns a standard id; below → cheap.
+    speculate_premium_probability: float = 0.7
+    speculate_standard_probability: float = 0.35
+
     # --- Live video go-live gate ---
     kinora_live_video: bool = False
+
+    # --- Unified VideoGenerationService facade (app/video/service; ADDITIVE) ---
+    #: Bounded provider attempts inside the facade before it falls through to a
+    #: SKIP the render pipeline degrades. A quality-gate reject re-rolls the seed
+    #: and retries up to this cap; >1 only matters when a quality gate is wired.
+    video_service_max_attempts: int = 3
+    #: Per-job await deadline (seconds) the facade passes to the job lifecycle;
+    #: ``None`` defers to the provider's own ``video_poll_timeout_s``.
+    video_service_job_timeout_s: float | None = None
+    # --- Shadow / live-eval harness (app/video/shadow; ADDITIVE, off-by-default) ---
+    # Evaluate a candidate video model against real workloads OFF the critical path
+    # before promoting it to reader traffic. Every default is the safe one: shadow
+    # mode is opt-in, nothing is sampled until a fraction is set, and the candidate
+    # eval budget is UNFUNDED (0.0) so enabling shadow mode can never spend a real
+    # video-second or touch the reader budget (independent of KINORA_LIVE_VIDEO).
+    video_shadow_enabled: bool = False
+    video_shadow_sample_fraction: float = 0.0
+    video_shadow_sample_salt: str = "shadow"
+    video_shadow_eval_video_seconds: float = 0.0
+    video_shadow_candidate_model: str = ""
+    video_shadow_confidence: float = 0.95
+    video_shadow_win_margin: float = 0.0
+    # --- Multi-model best-of-N ensemble (app/video/ensemble; §9.5/§11) ---
+    # Render a hero shot on K models and keep the best. OFF by default and capped
+    # at one candidate so an accidental wiring can NEVER fan out or overspend; a
+    # caller builds an EnsembleConfig from these into the BestOfNRenderer.
+    ensemble_enabled: bool = False
+    # Comma-separated shot tiers permitted to fan out (e.g. "hero"). Empty → none.
+    ensemble_enabled_tiers: str = ""
+    # Max providers launched per shot (1 → no fan-out even when enabled).
+    ensemble_max_candidates: int = 1
+    # Max providers rendering concurrently (bounds peak fan-out / cost spike).
+    ensemble_max_concurrency: int = 2
+    # Selection objective: max_quality | quality_per_cost | quality_under_cost_cap
+    # | consistency_vote.
+    ensemble_objective: str = "max_quality"
+    # Cost figure for value/cap objectives: video_seconds | usd.
+    ensemble_cost_unit: str = "video_seconds"
+    # Hard per-shot multi-render cost cap (in cost_unit; 0 → no cap).
+    ensemble_per_shot_cost_cap: float = 0.0
+    # Early-stop: stop launching + cancel losers once a candidate clears this
+    # composite quality (0 or >1 → never early-stop).
+    ensemble_good_enough_quality: float = 0.0
 
     # --- Concurrency lanes ---
     concurrency_committed: int = 4
     concurrency_speculative: int = 2
     concurrency_keyframe: int = 2
     retry_cap: int = 2
+
+    # --- Resilience chaos harness (app/resilience; ADDITIVE) ---
+    # Probabilistic fault/latency injection for proving the resilience policies.
+    # Hard-gated: app/resilience/chaos.chaos_from_settings refuses to ARM this
+    # outside the ``local`` environment even when the flag is True, so it can
+    # never inject faults into a real (non-local) deployment.
+    resilience_chaos_enabled: bool = False
+    resilience_chaos_fault_probability: float = 0.0
+    resilience_chaos_latency_probability: float = 0.0
+    resilience_chaos_latency_min_s: float = 0.0
+    resilience_chaos_latency_max_s: float = 0.0
 
     # --- Render-engine hardening (§9.7 resumability/poison; ADDITIVE) ---
     #: Snapshot in-flight shots so a worker restart resumes mid-render instead of
@@ -230,6 +448,33 @@ class Settings(BaseSettings):
     render_poison_threshold: int = 3
     #: Max shots a DAG batch releases in parallel (caps render fan-out).
     render_max_parallel_shots: int = 4
+    #: Cadence + batch size for the durable stuck-shot recovery loop
+    #: (``python -m app.render.durability.recovery``): finds shots left in a
+    #: non-terminal §9.7 state after a worker restart and resumes/repairs them.
+    render_recovery_interval_s: float = 30.0
+    render_recovery_limit: int = 50
+
+    # --- Video provider quality scoring / auto-eval (app/video/quality; ADDITIVE) ---
+    #: Use the real VL scorer for the perceptual axes (aesthetic / prompt-adherence /
+    #: NSFW) in the quality harness. OFF by default so scoring never spends — the
+    #: evaluator falls back to a neutral fake. This makes a VL *chat* call (not a
+    #: video call), independent of ``kinora_live_video``; flip on only when intended.
+    video_quality_vl_enabled: bool = False
+    #: Per-provider reputation EWMA half-life, in *observations* (clips). The last
+    #: ~``half_life`` clips dominate a provider's rolling quality reputation.
+    video_quality_ledger_half_life: float = 20.0
+    #: Max frames the VL scorer samples per clip (caps tokens on the perceptual call).
+    video_quality_vl_max_frames: int = 4
+
+    # --- Media transform graph (app/video/mediagraph; derived-media DAG; ADDITIVE) ---
+    #: Max independent media-transform nodes a wave runs concurrently (thumbnail /
+    #: poster / gif / sprite off one master fan out up to this width).
+    mediagraph_max_parallel: int = 4
+    #: Skip already-produced derivatives via per-node content-hash caching, so an
+    #: idempotent re-run does no ffmpeg work. OFF disables caching (every node runs).
+    mediagraph_cache_enabled: bool = True
+    #: Per-ffmpeg-invocation wall-clock ceiling (seconds) for the media graph.
+    mediagraph_ffmpeg_timeout_s: float = 240.0
 
     # --- Render-queue retry backoff (kinora.md §12.1) ---
     # Jitter strategy for the exponential-backoff retry schedule
@@ -253,9 +498,89 @@ class Settings(BaseSettings):
     queue_autoscale_speculative_max: int = 4
     queue_autoscale_cooldown_s: float = 30.0
 
+    # --- Adaptive scheduler v2 (kinora.md §4.5/§4.6/§4.9; app/scheduler/v2) ---
+    # An ADDITIVE strategy layer over the dual-watermark buffer. OFF by default so
+    # the live scheduler behaves byte-for-byte as today; flip on to let the
+    # velocity-regime model resize watermarks, the provider-aware policy fan
+    # promotions across free render slots, and the cold-zone prefetch/eviction
+    # decide what to pre-warm. Spends NO extra video-seconds the budget gate would
+    # not already allow — every promotion stays ``budget.can_render_live()``-gated.
+    scheduler_v2_enabled: bool = False
+    # Reader-velocity regime classifier (§4.6): a skim must exceed this multiple of
+    # the §4.3 clamp ceiling to read as SKIMMING; a re-read needs this fraction of
+    # recent motion to be backward; the dwell (ms) above which a steady reader is
+    # reclassified as PONDERING (long thinks).
+    scheduler_v2_skim_ceiling_multiple: float = 1.0
+    scheduler_v2_reread_backward_fraction: float = 0.35
+    scheduler_v2_ponder_dwell_ms: float = 6_000.0
+    # How many samples the regime classifier needs before it leaves the cold-start
+    # STEADY default (small counts stay conservative — no spend regression).
+    scheduler_v2_regime_min_samples: int = 3
+    # Provider-aware promotion (§4.9): per-provider nominal render latency (seconds)
+    # used to estimate how many in-flight slots will free before the buffer drains,
+    # so the policy promotes enough — but not more — to keep the buffer full.
+    scheduler_v2_provider_latency_s: float = 12.0
+    # Hard ceiling on parallel promotions one tick may release (caps fan-out even
+    # when many slots look free); 0 falls back to the committed lane width.
+    scheduler_v2_max_parallel_promotions: int = 0
+    # Cold-zone prefetch/eviction (§4.4): keyframes to keep warm past the
+    # speculative horizon, and the eviction high-watermark for the warm cache.
+    scheduler_v2_prefetch_depth: int = 4
+    scheduler_v2_cold_cache_capacity: int = 24
+    # --- Distributed render orchestration (kinora.md §12.1/§12.2; ADDITIVE) ---
+    # The coordination layer beside the single render queue: a worker registry +
+    # lease model, capability/locality-aware assignment, and work-stealing across
+    # many workers/providers (app/orchestration/). All knobs are ms / counts.
+    #: A worker silent longer than this is DEAD; its leases are reclaimed + reassigned.
+    orchestration_worker_ttl_ms: int = 90_000
+    #: Lease window granted on assignment — must outlast a render (mirrors §12.1).
+    orchestration_lease_ttl_ms: int = 120_000
+    #: Min lease-count gap between busiest and idlest worker before work-stealing fires.
+    orchestration_rebalance_imbalance: int = 2
+    #: Max shot migrations one rebalance pass may plan (anti-thrash).
+    orchestration_rebalance_max_steals: int = 4
+    #: Whether committed shots may be stolen (default off: keep them sticky for continuity).
+    orchestration_steal_committed: bool = False
+    # --- Demand-aware lane autoscaler (additive; see app/autoscale, §4.6/§4.9/§12.2) ---
+    # Per-lane replica bounds for the target-tracking + predictive controller. CPU
+    # is the cheap Ken-Burns lane; PROVIDER is the quota-bounded Wan/MiniMax lane;
+    # GPU is the scarce local accelerated lane (defaults to 0 = off).
+    autoscale_cpu_min: int = 2
+    autoscale_cpu_max: int = 24
+    autoscale_provider_min: int = 4
+    autoscale_provider_max: int = 16
+    autoscale_gpu_min: int = 0
+    autoscale_gpu_max: int = 4
+    # Anti-flap: scale-out is immediate; scale-in waits this cooldown. Hysteresis
+    # is the scale-out dead-band (fraction of current size) below which jitter is
+    # ignored; the floor is an absolute minimum scale-out margin (replicas) so a
+    # one-job wobble near the floor can't flap a small pool.
+    autoscale_scale_in_cooldown_s: float = 60.0
+    autoscale_hysteresis_band: float = 0.15
+    autoscale_hysteresis_floor: float = 1.0
+    # Predictive pre-warm gain: replicas added to the committed lane per unit of
+    # aggregate buffer-underrun risk (reader-velocity-driven). 0 disables pre-warm.
+    autoscale_predictive_gain: float = 1.0
+    # Cost-aware cap on the summed plan (relative cost_per_replica units); inf = off.
+    autoscale_max_cost: float = float("inf")
+    # p95 render-latency SLO (s) at/above which a lane is treated as saturated, and
+    # the look-ahead horizon (s) the predictive term provisions buffer for.
+    autoscale_latency_slo_s: float = 25.0
+    autoscale_underrun_horizon_s: float = 30.0
+
     # --- Ingest recovery ---
     ingest_recovery_interval_s: float = 30.0
     ingest_recovery_limit: int = 25
+
+    # --- Durable saga / workflow engine (app/sagas/) [additive] ---
+    #: How long a worker's lease on an in-flight run is valid before the
+    #: recovery sweep treats it as abandoned and re-claims it (seconds).
+    saga_lease_ttl_s: float = 300.0
+    #: Interval the recovery sweep runs at (fires due timers + recovers stuck
+    #: runs). Read by a production scheduler; the engine itself takes no time.
+    saga_recovery_interval_s: float = 15.0
+    #: Max runs processed per sweep pass (back-pressure for the recovery loop).
+    saga_recovery_batch: int = 100
 
     # --- Ingest pipeline (Phase A) [Agent: ingest-domain, additive] ---
     #: OCR fallback for scanned/image-only pages (§9.1). Off by default — it spends
@@ -341,6 +666,33 @@ class Settings(BaseSettings):
     #: Default seed for the chaos engine + deterministic load runs.
     chaos_default_seed: int = 1337
 
+    # --- Observability plane (app/observability/; §12.5) ---
+    #: Mount the flag-gated Prometheus exposition router built by the
+    #: observability plane. The plane is additive: the fixed ``/metrics`` route in
+    #: ``app/main.py`` is unaffected; this gates only the plane's own router (e.g. a
+    #: packaged build that must not expose an unauthenticated scrape can set False).
+    observability_metrics_enabled: bool = True
+    #: Retain finished spans in a bounded in-memory ring so the observability plane
+    #: can reconstruct a shot's render-trace timeline for debugging. Off by default
+    #: (the no-op exporter) so a normal run keeps zero span overhead.
+    observability_collect_spans: bool = False
+    # --- Deep health + SLO / error-budget engine (app.slo; additive) ---
+    # The *running-service* SLO plane (distinct from the load-test SLO set above,
+    # which gates a finished LoadReport). These tune the default product
+    # objectives the engine tracks continuously off the live metric streams; the
+    # error-budget + multi-window burn alerts + release gate derive from them.
+    # Additive-only — reuses the existing slo_intent_p99_ms / slo_availability_target.
+    #: Target fraction of page reads served without a buffer underrun (the §4
+    #: core promise: the next page's film is ready before the reader arrives).
+    slo_read_underrun_free_target: float = 0.99
+    #: Target fraction of shot renders that reach an accepted asset (§9.7) — not
+    #: dead-lettered or dropped to a lower ladder rung.
+    slo_shot_success_target: float = 0.98
+    #: Render p95 budget (ms): the buffer-fill latency a shot must clear.
+    slo_render_p95_ms: float = 8000.0
+    #: Window (s) the *current* SLI snapshot is computed over (the dashboard read).
+    slo_eval_window_s: float = 300.0
+
     # --- Product analytics (app/analytics/) ---
     # Distinct from ops-observability (Prometheus) and the §13 eval warehouse:
     # the event pipeline that answers "how do humans use the product?".
@@ -361,6 +713,27 @@ class Settings(BaseSettings):
     # correct; idempotent upserts make the overlap harmless).
     analytics_rollup_interval_s: float = 300.0
     analytics_rollup_window_days: int = 2
+
+    # --- Cost & usage analytics + dashboards (app/usageanalytics/, §11.1) ---
+    # A time-series analytics warehouse over *spend* (cost/usage/quality rolled up
+    # by provider/model/book/session/time-bucket), distinct from app/analytics
+    # (product behaviour), app/finops (budget governance), and the cost_meter
+    # (one process-global rollup). Read-only dashboard API; never spends.
+    usage_analytics_enabled: bool = True
+    # Monthly USD cap the burndown projects month-end spend against (the
+    # "$30-style" demo cap). Read as a Decimal string to avoid float drift.
+    ua_monthly_cap_usd: float = 30.0
+    # Default / hard-max dashboard query window (days back from ``until``).
+    ua_default_window_days: int = 30
+    ua_max_window_days: int = 730
+    # Trailing window (days) the burndown averages the $/day run-rate over.
+    ua_run_rate_window_days: int = 7
+    # Anomaly detector thresholds (overridable). Spend spike: latest bucket cost
+    # must exceed baseline_mean × this ratio. Error surge: absolute error-rate
+    # rise over baseline. Quality regression: absolute mean-quality drop.
+    ua_spend_spike_ratio: float = 3.0
+    ua_error_surge_delta: float = 0.10
+    ua_quality_drop_delta: float = 0.08
 
     # --- Realtime transport (SSE/WS resume, presence, recorder; §5.6) ---
     # The event recorder tees every §5.6 event into a per-session log so a dropped
@@ -384,6 +757,23 @@ class Settings(BaseSettings):
     #: Max rows the lifecycle GC sweep collects per run.
     media_gc_batch: int = 100
 
+    # --- Multi-region asset CDN / replication (app.cdn; additive) ---
+    #: Comma-separated replica region ids to mirror origin into (e.g. "eu,ap").
+    #: Empty == single-region (origin only); the manager simply has no replicas.
+    cdn_replica_regions: str = ""
+    #: A replica more than this many seconds behind origin is treated as stale and
+    #: skipped by the resolver in favour of a fresher region (or origin).
+    cdn_max_replica_lag_s: float = 60.0
+    #: Edge-cache TTL (seconds) for *immutable* content-addressed assets — set
+    #: effectively "forever" so edges never revalidate a by-hash blob.
+    cdn_immutable_ttl_s: int = 365 * 24 * 3600
+    #: Edge-cache TTL (seconds) for *mutable* path-keyed assets (a shot that may
+    #: be surgically re-rendered); a re-render is picked up within this window.
+    cdn_mutable_ttl_s: int = 6 * 3600
+    #: Default ceiling on how many upcoming shots the prefetch controller warms
+    #: into the reader's nearest region per pass.
+    cdn_prefetch_max_warm: int = 4
+
     # --- Event sourcing / event store (app.eventsourcing.store; additive) ---
     #: Events between aggregate snapshots (the SnapshotStrategy cadence). The
     #: domain facet consults this to keep rehydration O(events-since-snapshot).
@@ -392,6 +782,40 @@ class Settings(BaseSettings):
     es_outbox_batch: int = 100
     #: Publish attempts before an outbox row is dead-lettered (the §12.1 DLQ).
     es_outbox_max_attempts: int = 8
+
+    # --- Tamper-evident audit log + provenance (app.audit; additive) ------- #
+    # The hash-chained, redaction-aware account of every consequential action
+    # (canon mutation, arbitration decision, render accept/degrade, budget spend,
+    # auth/lockout, config/flag change). All additive with safe defaults so the
+    # subsystem is inert until a call site records to it.
+    #: Master on/off switch — when false, the AuditService is not wired into the
+    #: composition root (call sites no-op). The log itself always works in-process.
+    audit_enabled: bool = True
+    #: Entries per sealed Merkle checkpoint segment (the auto-seal cadence). A
+    #: checkpoint is a compact, publishable tamper-evidence commitment.
+    audit_segment_size: int = 1024
+    #: Retention horizon (days) for *sealed* entries before the retention sweep may
+    #: prune them (their Merkle checkpoint still proves they existed); ``0`` keeps
+    #: everything forever.
+    audit_retention_days: int = 0
+    #: Salt keying the PII redaction commitments (unforgeable without it,
+    #: reproducible by the operator who holds it). Defaults to the JWT secret so a
+    #: fresh deployment still anonymises; override to rotate independently.
+    audit_redaction_salt: str | None = None
+    # --- Privacy / GDPR right-to-erasure (app.privacy; additive) ---
+    #: Per-data-class retention TTLs (days) for the privacy retention engine.
+    #: ``0`` means "expire immediately"; a positive value sets the rolling
+    #: window; leave unset to use the data-class default (None == account life).
+    #: These mirror the data-map's retention_class names (datamap.RC_*).
+    privacy_retention_reading_session_days: int = 365
+    privacy_retention_directing_preference_days: int = 730
+    #: Audit / event-stream accountability retention (~7y) for crypto-erased data.
+    privacy_retention_audit_log_days: int = 2555
+    privacy_retention_event_stream_days: int = 2555
+    #: Marker substituted into a redacted append-only entry's personal fields.
+    privacy_redaction_marker: str = "[REDACTED]"
+    #: Max store-steps an erasure run drains per resume pass (idempotent/resumable).
+    privacy_erasure_step_batch: int = 50
 
     # --- Auth (JWT) ---
     jwt_secret: str = DEFAULT_JWT_SECRET
@@ -454,6 +878,38 @@ class Settings(BaseSettings):
     csrf_header_name: str = "X-CSRF-Token"
     # Auth audit log retention sweep (days; 0 disables pruning).
     auth_audit_retention_days: int = 365
+
+    # --- API hardening (app/apihardening/) — all additive, all opt-in ----------
+    # Master switch for the cross-cutting hardening middleware (request-id,
+    # body/content-type limits, the token-bucket rate limiter, idempotency-key
+    # replay, OpenAPI docs). OFF by default so existing behaviour is byte-for-byte
+    # unchanged until a deployment opts in.
+    hardening_enabled: bool = False
+    # Per-concern toggles (only consulted when ``hardening_enabled`` is true).
+    hardening_request_id: bool = True
+    hardening_request_limits: bool = True
+    hardening_rate_limit: bool = True
+    hardening_idempotency: bool = True
+    hardening_openapi: bool = True
+    # When true the hardening error surface (rate-limit 429, body-too-large 413,
+    # idempotency conflicts) renders RFC-7807 ``application/problem+json`` and the
+    # problem exception handlers are installed. OFF keeps the legacy
+    # ``{"error": {...}}`` envelope the desktop renderer already parses.
+    hardening_problem_json_enabled: bool = False
+    hardening_problem_type_base: str = "https://kinora.dev/problems/"
+    hardening_request_id_header: str = "X-Request-ID"
+    hardening_correlation_id_header: str = "X-Correlation-ID"
+    hardening_trust_inbound_request_id: bool = True
+    # Max accepted request body in bytes (0 disables). 8 MiB default covers the
+    # JSON/control surface; the PDF-upload route is exempted at wiring time.
+    hardening_max_body_bytes: int = 8 * 1024 * 1024
+    # Idempotency-Key replay window (seconds) + header name.
+    hardening_idempotency_ttl_s: int = 24 * 3600
+    hardening_idempotency_header: str = "Idempotency-Key"
+    # Default token-bucket rate limit (burst capacity + refill tokens/sec).
+    hardening_rate_limit_enabled: bool = True
+    hardening_rate_limit_capacity: int = 120
+    hardening_rate_limit_refill_per_s: float = 2.0
 
     # --- MCP control surface (the deployed canon-memory server, §8.3/§14) ---
     # When set, the streamable-HTTP MCP requires ``Authorization: Bearer <token>``.
@@ -544,6 +1000,27 @@ class Settings(BaseSettings):
     readwise_webhook_secret: str | None = None
     notion_webhook_secret: str | None = None
 
+    # --- Async-video/audio provider webhook ingress (app.video.webhooks; §12.1) ---
+    # The production HTTP door async media providers post render-completion
+    # callbacks to (``POST /api/video/webhooks/{provider}``). The route is
+    # unauthenticated by design — the provider's *signature* is the auth — so a
+    # per-provider signing secret must be set for that provider to be accepted; an
+    # unset provider yields a clean 404 (the gateway ships dark and lights up per
+    # provider). No secret is required to boot. None of these spend credits or
+    # touch the live model path.
+    video_webhook_wan_secret: str | None = None
+    video_webhook_dashscope_secret: str | None = None
+    video_webhook_minimax_secret: str | None = None
+    #: Signing secret for callbacks our own internal services post (canonical shape).
+    video_webhook_internal_secret: str | None = None
+    #: HMAC replay tolerance (seconds) the ingress enforces on a signed timestamp.
+    video_webhook_tolerance_s: int = 300
+    #: Hard cap on an inbound callback body (bytes); larger ⇒ 413 before parsing.
+    video_webhook_max_body_bytes: int = 1 * 1024 * 1024
+    #: Per-source (provider+IP) token-bucket rate limit for the ingress route.
+    video_webhook_rate_capacity: int = 120
+    video_webhook_rate_refill_per_s: float = 4.0
+
     # --- Content translation (app.translation; distinct from UI i18n) ---
     # The content-translation subsystem translates reader-facing material (page
     # text, canon entity descriptions, narration scripts) into a reader's
@@ -599,6 +1076,54 @@ class Settings(BaseSettings):
     #: Default number of eval/A-B runs (the §13 "mean + spread over N" knob).
     llmops_eval_runs: int = 3
 
+    # --- Input-validation & data-hygiene hardening (app.sechardening; additive) ---
+    # Defensive upload / storage / download / log-redaction settings.  All
+    # defaults are safe-conservative and can be tightened via env vars.
+
+    #: Maximum size (bytes) for any single file upload.  Default 100 MiB.
+    sechardening_upload_max_bytes: int = 100 * 1_024 * 1_024
+
+    #: Maximum *character* length for a raw storage key before normalization.
+    sechardening_key_max_raw_chars: int = 2_048
+
+    #: Comma-separated list of trusted download domains.  An empty string means
+    #: ``app.sechardening.domains.DEFAULT_ALLOWED_DOMAINS`` is used.  Entries
+    #: use suffix-match semantics: ``"dashscope.com"`` also allows
+    #: ``"cdn.dashscope.com"``.
+    sechardening_allowed_download_domains: str = ""
+
+    #: Comma-separated list of additional log-event key names (exact, case-
+    #: insensitive) that the redaction processor should treat as sensitive,
+    #: beyond the built-in vocabulary.
+    sechardening_extra_redact_keys: str = ""
+
+    @property
+    def sechardening_allowed_domains_list(self) -> tuple[str, ...]:
+        """Parsed tuple of trusted download domains from config.
+
+        Returns the configured list when non-empty, or the library default.
+        """
+        from app.sechardening.domains import DEFAULT_ALLOWED_DOMAINS
+
+        raw = self.sechardening_allowed_download_domains.strip()
+        if not raw:
+            return DEFAULT_ALLOWED_DOMAINS
+        return tuple(d.strip().lower() for d in raw.split(",") if d.strip())
+
+    @property
+    def sechardening_extra_redact_keys_tuple(self) -> tuple[str, ...]:
+        """Parsed tuple of extra sensitive key names for log redaction."""
+        raw = self.sechardening_extra_redact_keys.strip()
+        if not raw:
+            return ()
+        return tuple(k.strip().lower() for k in raw.split(",") if k.strip())
+    # --- Chaos / game-day framework (app/chaos) ---
+    #: Explicit opt-in to arm orchestrated chaos faults. OFF by default. Even when
+    #: set, the production hard gate (app/chaos/gate.py) refuses to arm unless
+    #: ``app_env`` is a chaos-safe environment (``local``/``test``/``ci``), so a
+    #: stray ``CHAOS_ENABLED=true`` in prod still cannot inject faults.
+    chaos_enabled: bool = False
+
     @property
     def is_local(self) -> bool:
         """True when running in the local development environment."""
@@ -620,6 +1145,11 @@ class Settings(BaseSettings):
     def analytics_salt_effective(self) -> str:
         """The salt to feed the analytics scrubber (falls back to the JWT secret)."""
         return self.analytics_salt or self.jwt_secret
+
+    @property
+    def audit_redaction_salt_effective(self) -> str:
+        """The salt for audit PII-redaction commitments (falls back to JWT secret)."""
+        return self.audit_redaction_salt or self.jwt_secret
 
     @model_validator(mode="after")
     def _guard_production_secrets(self) -> Settings:

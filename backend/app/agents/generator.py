@@ -217,15 +217,28 @@ class Generator:
             prev_last_frame_bytes=prev_last_frame_bytes,
         )
         video = await self._video.render(wan_spec)
-        narration = await self._providers.tts.synthesize(narration_text, voice_id=voice_id)
+        # Narration is best-effort: a real AI video must NEVER be discarded (and
+        # degraded to Ken-Burns) just because TTS failed — e.g. a provider quota
+        # /403 on the narration model. Ship the clip silent; the sync map simply
+        # has no word timings until narration is available.
+        audio_bytes: bytes = b""  # empty == "no audio" (pipeline guards on truthiness)
+        sample_rate = 0
+        word_timestamps: list[TtsWord] = []
+        try:
+            narration = await self._providers.tts.synthesize(narration_text, voice_id=voice_id)
+            audio_bytes = narration.audio_bytes
+            sample_rate = narration.sample_rate
+            word_timestamps = list(narration.word_timestamps)
+        except Exception:  # noqa: BLE001 — narration failure must not sink a good video
+            pass
         return GeneratorOutput(
             clip_bytes=video.clip_bytes,
             clip_url=video.clip_url,
             last_frame_bytes=video.last_frame_bytes,
             duration_s=video.duration_s,
-            audio_bytes=narration.audio_bytes,
-            sample_rate=narration.sample_rate,
-            word_timestamps=narration.word_timestamps,
+            audio_bytes=audio_bytes,
+            sample_rate=sample_rate,
+            word_timestamps=word_timestamps,
             provider_task_id=video.provider_task_id,
         )
 

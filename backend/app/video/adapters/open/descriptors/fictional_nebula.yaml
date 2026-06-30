@@ -1,0 +1,63 @@
+# PROOF OF CONFIG-ONLY ONBOARDING.
+#
+# "Nebula-Dream 3" is a fictional video model that does not exist. This descriptor
+# fully onboards it into Kinora with ZERO new Python: the tests load this file,
+# build a DescriptorAdapter from it, and drive a full submit -> poll -> fetch
+# render against a mocked transport. It deliberately uses an unusual API shape
+# (nested "generation" envelopes, a non-standard status vocabulary, a deeply
+# nested result URL, an inline-base64 fallback) to exercise the descriptor engine
+# end to end. If a real future model looks like this, dropping in a file like this
+# is all it takes.
+name: nebula-dream-3
+model: nebula-dream-3-turbo
+version: 1
+
+capabilities:
+  modes: [text_to_video, image_to_video, reference_to_video]
+  max_duration_s: 12.0
+  min_duration_s: 2.0
+  resolutions: ["720P", "1080P"]
+  supports_seed: true
+  supports_negative_prompt: true
+  supports_audio: true
+  max_reference_images: 4
+  default_fps: 30
+  cost_per_s: 0.25
+  quality: 0.82
+
+transport:
+  base_url: "https://api.nebula-dream.test/rpc/v3"
+  auth_scheme: key            # Authorization: Key <token>
+  headers:
+    X-Nebula-Region: intl
+  timeout_s: 90.0
+
+submit:
+  path: "renders/{{model}}/submit"     # model interpolated into the path
+  method: POST
+  body_template:
+    generation:
+      caption: "{{prompt}}"
+      avoid: "{{negative_prompt}}"
+      seconds: "{{duration_s}}"
+      grain: "{{resolution}}"
+      determinism:
+        seed: "{{seed}}"
+      driving_frame: "{{image_url}}"
+      identity_refs: "{{reference_image_urls}}"
+      with_audio: "{{watermark|false}}"
+  task_id_path: "data.generation.handle || data.handle"
+  poll_url_path: "data.links.status"   # provider returns a full poll URL
+
+poll:
+  path: "renders/status/{{task_id}}"   # used only if poll_url_path was absent
+  method: GET
+  status_path: "data.generation.phase"
+  succeeded_values: ["FINISHED", "READY"]
+  failed_values: ["ABORTED", "ERRORED"]
+  # The result URL is buried three levels deep; an inline base64 fallback covers
+  # the case where the provider returns the clip directly.
+  video_url_path: "data.generation.artifacts.video.delivery_url || data.generation.artifacts.video.url"
+  inline_b64_path: "data.generation.artifacts.video.inline_base64"
+  progress_path: "data.generation.percent"
+  message_path: "data.generation.note || error.detail"

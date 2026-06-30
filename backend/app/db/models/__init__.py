@@ -221,6 +221,17 @@ from app.eventsourcing.projections.models import (
     ProjectionCheckpointRecord,
     ReadModelRecord,
 )
+# Consolidated datalayer read side (app.datalayer, facet C, productionised) —
+# registers the three ``datalayer_*`` tables (read-model rows, projection
+# checkpoints, applied-event idempotency ledger) on Base.metadata so Alembic
+# autogenerate + create_all see them. Additive only; distinct from the esproj_*
+# tables above (this read side reads RecordedEvent straight from the real store).
+# Schema applied by revision ``readmodel_proj_0001``.
+from app.datalayer.models import (
+    DataLayerAppliedEventRecord,
+    DataLayerCheckpointRecord,
+    DataLayerReadModelRecord,
+)
 # Distributed saga / process-manager engine (app.distributed.sagas) — registered
 # here so Alembic autogenerate + create_all see the saga_instances / saga_steps /
 # saga_effects tables. Additive only (distributed-systems facet C).
@@ -257,6 +268,18 @@ import app.zerotrust.crypto.models  # noqa: E402, F401  (side-effect: table regi
 # over the existing tables, so this never competes with the legacy schema.
 from app.platform.authz.db_models import AuthzDecisionLogRow, AuthzRelationTuple
 
+# Multi-tenant isolation layer (app.tenancy) — registers the four additive
+# ``tenant_*`` tables (orgs, workspaces, memberships, usage) on Base.metadata so
+# Alembic autogenerate + create_all see them. Additive only and under a distinct
+# table namespace so it never collides with the collaboration-shelf tables in
+# app.workspaces; see app/tenancy/__init__.py.
+from app.tenancy.models import (
+    TenantMembership,
+    TenantOrg,
+    TenantUsage,
+    TenantWorkspace,
+)
+
 __all__ = [
     "AnalyticsDailyRollup",
     "AnalyticsEvent",
@@ -268,6 +291,9 @@ __all__ = [
     "AuthzRelationTuple",
     "ApiKey",
     "AppliedEventRecord",
+    "DataLayerAppliedEventRecord",
+    "DataLayerCheckpointRecord",
+    "DataLayerReadModelRecord",
     "ArtifactStatus",
     "AuditAction",
     "AuthAuditLog",
@@ -394,6 +420,10 @@ __all__ = [
     "SourceSpanIndex",
     "SyncRun",
     "SyncRunStatus",
+    "TenantMembership",
+    "TenantOrg",
+    "TenantUsage",
+    "TenantWorkspace",
     "TranslationArtifact",
     "TranslationGlossaryRow",
     "TranslationReview",

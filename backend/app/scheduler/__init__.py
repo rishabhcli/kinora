@@ -73,6 +73,7 @@ from app.scheduler.simulation import (
     SimulationResult,
     replay_trace,
 )
+from app.scheduler.v2 import AdaptiveStrategy  # opt-in adaptive layer (app/scheduler/v2)
 from app.scheduler.zones import (
     Zone,
     clamp_velocity,
@@ -83,6 +84,7 @@ from app.scheduler.zones import (
 
 __all__ = [
     "ABResult",
+    "AdaptiveStrategy",
     "ActionKind",
     "AdaptiveConfig",
     "Allocation",

@@ -1,0 +1,147 @@
+# Kinora video-provider catalog (declarative source of truth).
+#
+# Read by app.video.registry.catalog at startup / hot-reload. This is pure data:
+# loading it never renders and never spends (KINORA_LIVE_VIDEO is irrelevant
+# here). `cost_tier` is a *ref* into a sibling pricing table — this subsystem
+# does not own dollar amounts. Ids mirror the hosted models documented in
+# CLAUDE.md / app/core/config.py; capability envelopes are conservative.
+#
+# weight  : relative routing weight for the deterministic weighted picker.
+# rollout : ga | canary | preview | deprecated | disabled.
+# enabled : operator kill-switch (off => never routable, regardless of rollout).
+version: 1
+providers:
+  # --- Frontier hosted Wan (DashScope intl) -------------------------------- #
+  - id: wan2.1-t2v-turbo
+    kind: frontier
+    display_name: "Wan 2.1 T2V Turbo"
+    provider_backend: dashscope
+    cost_tier: turbo
+    weight: 60
+    rollout: ga
+    tags: [wan, turbo, default]
+    capabilities:
+      modes: [t2v]
+      resolutions: [480P, 720P]
+      min_duration_s: 3
+      max_duration_s: 5
+      max_fps: 24
+      supports_audio: false
+
+  - id: wan2.1-i2v-turbo
+    kind: frontier
+    display_name: "Wan 2.1 I2V Turbo"
+    provider_backend: dashscope
+    cost_tier: turbo
+    weight: 60
+    rollout: ga
+    tags: [wan, turbo, default]
+    capabilities:
+      modes: [i2v, r2v]
+      resolutions: [480P, 720P]
+      min_duration_s: 3
+      max_duration_s: 5
+      max_fps: 24
+      supports_audio: false
+
+  - id: wan2.5-t2v-preview
+    kind: frontier
+    display_name: "Wan 2.5 T2V (quality preview)"
+    provider_backend: dashscope
+    cost_tier: quality
+    weight: 10
+    rollout: preview
+    tags: [wan, quality]
+    capabilities:
+      modes: [t2v]
+      resolutions: [720P, 1080P]
+      min_duration_s: 3
+      max_duration_s: 10
+      max_fps: 30
+      supports_audio: false
+
+  - id: wan2.2-i2v-plus
+    kind: frontier
+    display_name: "Wan 2.2 I2V Plus (quality)"
+    provider_backend: dashscope
+    cost_tier: quality
+    weight: 15
+    rollout: ga
+    tags: [wan, quality]
+    capabilities:
+      modes: [i2v, r2v]
+      resolutions: [720P, 1080P]
+      min_duration_s: 3
+      max_duration_s: 8
+      max_fps: 30
+      supports_audio: false
+
+  # --- Cheaper hosted MiniMax (Hailuo) ------------------------------------- #
+  - id: MiniMax-Hailuo-2.3-Fast
+    kind: frontier
+    display_name: "MiniMax Hailuo 2.3 Fast"
+    provider_backend: minimax
+    cost_tier: cheap
+    weight: 20
+    rollout: ga
+    tags: [minimax, cheap]
+    capabilities:
+      modes: [t2v, i2v]
+      resolutions: [768P]
+      min_duration_s: 6
+      max_duration_s: 6
+      max_fps: 25
+      supports_audio: false
+
+  # --- Canary: a new frontier id getting a small weighted slice ------------ #
+  - id: wan2.5-i2v-preview
+    kind: frontier
+    display_name: "Wan 2.5 I2V (canary)"
+    provider_backend: dashscope
+    cost_tier: quality
+    weight: 5
+    rollout: canary
+    tags: [wan, canary]
+    capabilities:
+      modes: [i2v, r2v, flf]
+      resolutions: [720P, 1080P]
+      min_duration_s: 3
+      max_duration_s: 10
+      max_fps: 30
+      supports_audio: true
+
+  # --- Open-weights self-host lane (off by default; opt-in) ---------------- #
+  - id: wan2.2-ti2v-5b-local
+    kind: open
+    display_name: "Wan 2.2 TI2V-5B (self-host)"
+    provider_backend: local
+    cost_tier: selfhost
+    weight: 0
+    enabled: false
+    rollout: preview
+    tags: [wan, local, selfhost]
+    capabilities:
+      modes: [t2v, i2v]
+      resolutions: [480P, 720P]
+      min_duration_s: 1
+      max_duration_s: 5
+      max_fps: 24
+      supports_audio: false
+
+  # --- Multi-cloud gateway aggregator (disabled placeholder) --------------- #
+  - id: video-gateway-aggregate
+    kind: gateway
+    display_name: "Video Gateway (multi-upstream)"
+    provider_backend: gateway
+    cost_tier: standard
+    weight: 0
+    enabled: false
+    rollout: disabled
+    tags: [gateway]
+    capabilities:
+      modes: [t2v, i2v, r2v]
+      resolutions: [480P, 720P, 1080P]
+      min_duration_s: 1
+      max_duration_s: 10
+      max_fps: 30
+      supports_audio: true

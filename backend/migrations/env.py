@@ -18,12 +18,15 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+# These imports are for side effect: importing the models package registers every
+# table on ``Base.metadata`` so autogenerate sees the full schema. The audit
+# subsystem (app.audit) owns its own registration hook (kept out of app.db.models
+# to stay self-contained), imported here so Alembic + create_all also see
+# audit_log_entries / audit_checkpoints.
+from app.audit import registry  # noqa: F401  (side effect: audit table registration)
 from app.core.config import get_settings
-
-# Importing the models package registers every table on ``Base.metadata`` so
-# autogenerate sees the full schema.
+from app.db import models  # noqa: F401  (side effect: table registration)
 from app.db.base import Base
-from app.db import models  # noqa: F401  (import for side effect: table registration)
 
 # Alembic Config object, providing access to .ini values.
 config = context.config

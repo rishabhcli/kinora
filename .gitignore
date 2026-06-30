@@ -54,3 +54,4 @@ apps/desktop/dist-electron/
 # tracked; only the .claude/ inside any tree is ignored.)
 .claude/
 **/.claude/
+generated_videos/

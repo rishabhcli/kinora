@@ -30,6 +30,7 @@ Typical use::
 from __future__ import annotations
 
 from app.cache.cache import Cache, CacheConfig, tag_key_for
+from app.cache.clips import RenderCache, RenderInputs, RenderKey  # content-addressed clip dedup
 from app.cache.clock import SYSTEM_CLOCK, Clock, FakeClock, SystemClock
 from app.cache.codecs import BytesCodec, Codec, JsonCodec, PickleCodec
 from app.cache.decorator import CachedFunction, cached
@@ -83,6 +84,9 @@ __all__ = [
     "NullCache",
     "PickleCodec",
     "RedisCache",
+    "RenderCache",
+    "RenderInputs",
+    "RenderKey",
     "SerializationError",
     "SingleFlight",
     "SingleFlightError",

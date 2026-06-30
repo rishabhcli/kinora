@@ -1,0 +1,58 @@
+# Self-hosted ComfyUI video workflow, driven entirely by this descriptor.
+#
+# A ComfyUI box exposes /prompt (enqueue a workflow graph) and /history/{id}
+# (poll outputs). This descriptor wires Kinora's canonical WanSpec onto a t2v +
+# i2v workflow with no Python — the ComfyUIProvider alias is just the descriptor
+# engine reading this file. Auth is "none" (a LAN box); flip the network gate on
+# at build time to actually reach it.
+name: comfyui-local
+model: kinora-svd-workflow
+version: 1
+
+capabilities:
+  modes: [text_to_video, image_to_video]
+  max_duration_s: 6.0
+  min_duration_s: 1.0
+  resolutions: ["480P", "720P"]
+  supports_seed: true
+  supports_negative_prompt: true
+  default_fps: 24
+  cost_per_s: 0.0      # self-hosted: no metered spend
+  quality: 0.6
+  self_hosted: true
+
+transport:
+  base_url: "http://comfyui.local:8188"
+  auth_scheme: none
+  timeout_s: 120.0
+
+submit:
+  path: "prompt"
+  method: POST
+  # The ComfyUI prompt graph: node "6" is the positive prompt, "7" the negative,
+  # "3" the sampler seed. Optional fields vanish when their context value is null.
+  body_template:
+    prompt:
+      "6":
+        inputs:
+          text: "{{prompt}}"
+      "7":
+        inputs:
+          text: "{{negative_prompt}}"
+      "3":
+        inputs:
+          seed: "{{seed|0}}"
+      "10":
+        inputs:
+          image: "{{image_url}}"
+  task_id_path: "prompt_id || node_errors.prompt_id"
+
+poll:
+  path: "history/{{task_id}}"
+  method: GET
+  # ComfyUI history maps the prompt_id -> {status:{completed:bool}, outputs:{...}}.
+  status_path: "{{task_id}}.status.status_str || status.status_str"
+  succeeded_values: ["success", "completed"]
+  failed_values: ["error", "failed"]
+  video_url_path: "{{task_id}}.outputs.9.gifs[0].url || outputs.9.gifs[0].url"
+  message_path: "{{task_id}}.status.messages || status.messages"

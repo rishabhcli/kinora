@@ -156,6 +156,42 @@ async def _start_event_recorder(
     return asyncio.create_task(recorder.run(stop))
 
 
+def _install_hardening(app: FastAPI, settings: object) -> None:
+    """Wire the additive :mod:`app.apihardening` layer onto ``app`` (opt-in).
+
+    Builds a :class:`~app.apihardening.HardeningConfig` off ``settings`` and
+    installs the enabled middleware. The Redis-backed rate-limit / idempotency
+    stores resolve their client lazily from ``app.state.container`` (built in the
+    lifespan, after ``create_app``), so a fresh app with no container falls back
+    to fail-open behaviour rather than erroring. The ``/api/books`` upload route is
+    exempted from the body-size cap (it enforces its own 1 GiB streamed cap) and
+    from content-type enforcement (it accepts multipart + octet-stream).
+    """
+    from app.apihardening import HardeningConfig, install
+
+    config = HardeningConfig.from_settings(settings).replace(
+        # Upload route streams + caps its own (large) body; keep the global cap off
+        # it so legitimate book uploads are never rejected at the edge.
+        content_type_exempt_prefixes=("/api/books",),
+        body_size_exempt_prefixes=("/api/books",),
+    )
+
+    def _resolve_redis() -> object | None:
+        container = getattr(app.state, "container", None)
+        return getattr(container, "redis", None) if container is not None else None
+
+    install(
+        app,
+        config=config,
+        redis=_resolve_redis,
+        enable_request_id=bool(getattr(settings, "hardening_request_id", True)),
+        enable_request_limits=bool(getattr(settings, "hardening_request_limits", True)),
+        enable_rate_limit=bool(getattr(settings, "hardening_rate_limit", True)),
+        enable_idempotency=bool(getattr(settings, "hardening_idempotency", True)),
+        enable_openapi=bool(getattr(settings, "hardening_openapi", True)),
+    )
+
+
 def create_app() -> FastAPI:
     """Build and configure the Kinora FastAPI application."""
     settings = get_settings()
@@ -173,6 +209,22 @@ def create_app() -> FastAPI:
             container = build_container(settings)
             app.state.container = container
         await container.startup()
+        # Additive: install the settings-tuned SLO engine + wire the deep-health
+        # probes from the live container, so /api/slo reports against the real
+        # objectives + dependencies. Fully guarded — a wiring failure never blocks
+        # startup (the round-1 /health + /ready stay authoritative regardless).
+        try:
+            from app.slo.engine import engine_from_settings
+            from app.slo.service import (
+                build_health_registry,
+                set_health_registry,
+                set_slo_engine,
+            )
+
+            set_slo_engine(engine_from_settings(settings))
+            set_health_registry(build_health_registry(container))
+        except Exception as exc:  # noqa: BLE001 - SLO wiring must never crash boot
+            logger.warning("slo.wiring_failed", error=str(exc))
         logger.info(
             "kinora.startup",
             service=settings.service_name,
@@ -243,6 +295,13 @@ def create_app() -> FastAPI:
 
     set_app_info(service=settings.service_name, version=__version__, env=settings.app_env)
     install_exception_handlers(app)
+    # Optional cross-cutting API hardening (app/apihardening/) — request-id,
+    # body/content-type limits, a token-bucket rate limiter, Idempotency-Key
+    # replay, and OpenAPI docs. Entirely additive and OFF by default
+    # (``hardening_enabled``); it preserves the existing error envelope unless
+    # ``hardening_problem_json_enabled`` opts into RFC-7807 problem+json.
+    if settings.hardening_enabled:
+        _install_hardening(app, settings)
     # Optional OTel tracing — a clean no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
     init_tracing(app, service_name=settings.service_name)
 
@@ -320,7 +379,30 @@ def create_app() -> FastAPI:
     for router in root_routers():
         app.include_router(router)
 
+    # Optional OpenAPI enrichment (app.apispec): stable operationIds, documented
+    # typed-error responses, servers, and tag prose for ``/openapi.json`` + the
+    # generated client. Opt-in via KINORA_APISPEC_ENABLED; a pure metadata hook
+    # that never changes any endpoint's runtime response (see app/apispec).
+    _maybe_install_apispec(app)
+
     return app
+
+
+def _maybe_install_apispec(app: FastAPI) -> None:
+    """Install the §5.6 OpenAPI enricher hook when enabled (additive, safe).
+
+    Defensive: any import/setup failure is logged and swallowed so the spec
+    subsystem can never block app construction — the bare FastAPI OpenAPI is the
+    fallback.
+    """
+    try:
+        from app.apispec.enricher import install as install_apispec
+        from app.apispec.settings import get_apispec_settings
+
+        if get_apispec_settings().enabled:
+            install_apispec(app)
+    except Exception as exc:  # noqa: BLE001 - never let spec enrichment break boot
+        get_logger("app.main").warning("apispec.install_failed", error=str(exc))
 
 
 app = create_app()

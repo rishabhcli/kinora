@@ -105,6 +105,10 @@ ignore = [
 # truth-table assertions use SCREAMING_CASE option aliases for readability — both
 # are intentional, so pep8-naming is relaxed here. See app/verification/DESIGN.md.
 "tests/verification/*.py" = ["N802", "N806"]
+# Throttle fabric: domain-meaningful exception names (Throttled is a state, not an
+# "Error"; LeaseUnavailable / StoreUnavailable read as conditions) intentionally
+# omit the "Error" suffix, so flake8-naming's N818 is relaxed for the errors module.
+"app/throttle/errors.py" = ["N818"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

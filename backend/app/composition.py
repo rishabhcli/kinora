@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     from app.auth.service import AuthService
     from app.eventsourcing.store.service import EventStoreFactory
     from app.finops.service import FinOpsService
+    from app.flags.plane.plane import RuntimeConfigPlane
     from app.flags.service import FlagService
     from app.integrations.http import HttpxClient
     from app.integrations.service import IntegrationsService
@@ -304,7 +305,12 @@ class Container:
     _translation_provider: TranslationProvider | None = field(default=None, repr=False)
     _billing_service: object | None = field(default=None, repr=False)
     _flag_service: FlagService | None = field(default=None, repr=False)
+    _runtime_config_plane: RuntimeConfigPlane | None = field(default=None, repr=False)
     _analytics_service: AnalyticsService | None = field(default=None, repr=False)
+    #: Cost & usage analytics dashboard façade (app/usageanalytics/). Additive,
+    #: infra-free: an in-memory metric store by default, so building it spends
+    #: nothing and depends on no DB/Redis. See :meth:`usage_analytics_service`.
+    _usage_analytics_service: Any = field(default=None, repr=False)
     _conversation_memory: ConversationMemory | None = field(default=None, repr=False)
     _llmops: Any = field(default=None, repr=False)
     _dataset_service: Any = field(default=None, repr=False)
@@ -414,6 +420,25 @@ class Container:
                 channel=self.settings.flags_stream_channel,
             )
         return self._flag_service
+
+    @property
+    def runtime_config_plane(self) -> RuntimeConfigPlane:
+        """The unified runtime feature-flag / dynamic-config plane (lazy; no infra).
+
+        Distinct from :attr:`flag_service` (the §13 A/B experimentation platform):
+        this is the operational *config* plane whose **base layer is Settings**.
+        It overlays runtime overrides / targeting rules / sticky rollouts on top
+        of the live :class:`Settings`, enforces the guarded kill-switches
+        (``kinora.live_video`` can only ever be forced OFF), audits every change,
+        and notifies subscribers. The default in-memory override store keeps it
+        infra-free; a DB/Redis-backed store can be slotted in without touching the
+        plane (see ``app.flags.plane.store.OverrideStore``).
+        """
+        if self._runtime_config_plane is None:
+            from app.flags.plane.plane import RuntimeConfigPlane
+
+            self._runtime_config_plane = RuntimeConfigPlane.from_settings(self.settings)
+        return self._runtime_config_plane
 
     def _embedder(self) -> Embedder:
         return self.embedder if self.embedder is not None else self.providers.embeddings
@@ -1281,6 +1306,23 @@ class Container:
                 max_batch=self.settings.analytics_max_batch,
             )
         return self._analytics_service
+
+    # -- cost & usage analytics dashboards (app/usageanalytics/, additive) --- #
+
+    def usage_analytics_service(self) -> Any:
+        """Build the cost-&-usage analytics dashboard façade (kinora.md §11.1).
+
+        Infra-free and self-contained: an in-memory metric store + the configured
+        ``ua_*`` thresholds/cap. Cached after first build. Distinct from
+        :meth:`analytics_service` (product behaviour) and :mod:`app.finops`
+        (budget governance) — this is the time-series spend warehouse the
+        operator dashboard reads.
+        """
+        if self._usage_analytics_service is None:
+            from app.usageanalytics.service import UsageAnalyticsService
+
+            self._usage_analytics_service = UsageAnalyticsService.from_settings(self.settings)
+        return self._usage_analytics_service
 
     def analytics_summary_sink(self) -> SummarySink:
         """The summary sink the rollup worker persists into (Postgres or seam)."""

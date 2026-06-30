@@ -246,6 +246,30 @@ render_dag_batch_size: Histogram = Histogram(
     registry=registry,
 )
 
+render_dedup_total: Counter = Counter(
+    "kinora_render_dedup_total",
+    "Duplicate render deliveries suppressed by the exactly-once idempotency guard "
+    "(a re-delivered job for an already in-flight / completed (shot_id, spec) — "
+    "never double-rendered, never double-spent).",
+    labelnames=("outcome",),  # in_flight | completed
+    registry=registry,
+)
+
+render_deadletter_total: Counter = Counter(
+    "kinora_render_deadletter_total",
+    "Shots routed to the durability dead-letter path after repeated hard crashes "
+    "(poison-quarantined; a defect is logged and a bottom-rung card still ships).",
+    registry=registry,
+)
+
+render_recovered_total: Counter = Counter(
+    "kinora_render_recovered_total",
+    "Shots stuck in a non-terminal render state that the recovery loop resumed, "
+    "repaired, or dead-lettered after a worker restart.",
+    labelnames=("action",),  # resumed | repaired | dead_lettered | skipped
+    registry=registry,
+)
+
 # --------------------------------------------------------------------------- #
 # Provider telemetry (DashScope calls; §11/§12.5)
 # --------------------------------------------------------------------------- #
@@ -387,6 +411,21 @@ def observe_dag_batch(size: int) -> None:
     """Record the size of one DAG ready-batch (render parallelism)."""
     if size > 0:
         render_dag_batch_size.observe(size)
+
+
+def inc_render_dedup(outcome: str) -> None:
+    """Count one duplicate render delivery suppressed by the idempotency guard."""
+    render_dedup_total.labels(outcome=outcome).inc()
+
+
+def inc_render_deadletter() -> None:
+    """Count one shot routed to the durability dead-letter path."""
+    render_deadletter_total.inc()
+
+
+def inc_render_recovered(action: str) -> None:
+    """Count one stuck shot handled by the recovery loop (by action taken)."""
+    render_recovered_total.labels(action=action).inc()
 
 
 # --------------------------------------------------------------------------- #

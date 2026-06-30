@@ -1,0 +1,45 @@
+{
+  "_comment": "JSON-format proof of config-only onboarding for a second fictional model, 'Pulsar-1'. Loaded by load_descriptor exactly like the YAML files. Exercises a Replicate-ish prediction shape with output as a bare list of URLs.",
+  "name": "pulsar-1",
+  "model": "pulsar-1:hex-version-id",
+  "version": 1,
+  "capabilities": {
+    "modes": ["text_to_video", "image_to_video"],
+    "max_duration_s": 8.0,
+    "min_duration_s": 1.0,
+    "resolutions": ["480P", "720P"],
+    "supports_seed": true,
+    "supports_negative_prompt": false,
+    "default_fps": 24,
+    "cost_per_s": 0.35,
+    "quality": 0.6
+  },
+  "transport": {
+    "base_url": "https://api.pulsar-video.test/v1",
+    "auth_scheme": "token"
+  },
+  "submit": {
+    "path": "predictions",
+    "method": "POST",
+    "body_template": {
+      "version": "{{model}}",
+      "input": {
+        "prompt": "{{prompt}}",
+        "image": "{{image_url}}",
+        "seed": "{{seed}}",
+        "num_frames": "{{duration_s}}"
+      }
+    },
+    "task_id_path": "id",
+    "poll_url_path": "urls.get"
+  },
+  "poll": {
+    "path": "predictions/{{task_id}}",
+    "method": "GET",
+    "status_path": "status",
+    "succeeded_values": ["succeeded"],
+    "failed_values": ["failed", "canceled"],
+    "video_url_path": "output[-1] || output",
+    "message_path": "error"
+  }
+}

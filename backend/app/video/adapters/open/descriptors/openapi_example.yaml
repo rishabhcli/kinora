@@ -1,0 +1,52 @@
+# A generic OpenAPI-style hosted video endpoint, onboarded by config alone.
+#
+# This is the OpenAPIProvider shape: a vanilla "POST a job, poll a job" REST API
+# with bearer auth. It shows the descriptor handling per-mode conditioning,
+# string-interpolated paths, and a fallback chain for the result URL.
+name: generic-openapi-video
+model: generic-video-v2
+version: 1
+
+capabilities:
+  modes: [text_to_video, image_to_video, first_last_frame]
+  max_duration_s: 10.0
+  min_duration_s: 2.0
+  resolutions: ["480P", "720P", "1080P"]
+  supports_seed: true
+  supports_negative_prompt: true
+  max_reference_images: 0
+  default_fps: 24
+  cost_per_s: 0.4
+  quality: 0.65
+
+transport:
+  base_url: "https://api.example-video.test/v2"
+  auth_scheme: bearer
+  headers:
+    X-Client: kinora
+  timeout_s: 60.0
+
+submit:
+  path: "jobs"
+  method: POST
+  body_template:
+    model: "{{model}}"
+    prompt: "{{prompt}}"
+    negative_prompt: "{{negative_prompt}}"
+    seconds: "{{duration_s}}"
+    resolution: "{{resolution}}"
+    seed: "{{seed}}"
+    init_image: "{{image_url}}"
+    start_image: "{{first_frame_url}}"
+    end_image: "{{last_frame_url}}"
+  task_id_path: "job.id || id"
+
+poll:
+  path: "jobs/{{task_id}}"
+  method: GET
+  status_path: "job.state || state"
+  succeeded_values: ["done", "succeeded"]
+  failed_values: ["error", "failed", "canceled"]
+  video_url_path: "job.result.video_url || result.video_url || result.assets[0].url"
+  progress_path: "job.progress || progress"
+  message_path: "job.error || error || message"

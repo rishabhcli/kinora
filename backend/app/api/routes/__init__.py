@@ -27,10 +27,17 @@ from app.api.routes import (
     search,
     sessions,
     translation,
+    usage_analytics,
     workspaces,
 )
 from app.billing import routes as billing  # additive: billing & payments domain
 from app.compliance.api import router as compliance_router  # additive: compliance domain
+
+# Additive: the unified runtime feature-flag / dynamic-config plane
+# (app.flags.plane). The operational config overlay over Settings, with guarded
+# kill-switches (KINORA_LIVE_VIDEO can only be forced OFF), targeting, sticky
+# rollouts, audit, and hot-reload. Distinct from the /flags experimentation API.
+from app.flags.plane.api import router as runtime_config_router
 
 # Additive: the content-moderation & safety admin/operations surface (§9/§10).
 # The router lives under app.moderation to keep the safety domain self-contained.
@@ -39,6 +46,25 @@ from app.moderation.routes import router as moderation_router
 # Additive: the sandboxed plugin/extension platform (app.platform.plugins).
 # Self-contained marketplace + lifecycle + dispatch surface under /plugins.
 from app.platform.plugins.api import router as plugins_router
+
+# Additive: deep health + SLO / error-budget tracking (app.slo). Self-contained
+# reliability plane under /slo (deep readiness, SLI/budget status, burn alerts,
+# release gate). Distinct from — and never touches — the round-1 root /health + /ready.
+from app.slo.api import router as slo_router
+
+# Additive: the read-only video-provider marketplace catalog (app.video.marketplace).
+# Self-contained, in-memory, seeded; browse/search/compare/migration under
+# /video/marketplace. No DB / network / container dependency.
+from app.video.marketplace.api import router as video_marketplace_router
+
+# Additive: read-only video-provider registry introspection (app.video.registry).
+# Catalog/capabilities/canary view under /video; never renders or spends.
+from app.video.registry.api import router as video_registry_router
+
+# Additive: the async-video/audio provider webhook ingress gateway
+# (app.video.webhooks). Verifies signatures, normalises callbacks, dedups
+# at-least-once deliveries, and fast-ACKs to a local JobCompletionSink (§12.1).
+from app.video.webhooks import router as video_webhooks_router
 
 #: The routers mounted (in order) under the versioned ``/api`` prefix.
 ROUTERS = [
@@ -58,6 +84,7 @@ ROUTERS = [
     # touching the round-1 event/session/director routes.
     realtime_router,
     analytics.router,  # product-analytics event pipeline (app/analytics/)
+    usage_analytics.router,  # cost & usage analytics + dashboards (app/usageanalytics/)
     assistant.router,  # reader assistant: grounded, spoiler-aware RAG Q&A (§8)
     finops.router,
     billing.router,  # billing & payments (additive)
@@ -74,6 +101,11 @@ ROUTERS = [
     portability.router,  # data export/import & portability (book/canon/account/backup)
     media.router,  # Media domain: /api/media asset registry (additive)
     plugins_router,  # sandboxed plugin/extension platform (app.platform.plugins)
+    runtime_config_router,  # unified runtime config plane (app.flags.plane) at /runtime-config
+    video_registry_router,  # read-only video-provider registry introspection (app.video.registry)
+    slo_router,  # deep health + SLO / error-budget / release-gate plane (app.slo)
+    video_marketplace_router,  # read-only video-provider marketplace (app.video.marketplace)
+    video_webhooks_router,  # async-video provider webhook ingress (app.video.webhooks, §12.1)
 ]
 
 
