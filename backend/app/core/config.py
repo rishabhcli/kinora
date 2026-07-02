@@ -607,6 +607,23 @@ class Settings(BaseSettings):
     ingest_analyze_max_attempts: int = 3
     #: Base backoff (seconds) for the analyse retry; grows exponentially + jitter.
     ingest_analyze_backoff_base_s: float = 1.0
+    #: Retry attempts for the sequential per-page Adapter (``analyze_page``) call
+    #: in shot planning — unlike the VL analyse fan-out this runs one page at a
+    #: time with no concurrency to smooth, but still needs backoff so a single
+    #: transient error doesn't abort the whole ingest run.
+    ingest_shotplan_max_attempts: int = 3
+    #: Base backoff (seconds) for the shot-plan per-page retry.
+    ingest_shotplan_backoff_base_s: float = 1.0
+    #: Token-bucket rate limit for identity-lock's per-character/pose image-gen
+    #: calls (requests/sec). 0 disables the limiter. A book with many principal
+    #: characters otherwise fires these back-to-back with no backoff.
+    ingest_identity_rate_per_s: float = 0.0
+    #: Burst size for the identity-lock image-gen token bucket.
+    ingest_identity_rate_burst: int = 4
+    #: Per-call retry attempts on a transient provider error during identity lock.
+    ingest_identity_max_attempts: int = 3
+    #: Base backoff (seconds) for the identity-lock retry.
+    ingest_identity_backoff_base_s: float = 1.0
 
     # --- Search & indexing service (app/search) ---
     # The server-side corpus search engine (kinora.md §8 — search complements the

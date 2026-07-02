@@ -45,7 +45,8 @@ from app.db.repositories.beat import BeatRepo
 from app.db.repositories.scene import SceneRepo
 from app.db.repositories.shot import ShotRepo, SourceSpanRepo
 from app.ingest.canon_build import CanonBuildResult, normalize_name
-from app.ingest.pdf_extract import PdfExtractResult
+from app.ingest.pdf_extract import PageExtract, PdfExtractResult
+from app.ingest.ratelimit import retrying
 
 logger = get_logger("app.ingest.shot_plan")
 
@@ -339,6 +340,8 @@ async def plan_and_persist(
     spans: SourceSpanRepo,
     pages_per_scene: int = 1,
     max_tokens: int | None = 1500,
+    max_attempts: int = 3,
+    backoff_base_s: float = 1.0,
 ) -> ShotPlanResult:
     """Plan + persist scenes/beats/shots and the reconciled source-span index.
 
@@ -346,6 +349,14 @@ async def plan_and_persist(
     unit of work), so resuming an ingest that previously failed *after* this step
     — e.g. a book that 429'd during identity-lock — re-inserts cleanly instead of
     colliding on ``pk_scenes``/``pk_shots`` (§9.1: "a partial import is resumable").
+
+    Unlike :func:`app.ingest.analyze.analyze_pages`, ``analyze_page`` runs
+    strictly sequentially (each page's beat ids/indices depend on the running
+    ``beat_index`` offset), so there is no concurrent fan-out to smooth with a
+    token bucket — but a single transient provider error (429/5xx/timeout) would
+    otherwise abort the whole ingest run. ``max_attempts``/``backoff_base_s``
+    wrap each page's call in the same bounded-backoff retry used by the VL
+    analyse pass, so one flaky page doesn't fail the book.
     """
     repos = _Repos(scenes=scenes, beats=beats, shots=shots, spans=spans)
 
@@ -382,12 +393,22 @@ async def plan_and_persist(
         if page.num_words == 0:
             continue
         scene_id = page_to_scene[page.page_number]
-        page_beats = await adapter.analyze_page(
-            page.text,
-            page=page.page_number,
-            scene_id=scene_id,
-            beat_index_start=beat_index,
-            max_tokens=max_tokens,
+
+        async def _analyze_page(
+            _page: PageExtract = page,
+            _scene_id: str = scene_id,
+            _beat_index: int = beat_index,
+        ) -> list[Beat]:
+            return await adapter.analyze_page(
+                _page.text,
+                page=_page.page_number,
+                scene_id=_scene_id,
+                beat_index_start=_beat_index,
+                max_tokens=max_tokens,
+            )
+
+        page_beats = await retrying(
+            _analyze_page, max_attempts=max_attempts, base_delay_s=backoff_base_s
         )
         for beat in page_beats:
             all_beats.append(

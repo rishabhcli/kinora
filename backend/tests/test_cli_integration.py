@@ -13,8 +13,10 @@ FLUSHes Redis before each test, so each test starts from a clean slate.
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -501,3 +503,87 @@ async def test_maintenance_stuck_imports_report_only(cli_container: Container) -
     assert len(report.books) == 1
     assert report.spawned is None  # report-only
     assert report.books[0].has_source is False
+
+
+# --------------------------------------------------------------------------- #
+# books export-review — the local script+video human grading surface
+# --------------------------------------------------------------------------- #
+
+
+async def test_books_export_review_writes_script_manifest_and_clip(
+    cli_container: Container, tmp_path: Path
+) -> None:
+    from app.cli.actions import review_export as actions
+    from app.db.repositories.beat import BeatRepo
+    from app.db.repositories.scene import SceneRepo
+    from app.db.repositories.shot import ShotRepo
+
+    book_id = await _make_book(cli_container, title="The Snow Queen", status=BookStatus.READY)
+    async with cli_container.session_factory() as db:
+        scene = await SceneRepo(db).create(
+            book_id=book_id, scene_index=0, page_start=1, page_end=1
+        )
+        beat = await BeatRepo(db).create(
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_index=0,
+            summary="Elsa stands at the frozen window.",
+            entities=["char_elsa"],
+            described_visuals="a quiet figure at a frosted window",
+            source_span={"page": 1, "word_range": [0, 10]},
+        )
+        accepted = await ShotRepo(db).create(
+            id=new_id(),
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_id=beat.id,
+            source_span={"page": 1, "word_range": [0, 10]},
+            status=ShotStatus.ACCEPTED,
+            render_mode="reference_to_video",
+            duration_s=5.0,
+            output={"clip_key": "clips/demo.mp4", "clip_url": None, "last_frame_key": None},
+            narration={"text": "Elsa stood still at the window."},
+            qa={"verdict": "pass", "ccs": 0.95, "score": 0.9},
+        )
+        # A second, unrendered shot must not crash the export (no clip yet).
+        await ShotRepo(db).create(
+            id=new_id(),
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_id=beat.id,
+            source_span={"page": 1, "word_range": [10, 20]},
+            status=ShotStatus.PLANNED,
+        )
+
+    cli_container.object_store.ensure_bucket()
+    cli_container.object_store.put_bytes("clips/demo.mp4", b"fake-mp4-bytes", "video/mp4")
+
+    out_dir = str(tmp_path / "review")
+    result = await actions.export_book_review(cli_container, book_id, out_dir)
+
+    assert result.num_shots == 2
+    assert result.num_clips_downloaded == 1
+
+    root = Path(out_dir)
+    manifest = json.loads((root / "manifest.json").read_text())
+    assert manifest["title"] == "The Snow Queen"
+    assert len(manifest["shots"]) == 2
+    assert manifest["shots"][0]["clip_file"] == f"clips/{accepted.id}.mp4"
+    assert (root / manifest["shots"][0]["clip_file"]).read_bytes() == b"fake-mp4-bytes"
+    assert manifest["shots"][1]["clip_file"] is None  # the planned shot has no clip
+
+    script = (root / "script.md").read_text()
+    assert "The Snow Queen" in script
+    assert "Elsa stood still at the window." in script
+
+    viewer = (root / "index.html").read_text()
+    assert f"clips/{accepted.id}.mp4" in viewer
+    assert "QA: pass" in viewer
+
+
+async def test_books_export_review_not_found(cli_container: Container, tmp_path: Path) -> None:
+    from app.cli.actions import review_export as actions
+    from app.cli.errors import CliError
+
+    with pytest.raises(CliError):
+        await actions.export_book_review(cli_container, "nope", str(tmp_path))
