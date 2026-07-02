@@ -676,11 +676,10 @@ class RenderPipeline:
             actual = float(output.duration_s or ctx.target_duration)
             await ctx.machine.transition(RenderState.QA)
             frames = await self._frames(output)
-            # QA is ADVISORY: a real AI-rendered clip is ALWAYS shipped — never
-            # repaired into credit-burning re-renders nor degraded to Ken-Burns.
-            # The Critic's score is still recorded (episodic memory / §13 metrics)
-            # but no longer gates whether a genuine render reaches the reader.
-            qa_record: QARecord | None = None
+            # QA is the §9.5 self-correcting gate: a real render still costs real
+            # video-seconds (charged below regardless of verdict), but only a
+            # PASS ships to the reader. A FAIL routes to repair/conflict/degrade
+            # by which check failed — never silently shipped (§7.2/§9.5).
             try:
                 qa_record = await self._critic.score(
                     shot_id=ctx.shot_id,
@@ -692,13 +691,44 @@ class RenderPipeline:
                     retries_exhausted=retries_exhausted,
                 )
             except (LiveVideoDisabled, ProviderError) as exc:
+                # The Critic itself is unavailable. The render already happened
+                # and cost real budget, so charge it — but an unverified clip
+                # must not ship as ACCEPTED, and retrying against a dead QA
+                # service would only burn more live renders. Degrade instead.
                 logger.warning("qa.unavailable", shot_id=ctx.shot_id, error=str(exc))
+                await self._budget.commit(reservation, actual)
+                ctx.spent_video_seconds += actual
+                await ctx.machine.transition(RenderState.REPAIR)
+                return await self._degrade(
+                    ctx, cur_spec, reason=f"critic_{type(exc).__name__}", qa=None
+                )
+
             await self._budget.commit(reservation, actual)
             ctx.spent_video_seconds += actual
-            await ctx.machine.transition(RenderState.ACCEPTED)
-            return await self._accept(ctx, cur_spec, output, qa_record)
 
-        # Unreachable: the loop accepts a real render on the first attempt.
+            if qa_record.verdict is Verdict.PASS:
+                await ctx.machine.transition(RenderState.ACCEPTED)
+                return await self._accept(ctx, cur_spec, output, qa_record)
+
+            action = qa_record.repair_action
+            await ctx.machine.transition(RenderState.REPAIR)
+            if action is RepairAction.DEGRADE:
+                return await self._degrade(ctx, cur_spec, reason="retries_exhausted", qa=qa_record)
+
+            if action in (RepairAction.RAISE_CONFLICT, RepairAction.EVOLVE_CANON):
+                outcome = await self._handle_conflict(ctx, cur_spec, qa_record, output)
+                if outcome.terminal is not None:
+                    return outcome.terminal
+                if outcome.next_spec is not None:
+                    cur_spec = outcome.next_spec
+                if outcome.next_notes is not None:
+                    cur_notes = outcome.next_notes
+                continue
+
+            cur_spec, cur_notes = await self._apply_repair(ctx, action, cur_spec, cur_notes)
+
+        # Defensive: decide_qa's retries_exhausted branch on the final attempt
+        # always routes to DEGRADE above, so this is unreachable in practice.
         return await self._degrade(ctx, cur_spec, reason="loop_exhausted", qa=None)
 
     async def _apply_repair(

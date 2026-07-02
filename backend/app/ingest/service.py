@@ -423,6 +423,8 @@ async def _run_pipeline(ctx: _Context, pdf_bytes: bytes) -> IngestResult:
             spans=SourceSpanRepo(session),
             pages_per_scene=opts.pages_per_scene,
             max_tokens=opts.adapter_max_tokens,
+            max_attempts=ctx.settings.ingest_shotplan_max_attempts,
+            backoff_base_s=ctx.settings.ingest_shotplan_backoff_base_s,
         )
     await _emit(ctx, "shot_plan", 0.8)
     await _checkpoint(
@@ -448,6 +450,10 @@ async def _run_pipeline(ctx: _Context, pdf_bytes: bytes) -> IngestResult:
             poses=opts.poses,
             min_beats=opts.min_beats,
             keyframe_size=opts.keyframe_size,
+            rate_per_s=ctx.settings.ingest_identity_rate_per_s,
+            rate_burst=ctx.settings.ingest_identity_rate_burst,
+            max_attempts=ctx.settings.ingest_identity_max_attempts,
+            backoff_base_s=ctx.settings.ingest_identity_backoff_base_s,
         )
     await _emit(ctx, "identity_lock", 0.95)
     await _checkpoint(

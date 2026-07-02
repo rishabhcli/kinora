@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from app.cli.actions import books as actions
+from app.cli.actions import review_export
 from app.cli.context import CliContext
 from app.cli.output import Renderable
 from app.db.models.enums import BookStatus
@@ -30,6 +31,12 @@ async def _reingest(ctx: CliContext, args: argparse.Namespace) -> Renderable:
 async def _delete(ctx: CliContext, args: argparse.Namespace) -> Renderable:
     return await actions.delete_book(
         ctx.container, args.book_id, purge_storage=not args.keep_storage
+    )
+
+
+async def _export_review(ctx: CliContext, args: argparse.Namespace) -> Renderable:
+    return await review_export.export_book_review(
+        ctx.container, args.book_id, args.out, max_shots=args.max_shots
     )
 
 
@@ -67,6 +74,17 @@ def add_parser(subparsers: argparse._SubParsersAction) -> None:
     p_delete.add_argument("book_id")
     p_delete.add_argument("--keep-storage", action="store_true", help="do not purge object storage")
     p_delete.set_defaults(func=_delete)
+
+    p_export = sub.add_parser(
+        "export-review",
+        help="export a reading-order script + downloaded clips + a local HTML viewer",
+    )
+    p_export.add_argument("book_id")
+    p_export.add_argument("--out", required=True, help="local directory to write the review into")
+    p_export.add_argument(
+        "--max-shots", type=int, default=None, help="cap on shots exported (default: all)"
+    )
+    p_export.set_defaults(func=_export_review)
 
 
 __all__ = ["add_parser"]

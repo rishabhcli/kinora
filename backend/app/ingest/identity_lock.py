@@ -38,6 +38,7 @@ from app.core.logging import get_logger
 from app.db.models.beat import Beat
 from app.db.models.enums import EntityType
 from app.ingest.canon_build import DEFAULT_ART_DIRECTION, CanonEntity
+from app.ingest.ratelimit import TokenBucket, retrying
 from app.memory.canon_service import CanonService
 from app.memory.interfaces import BlobStore
 from app.providers import Providers
@@ -156,6 +157,10 @@ async def lock_identities(
     poses: Sequence[str] = ("front",),
     min_beats: int = 2,
     keyframe_size: str = _DEFAULT_KEYFRAME_SIZE,
+    rate_per_s: float = 0.0,
+    rate_burst: int = 4,
+    max_attempts: int = 3,
+    backoff_base_s: float = 1.0,
 ) -> IdentityLockResult:
     """Lock principal characters' appearance (keyframes) + assign preset voices.
 
@@ -170,10 +175,20 @@ async def lock_identities(
         poses: which canonical poses to render per principal (1–2).
         min_beats: a character is a *principal* when it appears in ≥ this many beats.
         keyframe_size: image-gen size string.
+        rate_per_s: token-bucket rate (requests/sec) over the per-character,
+            per-pose image-gen calls; 0 disables the limiter. A book with many
+            principals × poses otherwise fires these back-to-back with no
+            backoff, unlike the token-bucketed VL analyse fan-out
+            (:mod:`app.ingest.analyze`) — the same protection here guards
+            identity-lock from the hosted endpoint's ``429 Throttling.RateQuota``.
+        rate_burst: token-bucket burst (max calls that may fire at once).
+        max_attempts: per-call retry attempts on a transient provider error.
+        backoff_base_s: base backoff for the per-call retry.
     """
     counts = await _beat_counts(canon, book_id)
     principals = [c for c in characters if counts.get(c.entity_key, 0) >= min_beats]
     voices = assign_voices([c.entity_key for c in principals])
+    bucket = TokenBucket(rate_per_s, rate_burst)
 
     keyframe_keys: dict[str, list[str]] = {}
     for entity in sorted(principals, key=lambda c: c.entity_key):
@@ -181,12 +196,23 @@ async def lock_identities(
         ref_descriptors: list[dict[str, Any]] = []
         produced: list[str] = []
         for pose_index, pose in enumerate(poses):
-            images = await providers.image.generate(
-                prompt,
-                size=keyframe_size,
-                n=1,
-                negative_prompt=_KEYFRAME_NEGATIVE,
-                seed=_seed_for(entity.entity_key, pose_index),
+
+            async def _generate(
+                _prompt: str = prompt,
+                _entity_key: str = entity.entity_key,
+                _pose_index: int = pose_index,
+            ) -> list[bytes]:
+                await bucket.acquire()
+                return await providers.image.generate(
+                    _prompt,
+                    size=keyframe_size,
+                    n=1,
+                    negative_prompt=_KEYFRAME_NEGATIVE,
+                    seed=_seed_for(_entity_key, _pose_index),
+                )
+
+            images = await retrying(
+                _generate, max_attempts=max_attempts, base_delay_s=backoff_base_s
             )
             if not images:
                 continue
