@@ -4,7 +4,7 @@ Where the §13 experimentation platform uses a generic
 :class:`~app.flags.context.EvalContext` attribute bag, the *runtime config plane*
 targets a fixed, named set of dimensions that map onto Kinora's domain: the
 **book** being adapted, the **user** reading it, the **cohort** they belong to
-(e.g. ``beta`` / ``internal`` / ``judge``), and the **provider** a code path is
+(e.g. ``beta`` / ``internal`` / ``partner``), and the **provider** a code path is
 about to call (e.g. ``dashscope`` / ``minimax``). A flag rule constrains a subset
 of these; a percentage rollout buckets on one of them.
 

@@ -1074,7 +1074,7 @@ const BookWindowRoom = lazy(() => import("./reading/BookWindowRoom"));
   };
 ```
 
-  with a version that prefers the pop-out window when the Electron bridge is present, and keeps the in-app overlay for the browser/judging surface:
+  with a version that prefers the pop-out window when the Electron bridge is present, and keeps the in-app overlay for the browser renderer:
 
 ```ts
   const handleOpen = (book: Book) => {
@@ -2032,7 +2032,7 @@ await page.keyboard.press("Escape").catch(() => {});
 ## Open questions / risks encountered
 
 1. **`ReadingRoom` import path mismatch.** `HomePage.tsx` imports `./ReadingRoom` from `src/components/` but the file is `src/reading/ReadingRoom.tsx`. Either a `src/components/ReadingRoom.tsx` re-export shim exists, or the bundler resolves it some other way. Task 8 starts by confirming this; `BookWindowRoom` imports `./ReadingRoom` (sibling in `src/reading/`).
-2. **Library dimming on non-mac & in the browser.** The dim veil is implemented as a renderer overlay driven by a new `kinora:window:dim` event — cross-platform and robust, but only fires under Electron. In the browser (judging surface) there is no second window, so no dimming is needed. Verified renderer-side via the overlay state; the actual two-window dim/undim is a manual Electron check (screencapture blocked).
+2. **Library dimming on non-mac & in the browser.** The dim veil is implemented as a renderer overlay driven by a new `kinora:window:dim` event — cross-platform and robust, but only fires under Electron. In the browser renderer there is no second window, so no dimming is needed. Verified renderer-side via the overlay state; the actual two-window dim/undim is a manual Electron check (screencapture blocked).
 3. **`titleBarStyle: 'hiddenInset'` is macOS-only.** Applied conditionally; Win/Linux book windows keep `frame: true` + acrylic/background. The toolbar reserves `paddingLeft: 64` for the mac traffic lights — on Win/Linux that left gap is cosmetic (acceptable for v1; could be made conditional on `window.kinora.platform` in a follow-up).
 4. **In-book search jump precision.** Page text is word-indexed and the column is continuous; `onJump` does an approximate scroll to the `data-para` whose index ≈ page number. This is intentionally v1-minimal per the spec ("best-effort"). Flagged in Task 10.
 5. **Share is a stub.** No backend share API exists; `onShare` copies a `kinora://book/:id` deep link to the clipboard. Kept lean and flagged.

@@ -4,9 +4,6 @@
 
 | | |
 |---|---|
-| **Primary track** | Track 2 — AI Showrunner |
-| **Secondary coverage** | Track 1 (MemoryAgent) + Track 3 (Agent Society) |
-| **Submission deadline** | Jul 9, 2026 · 2:00pm PDT |
 | **Deployment target** | Alibaba Cloud (ECS / Function Compute · OSS · managed queue · DashScope / Model Studio) |
 | **Free-tier ceiling** | ~1,650 video-seconds + ~70M tokens, 90 days, Singapore endpoint |
 
@@ -27,10 +24,10 @@
 11. [Model stack & budget accounting](#11-model-stack--budget-accounting)
 12. [Engineering — the unglamorous 30%](#12-engineering--the-unglamorous-30)
 13. [Metrics & the eval harness](#13-metrics--the-eval-harness)
-14. [How it maps to — and beats — the rubric](#14-how-it-maps-to--and-beats--the-rubric)
-15. [Build plan — 18 days](#15-build-plan--18-days)
-16. [Demo script](#16-demo-script--3-minutes)
-17. [Submission checklist](#17-submission-checklist-devpost)
+14. [Architecture summary](#14-architecture-summary--what-this-buys-you)
+15. [MVP scope & prioritization](#15-mvp-scope--prioritization)
+16. [Guided walkthrough](#16-guided-walkthrough-dev-only-demo-mode)
+17. [Deployment-proof & release discipline](#17-deployment-proof--release-discipline)
 18. [Open questions](#18-open-questions-to-lock-before-you-build)
 
 ---
@@ -41,17 +38,26 @@ Kinora turns any book or PDF into a watchable, page-synced film that **generates
 
 The two ideas that make it defensible: **consistency is a memory problem, not a model problem**, and **the film is a function of attention — generated on demand against your reading position, never pre-rendered in bulk.** Everything below is in service of those two sentences.
 
+This is the part worth emphasizing: Kinora is not merely "AI video for books."
+It is an argument that useful generated media needs memory, taste, feedback,
+thrift, and timing. The product watches where the reader is, spends only when a
+scene is likely to matter, and lets the canon keep the story consistent enough to
+go long.
+
 ## 2. The bet (read this first)
 
-Every other Track-2 team builds the same thing: *type a prompt → get a 15-second short.* That is the solved party trick. Judges have seen 200 of them; it loses on novelty alone.
+Most AI-video products build the same thing: *type a prompt → get a 15-second short.* That is the solved demo pattern, and it loses on novelty alone.
 
 The unsolved problem is **long-form consistency.** You cannot one-shot a long video. You must cut it into clips and stitch them, and the seams are exactly where characters change faces, palettes drift, and props teleport. The industry instinct — "throw a bigger video model at it" — is wrong, because drift is not a fidelity failure of any single clip; it is the absence of a shared source of truth *across* clips.
 
-**Thesis A — consistency is memory.** If a persistent system holds the canonical truth of the story (what each character looks like, sounds like, where they are, what has already happened) and conditions every generated clip on the *relevant slice* of that truth, then continuity stops being a dice roll and becomes an emergent property of retrieval. That single reframe is what lets one architecture win Track 2 (the showrunner), satisfy Track 1 (the memory), and require Track 3 (the crew that maintains it).
+**Thesis A — consistency is memory.** If a persistent system holds the canonical truth of the story (what each character looks like, sounds like, where they are, what has already happened) and conditions every generated clip on the *relevant slice* of that truth, then continuity stops being a dice roll and becomes an emergent property of retrieval. That single reframe is what lets one architecture serve as the showrunner, the memory system, and the crew that maintains it.
 
-**Thesis B — the film is a function of attention.** A 300-page book is roughly 25 minutes of video, which exceeds the *entire* free-tier budget several times over and would be insane to pre-render — most of it would never be watched. So Kinora never renders a film. It renders the **next few seconds**, just ahead of the reader's eyes, spending video-seconds only on pages a human is actually arriving at, and caching every accepted shot so a re-read costs nothing. This is simultaneously the product's defining interaction *and* the reason it fits inside 1,650 seconds. Section 4 is the engineering of this idea and is the heart of the submission.
+**Thesis B — the film is a function of attention.** A 300-page book is roughly 25 minutes of video, which exceeds the *entire* free-tier budget several times over and would be insane to pre-render — most of it would never be watched. So Kinora never renders a film. It renders the **next few seconds**, just ahead of the reader's eyes, spending video-seconds only on pages a human is actually arriving at, and caching every accepted shot so a re-read costs nothing. This is simultaneously the product's defining interaction *and* the reason it fits inside 1,650 seconds. Section 4 is the engineering of this idea and is the heart of the design.
 
-Thesis B is also why we win the **budget** sub-criterion outright: a naive pipeline pre-renders the book and burns the budget on unseen footage; Kinora's spend is bounded by reading, deduplicated by memory, and degraded gracefully under pressure.
+Thesis B is also why the **budget** math works out: a naive pipeline pre-renders the book and burns the budget on unseen footage; Kinora's spend is bounded by reading, deduplicated by memory, and degraded gracefully under pressure.
+
+The excitement is practical: if the loop stays smooth under a real budget, the
+demo is not just a good clip. It is a new consumption model with proof.
 
 ## 3. Why anyone cares (the hook)
 
@@ -246,7 +252,7 @@ Net behaviour: **always ≥25s of video ready, generation only in short bursts a
 
 ### 4.11 Failure modes and the guarantees that cover them
 
-The design is best understood by the failures it is built to absorb. This table is also the answer sheet for the question a judge *will* ask — "what happens when…":
+The design is best understood by the failures it is built to absorb. This table is also the answer sheet for the question every production system faces — "what happens when…":
 
 | Failure | What goes wrong without a guard | The mechanism that covers it |
 |---|---|---|
@@ -287,7 +293,7 @@ The SyncEngine is also the client half of generation-on-scroll: it computes `w` 
 
 ### 5.3 Viewer mode
 
-Just watch. Narration plays; the **exact words being spoken highlight in sync** (karaoke, driven by CosyVoice word timestamps in the sync map, §9.4 — a moving highlight on the rendered text layer, not a caption box); the page turns itself to stay locked to the playhead. A deliberately subtle **buffer indicator** (a faint hairline that fills toward `H`) is the *only* surfacing of the generation machinery — present so a curious judge sees it working, quiet enough that a reader never thinks about it.
+Just watch. Narration plays; the **exact words being spoken highlight in sync** (karaoke, driven by CosyVoice word timestamps in the sync map, §9.4 — a moving highlight on the rendered text layer, not a caption box); the page turns itself to stay locked to the playhead. A deliberately subtle **buffer indicator** (a faint hairline that fills toward `H`) is the *only* surfacing of the generation machinery — inspectable when you want it, quiet enough that a reader never thinks about it.
 
 ### 5.4 Director mode
 
@@ -296,9 +302,9 @@ The reader takes over the production. Four tools:
 - **Pointer-based commenting** — exactly the Codex/Cursor region-select interaction. Drag a box over any part of a frame; the client screenshots that region, attaches it to a natural-language note, and routes the pair to the right agent (§7). "Make her coat red" → Cinematographer + Continuity. "This shot is too fast" → Cinematographer (pacing). "Wrong room" → Continuity. Routing is by a small intent classifier (a cheap Qwen call) over the note text plus the region's bound shot.
 - **Stop-frame & shot timeline** — a filmstrip of the scene's shots; scrub, select, and target an individual shot for a comment or regen. Each shot tile shows its QA badge (CCS, pass/fail) so the reader sees *why* a shot looks the way it does.
 - **The canon editor** — the memory graph (§8) rendered inspectable and **editable at any time.** Change a character's appearance description, swap a locked reference image, retune a style token (palette, lens, art direction). On save, the editor computes which shots depend on the changed entity (via the reference-set in each shot record) and **regenerates only those** — surgical, not a full re-render. This is the canon-editing requirement made concrete and budget-safe.
-- **(Stretch) Live agent-activity feed** — a streaming log of agent messages and conflict resolutions (§7), turning the multi-agent negotiation into something a judge can *watch happen.*
+- **(Stretch) Live agent-activity feed** — a streaming log of agent messages and conflict resolutions (§7), turning the multi-agent negotiation into something the user can *watch happen.*
 
-Every director edit **writes back into memory** (§9.6), so the system accumulates *this reader's* directing preferences — pacing, palette, framing — and applies them by default in later sessions. That is the cross-session preference-learning Track 1 asks for, surfaced as a feature rather than a footnote.
+Every director edit **writes back into memory** (§9.6), so the system accumulates *this reader's* directing preferences — pacing, palette, framing — and applies them by default in later sessions. That is cross-session preference learning, surfaced as a feature rather than a footnote.
 
 ### 5.5 Component tree & client event flow
 
@@ -362,7 +368,7 @@ flowchart TB
         BUD["Budget service<br/>reserve / remaining / guardrails"]
     end
 
-    subgraph ORCH["Agent Society — the production crew (Track 3)"]
+    subgraph ORCH["Agent Society — the production crew"]
         SHOW["Showrunner / Orchestrator<br/>Qwen3.7-Max"]
         ADAPT["Adapter / Screenwriter<br/>Qwen3.5-Plus"]
         CONT["Continuity Supervisor<br/>guards the canon · Qwen3.7-Plus"]
@@ -371,7 +377,7 @@ flowchart TB
         CRIT["Critic / QA<br/>Qwen3-VL"]
     end
 
-    subgraph MEM["Memory layer — the IP (Track 1) · MCP server"]
+    subgraph MEM["Memory layer — the canon store · MCP server"]
         CANON["Canon graph<br/>characters · voices · locations · style · timeline (versioned)"]
         EPI["Episodic / vector store<br/>every shot + its QA score"]
         RET["Retrieval + forgetting policy"]
@@ -415,7 +421,7 @@ flowchart TB
     BUD <--> Q
 ```
 
-The data plane is **stateless agents over shared canon**: every agent is an independently deployable service whose only shared dependency is the MCP memory server. That is what lets them scale horizontally and be swapped one at a time, and it is the architectural claim that earns the Innovation points (§14).
+The data plane is **stateless agents over shared canon**: every agent is an independently deployable service whose only shared dependency is the MCP memory server. That is what lets them scale horizontally and be swapped one at a time, and it is the core architectural claim (§14).
 
 ---
 
@@ -457,9 +463,9 @@ Six roles. Each is a separate service with a **typed contract** — a JSON reque
 
 Typed contracts are what make the crew swappable and the system debuggable: any agent can be replaced by a better model behind the same schema, and every message is a logged, inspectable artifact.
 
-### 7.2 The negotiation protocol — the Track-3 money shot
+### 7.2 The negotiation protocol
 
-Track 3 explicitly rewards showing "how agents resolve disagreements and execution conflicts." Conflicts are **first-class structured objects** raised onto the blackboard, not ad-hoc prose. The canonical demo conflict:
+A multi-agent architecture should show how agents resolve disagreements and execution conflicts. Conflicts are **first-class structured objects** raised onto the blackboard, not ad-hoc prose. The canonical demo conflict:
 
 ```json
 {
@@ -505,17 +511,17 @@ stateDiagram-v2
     Approved --> [*]
 ```
 
-Surface this live during the demo (the agent-activity feed). **Conflicts resolved + the measurable efficiency gain over a single-agent baseline (§13)** is exactly what the rubric rewards, and it is a thing a judge can watch rather than take on faith.
+Surface this live in the app (the agent-activity feed). **Conflicts resolved + the measurable efficiency gain over a single-agent baseline (§13)** is the core proof, and it is something users can watch rather than take on faith.
 
 ---
 
 ## 8. The memory layer — the MCP canon server
 
-This is the part you over-invest in, because it is simultaneously the Track-1 submission, the consistency engine, and the budget optimiser. Two stores, one access protocol.
+This is the part you over-invest in, because it is simultaneously the memory system, the consistency engine, and the budget optimiser. Two stores, one access protocol.
 
 ### 8.1 The Canon Graph (structured, human-inspectable)
 
-The story's bible. Back it with an Obsidian-style markdown vault for inspectability **plus** a graph + vector index for retrieval — the vault is what a judge can open and read, the index is what agents query in milliseconds.
+The story's bible. Back it with an Obsidian-style markdown vault for inspectability **plus** a graph + vector index for retrieval — the vault is what users can open and review, the index is what agents query in milliseconds.
 
 **Character node** — note the appearance embedding (for the Critic's similarity check) and the *locked* reference set:
 
@@ -565,7 +571,7 @@ The story's bible. Back it with an Obsidian-style markdown vault for inspectabil
 
 ### 8.2 The Episodic / Vector store
 
-Every shot ever generated — its prompt, seed, references, output URL, and the Critic's scores — embedded for retrieval. This is the "what worked before" memory that makes generation *increasingly accurate across sessions*, the exact Track-1 phrasing.
+Every shot ever generated — its prompt, seed, references, output URL, and the Critic's scores — embedded for retrieval. This is the "what worked before" memory that makes generation *increasingly accurate across sessions*.
 
 ```json
 {
@@ -609,7 +615,7 @@ The memory server exposes a small, deliberate set of tools — wire two of them 
 
 ### 8.4 Retrieval policy — recall under a limited context window
 
-The Track-1 behaviour "recall under a limited context window" is `canon.query`, and it is also the budget win. For the current beat, fetch **only** the canon that matters:
+Recall under a limited context window is what `canon.query` provides, and it is also the budget win. For the current beat, fetch **only** the canon that matters:
 
 ```
 canon.query(beat) =
@@ -628,7 +634,7 @@ Never the whole book, never stale versions. A 300-page book never re-enters the 
 
 ### 8.6 Preference learning — persistent across sessions
 
-Every Director edit writes a preference signal via `prefs.upsert`: a "slower" note nudges a pacing prior; repeated palette edits shift the default Style node; a re-framed shot adjusts a composition default. These accumulate per reader (and optionally per book), and the Cinematographer reads `prefs.get` into its prompt prior on the *next* session. Over time the system directs in the reader's taste without being asked — the persistent personalization Track 1 calls for, earned by the same write-back that powers self-correction.
+Every Director edit writes a preference signal via `prefs.upsert`: a "slower" note nudges a pacing prior; repeated palette edits shift the default Style node; a re-framed shot adjusts a composition default. These accumulate per reader (and optionally per book), and the Cinematographer reads `prefs.get` into its prompt prior on the *next* session. Over time the system directs in the reader's taste without being asked — persistent personalization earned by the same write-back that powers self-correction.
 
 **How it's wired (implementation).** A free-text note is mapped to `(axis, direction)` signals (`app/memory/prefs_signals.py`): each signal nudges a signed `bias` per axis (±0.3, clamped ±1.5), so opposing notes cancel and repeated notes reinforce. `POST /sessions/{id}/comment` and `POST /books/{id}/canon_edit` both invoke this nudge path; the comment response echoes what it taught for teach-time confirmation. A prior becomes an applied *default* once `|bias| ≥ 0.5` — the Cinematographer folds book-scoped priors into the shot's `camera`/prompt, but only on axes the current note doesn't already address (an explicit ask wins). The learned camera also drives the off-gate Ken-Burns push (`zoom_for_camera`), so a "slower / wider" taste is visible even with `KINORA_LIVE_VIDEO` off. The accumulated priors are read back as plain language ("You prefer slower, lingering shots", "Warmer palette bias +0.3") via `GET /me/prefs` and `GET /books/{id}/prefs`, shown in a **"Your directing style"** Settings panel on both shells, and cleared per-book or globally via the matching `DELETE`.
 
@@ -716,7 +722,7 @@ CosyVoice synthesizes narration with `word_timestamp_enabled`. The returned word
 
 ### 9.5 The self-correcting loop (the Critic)
 
-The Critic (Qwen3-VL) watches each rendered clip and scores it against the canon slice. **Concrete thresholds**, not vibes:
+The Critic (Qwen3-VL) watches each rendered clip and scores it against the canon slice. **Concrete thresholds**, not loose impressions:
 
 | Check | Metric | Pass condition |
 |---|---|---|
@@ -770,7 +776,7 @@ stateDiagram-v2
 
 ### 9.8 The end-to-end happy path
 
-Putting the planes together — from a reader's scroll to pixels on screen — in one sequence. This is the diagram to walk a judge through after the architecture slide.
+Putting the planes together — from a reader's scroll to pixels on screen — in one sequence. This is the diagram for the architecture walkthrough.
 
 ```mermaid
 sequenceDiagram
@@ -851,7 +857,7 @@ Every design decision falls out of this: **spend tokens to save video-seconds.**
 - **Batch API (~50% off)** for all non-realtime work: Phase A page analysis, bulk keyframe generation, offline re-scoring.
 - **Budget-aware degradation.** When `remaining_s` drops below a floor, the Scheduler stops promoting to full video and rides the keyframe/Ken-Burns ladder — the film keeps playing, just cheaper, and the `budget_low` event tells the UI to say so quietly.
 
-Frame this accounting explicitly in the submission — it is the literal Track-2 budget sub-criterion, and the headline metric (§13) is *minutes of consistent film per 1,650-second budget.*
+This accounting produces the headline metric (§13): *minutes of consistent film per 1,650-second budget.*
 
 
 ---
@@ -916,7 +922,7 @@ Each rung is cheaper than the last; the bottom rung (audio + highlighted text) s
 
 Emit, per shot: render latency, QA scores, retry count, cache hit/miss, video-seconds spent, mode used. Per session: buffer occupancy over time, watermark crossings, promotion count, idle periods, seek events. These feed both the live demo metrics panel (§13) and post-hoc debugging. A buffer-occupancy timeline that stays above `L` and shows clean burst-then-idle sawteeth is the visual proof that generation-on-scroll works.
 
-### 12.6 Deployment on Alibaba Cloud (a hard submission requirement)
+### 12.6 Deployment on Alibaba Cloud
 
 The backend runs on Alibaba Cloud: stateless agent services and the Scheduler on **ECS / Function Compute**; all model calls through **DashScope / Model Studio**; clips, frames, audio, and the markdown canon vault in **OSS**; the render queue on the managed broker. The **proof of deployment** is a linked repo code file that demonstrably uses OSS + DashScope + ECS/FC. A minimal, honest proof file:
 
@@ -947,13 +953,13 @@ def render_shot(spec: dict) -> dict:
 # This module runs on ECS / Function Compute as a queue worker (§12.1).
 ```
 
-Record a short clip of this running end-to-end and link the file in the submission.
+Record a short clip of this running end-to-end as deployment proof.
 
 ---
 
 ## 13. Metrics & the eval harness
 
-Track 3 demands "a measurable efficiency gain over single-agent baselines." Build a tiny eval harness and put **one chart** in the demo. Define the metrics precisely:
+A measurable efficiency gain over a single-agent baseline is the whole point of the memory architecture. Build a tiny eval harness and put **one chart** together. Define the metrics precisely:
 
 - **Character Consistency Score (CCS).** Mean Qwen3-VL appearance-embedding cosine similarity for a character across every shot they appear in: `CCS = mean_i cos(emb(crop_i), emb(locked_ref))`. Higher is better. *Crew + memory* vs. *single-agent baseline.*
 - **Accepted-footage efficiency.** Seconds of QA-passed video per 100s of generation budget: `efficiency = (1 − rejected_seconds / total_seconds) × 100`. The headline number — *minutes of consistent film per 1,650-second budget.*
@@ -964,25 +970,25 @@ Track 3 demands "a measurable efficiency gain over single-agent baselines." Buil
 
 **The baseline (the control):** one Qwen3.7-Max doing the whole pipeline with **no memory** — pure frame-chaining, no canon, no critic loop. Run both over the *same* demo book and chart CCS and accepted-footage efficiency side by side. Show the crew winning on **both** consistency and budget. That single slide is more persuasive than any amount of demo polish, because it converts the thesis ("consistency is a memory problem") into a number.
 
-**Experimental protocol (so the chart is honest).** Fix the demo book, the random seeds, and the per-shot prompts across both arms; the *only* difference is memory + crew vs. single-agent. Generate the same N shots (the demo sequence) in each arm. Compute CCS per character over every shot they appear in, regeneration rate over all N, and accepted-footage efficiency over identical budget. Report mean and spread across 3 runs to show the gap isn't noise. Pre-register the thresholds (§9.5) before running so you can't tune them to flatter the result — judges trust a number you committed to in advance.
+**Experimental protocol (so the chart is honest).** Fix the demo book, the random seeds, and the per-shot prompts across both arms; the *only* difference is memory + crew vs. single-agent. Generate the same N shots (the demo sequence) in each arm. Compute CCS per character over every shot they appear in, regeneration rate over all N, and accepted-footage efficiency over identical budget. Report mean and spread across 3 runs to show the gap isn't noise. Pre-register the thresholds (§9.5) before running so you can't tune them to flatter the result.
 
 ---
 
-## 14. How it maps to — and beats — the rubric
+## 14. Architecture summary — what this buys you
 
-**Technical Depth & Engineering (30%).** Memory exposed as a custom MCP server shared by all agents; `canon.query` and `shot.render` wired as custom Qwen skills; multi-model orchestration across six roles; the closed-loop VL critic with concrete thresholds; the reference-to-video consistency engine; the watermark-buffered scroll scheduler; the budget accounting service; the cancellable, idempotent, dead-lettered render queue.
+**Technical depth.** Memory exposed as a custom MCP server shared by all agents; `canon.query` and `shot.render` wired as custom Qwen skills; multi-model orchestration across six roles; the closed-loop VL critic with concrete thresholds; the reference-to-video consistency engine; the watermark-buffered scroll scheduler; the budget accounting service; the cancellable, idempotent, dead-lettered render queue.
 
-**Innovation & Architecture (30%).** Two genuinely novel moves: **the film as a function of attention** (generation-on-scroll with image-only speculation and watermark hysteresis) and **consistency-as-retrieval** (the shared-memory blackboard). Plus modular agent services with typed contracts, stateless horizontal scaling against shared canon, real error handling, graceful degradation, and layered caching. The architecture *is* the innovation — say so.
+**Architecture.** Two genuinely novel moves: **the film as a function of attention** (generation-on-scroll with image-only speculation and watermark hysteresis) and **consistency-as-retrieval** (the shared-memory blackboard). Plus modular agent services with typed contracts, stateless horizontal scaling against shared canon, real error handling, graceful degradation, and layered caching. The architecture *is* the innovation.
 
-**Problem Value & Impact (25%).** Anti-brainrot literacy + accessibility (ADHD, dyslexia, ESL) + manga/indie-author adaptation. An obvious productization path (per-book library, creator tools). Real pain, real users, and a demo that opens on the human story.
+**Problem & impact.** Anti-brainrot literacy + accessibility (ADHD, dyslexia, ESL) + manga/indie-author adaptation. An obvious productization path (per-book library, creator tools). Real pain, real users, and a walkthrough that opens on the human story.
 
-**Presentation & Documentation (15%).** The architecture diagram (§6), the live agent-activity feed and conflict resolution (§7.2), the buffer-occupancy sawtooth and the metrics panel (§13), and clear docs in the repo (this file, trimmed).
+**Presentation.** The architecture diagram (§6), the live agent-activity feed and conflict resolution (§7.2), the buffer-occupancy sawtooth and the metrics panel (§13), and clear docs in the repo.
 
 ---
 
-## 15. Build plan — 18 days
+## 15. MVP scope & prioritization
 
-Ship the loop, not the vision. You need the core loop working on one book and a 3-minute video that makes a judge feel something.
+Ship the loop, not the vision. You need the core loop working on one book and a short walkthrough that makes a reader feel something.
 
 **MVP (must demo):**
 1. Shelf + two-pane workspace; Viewer mode with working PDF↔video↔word sync (the SyncEngine, §5.2).
@@ -995,29 +1001,29 @@ Ship the loop, not the vision. You need the core loop working on one book and a 
 
 **Stretch (only if MVP is solid):** full pointer-commenting UX, multi-scene films, manga overlay mode, cross-session preference learning surfaced in UI, the live agent-activity feed, full velocity-adaptive promotion tuning.
 
-**Pick the demo book carefully.** Short, few characters, strong visuals, and **public domain** so there is zero copyright risk in a public submission video — a short Brothers Grimm or Aesop piece, or an original short you write. Avoid anything in copyright.
+**Pick the demo book carefully.** Short, few characters, strong visuals, and **public domain** so there is zero copyright risk in a public video — a short Brothers Grimm or Aesop piece, or an original short you write. Avoid anything in copyright.
 
 ---
 
-## 16. Demo script — 3 minutes
+## 16. Guided walkthrough (dev-only demo mode)
 
-1. **(0:00–0:25) The hook.** "You don't read it — you watch it." Viewer mode playing, words highlighting, page turning itself. Land the accessibility angle in one sentence. Then say the line: *"and none of this existed five seconds ago — it's generating as I read."*
-2. **(0:25–1:10) Generation-on-scroll.** Scroll forward; show the buffer hairline filling in bursts then going quiet; scroll fast to trigger the Ken-Burns bridge and watch full video catch up. This is the part no other team has.
-3. **(1:10–1:50) Director mode.** Region-select a character, "make her coat crimson," watch the canon update and **only that shot** regenerate consistently.
-4. **(1:50–2:35) The crew + the proof.** Show a continuity conflict resolved live in the agent feed (the lost-sword example), then the metrics slide — crew vs. baseline on consistency *and* budget, with the buffer sawtooth.
-5. **(2:35–3:00) The vision.** Any book, any reader, any attention span. Close.
+A fixed sequence the dev-only demo trigger (`simulate_conflict.py`) walks through — useful for onboarding, sales walkthroughs, and exercising the conflict-resolution UX end-to-end:
+
+1. **The hook.** Viewer mode playing, words highlighting, page turning itself. Land the accessibility angle in one sentence, then: *"none of this existed five seconds ago — it's generating as I read."* Uses the louder, punchier demo-opener audio style.
+2. **Generation-on-scroll.** Scroll forward; show the buffer hairline filling in bursts then going quiet; scroll fast to trigger the Ken-Burns bridge and watch full video catch up.
+3. **Director mode.** Region-select a character, "make her coat crimson," watch the canon update and **only that shot** regenerate consistently.
+4. **The crew + the proof.** Trigger the canonical lost-sword conflict (§7.2); show it resolved live in the agent feed, then the metrics slide — crew vs. baseline on consistency *and* budget, with the buffer sawtooth.
+5. **The vision.** Any book, any reader, any attention span. Close.
 
 ---
 
-## 17. Submission checklist (Devpost)
+## 17. Deployment-proof & release discipline
 
-- [ ] Public, open-source repo with a **license file visible in the About section** (detectable at the top of the repo page).
+- [ ] Public, open-source repo with a **license file visible at the top of the repo page**.
 - [ ] **Proof of Alibaba Cloud deployment** — a short recording *plus* a link to a repo code file using Alibaba Cloud services/APIs (the §12.6 worker is your file).
 - [ ] **Architecture diagram** (the §6 diagram, exported clean).
-- [ ] **~3-minute demo video**, public on YouTube / Vimeo / Facebook Video.
+- [ ] **A short walkthrough video**, public — keep any music procedurally generated so it stays copyright-clean.
 - [ ] **Text description** of features + functionality.
-- [ ] **Identify the track: Track 2 — AI Showrunner.**
-- [ ] *Optional:* a build-journey blog/social post → eligible for the separate Blog Post prize ($500 + credits). Low effort, extra shot on goal.
 
 ---
 

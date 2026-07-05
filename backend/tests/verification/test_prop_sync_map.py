@@ -2,7 +2,7 @@
 
 The sync map binds video-time ↔ word ↔ page; if its timestamps drift or its page
 turn lands after a shot ends, the karaoke highlight and self-turning page desync —
-the one piece of the product a judge watches closely. These pure helpers carry
+the one piece of the product a reader watches closely. These pure helpers carry
 crisp temporal invariants:
 
 * ``page_turn_at`` — ``start <= turn < end`` for any positive duration (the page

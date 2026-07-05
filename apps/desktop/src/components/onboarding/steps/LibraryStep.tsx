@@ -1,6 +1,6 @@
 // Onboarding · Library — orient the reader on adding a first book vs exploring
 // the demo. Purely presentational hints; the actual upload/library lives in the
-// library domain (another agent), so this step just sets expectations.
+// library domain (another agent), so this step sets expectations.
 import { Upload, Sparkles } from "lucide-react";
 
 export function LibraryStep() {

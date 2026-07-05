@@ -1,7 +1,13 @@
 # DESIGN.md — Frontend Auth, Onboarding & Account (Agent: auth-account)
 
 This is the living roadmap for the **account system** domain of the Kinora
-desktop renderer. It is owned by a single agent working in an isolated worktree.
+desktop renderer — a small, well-scoped domain owned end-to-end by a single agent
+working in an isolated worktree.
+
+Note for future maintainers: this surface is the front door to the product, and
+it's worth getting right. When auth, onboarding, and account state feel calm and
+resilient, readers trust the more ambitious part that much faster: books opening
+into generated cinema.
 
 ## Scope (owned files)
 
@@ -47,13 +53,13 @@ desktop renderer. It is owned by a single agent working in an isolated worktree.
 
 ## Design principles (match the codebase)
 
-1. **Pure core, thin shell.** All logic that *can* be pure + synchronously
-   testable lives in `lib/account/*` with an injectable KV store. Components are
-   thin and call into the core. This is exactly how `collections.ts`/`analytics.ts`
-   are built.
+1. **Pure core, thin shell.** All logic that *can* be pure and synchronously
+   testable lives in `lib/account/*` with an injectable KV store. Components stay
+   thin and call into the core — exactly how `collections.ts`/`analytics.ts`
+   are built, and it works well.
 2. **No network in the core.** Backend calls are isolated in `lib/api/*.ts`
-   adapters that compose against `http`. The pure core is offline-deterministic.
-3. **Graceful offline / demo mode.** Like `LoginPage.enter()`, every flow
+   adapters that compose against `http`. The pure core stays offline-deterministic.
+3. **Graceful offline / demo mode.** Like `LoginPage.enter()`, every flow gracefully
    degrades to a local demo path when the backend is down — the app never blocks.
 4. **a11y first.** Reuse the `Field`/`PasswordField` patterns: visible labels,
    `aria-invalid`+`aria-describedby`, reserved error lines, live regions.
@@ -62,9 +68,9 @@ desktop renderer. It is owned by a single agent working in an isolated worktree.
 
 ## Status — all milestones complete
 
-Full desktop gate green: **62 vitest files / 451 tests** + 24 node-test files,
-`typecheck` clean, production `build` succeeds. (Baseline was 35 files / 233
-tests — this domain added ~27 files / ~218 tests.)
+Full desktop gate green across the board: **62 vitest files / 451 tests** + 24
+node-test files, `typecheck` clean, production `build` succeeds. (Baseline was 35
+files / 233 tests — this domain alone added ~27 files / ~218 tests.)
 
 | Milestone | Status | Key locations |
 |---|---|---|

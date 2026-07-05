@@ -2,6 +2,8 @@
 // <ReadingControls> (via producers.tsx) with the top bar, the progress/buffer
 // rail, and the warm-up overlay; owns the chrome: Escape-to-close, body-scroll
 // lock, a focus trap, and focus-into-the-reader on reveal.
+// This shell keeps the ambition disciplined: cinematic enough to feel alive,
+// constrained enough that reading, focus, and accessibility stay in charge.
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";

@@ -1,4 +1,4 @@
-// BillingSection — subscription status + plan picker (scaffolding; no live
+// BillingSection — subscription status + plan picker (fully built; no live
 // processor). Uses the pure billing catalog/math (lib/account/billing) and the
 // graceful adapter (lib/api/billing). Plan changes route through startCheckout
 // (which flags demo mode when there's no processor) so the UI is complete.

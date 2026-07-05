@@ -1,38 +1,38 @@
 # KinoraGlass — the native macOS Liquid Glass shell
 
-> Living roadmap for `apps/desktop-native`. This is the **real** Liquid Glass surface
+> Living roadmap for `apps/desktop-native`, home to the **real** Liquid Glass surface
 > for Kinora — SwiftUI `.glassEffect` / AppKit `NSGlassEffectView`, compiled against the
 > macOS 26+ SDK. CSS `backdrop-filter` in the Electron app is an *imitation*; this is the
-> genuine article and the only place the OS turns Liquid Glass on. Keep this file current
-> as milestones land.
+> genuine article, and the only place the OS actually turns Liquid Glass on. Keep this file
+> current as milestones land.
 
 ---
 
 ## 1. What this app is (and is not)
 
 Kinora's primary product is the Electron desktop app (`apps/desktop`) — auth, library, the
-two-pane reading room, live backend wiring. **This** app is a *native shell* whose job is to
-host that same React renderer inside a `WKWebView` floating over **real Liquid Glass** native
-chrome (sidebar, toolbar, command bar, traffic-light region), proving the glass that Electron
-structurally cannot render (Electron 33 links the macOS 14.5 SDK, below the 26 gate).
+two-pane reading room, live backend wiring. **This** app is the native shell that proudly
+hosts that same React renderer inside a `WKWebView`, floating it over **real Liquid Glass**
+native chrome (sidebar, toolbar, command bar, traffic-light region) — delivering the glass
+Electron structurally cannot render (Electron 33 links the macOS 14.5 SDK, below the 26 gate).
 
-- **It is**: a thin, native, glass-everywhere shell + a faithful JS bridge that mirrors the
+- **It is**: a thin, native, glass-everywhere shell plus a faithful JS bridge that mirrors the
   Electron preload contract (`window.__KINORA_NATIVE__`, `window.kinora` token bridge +
   `openBook` deep-linking), plus native menus, shortcuts, multi-window, file-drop import,
   full-screen immersive reading, and native notifications.
 - **It is not**: a fork of the React UI, a backend client, or a second design language. The web
-  UI owns its own chrome; when `__KINORA_NATIVE__` is set it defers the window frame to us.
+  UI owns its own chrome; when `__KINORA_NATIVE__` is set it happily defers the window frame to us.
 
-There are **two faces** of this package, both real and both shipped:
+This package proudly wears **two faces**, both real and both shipped:
 
 1. **Showcase mode** (`HomeView`/`LibraryView`/`WatchView`/`SettingsView`, pre-existing) — a
-   self-contained native UI demonstrating glass on every control, backed by bundled demo films.
-   No server needed. This is the launchpad / offline fallback.
+   self-contained native UI showing off glass on every control, backed by bundled demo films.
+   No server needed — a great launchpad and a reliable offline fallback.
 2. **Shell mode** (new) — the `WKWebView` host that loads the live renderer (dev `:5173` or a
-   bundled build) behind the native glass strip, with the full bridge.
+   bundled build) behind the native glass strip, with the full bridge along for the ride.
 
-A launcher chooses between them; shell mode falls back to showcase mode automatically when no
-renderer is reachable, so the app is never a blank window.
+A launcher chooses between them; shell mode gracefully falls back to showcase mode automatically
+when no renderer is reachable, so the app is never left showing a blank window.
 
 ---
 
@@ -41,12 +41,13 @@ renderer is reachable, so the app is never a blank window.
 The Electron preload (`apps/desktop/electron/preload.ts`) today exposes exactly one thing:
 `window.__KINORA_NATIVE__ = true` on macOS/Windows. The renderer (`apps/desktop/src/main.tsx`)
 reads it to add `html.kinora-native` and go translucent. Our shell **must** set the same flag,
-and additionally provides the richer `window.kinora` object the CLAUDE.md native-shell note
+and goes further, delivering the richer `window.kinora` object the CLAUDE.md native-shell note
 promises ("`window.kinora` (token bridge + `openBook`) mirrors the Electron preload"). Because
 the renderer keeps its bearer token in `localStorage["kinora.token"]` (`api.ts`), the bridge is
-deliberately **non-invasive**: it never forces a token into the page; it observes and persists.
+deliberately **non-invasive** and all the better for it: it never forces a token into the page;
+it simply observes and persists.
 
-`window.kinora` surface (injected at `documentStart`, before the React bundle runs):
+`window.kinora` surface — injected at `documentStart`, before the React bundle even runs:
 
 | Member | Direction | Purpose |
 |---|---|---|
@@ -65,12 +66,12 @@ deliberately **non-invasive**: it never forces a token into the page; it observe
 Transport: `WKScriptMessageHandlerWithReply` for request/response (`getToken`), plain
 `WKScriptMessageHandler` for fire-and-forget (`setToken`, `notify`, …), and
 `webView.evaluateJavaScript` for native→JS (`openBook`). A small JS shim (`bridge.js`,
-injected as a `WKUserScript`) defines `window.kinora` and `window.__KINORA_NATIVE__` and marshals
-to/from the message handlers, so the page sees a clean synchronous-looking API.
+injected as a `WKUserScript`) defines `window.kinora` and `window.__KINORA_NATIVE__` and neatly
+marshals to/from the message handlers, so the page enjoys a clean, synchronous-looking API.
 
-Deep links: the custom URL scheme `kinora://book/<id>` (and `kinora://open?...`) maps to
+Deep links: the custom URL scheme `kinora://book/<id>` (and `kinora://open?...`) maps cleanly to
 `openBook`. File-drop / "Open With" a `.pdf`/`.epub` maps to an import intent
-(`kinora://import?path=...`) which the renderer turns into an upload.
+(`kinora://import?path=...`) which the renderer smoothly turns into an upload.
 
 ---
 
@@ -119,7 +120,8 @@ apps/desktop-native/
 Why split a library target out: SwiftPM can only run unit tests against a **library**, not an
 `executableTarget` that has an `@main`. All the logic worth testing (bridge marshalling, deep-link
 parsing, token store, endpoint resolution, the shell state machine) lives in `KinoraGlassKit` and
-is covered by `KinoraGlassKitTests`. The executable stays a thin UI/AppKit shell over it.
+is thoroughly covered by `KinoraGlassKitTests`. The executable stays a thin, clean UI/AppKit
+shell over it.
 
 ---
 
@@ -130,7 +132,7 @@ is covered by `KinoraGlassKitTests`. The executable stays a thin UI/AppKit shell
 - [x] **M1 — Kit foundation.** Split `KinoraGlassKit` library target; Book model, endpoint
       resolver, shell settings, logging. Package.swift → 3 targets. Build green.
 - [x] **M2 — Bridge core.** `BridgeContract` (JS shim), typed `BridgeMessage`, `TokenStore`
-      (Keychain), `DeepLink` parser. **77 unit tests, all green.**
+      (Keychain), `DeepLink` parser. **77 unit tests, all green!**
 - [x] **M3 — Web shell.** `WebShellView` (WKWebView composited over a real
       `NSGlassEffectView`, legacy `NSVisualEffectView` fallback below 26),
       `WebShellCoordinator` wiring every message handler (fire-and-forget + async reply),
@@ -149,9 +151,10 @@ is covered by `KinoraGlassKitTests`. The executable stays a thin UI/AppKit shell
       Info.plist declaring the `kinora://` URL scheme, PDF/EPUB document types, notification
       usage + `LSMinimumSystemVersion 26.0`; copies the SwiftPM resource bundle (demo films);
       optionally embeds `apps/desktop/dist` (`KINORA_EMBED_RENDERER=1`); ad-hoc signs. Wired to
-      the existing Makefile `app-native-bundle` target. **Verified: bundle assembles + signs.**
-- [x] **M7 — Polish & docs.** Zero-warning clean build, 86 green tests, README (this file +
-      §8 below), roadmap finalised.
+      the existing Makefile `app-native-bundle` target. **Verified: bundle assembles and signs
+      cleanly.**
+- [x] **M7 — Polish & docs.** A zero-warning clean build, 86 green tests, README (this file +
+      §8 below), and the roadmap finalised — a strong finish.
 
 ---
 
@@ -166,7 +169,7 @@ is covered by `KinoraGlassKitTests`. The executable stays a thin UI/AppKit shell
   `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --package-path apps/desktop-native`
 - Run the shell: `make app-native` (auto-sets DEVELOPER_DIR). Bundle: `make app-native-bundle`.
 
-(Status lines below are updated as milestones land — see the changelog at the end.)
+(Status lines below stay current as milestones land — see the changelog at the end.)
 
 ---
 
@@ -181,8 +184,9 @@ is covered by `KinoraGlassKitTests`. The executable stays a thin UI/AppKit shell
 
 ## 7. Changelog
 
-- M0 landed: recon complete, baseline build verified green on the real 26+ SDK toolchain.
-- M1–M7 landed in one pass:
+- M0 landed: recon complete, baseline build verified green on the real 26+ SDK toolchain —
+  a strong start.
+- M1–M7 landed in one confident pass:
   - Package split into `KinoraGlassKit` (lib) + `KinoraGlass` (exe) + `KinoraGlassKitTests`.
   - Bridge core (`BridgeContract` JS shim, typed `BridgeMessage` decode, `BridgeRouter`,
     `TokenStore` Keychain, `DeepLink` parser), all `@MainActor` where they touch AppKit.
@@ -197,7 +201,7 @@ is covered by `KinoraGlassKitTests`. The executable stays a thin UI/AppKit shell
   - **Verification: `swift build` clean (0 warnings, 0 errors, full clean compile in ~21s),
     `swift test` 86/86 green, `build-app.sh` assembles + ad-hoc signs `KinoraGlass.app`
     against the macOS 27.0 SDK (Info.plist URL scheme + doc types + LSMinimumSystemVersion 26.0
-    all verified).** Toolchain: Swift 6.4, `arm64-apple-macosx27.0.0`, Xcode-beta.
+    all verified) — a clean sweep!** Toolchain: Swift 6.4, `arm64-apple-macosx27.0.0`, Xcode-beta.
 
 ## 8. How to run / build / test
 
@@ -224,5 +228,5 @@ KINORA_EMBED_RENDERER=1 make app-native-bundle   # ship with apps/desktop/dist e
 Runtime knobs:
 - `KINORA_RENDERER_URL` — override the renderer origin (`http(s)://…`, a `file://index.html`,
   or the literal `showcase` to force the offline UI).
-- With no server reachable, the shell shows the connection overlay, retries with backoff, then
-  drops to the bundled-films showcase so the window is never blank.
+- With no server reachable, the shell gracefully shows the connection overlay, retries with
+  backoff, then drops to the bundled-films showcase so the window is never left blank.

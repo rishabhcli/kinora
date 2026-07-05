@@ -92,7 +92,7 @@ At each pipeline stage, the Production Manager runs an automated quality gate:
 | Stitch | Audio sync | Word timestamps within 50ms of audio | Timestamp drift detected |
 | Final | Overall production quality | QA score > threshold | Below threshold → Director review |
 
-Each gate either auto-proceeds, auto-remediates, or escalates to HITL. The gate decisions are **logged with reasoning** — judges can see the automated decision-making happening.
+Each gate either auto-proceeds, auto-remediates, or escalates to HITL. The gate decisions are **logged with reasoning** so the automated decision-making is inspectable.
 
 #### Budget Optimizer
 
@@ -223,7 +223,7 @@ One architecture, four tracks. Not four bolted-together features — the tracks 
 - Multiple agents (T3) → maintain the memory → produce the video
 - Autopilot (T4) → manages the pipeline → makes it production-ready
 
-Judges will see that the tracks aren't forced — they're the natural decomposition of a real product.
+The tracks aren't forced — they're the natural decomposition of a real product.
 
 ---
 
@@ -371,13 +371,13 @@ If the server crashes mid-session, the user can reconnect and the system resumes
 
 ## How Each Track Is Demonstrated in the Demo
 
-| Demo Segment | Track | What the Judge Sees |
+| Demo Segment | Track | What to Show |
 |---|---|---|
 | 0:00–0:25 — Viewer mode playing | T2 | Video generating as the reader reads, karaoke highlight, auto page-turn |
 | 0:25–1:10 — Generation-on-scroll | T2 | Buffer hairline filling in bursts, Ken-Burns bridge on fast scroll |
 | 1:10–1:50 — Director mode edit | T1, T2 | Region-select → "make coat crimson" → canon updates → only dependent shots regenerate → **cost displayed: "3 shots, 15 video-seconds"** |
 | 1:50–2:15 — Agent negotiation | T3 | Live agent feed: continuity conflict (lost sword) → Showrunner arbitration → resolution. Agents visibly negotiating. |
-| 2:15–2:40 — Autopilot in action | T4 | Production Manager: automated quality gate catches a bad shot → remediation engine auto-recovers (switches Wan mode) → HITL checkpoint for budget override → judge sees the automated decision log |
+| 2:15–2:40 — Autopilot in action | T4 | Production Manager: automated quality gate catches a bad shot → remediation engine auto-recovers (switches Wan mode) → HITL checkpoint for budget override → automated decision log is visible |
 | 2:40–3:00 — Metrics + vision | T1, T3 | CCS chart (crew vs. baseline), buffer sawtooth, production report. "Any book, any reader, any attention span." |
 
 ---

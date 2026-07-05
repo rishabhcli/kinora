@@ -1,5 +1,5 @@
-// The §12.5 observability snapshot, pure half. The metrics panel (and a curious
-// judge) wants a single, honest readout of how the reading room is performing:
+// The §12.5 observability snapshot, pure half. The metrics panel wants a single,
+// honest readout of how the reading room is performing:
 // render smoothness, decode health, the adaptive rung and why, and the buffer
 // occupancy. This module FUSES the independent cores — FrameStats, DecodeStats,
 // the quality decision, and the SSE buffer signal — into one flat, serialisable

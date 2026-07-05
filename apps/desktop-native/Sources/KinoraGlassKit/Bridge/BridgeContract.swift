@@ -56,7 +56,7 @@ public enum BridgeContract {
     /// rest are fire-and-forget. A small handler-presence guard keeps the shim from
     /// throwing if it is ever evaluated outside the native host (defensive).
     public static func userScriptSource(version: String = shellVersion) -> String {
-        // NOTE: kept dependency-free + idempotent (guards re-injection on bf-cache restore).
+        // Deliberately dependency-free and idempotent — guards re-injection on bf-cache restore.
         """
         (function () {
           if (window.__kinoraBridgeInstalled) { return; }

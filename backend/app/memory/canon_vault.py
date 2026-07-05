@@ -1,8 +1,8 @@
 """Canon vault export — the human-inspectable Obsidian-style bible (kinora.md §8.1).
 
 The canon graph is backed by a graph + vector index for millisecond agent
-retrieval, but the design also wants a **markdown vault a judge can open and
-read**. This service renders the whole canon of a book — every entity (with its
+retrieval, but the design also wants a **markdown vault a reader can open and
+review**. This service renders the whole canon of a book — every entity (with its
 version history) and every continuity fact (with its beat interval, retired ones
 included for the audit trail) — to markdown and writes it to object storage
 under ``canon/<book_id>/``.

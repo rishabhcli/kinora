@@ -3,6 +3,9 @@
 // film engine, and Agent 6's reading controls (all via producers.tsx) into one
 // flawless open→read→close whole that is fully functional every time, even with
 // KINORA_LIVE_VIDEO OFF. See coordination/CONTRACTS.md.
+// This is the product promise in code: not "play a clip beside text", but a book
+// opening into a responsive film room while still behaving like a dependable
+// reader.
 import { AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { Book } from "../data/books";

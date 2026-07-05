@@ -1,5 +1,5 @@
 // SmartCollectionEditor — create/save a smart collection from the CURRENT
-// faceted query + sort. A smart collection is just a saved (FacetQuery, sort)
+// faceted query + sort. A smart collection is a saved (FacetQuery, sort)
 // rule that re-evaluates against the live library, so "save current view as a
 // collection" is the whole interaction. Editing reuses the same form.
 import { useState } from "react";

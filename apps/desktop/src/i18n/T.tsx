@@ -7,7 +7,7 @@
 //   <T k="terms.accept" components={{ link: (c) => <a href="/tos">{c}</a> }} />
 //
 // Tags with no matching component render their children inline (no wrapper),
-// so an un-mapped `<b>` simply contributes its text — never a broken element.
+// so an un-mapped `<b>` still contributes its text — never a broken element.
 
 import { Fragment, type ReactNode } from "react";
 import { useTParts } from "./useT.ts";

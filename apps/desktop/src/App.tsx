@@ -18,6 +18,8 @@ export default function App() {
   const [entered, setEntered] = useState(() => api.isAuthed());
   const prefersReduced = useReducedMotionPref();
 
+  // Keep the root quiet: get the reader from "signed in" to the reading room
+  // without adding DOM ceremony or visual churn.
   // Crossing the threshold into the app. LoginPage runs its own cinematic exit
   // (the card recedes, the wall blooms) and then calls onEnter; here we keep the
   // *home* wrapper opacity-only on purpose — a transform/filter/backdrop-filter on

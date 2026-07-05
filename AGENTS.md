@@ -17,7 +17,7 @@
 
 ## Project Structure & Module Organization
 
-Kinora is a Python backend plus a pnpm/Turborepo desktop workspace. `backend/app` holds the FastAPI service: routes in `api/routes`, persistence in `db`, generation agents in `agents`, render logic in `render`, scheduler control in `scheduler`, memory/canon services in `memory`, providers in `providers`, queue workers in `queue`, and ingest in `ingest`; tests live in `backend/tests`. `apps/desktop` is the Electron + React + Vite + Tailwind product, with the hand-written backend client at `apps/desktop/src/lib/api.ts` and the reading experience under `apps/desktop/src/reading`. `apps/desktop-native` is the separate SwiftUI Liquid Glass showcase. Infrastructure and deployment assets live in `infra`, `deploy`, and `assets/books`. There is no `frontend/`, `packages/core`, or `apps/mobile` directory.
+Kinora pairs a Python backend with a pnpm/Turborepo desktop workspace, and everything has a clear home. `backend/app` holds the FastAPI service: routes in `api/routes`, persistence in `db`, generation agents in `agents`, render logic in `render`, scheduler control in `scheduler`, memory/canon services in `memory`, providers in `providers`, queue workers in `queue`, and ingest in `ingest`; tests live in `backend/tests`. `apps/desktop` is the Electron + React + Vite + Tailwind product, with the hand-written backend client at `apps/desktop/src/lib/api.ts` and the reading experience under `apps/desktop/src/reading`. `apps/desktop-native` is the separate SwiftUI Liquid Glass showcase. Infrastructure and deployment assets live in `infra`, `deploy`, and `assets/books`. There is no `frontend/`, `packages/core`, or `apps/mobile` directory.
 
 ## Build, Test, and Development Commands
 

@@ -9,6 +9,10 @@ CRITICAL: ``render`` raises :class:`LiveVideoDisabled` unless
 ``settings.kinora_live_video`` is set. Real Wan renders burn scarce, metered
 video-seconds; degradation (Ken-Burns over a keyframe) lives in the render
 worker, not here — this provider never fabricates a clip.
+
+This is one of the pressure points that makes the architecture credible: the
+expensive path is real, hosted, and explicit, while the app still checks the
+budget gate before spending.
 """
 
 from __future__ import annotations

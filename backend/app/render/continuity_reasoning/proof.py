@@ -1,6 +1,6 @@
 """Human-readable PROOF TRACES for continuity reasoning (§7.2, §13).
 
-A continuity verdict is only useful to a director (and a judge, §14) if it can
+A continuity verdict is only useful to a director if it can
 *show its work*: not "this contradicts the canon" but the exact chain of facts
 and temporal relations that forces the conclusion. §7.2 makes conflicts
 first-class structured objects so they are "inspectable, loggable, and

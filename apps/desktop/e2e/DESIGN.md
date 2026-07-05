@@ -1,9 +1,10 @@
 # DESIGN.md — Desktop E2E & quality harness (living roadmap)
 
-Domain: the comprehensive end-to-end + quality harness for `apps/desktop`,
+Domain: a comprehensive end-to-end + quality harness for `apps/desktop`,
 living entirely under `apps/desktop/e2e/`. Built to be **additive** (own config,
 own specs, no edits to renderer source or the pre-existing a11y specs) and
-**hermetic** (network-mocked; `KINORA_LIVE_VIDEO` OFF; no Docker; no Wan credits).
+**hermetic** (network-mocked; `KINORA_LIVE_VIDEO` OFF; no Docker; no Wan credits) —
+so it runs fast and clean, anywhere.
 
 ## Principles
 
@@ -11,17 +12,17 @@ own specs, no edits to renderer source or the pre-existing a11y specs) and
    set of stable hooks (`.book-cover`, `[data-testid="reading-scroll"]`,
    `[data-warmup]`, `role="dialog"`/`role="tab"`) second. CSS classes only as a
    last resort. The vocabulary is centralised in `support/selectors.ts` so a UI
-   rename is one patch, not a sweep. This matters because the renderer is under
-   active multi-agent churn.
+   rename is a one-line patch, not a sweep — a real win given the renderer is
+   under active multi-agent churn.
 2. **Determinism over realism.** A deterministic API mock + EventSource shim
    means specs pass byte-for-byte whether or not the real stack is up. Motion,
-   clock, and `Math.random` are frozen for visual stability.
+   clock, and `Math.random` are frozen for rock-solid visual stability.
 3. **Mount the real components.** Where live in-app nav is flaky headless
    (library, director — framer crossfades), drive standalone mounts of the
-   *real* components, not fakes. The core journey still runs against the real app.
+   *real* components, not fakes, so the core journey still runs against the real app.
 4. **Soft gates that catch regressions, not churn.** a11y asserts zero
    serious/critical (records everything); perf asserts generous budgets (catch
-   10x regressions). Both write JSON artifacts for triage.
+   10x regressions). Both write JSON artifacts for easy triage.
 5. **Additive shared-file changes only**, documented here (see below).
 
 ## Shared-file changes (additive)
@@ -53,7 +54,7 @@ own specs, no edits to renderer source or the pre-existing a11y specs) and
 
 **Verification:** `e2e:typecheck` clean; `--list` shows 53 tests in 12 files;
 **49 passed / 3 skipped** (2 gated live + 1 documented `fixme`) on the hermetic
-run; visual baselines pass deterministically on re-run.
+run — visual baselines pass deterministically on every re-run.
 
 ## Roadmap — next milestones (not yet built)
 
@@ -81,7 +82,7 @@ run; visual baselines pass deterministically on re-run.
   - [ ] CLS + interaction latency (INP-ish) on scroll; bundle-size guard via the
         build output; trace-on-CI upload for flame review.
 - **M7 — cross-browser**
-  - [ ] Add a webkit/firefox project for the browser-served judging surface
+  - [ ] Add a webkit/firefox project for the browser-served renderer
         (visual baselines per engine).
 
 ## Open questions / risks

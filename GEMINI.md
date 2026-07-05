@@ -1,8 +1,8 @@
 # GEMINI.md
 
-This file provides guidance to the Gemini CLI when working with code in this repository.
+This file is the fast, reliable briefing for the Gemini CLI working in this repository.
 
-Kinora turns a book/PDF into a **page-synced film that generates itself a few seconds ahead of the reader** — six AI agents share one versioned "canon" so a long adaptation stays visually consistent. The primary product is the Electron desktop app over a cloud **FastAPI** backend; the same Vite renderer can also be served as a browser-accessible judging surface from `infra/docker/desktop.Dockerfile`.
+Kinora turns a book/PDF into a **page-synced film that generates itself a few seconds ahead of the reader** — six AI agents share one versioned "canon", keeping even a long adaptation visually consistent from start to finish. The primary product is the Electron desktop app running on a cloud **FastAPI** backend; that same Vite renderer can also be served straight to a normal browser from `infra/docker/desktop.Dockerfile`.
 
 ## ⚠️ Current reality & key decisions (read first)
 
@@ -52,7 +52,7 @@ Apps — pnpm + Turborepo (from the repo root):
 | `mcp` | `python -m app.mcp.run --http` | the canon-memory MCP server |
 | `migrate` | `alembic upgrade head` | one-shot schema apply |
 
-The API still starts ingest immediately after upload; the ingest worker makes that work durable across restarts.
+The API still kicks off ingest immediately after upload; the ingest worker then makes that same work durable across restarts.
 
 ## Architecture
 - **Composition root** `backend/app/composition.py` builds the wired `Container` (every DI seam). Lazy — `create_app()` + `/health` work with `DASHSCOPE_API_KEY=test` and no network.

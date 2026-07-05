@@ -2,8 +2,8 @@
 // `kinora://` deep link to the book (copy to clipboard), exports the canon as
 // markdown, exports annotations as a portable bundle, and exports the whole
 // "director project" (canon + annotations + collections) as one JSON file.
-// Downloads use a Blob + anchor (works in the Electron renderer + the browser
-// judging surface); clipboard uses navigator.clipboard with a textarea fallback.
+// Downloads use a Blob + anchor (works in the Electron renderer + browser);
+// clipboard uses navigator.clipboard with a textarea fallback.
 import { useCallback, useState } from "react";
 import type { Book } from "../../data/books";
 import {

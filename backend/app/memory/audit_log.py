@@ -3,7 +3,7 @@
 Every canon mutation — a bitemporal fact assert/correct/retire, an entity upsert, a branch
 fork/merge — is recorded as one immutable row whose ``entry_hash`` covers the *previous*
 row's hash plus this row's payload. Re-hashing the chain detects any retroactive edit, so
-the log is **tamper-evident**: a judge (or the Continuity Supervisor) can prove the canon's
+the log is **tamper-evident**: the app (or the Continuity Supervisor) can prove the canon's
 history was not silently rewritten.
 
 This mirrors the budget ledger's append-only discipline (§11.1) but adds the hash-chain so

@@ -2,8 +2,8 @@
 
 These pin that the *declarative* metrics-as-code KPIs agree with the
 authoritative pure §13 math in :mod:`app.eval.metrics` over the same data — the
-whole point of the semantic layer is that it computes the same numbers a judge
-would, sliceable by book / role / time.
+whole point of the semantic layer is that it computes the same numbers the
+pure math does, sliceable by book / role / time.
 """
 
 from __future__ import annotations

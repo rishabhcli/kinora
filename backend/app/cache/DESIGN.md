@@ -1,9 +1,9 @@
 # `app.cache` — unified multi-tier caching subsystem (DESIGN / roadmap)
 
-> A **general** application cache for the Kinora backend. Distinct from
+> A **general** application cache for the Kinora backend, built to be reused everywhere. Distinct from
 > `app.memory.cache_service`, which is the shot-hash-specific §8.7 render-dedup
 > cache (DB-backed via `ShotCacheRepo`). This package was **not** allowed to edit
-> that module; it builds a parallel, reusable layer that any subsystem can adopt.
+> that module; instead it builds a parallel, reusable layer that any subsystem can adopt outright.
 
 Reads: `kinora.md` §8.7 (caching & dedup), §12.3 (caching layers), §12.5
 (observability — per-shot cache hit/miss).
@@ -12,9 +12,9 @@ Reads: `kinora.md` §8.7 (caching & dedup), §12.3 (caching layers), §12.5
 
 §12.3 lists five cache "layers" (shot, keyframe, canon-embedding, reference-video,
 request-level dedup). Today only the shot cache exists as a concrete service; the
-others were notional. Rather than hand-roll each one, this package provides the
+others were notional. Rather than hand-roll each one, this package delivers the
 *mechanism* (tiers, TTL, tags, single-flight, negative caching, metrics) so each
-logical cache is just a `CacheManager.get("<namespace>", config=...)` away.
+logical cache is a single `CacheManager.get("<namespace>", config=...)` call away.
 
 ## Architecture (all under `backend/app/cache/`)
 
@@ -61,10 +61,10 @@ logical cache is just a `CacheManager.get("<namespace>", config=...)` away.
   tests drive a `FakeClock`, so expiry is deterministic with no `sleep`.
 - **In-memory-only mode is first-class.** `CacheManager()` with no `redis=` is a
   pure L1 manager that needs no infra — the default for tests and Redis-less envs.
-- **Fail-open by default.** A Redis blip degrades the tiered cache to L1-only (and
-  the facade to a soft miss) rather than taking the request down — the §12.4 "the
-  film never hard-stops" ethos applied to the cache. Toggle via
-  `CacheConfig.fail_open` / `TieredCache(l2_fail_open=...)`.
+- **Fail-open by default.** A Redis blip gracefully degrades the tiered cache to
+  L1-only (and the facade to a soft miss) rather than taking the request down —
+  the §12.4 "the film never hard-stops" ethos, applied straight to the cache.
+  Toggle via `CacheConfig.fail_open` / `TieredCache(l2_fail_open=...)`.
 - **Stampede protection is layered:** in-process `SingleFlight` (always) +
   optional cross-process Redis lock (`lock_factory`) + probabilistic early expiry
   (XFetch) so the population refreshes a hot key gradually instead of all at once.
@@ -81,8 +81,8 @@ logical cache is just a `CacheManager.get("<namespace>", config=...)` away.
 **None.** `app/core/config.py` and `app/composition.py` are untouched. Wiring is
 provided *inside* this package (`integration.py`): a composition root can call
 `build_cache_manager_from_settings(settings, lock_redis=container.redis)` and
-store the result without modifying the `Container` dataclass. This keeps the
-package strictly additive and conflict-free with other agents.
+store the result without modifying the `Container` dataclass. That keeps the
+package strictly additive and cleanly conflict-free with other agents.
 
 ## Test coverage (all green; `make lint` clean across the backend)
 

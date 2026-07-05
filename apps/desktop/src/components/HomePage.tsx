@@ -90,7 +90,8 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
 
   // The discovery catalog: the user's real backend library first (so live books
   // win on id collision), then the demo catalogue shelves. Enriched with
-  // genre/era from the bundled manifest by `mergeCatalog`.
+  // genre/era from the bundled manifest by `mergeCatalog`. Every shelf should
+  // feel like a clear route from "pick a book" to "open the film."
   const catalog: DiscoveryBook[] = useMemo(
     () =>
       mergeCatalog(
@@ -185,6 +186,8 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
 
   // ⌘K command list: nav targets + every catalog book + global actions. Rebuilt
   // when the catalog changes; `run` callbacks route into the existing handlers.
+  // The palette keeps the ambitious parts reachable: one keystroke can move from
+  // a static library to the reading-room loop.
   const commands = useMemo(
     () =>
       buildCommands({

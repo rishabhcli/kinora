@@ -6,24 +6,35 @@ The book stays on screen. As the film plays, a narrator reads the text aloud, th
 
 |  |  |
 |---|---|
-| **Hackathon** | Global AI Hackathon Series with Qwen Cloud |
-| **Primary track** | Track 2 — AI Showrunner (also covers Track 1 · MemoryAgent and Track 3 · Agent Society) |
-| **Deadline** | Jul 9, 2026 · 2:00pm PDT |
 | **Deployment** | Alibaba Cloud — ECS / Function Compute · OSS · DashScope / Model Studio |
-| **Status** | **Built and runnable** — full backend + Electron desktop, a native macOS **Liquid Glass** shell, and a browser-served renderer for judging; real Qwen/Wan/Qwen3-TTS, persistence, queue, budget, and recovery workers. Bring up the stack with `docker compose`; deploy with `infra/terraform`. |
+| **Status** | **Built and runnable** — full backend + Electron desktop, a native macOS **Liquid Glass** shell, and a browser-served renderer; real Qwen/Wan/Qwen3-TTS, persistence, queue, budget, and recovery workers. Bring up the stack with `docker compose`; deploy with `infra/terraform`. |
 
 > **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → `make app-desktop-dev`. See [Run it locally](#run-it-locally).
 
 ---
 
+## Why this is exciting
+
+Kinora is exciting because it turns a hard product problem into a coherent
+system: the book remains readable, the film responds to attention, and the
+backend spends only when a scene is likely to matter. The pieces reinforce one
+another: canon memory keeps the adaptation consistent, the scheduler keeps motion
+ahead of the reader, and the fallback path keeps the experience moving when live
+generation is unavailable.
+
+That is the story worth telling: long-form generated video becomes practical
+when it is guided by memory, budget, and reader intent.
+
+---
+
 ## The two ideas that make it defensible
 
-Most Track-2 projects do the solved party trick: *type a prompt → get a 15-second short.* The unsolved problem is **long-form consistency** — across the dozens of clips a long story needs, faces change, palettes drift, and props teleport. Kinora's bet is that this is fixable with architecture, not a bigger model:
+Most AI-video projects follow the solved demo pattern: *type a prompt → get a 15-second short.* The unsolved problem is **long-form consistency** — across the dozens of clips a long story needs, faces change, palettes drift, and props teleport. Kinora's bet is that this is fixable with architecture, not a bigger model:
 
 - **Consistency is a memory problem, not a model problem.** A persistent, versioned **story canon** — what each character looks like, sounds like, where they are, and what has already happened — conditions every generated clip on the *relevant slice* of that truth. Continuity stops being a dice roll and becomes an emergent property of retrieval.
 - **The film is a function of attention.** A 300-page book is ~25 minutes of video and would be insane to pre-render — most of it would never be watched. So Kinora never renders a film. It renders the **next few seconds**, just ahead of your eyes, spending its scarce video budget only on pages a human is actually arriving at, and **caching every accepted shot** so a re-read costs nothing.
 
-These two reframes are what let a single architecture win Track 2 (the showrunner), satisfy Track 1 (the memory), and require Track 3 (the crew that maintains it).
+These two reframes are what let a single architecture double as the showrunner, the memory system, and the crew that maintains it.
 
 ## Why anyone cares
 
@@ -61,11 +72,11 @@ Six single-purpose agents, each a separate service with a typed JSON contract, a
 | **Generator** | Renders the clip + narration | Hosted Wan (`wan2.1-*` demo defaults; `wan2.5/2.2` quality overrides) + Qwen3-TTS |
 | **Critic / QA** | Scores each clip against the canon; decides pass / fix / regen | Qwen3-VL |
 
-When the Continuity Supervisor catches a contradiction (e.g. *a shot depicts the heroine drawing a sword she lost three beats ago*), it raises a **structured conflict object** and the Showrunner arbitrates under a fixed policy: evolve the canon if the text supports it, surface to the director if user-facing, otherwise honor the established truth. This negotiation is surfaced live in the demo — a thing a judge can *watch happen*.
+When the Continuity Supervisor catches a contradiction (e.g. *a shot depicts the heroine drawing a sword she lost three beats ago*), it raises a **structured conflict object** and the Showrunner arbitrates under a fixed policy: evolve the canon if the text supports it, surface to the director if user-facing, otherwise honor the established truth. This negotiation is surfaced live in the app as an inspectable activity feed.
 
 ### The memory layer (MemoryAgent)
 
-A versioned **canon graph** (characters, voices, locations, props, style, timeline) plus an **episodic vector store** of every shot ever generated and its QA scores, exposed through a small, deliberate MCP tool surface. It delivers exactly what Track 1 asks for:
+A versioned **canon graph** (characters, voices, locations, props, style, timeline) plus an **episodic vector store** of every shot ever generated and its QA scores, exposed through a small, deliberate MCP tool surface. It delivers:
 
 - **Recall under a limited context window** — `canon.query(beat)` returns *only* what a beat needs (characters present + active location + style tokens + the previous shot's endpoint frame), never the whole book. Token cost stays flat as books get longer.
 - **Timely forgetting** — facts are scoped to the beat interval where they were true; retired states drop out of forward retrieval but survive for backward (time-travel) reads.
@@ -151,7 +162,7 @@ Every backend role is the same image with a different command (see `infra/docker
 | `ingest-worker` | `python -m app.ingest.recovery` | Recovers books left `importing` after restarts from the durable `source_pdf_key` |
 | `render-worker` | `python -m app.queue.worker` | Drains the Redis priority queue; runs the per-shot pipeline / the ffmpeg degradation ladder |
 | `mcp` | `python -m app.mcp.run --http` | The canon-memory MCP server (the §8.3 tool surface) |
-| `frontend` | `nginx` over `apps/desktop/dist` | Browser-accessible judging surface for the Vite renderer |
+| `frontend` | `nginx` over `apps/desktop/dist` | Browser-accessible Vite renderer |
 | `migrate` | `alembic -c alembic.ini upgrade head` | One-shot schema apply (runs before the app) |
 | `postgres` / `redis` / `minio` | — | Postgres+pgvector · Redis · S3-compatible object storage |
 
@@ -208,7 +219,7 @@ make app-desktop-dev          # == pnpm --filter @kinora/desktop dev
 #   point at another backend with:  VITE_KINORA_API_URL=https://api.example.com
 #   package signed installers (needs certs):  pnpm --filter @kinora/desktop dist
 
-# Browser-served renderer image for judging:
+# Browser-served renderer image:
 docker build -f infra/docker/desktop.Dockerfile \
   --build-arg VITE_KINORA_API_URL=http://localhost:8000 \
   -t kinora-frontend:local .
@@ -264,7 +275,7 @@ terraform init && terraform validate && terraform plan && terraform apply
 
 The **MCP port (8765) is intra-VPC only** (never internet-facing); the bearer token is defense-in-depth on top. cloud-init writes these into each node's env **without** shell tracing, so secrets never land in `cloud-init-output.log`. Read back the generated secrets with `terraform output -raw jwt_secret` / `-raw mcp_auth_token`. For real prod, prefer KMS / Secrets Manager / OOS over user_data.
 
-The **Electron app** ([`apps/desktop`](./apps/desktop)) is the primary local product. For judging, build the browser renderer image from [`infra/docker/desktop.Dockerfile`](./infra/docker/desktop.Dockerfile) with `VITE_KINORA_API_URL` pointed at the deployed API and push it to `frontend_container_image`.
+The **Electron app** ([`apps/desktop`](./apps/desktop)) is the primary local product. For browser deployment, build the renderer image from [`infra/docker/desktop.Dockerfile`](./infra/docker/desktop.Dockerfile) with `VITE_KINORA_API_URL` pointed at the deployed API and push it to `frontend_container_image`.
 
 The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py), kinora.md §12.6) is a real render worker that demonstrably uses **OSS** + **DashScope** — it reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than duplicating logic. See [`deploy/README.md`](./deploy/README.md) and [`infra/terraform/README.md`](./infra/terraform/README.md).
 
@@ -276,18 +287,6 @@ The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./depl
 | [`infra/`](./infra) · [`deploy/`](./deploy) · [`assets/`](./assets) | Local stack + Alibaba IaC · §12.6 proof artifact · demo book. |
 | [`kinora.md`](./kinora.md) | The full technical design — architecture, agents, pipeline, memory, budget. |
 | [`what-is-kinora.md`](./what-is-kinora.md) | Plain-English explainer. **Start here if you're non-technical.** |
-| [`hackathon_description.md`](./hackathon_description.md) | The hackathon's rules, tracks, and judging criteria. |
-
-## Submission readiness
-
-Tracked against the Devpost requirements (see [`hackathon_description.md`](./hackathon_description.md)):
-
-- [x] **Open-source license** — [`LICENSE`](./LICENSE) (Apache-2.0), visible in the repo's About section
-- [x] **Proof of Alibaba Cloud deployment** — [`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py) uses OSS + DashScope (record it running per [`deploy/README.md`](./deploy/README.md))
-- [x] **Architecture diagram** — see [Architecture](#architecture) and [`kinora.md` §6](./kinora.md#6-system-architecture)
-- [ ] **~3-minute demo video** (public on YouTube / Vimeo / Facebook Video)
-- [x] **Text description** of features + functionality (this README + `kinora.md`)
-- [x] **Track identified** — Track 2, AI Showrunner
 
 ## License
 

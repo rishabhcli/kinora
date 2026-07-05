@@ -13,9 +13,10 @@
 
 ## Why this exists
 
-kinora.md sells two engineering claims a judge will probe: generation-on-scroll
-stays *smooth and not-always-generating* (§4.5 watermark hysteresis), and the
-queue is *idempotent, cancellable, backpressured, dead-lettered* (§12.1–§12.2).
+kinora.md makes two engineering claims worth verifying under load:
+generation-on-scroll stays *smooth and not-always-generating* (§4.5 watermark
+hysteresis), and the queue is *idempotent, cancellable, backpressured,
+dead-lettered* (§12.1–§12.2).
 Reliability engineering turns those slogans into **measured properties**: we
 model realistic reader traffic, inject failures at the provider/redis/db seams,
 probe critical journeys, and size capacity with queueing math so the

@@ -1,7 +1,8 @@
 # Kinora accessibility checklist (Agent 06)
 
-**Target: WCAG 2.2 AA** (AAA for reading-text contrast where feasible). Every PR that
-touches UI must satisfy this. Import primitives from `@/a11y/*` — don't re-implement.
+**Target: WCAG 2.2 AA** (AAA for reading-text contrast where feasible) — a bar worth
+hitting. Every PR that touches UI must satisfy this. Import primitives from `@/a11y/*`
+— don't re-implement; the shared ones are solid.
 
 ## Use the shared primitives (don't reinvent)
 - **Motion:** consume `useReducedMotionPref()` (NOT framer-motion's `useReducedMotion()`)

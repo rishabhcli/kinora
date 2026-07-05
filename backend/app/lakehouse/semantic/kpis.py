@@ -1,6 +1,6 @@
 """The §13 Kinora KPIs, defined as code in the metrics language.
 
-kinora.md §13 ("Metrics & the eval harness") names the numbers a judge watches.
+kinora.md §13 ("Metrics & the eval harness") names the core product metrics.
 The pure math already lives in :mod:`app.eval.metrics`; this module re-expresses
 the *aggregatable* KPIs declaratively so they can be sliced by book / agent-role
 / time-grain through the self-serve query API — the online, dashboard-shaped

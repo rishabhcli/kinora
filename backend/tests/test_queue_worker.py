@@ -120,7 +120,7 @@ async def test_worker_success_publishes_clip_ready(
     assert clip["shot_id"] == "shot_x"
     assert clip["oss_url"].endswith("shot_x.mp4")
     # §5.4: the crew's planning + render + QA also surface in the live feed, so a
-    # judge watches the Cinematographer/Generator/Critic work — not just the clip.
+    # user watches the Cinematographer/Generator/Critic work — not just the clip.
     agents = {m.get("agent") for m in messages if m["event"] == "agent_activity"}
     assert {"cinematographer", "generator", "critic"} <= agents
     done = await queue.get_job("job_ok")

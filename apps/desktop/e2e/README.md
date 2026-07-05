@@ -1,15 +1,17 @@
 # Kinora desktop — E2E, visual-regression, a11y & perf harness
 
-A comprehensive Playwright harness for the desktop renderer (`apps/desktop`).
-It is **hermetic by default**: every spec runs against a deterministic network
-mock, so it needs **only the Vite dev server** — no FastAPI backend, no Docker,
-no Wan credits. `KINORA_LIVE_VIDEO` stays **OFF** throughout.
+A comprehensive Playwright harness for the desktop renderer (`apps/desktop`) —
+and a genuinely pleasant one to run. It is **hermetic by default**: every spec
+runs against a deterministic network mock, so it needs **only the Vite dev
+server** — no FastAPI backend, no Docker, no Wan credits. `KINORA_LIVE_VIDEO`
+stays **OFF** throughout.
 
 > This harness is **additive**. It lives entirely under `apps/desktop/e2e/` and
-> has its own Playwright config (`e2e/playwright.e2e.config.ts`). The pre-existing
-> a11y/walkthrough specs (`e2e/a11y.spec.ts`, `e2e/app-screens.spec.ts`,
-> `e2e/walkthrough.spec.ts`) and their `apps/desktop/playwright.config.ts` are
-> untouched and still run via `npm run test:a11y`.
+> has its own Playwright config (`e2e/playwright.e2e.config.ts`), so it slots in
+> cleanly. The pre-existing a11y/walkthrough specs (`e2e/a11y.spec.ts`,
+> `e2e/app-screens.spec.ts`, `e2e/walkthrough.spec.ts`) and their
+> `apps/desktop/playwright.config.ts` are untouched and still run via
+> `npm run test:a11y`.
 
 ## Quick start
 
@@ -35,7 +37,7 @@ npx playwright test -c e2e/playwright.e2e.config.ts --list
 ```
 
 The config's `webServer` block runs `npm run dev:web` and **reuses** an
-already-running `:5173`, so a dev server you already have up is fine.
+already-running `:5173`, so a dev server you already have up works just fine.
 
 ## What's covered
 
@@ -83,10 +85,10 @@ e2e/
 
 The live in-app navigation into the **library** and **director** surfaces uses
 framer-motion `AnimatePresence` crossfades that are unreliable headless (the
-project's own `app-screens.spec.ts` documents the same for the library). So those
-two surfaces are also driven via standalone mounts of the **real** components —
-exactly like the a11y harness mounts `ReadingControls`/`ReadAloudView`. The
-login → home → reading-room flow runs against the **real app** (`/`).
+project's own `app-screens.spec.ts` documents the same for the library). The neat
+solution: drive those two surfaces via standalone mounts of the **real**
+components — exactly like the a11y harness mounts `ReadingControls`/`ReadAloudView`.
+The login → home → reading-room flow runs against the **real app** (`/`).
 
 ### Determinism
 

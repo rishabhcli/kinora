@@ -4,6 +4,8 @@
 // Every failure path dispatches FALLBACK so the room degrades to the bundled film
 // instead of erroring. Tears down the SSE on unmount/book-change (EventSource
 // auto-reconnects across transient drops on its own).
+// This hook treats the cinematic layer as a reliability problem: use the live
+// path when it is available, and keep the reader moving when it is not.
 import { useEffect, useRef, useState } from "react";
 import { api, toBrowserUrl, type SessionEvent, type ShotResponse } from "../lib/api";
 import type { Book } from "../data/books";

@@ -18,7 +18,7 @@ export default function PreferencesSection() {
 
   useEffect(() => store.subscribe(() => setPrefs(store.get())), [store]);
 
-  // Debounced backend mirror — keep it simple: fire on each change, the adapter
+  // Debounced backend mirror — fires on each change, and the adapter
   // is graceful when offline.
   function persist(next: AccountPreferences) {
     void updatePreferences(next);

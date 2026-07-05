@@ -7,8 +7,8 @@ selection** half of that — a pure, deterministic mapping from a beat's free-te
 tempo, intensity, and instrument colour. The actual mix (looping the bed to length,
 ducking it under speech, mastering) is :mod:`app.render.audio_post`'s job.
 
-Why a *generated* cue rather than a library of mp3s? Two reasons that matter for a
-public submission (§17): a procedurally-described cue is **copyright-clean** (no
+Why a *generated* cue rather than a library of mp3s? Two reasons that matter for
+public release (§17): a procedurally-described cue is **copyright-clean** (no
 third-party recording), and it is **deterministic** — the same mood always scores
 the same way, so a re-render of a scene produces an identical bed (cache-friendly,
 diffable in tests). The cue is rendered to real audio by

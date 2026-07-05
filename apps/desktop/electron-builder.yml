@@ -78,7 +78,7 @@ nsis:
   include: build/installer.nsh
 
 # ---------------------------------------------------------------------------
-# Linux — AppImage for the judging surface; not the primary target.
+# Linux — AppImage packaging; not the primary target.
 # ---------------------------------------------------------------------------
 linux:
   target:

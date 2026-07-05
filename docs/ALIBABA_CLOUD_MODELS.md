@@ -1,6 +1,6 @@
 # Alibaba Cloud / DashScope — Model Catalog Notes (June 2026)
 
-> Kinora's repo defaults use hosted DashScope/Qwen Cloud only. The judge demo
+> Kinora's repo defaults use hosted DashScope/Qwen Cloud only. The fast demo
 > defaults are `wan2.1-t2v-turbo` for text-to-video and `wan2.1-i2v-turbo` for
 > image/reference-to-video, with quality overrides `wan2.5-t2v-preview` and
 > `wan2.2-i2v-plus`. Avoid `wan2.2-t2v-plus`: it submits but fails at render in
@@ -98,8 +98,8 @@ You no longer need a separate VL model. `qwen3.6-plus`, `qwen3.6-flash`, `qwen3.
 
 | Model ID | Task | Key Features | Notes |
 |---|---|---|---|
-| `wan2.1-t2v-turbo` | Text-to-Video | Text prompt → video | Fast judge-demo default |
-| `wan2.1-i2v-turbo` | Image-to-Video | First-frame/reference inputs | Fast judge-demo default for i2v/r2v |
+| `wan2.1-t2v-turbo` | Text-to-Video | Text prompt → video | Fast demo default |
+| `wan2.1-i2v-turbo` | Image-to-Video | First-frame/reference inputs | Fast demo default for i2v/r2v |
 | `wan2.5-t2v-preview` | Text-to-Video | Higher-quality T2V | Quality override |
 | `wan2.2-i2v-plus` | Image-to-Video | Higher-quality I2V | Quality override |
 
@@ -163,12 +163,12 @@ New workspace domain: `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/ap
 
 | Model ID | Region | Voice Cloning | Voice Design | Timestamps | Notes |
 |---|---|---|---|---|---|
-| `cosyvoice-v3-plus` | ✅ Singapore | ✅ | ❌ | ✅ (manual enable) | **Use this for hackathon** |
+| `cosyvoice-v3-plus` | ✅ Singapore | ✅ | ❌ | ✅ (manual enable) | **Use this for narration** |
 | `cosyvoice-v3-flash` | ✅ Singapore | ✅ | ❌ | ✅ (manual enable) | Cheaper, faster |
 | `cosyvoice-v3.5-plus` | ❌ Beijing only | ✅ | ✅ | ❌ | NOT available in Singapore |
 | `cosyvoice-v3.5-flash` | ❌ Beijing only | ✅ | ✅ | ❌ | NOT available in Singapore |
 
-**For the hackathon (Singapore endpoint):** Use `cosyvoice-v3-plus` for narration with voice cloning and word timestamps.
+**For the Singapore endpoint:** Use `cosyvoice-v3-plus` for narration with voice cloning and word timestamps.
 
 **Timestamp feature:** Must be manually enabled. Supported by `cosyvoice-v3-plus` and `cosyvoice-v3-flash`. This is critical for Kinora's karaoke word highlighting.
 
@@ -253,8 +253,8 @@ POST https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings
 | **Adapter** | `qwen3.5-plus` | PDF → screenplay → shot list | 1M context, cheaper than 3.6, still powerful |
 | **Continuity Supervisor** | `qwen3.6-plus` | Canon writes, inconsistency detection | Needs thinking mode for complex reasoning |
 | **Cinematographer** | `qwen3.6-plus` | Shot design (needs vision for reference images) | Vision built-in, 1M context, function calling |
-| **Generator (video)** | `wan2.1-i2v-turbo` | Image-to-video (primary) | Fast judge-demo default |
-| **Generator (fallback video)** | `wan2.1-t2v-turbo` | Text-to-video (establishing shots) | Fast judge-demo default |
+| **Generator (video)** | `wan2.1-i2v-turbo` | Image-to-video (primary) | Fast demo default |
+| **Generator (fallback video)** | `wan2.1-t2v-turbo` | Text-to-video (establishing shots) | Fast demo default |
 | **Generator (quality video)** | `wan2.2-i2v-plus` / `wan2.5-t2v-preview` | Higher-quality hosted Wan render | Use when demo timing allows |
 | **Generator (alt video)** | `happyhorse-1.0-i2v` | Alternative I2V | Different style, fallback |
 | **Generator (narration)** | `cosyvoice-v3-plus` | TTS + voice cloning + word timestamps | **Only TTS with timestamps in Singapore** |
@@ -295,7 +295,6 @@ For Phase A analysis (processing the entire PDF at ingest time), use the Batch A
 
 ## Pricing Notes (Free Tier)
 
-- **$40 Qwen Cloud voucher** for hackathon participants
 - **~1,650 video-seconds** free tier (Wan/HappyHorse)
 - **~70M tokens** free tier (text models)
 - **90 days** validity after activation

@@ -6,6 +6,11 @@
 video synthesis + the Qwen crew), designed to run on **ECS or Function Compute** as a
 queue worker.
 
+This worker is the proof layer: hosted model call in, OSS object out, queue
+semantics around it, and logs that make the flow auditable. When this runs,
+Kinora is carrying the render loop into the same surface it would use in
+production.
+
 It does **not** reimplement the pipeline — it reuses the application's real
 modules so the proof is honest:
 
@@ -87,13 +92,13 @@ event, calling `render_shot_to_oss(spec)` per message (or run `main()` as an FC
 custom-runtime long task). ECS is the default here because it maps 1:1 to the
 local `docker-compose.yml` process model.
 
-## Recording the proof (Devpost §17)
+## Recording the proof (§17)
 
 Run the provider preflight first, then flip `KINORA_LIVE_VIDEO=1`, enqueue one
 shot, and record the worker rendering a real hosted Wan clip through DashScope
 and writing it to OSS. The proof should show the safe model diagnostics, one
 `clip_ready` event, the OSS object URL, and worker logs with the model id plus
-object key — then link this file in the submission (kinora.md §12.6 / §17).
+object key — then keep this recording as deployment proof (kinora.md §12.6 / §17).
 
 ## Deployment orchestration (`orchestrator/`)
 

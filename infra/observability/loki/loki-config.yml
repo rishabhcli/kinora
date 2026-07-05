@@ -1,4 +1,4 @@
-# Loki — single-binary, filesystem-backed config for the local/judging stack.
+# Loki — single-binary, filesystem-backed config for the local app stack.
 # Aggregates container logs shipped by Promtail. Not tuned for scale; for cloud,
 # back it with OSS/S3 + a schema upgrade.
 

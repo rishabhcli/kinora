@@ -1,7 +1,7 @@
 """Bitemporal canon export — the inspectable bible for the 4-D canon (kinora.md §8.1).
 
 The existing :class:`app.memory.canon_vault.CanonVault` renders the uni-temporal entity graph
-to markdown a judge can read. This is its bitemporal counterpart: it renders the **two-axis**
+to readable markdown. This is its bitemporal counterpart: it renders the **two-axis**
 canon — every branch, every fact's transaction-time history (what the system believed and
 when), and the tamper-evident audit trail — so the "as of any past write" and FORK/MERGE
 story is *visible*, not just queryable.

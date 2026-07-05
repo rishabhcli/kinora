@@ -19,7 +19,7 @@ concrete checks / repair routing), **§10** (prompt contracts; the Critic's
 Today Continuity does *single-shot contradiction judgement*: one reasoning-model
 call returns "does this contradict?" and a deterministic builder wraps the answer
 in a §7.2 `ConflictObject`. That is fragile over a 300-page adaptation — the
-model re-judges from scratch each shot, has no temporal model of the canon, and
+model re-evaluates from scratch each shot, has no temporal model of the canon, and
 cannot explain *why*.
 
 The bet: **the canon's continuity is a formal temporal structure, so reason over
@@ -30,7 +30,7 @@ in time but disagree — not a vibe. The model's only job shrinks to extracting
 *what a shot implies*; the engine proves the rest and emits a **proof trace**.
 
 This is the Track-1 ("self-correcting, self-improving memory") + Track-3
-("how agents resolve conflicts") money shot made literal: a judge can *watch* the
+("how agents resolve conflicts") money shot made literal: the user can *watch* the
 derivation, not take it on faith (§14).
 
 ---

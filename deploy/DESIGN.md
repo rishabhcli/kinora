@@ -10,8 +10,8 @@
 ## Why this exists
 
 `deploy/alibaba_render_worker.py` is honest about *running* on Alibaba (OSS +
-DashScope + ECS/FC). But a hard submission requirement (§12.6) and the
-engineering-depth rubric (§14) reward the *unglamorous 30%*: the machinery that
+DashScope + ECS/FC). But the §12.6 deployment-proof discipline and the §14
+engineering-depth goals reward the *unglamorous 30%*: the machinery that
 ships a new version without a stall, a double-spend, or an orphaned render job.
 That machinery is here, and — critically — it is **provable offline**: the whole
 rollout/rollback decision tree runs against in-memory fakes with a virtual clock,

@@ -550,7 +550,7 @@ class RenderWorker:
         }
         await self._redis.publish(channel, payload)
         # §5.4: the feed shows the Generator producing the shot + the Critic's QA,
-        # so a judge watches the crew render + score each clip, not just its arrival.
+        # so the user can watch the crew render + score each clip, not just its arrival.
         # §12.4 ladder is visible here: a real Wan clip vs a cache reuse vs a
         # degraded bridge (Ken-Burns / audio-text) all read distinctly in the feed.
         rung = result.rung or ""

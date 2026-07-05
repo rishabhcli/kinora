@@ -1,18 +1,20 @@
 # Electron main process — design & roadmap
 
 This document is the living roadmap for the Electron **main-process + preload +
-packaging** domain (`apps/desktop/electron/`). It does NOT cover the renderer
-(`apps/desktop/src/**`), which is owned separately.
+packaging** domain (`apps/desktop/electron/`) — a solid, well-tested foundation.
+It does NOT cover the renderer (`apps/desktop/src/**`), which is owned separately.
 
 > **Glass note:** Kinora's Electron window uses native OS *material* —
-> macOS `vibrancy: "under-window"` and Windows 11 `backgroundMaterial: "acrylic"`.
-> This is **not** Liquid Glass. Real Liquid Glass is macOS-26-SDK-only and lives
-> in `apps/desktop-native/`. Nothing here claims otherwise.
+> macOS `vibrancy: "under-window"` and Windows 11 `backgroundMaterial: "acrylic"`
+> — both look great in their own right. This is **not** Liquid Glass, though.
+> Real Liquid Glass is macOS-26-SDK-only and lives in `apps/desktop-native/`.
+> Nothing here claims otherwise.
 
 ## Architecture
 
-The old monolithic `main.ts` is now a thin **orchestrator**. Logic is split into
-two layers so the hard parts are unit-testable without launching Electron:
+The old monolithic `main.ts` is now a thin **orchestrator** — a much cleaner shape.
+Logic is split into two layers so the hard parts are unit-testable without
+launching Electron:
 
 - **`electron/core/`** — pure, Electron-free modules. No `import "electron"` at
   load time, so they run under plain Node (`node:test`).
@@ -94,7 +96,7 @@ Run without launching Electron: `pnpm --filter @kinora/desktop run test:electron
 (also part of `pnpm … run test`). The runner builds `dist-electron/` then
 executes every `electron/__tests__/*.test.mjs` via `node --test`, importing the
 **compiled** modules (the source uses `.js` import specifiers for the CJS build).
-Current: **105 tests across 15 files, all green.**
+Current: **105 tests across 15 files, all green!**
 
 ## Additive shared-file changes
 
@@ -109,9 +111,9 @@ Current: **105 tests across 15 files, all green.**
 
 `electron-updater` is **not** a declared dependency. The auto-update service
 `require`s it lazily; when absent (dev, or a build that didn't bundle it) the
-updater reports `phase: "disabled"` instead of crashing. To enable real updates,
-add `electron-updater` to `dependencies` and run a packaged build that publishes
-to the `electron-builder.yml` `publish` target.
+updater gracefully reports `phase: "disabled"` instead of crashing. To enable
+real updates, add `electron-updater` to `dependencies` and run a packaged build
+that publishes to the `electron-builder.yml` `publish` target.
 
 ## Roadmap (next phases)
 

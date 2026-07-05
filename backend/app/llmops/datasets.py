@@ -1,7 +1,7 @@
 """Golden datasets for the prompt eval harness.
 
 A golden dataset is a list of cases; each case is an *input* (what gets rendered
-into the prompt's user turn) plus optional *expectations* a judge can score
+into the prompt's user turn) plus optional *expectations* the scorer can compare
 against (a reference answer, expected JSON keys, must-include / must-not-include
 phrases). Datasets name the rubric they should be scored with so the harness can
 look it up.

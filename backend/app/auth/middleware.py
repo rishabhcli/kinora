@@ -3,8 +3,8 @@
 Kinora's primary clients are the Electron desktop app and headless callers, both
 of which authenticate with an ``Authorization: Bearer`` token or an ``X-API-Key``
 header — neither is vulnerable to CSRF, because a browser will not attach those
-headers cross-site. The risk surface is **cookie-borne** auth (a browser judging
-surface that stores the session in a cookie); for those requests this middleware
+headers cross-site. The risk surface is **cookie-borne** auth (a browser
+deployment that stores the session in a cookie); for those requests this middleware
 enforces the **double-submit cookie** pattern:
 
 * a non-secret random token is set in a readable cookie (``csrf_cookie_name``),

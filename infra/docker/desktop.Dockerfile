@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
 # Production web renderer image for the Kinora desktop/Vite app. Electron stays
-# the primary desktop product; this image serves the same renderer for judges in
-# a normal browser, pointed at the deployed FastAPI backend.
+# the primary desktop product; this image serves the same renderer in a normal
+# browser, pointed at the deployed FastAPI backend.
 
 # ---------------------------------------------------------------------------- #
 # Stage 1: build the Vite bundle. A BuildKit cache mount keeps the pnpm store

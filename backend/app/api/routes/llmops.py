@@ -8,7 +8,7 @@ in changes nothing by default (mirrors ``optim``/``routing`` opt-in posture).
 
 The eval endpoints run the harness with the platform's **deterministic fake
 responder + judge**, so they never make a live model call or spend credits — the
-numbers are reproducible and free, exactly what a judging surface needs.
+numbers are reproducible and free for diagnostics.
 
 Routes (all under ``/api/llmops``):
 

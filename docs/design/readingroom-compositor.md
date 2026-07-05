@@ -6,8 +6,8 @@ paints / streams / instruments the vertical AI film).
 **North star:** the reading room is one continuous film the reader scrubs by scrolling
 (kinora.md §4.3, §5.2). It must stay buttery at 60fps, never show a black frame, work
 fully on bundled Ken-Burns mp4s with `KINORA_LIVE_VIDEO` OFF, and degrade gracefully
-(§12.4 ladder) under bandwidth / decode / GPU pressure — while a curious judge can watch
-the machinery work (§12.5 observability) without a reader ever thinking about it.
+(§12.4 ladder) under bandwidth / decode / GPU pressure — while observability can show
+the machinery work (§12.5) without a reader ever thinking about it.
 
 This document is a **living roadmap**: each phase lists what is DONE (shipped + tested in
 this worktree) vs. REMAINING.
