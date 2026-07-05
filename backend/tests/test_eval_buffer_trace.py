@@ -9,8 +9,10 @@ critically, **zero video-seconds reserved or spent**.
 from __future__ import annotations
 
 from app.core.config import get_settings
-from app.eval.buffer_trace import simulate_buffer_trace
+from app.db.models.enums import RenderPriority
+from app.eval.buffer_trace import RecordingQueue, simulate_buffer_trace
 from app.eval.metrics import buffer_health
+from app.queue.redis_queue import EnqueueStatus
 from tests.test_scheduler_support import BOOK_ID, FakeShots, build_shots
 
 _SETTINGS = get_settings()  # L=25, H=75, C=45, SPEC=240
@@ -87,6 +89,36 @@ async def test_buffer_trace_fast_reader_still_zero_video() -> None:
     assert result.video_seconds_spent == 0.0
     assert result.video_reservations_s == 0.0
     assert max(s.committed_seconds_ahead for s in result.samples) == _SETTINGS.watermark_high_s
+
+
+async def test_recording_queue_get_job_returns_enqueued_record() -> None:
+    """get_job backs SchedulerService._covered_shot_ids's event-granularity
+    dedup read-back (Task 9) — it must return the real enqueued record, not a
+    bare stub, or a simulation exercising render_granularity="event" would
+    always fall back to single-shot coverage.
+    """
+    queue = RecordingQueue()
+    result = await queue.enqueue(
+        shot_hash="hash-1",
+        priority=RenderPriority.COMMITTED,
+        book_id=BOOK_ID,
+        job_id="job-1",
+        shot_id="shot-1",
+        shot_ids=["shot-1", "shot-2", "shot-3"],
+    )
+    assert result.status == EnqueueStatus.ENQUEUED
+
+    job = await queue.get_job("job-1")
+
+    assert job is not None
+    assert job.id == "job-1"
+    assert job.shot_hash == "hash-1"
+    assert job.shot_ids == ["shot-1", "shot-2", "shot-3"]
+
+
+async def test_recording_queue_get_job_unknown_id_returns_none() -> None:
+    queue = RecordingQueue()
+    assert await queue.get_job("no-such-job") is None
 
 
 async def test_buffer_trace_to_contract_shape() -> None:

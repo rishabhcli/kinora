@@ -32,10 +32,10 @@ from typing import Any
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
-from app.db.models.enums import RenderPriority
+from app.db.models.enums import RenderJobStatus, RenderPriority
 from app.eval.metrics import BufferSample
 from app.memory.budget_service import Reservation
-from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult, EnqueueStatus
+from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult, EnqueueStatus, QueuedJob
 from app.scheduler.model import SchedulerSession
 from app.scheduler.service import SchedulerService, ShotSource
 from app.scheduler.zones import DEFAULT_VELOCITY_WPS, clamp_velocity
@@ -112,6 +112,10 @@ class RecordingQueue:
     def __init__(self) -> None:
         self.enqueues: list[dict[str, Any]] = []
         self._known: dict[str, str] = {}
+        #: job_id -> the job record it would have written to Redis, so
+        #: ``get_job`` (needed for event-granularity dedup read-back, Task 9)
+        #: can answer from the same data instead of a bare stub.
+        self._jobs: dict[str, QueuedJob] = {}
 
     async def enqueue(
         self,
@@ -130,6 +134,7 @@ class RecordingQueue:
         target_duration_s: float = 5.0,
         target_word: int = 0,
         prompt: str | None = None,
+        shot_ids: list[str] | None = None,
         now_ms: int | None = None,
     ) -> EnqueueResult:
         if shot_hash in self._known:
@@ -143,7 +148,36 @@ class RecordingQueue:
                 "target_word": target_word,
             }
         )
+        self._jobs[job_id] = QueuedJob(
+            id=job_id,
+            shot_hash=shot_hash,
+            priority=priority,
+            status=RenderJobStatus.QUEUED,
+            book_id=book_id,
+            session_id=session_id,
+            shot_id=shot_id,
+            beat_id=beat_id,
+            scene_id=scene_id,
+            cancel_token=cancel_token,
+            reservation_id=reservation_id,
+            reserved_video_s=reserved_video_s,
+            target_duration_s=target_duration_s,
+            target_word=target_word,
+            prompt=prompt,
+            shot_ids=shot_ids,
+        )
         return EnqueueResult(status=EnqueueStatus.ENQUEUED, job_id=job_id)
+
+    async def get_job(self, job_id: str) -> QueuedJob | None:
+        """Return the recorded job, mirroring ``RedisRenderQueue.get_job``.
+
+        Backs :meth:`SchedulerService._covered_shot_ids`'s dedup read-back
+        (event-granularity jobs) with the same record ``enqueue`` wrote,
+        rather than an unconditional ``None`` — so a simulation that ever
+        exercises ``render_granularity="event"`` gets real group coverage
+        instead of always falling back to a single shot id.
+        """
+        return self._jobs.get(job_id)
 
     async def cancel_by_token(
         self, token: str, *, lanes: Sequence[RenderPriority] | None = None

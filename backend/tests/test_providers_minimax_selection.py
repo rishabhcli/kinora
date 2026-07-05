@@ -9,7 +9,7 @@ from app.providers.video import VideoProvider
 
 
 def _settings(**overrides: object) -> Settings:
-    return Settings(dashscope_api_key="test", **overrides)  # type: ignore[arg-type]
+    return Settings(_env_file=None, dashscope_api_key="test", **overrides)  # type: ignore[arg-type]
 
 
 def test_minimax_config_defaults() -> None:

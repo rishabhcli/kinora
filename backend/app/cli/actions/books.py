@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from app.cli.errors import conflict, not_found
 from app.cli.formatting import ago, humanize_seconds, isoformat, truncate
 from app.cli.output import Payload, Table, kv_table
-from app.composition import Container
+from app.composition import Container, ingest_active_lock_key
 from app.db.models.book import Book, Page
 from app.db.models.budget import BudgetKind, BudgetLedger
 from app.db.models.defect import Defect
@@ -311,13 +311,33 @@ async def set_book_status(container: Container, book_id: str, status: BookStatus
 
 
 async def reingest_book(
-    container: Container, book_id: str, *, reset_status: bool = True
+    container: Container, book_id: str, *, reset_status: bool = True, force: bool = False
 ) -> ActionResult:
     """Re-run Phase-A ingest for a book from its persisted source PDF.
 
-    Reuses the container's single-flight ingest path (so a concurrent ingest is
-    skipped, never doubled). Requires the book to have a ``source_pdf_key``;
-    optionally flips it back to ``importing`` first so the UI reflects the rerun.
+    Requires the book to have a ``source_pdf_key``; optionally flips it back to
+    ``importing`` first so the UI reflects the rerun.
+
+    This is an explicit, single-book admin override, so — unlike the routine
+    upload-triggered and recovery-worker paths — it force-clears the shared
+    single-flight ingest lock before running. Without this, a lock left behind
+    by a process that crashed mid-ingest (no heartbeat; it only expires after
+    ``INGEST_RECOVERY_LOCK_TTL_MS`` — 30 minutes) would make
+    :meth:`Container.run_ingest` silently no-op, and this action would have
+    reported success for work that never happened (observed live: a container
+    restart mid-ingest orphaned a book's lock, and a naive reingest call here
+    "succeeded" while doing nothing).
+
+    Because there is no heartbeat, an outstanding lock cannot be told apart
+    from a *genuinely still-running* ingest by its TTL alone — only that it
+    hasn't naturally expired yet. So unless ``force=True``, this refuses to
+    clear a lock that is still active (raises a ``conflict``) rather than
+    risk racing a real in-progress ingest into a second, concurrent one on
+    the same book (observed live: this collision was one Redis command away
+    during this very session, caught only by manually checking the lock
+    first). Pass ``force=True`` once you've independently confirmed the
+    original process is dead (e.g. the api container has restarted since the
+    lock was acquired).
     """
     async with container.session_factory() as db:
         repo = BookRepo(db)
@@ -327,13 +347,47 @@ async def reingest_book(
         if not book.source_pdf_key:
             raise conflict(f"book {book_id} has no source_pdf_key; cannot re-ingest")
         pdf_key = book.source_pdf_key
-        if reset_status and book.status is not BookStatus.IMPORTING:
-            await repo.set_status(book_id, BookStatus.IMPORTING)
+        needs_status_reset = reset_status and book.status is not BookStatus.IMPORTING
+
+    lock_key = ingest_active_lock_key(book_id)
+    if force:
+        await container.redis.delete(lock_key)
+    else:
+        remaining_ms = await container.redis.raw.pttl(lock_key)
+        if remaining_ms > 0:
+            raise conflict(
+                f"book {book_id}'s ingest lock is still active "
+                f"({remaining_ms / 1000:.0f}s remaining) — this may be a genuinely "
+                "in-progress ingest, not a stale one (no heartbeat exists to tell them "
+                "apart). Pass force=True only after confirming the original process is "
+                "dead (e.g. the api container has restarted since the lock was acquired)."
+            )
+        # No active lock right now — but do NOT delete here: nothing to clear,
+        # and deleting on a bare "not currently active" reading could stomp a
+        # lock a DIFFERENT process (a fresh upload, the recovery worker)
+        # legitimately just acquired in the gap between this check and the
+        # delete (independent review finding, 2026-07-05). run_ingest's own
+        # atomic SET NX below is the correct arbiter for that race — exactly
+        # like every non-admin ingest path already relies on it.
+
+    if needs_status_reset:
+        async with container.session_factory() as db:
+            await BookRepo(db).set_status(book_id, BookStatus.IMPORTING)
 
     import anyio
 
     pdf_bytes = await anyio.to_thread.run_sync(container.object_store.get_bytes, pdf_key)
-    await container.run_ingest(book_id, pdf_bytes, None)
+    ran = await container.run_ingest(book_id, pdf_bytes, None)
+    if not ran:
+        return ActionResult(
+            ok=False,
+            action="reingest",
+            detail={"book_id": book_id, "source_pdf_key": pdf_key},
+            message=(
+                f"{book_id}: reingest skipped — another process re-acquired the "
+                "ingest lock; retry"
+            ),
+        )
     return ActionResult(
         ok=True,
         action="reingest",

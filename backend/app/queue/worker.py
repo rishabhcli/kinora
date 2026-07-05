@@ -29,7 +29,7 @@ import contextlib
 import signal
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
@@ -44,9 +44,10 @@ from app.queue.redis_queue import (
     conflict_object_key,
     session_channel,
 )
-from app.render.pipeline import RenderResult, UnknownShotError
+from app.render.pipeline import BudgetOps, ClipCritic, RenderResult, UnknownShotError
 
 if TYPE_CHECKING:
+    from app.render.event_director import EventRenderResult
     from app.render.stitch import StitchResult
 
 logger = get_logger("app.queue.worker")
@@ -65,13 +66,12 @@ SessionFactory = Callable[[], AbstractAsyncContextManager[Any]]
 _PERMANENT = (UnknownShotError,)
 
 
-class BudgetReleaser(Protocol):
-    """The slice of :class:`BudgetService` the worker needs to free an earmark."""
-
-    async def release(self, reservation: Reservation, *, note: str | None = None) -> None: ...
-
-
-BudgetFactory = Callable[[Any], BudgetReleaser]
+#: Builds the real ``BudgetService`` bound to a db session (``_default_budget_factory``);
+#: typed against the full ``BudgetOps`` seam (not just the ``release`` slice
+#: ``_release_earmark`` uses) so ``_run_event_job`` can also wire it into
+#: ``LiveEventShotRenderer`` for reserve/commit/gate parity with the
+#: shot-granularity path's own ``build_render_pipeline`` wiring.
+BudgetFactory = Callable[[Any], BudgetOps]
 
 
 class RenderWorker:
@@ -89,6 +89,7 @@ class RenderWorker:
         session_factory: SessionFactory | None = None,
         providers: Any | None = None,
         object_store: Any | None = None,
+        critic: ClipCritic | None = None,
         poll_interval_s: float = 0.25,
         lease_heartbeat_s: float = 30.0,
     ) -> None:
@@ -101,6 +102,10 @@ class RenderWorker:
         self._session_factory = session_factory
         self._providers = providers
         self._object_store = object_store
+        # Injectable for tests / callers that already have a calibrated Critic;
+        # the event-granularity path (_run_event_job) otherwise builds one the
+        # same way build_render_pipeline does for the shot-granularity path.
+        self._critic = critic
         self._poll = poll_interval_s
         # Cadence the worker re-extends a job's lease at while it actively renders;
         # well under the queue lease so a slow render is never reaped (§12.1).
@@ -189,8 +194,12 @@ class RenderWorker:
         )
         # §9.6: once this shot completes its scene, stitch the accepted clips and
         # publish ``scene_stitched`` (absolute-time sync map). Best-effort — a
-        # stitch failure must never undo the ack or fail the render.
-        await self._maybe_stitch_scene(job, result)
+        # stitch failure must never undo the ack or fail the render. Skipped for
+        # an event job (Task 9): its shots already share ONE merged/stitched
+        # clip, so SceneStitcher's one-clip-per-shot concat would splice N
+        # copies of that same event clip back-to-back instead of the scene.
+        if not job.shot_ids:
+            await self._maybe_stitch_scene(job, result)
 
     async def _run_with_lease_heartbeat(self, job: QueuedJob, runner: ShotRunner) -> RenderResult:
         """Run the render while heartbeating its lease so the reaper can't steal it."""
@@ -260,7 +269,7 @@ class RenderWorker:
         except Exception as exc:
             logger.warning("worker.budget_release_failed", job_id=job.id, error=str(exc))
 
-    def _default_budget_factory(self, db: Any) -> BudgetReleaser:
+    def _default_budget_factory(self, db: Any) -> BudgetOps:
         from app.db.repositories.budget import BudgetRepo
         from app.memory.budget_service import BudgetLimits, BudgetService
 
@@ -269,13 +278,18 @@ class RenderWorker:
     # -- default real pipeline runner --------------------------------------- #
 
     async def _default_run_shot(self, job: QueuedJob) -> RenderResult:
-        from app.render.pipeline import build_render_pipeline
-
         if self._session_factory is None:
             raise RuntimeError("worker has no session_factory; cannot build the render pipeline")
         if self._providers is None or self._object_store is None:
             raise RuntimeError("worker missing providers/object_store; use build_worker()")
         async with self._session_factory() as db:
+            if job.shot_ids:
+                # Task 9: render_granularity="event" grouped this job's shots
+                # into ONE merged clip at Scheduler-promotion time.
+                return await self._run_event_job(job, db)
+
+            from app.render.pipeline import build_render_pipeline
+
             pipeline = build_render_pipeline(
                 db,
                 providers=self._providers,
@@ -293,6 +307,163 @@ class RenderWorker:
                 session_id=job.session_id,
                 director_present=job.session_id is not None,
             )
+
+    # -- event-granularity runner (Task 9) ----------------------------------- #
+
+    async def _run_event_job(self, job: QueuedJob, db: Any) -> RenderResult:
+        """Render ``job.shot_ids`` (a Scheduler-batched, same-scene group of
+        already-planned ``shots`` rows) as ONE merged continuous clip.
+
+        Rebuilds the beat cluster behind the batch (``BeatRepo.list_by_scene``,
+        filtered/ordered to just this job's shots — a scene can hold more beats
+        than fit in one ``MAX_EVENT_SHOTS``-capped batch), plans it with the
+        existing ``plan_segment_script``, and renders it via ``EventDirector`` +
+        ``LiveEventShotRenderer`` wired the same way ``build_render_pipeline``
+        wires the shot-granularity path's own Generator/Critic. The merged
+        clip's key and each shot's own ``[clip_start_s, clip_end_s)`` window
+        (Task 8) are then fanned back onto every original shot row so the read
+        path (``_shot_response``) can serve them.
+        """
+        from app.agents.critic import Critic
+        from app.agents.generator import Generator
+        from app.db.repositories.beat import BeatRepo
+        from app.db.repositories.shot import ShotRepo
+        from app.render.event_director import (
+            EventDirector,
+            plan_segment_script,
+            shot_duration_for_beat,
+        )
+        from app.render.live_event_renderer import LiveEventShotRenderer
+        from app.render.segment_packer import pack_segments
+
+        assert job.shot_ids
+        assert self._providers is not None  # _default_run_shot already checked this
+        shots_repo = ShotRepo(db)
+        beats_repo = BeatRepo(db)
+
+        shot_rows = []
+        for shot_id in job.shot_ids:
+            row = await shots_repo.get(shot_id)
+            if row is None:
+                logger.warning("worker.event_shot_missing", job_id=job.id, shot_id=shot_id)
+                continue
+            shot_rows.append(row)
+        if not shot_rows:
+            raise UnknownShotError(f"none of event job {job.id}'s shots exist: {job.shot_ids}")
+
+        scene_beats = await beats_repo.list_by_scene(job.scene_id) if job.scene_id else []
+        beats_by_id = {beat.id: beat for beat in scene_beats}
+        ordered_beats = [
+            beats_by_id[row.beat_id] for row in shot_rows if row.beat_id in beats_by_id
+        ]
+        if not ordered_beats:
+            raise UnknownShotError(
+                f"no beats resolved for event job {job.id} (scene {job.scene_id})"
+            )
+
+        agent_beats = [_to_agent_beat(beat) for beat in ordered_beats]
+        script = plan_segment_script(
+            event_id=job.id, book_id=job.book_id, scene_id=job.scene_id, beats=agent_beats
+        )
+        # Re-derive the SAME (pure, deterministic) packing plan_segment_script
+        # used internally, purely to recover which beats — hence which original
+        # shots — landed in which segment: plan_segment_script's EventScript
+        # only exposes each segment's FIRST beat_id, not pack_segments' full
+        # per-segment beat_ids list.
+        segments = pack_segments(
+            agent_beats, duration_for_beat=shot_duration_for_beat, scene_id=job.scene_id
+        )
+        beat_to_segment = {
+            beat_id: seg.segment_id for seg in segments for beat_id in seg.beat_ids
+        }
+
+        critic = self._critic or Critic(self._providers, settings=self._settings)
+        generator = Generator(self._providers, video_backend=self._providers.video)
+        # Same BudgetService build_render_pipeline wires for the shot-granularity
+        # path — without it, event-granularity renders spend real provider
+        # seconds with zero accounting against the Scheduler's ledger/live-gate
+        # (resilience audit finding).
+        budget = self._budget_factory(db)
+        renderer = LiveEventShotRenderer(
+            generator=generator,
+            critic=critic,
+            scene_id=job.scene_id,
+            book_id=job.book_id,
+            budget=budget,
+        )
+        director = EventDirector(renderer=renderer, store=self._object_store)
+        result = await director.render_event(script)
+
+        await self._persist_event_shots(shots_repo, shot_rows, beat_to_segment, result)
+        return self._to_event_render_result(job, result)
+
+    async def _persist_event_shots(
+        self,
+        shots_repo: Any,
+        shot_rows: list[Any],
+        beat_to_segment: dict[str, str],
+        result: EventRenderResult,
+    ) -> None:
+        """Fan the merged clip's key + each shot's own offset window (Task 8)
+        back onto every original shot row, and settle each row's status off ITS
+        OWN segment's degrade flag (mirrors ``RenderPipeline._accept``/
+        ``_degrade`` transitioning a shot to ``ACCEPTED``/``DEGRADED``) — never
+        left at a pre-render status, or the Scheduler would keep re-offering an
+        already-rendered shot forever.
+
+        A row whose beat never resolved to a packed segment (defensive only —
+        ``ordered_beats`` is built from these same rows, so every row's beat
+        should always land in ``beat_to_segment``) is skipped entirely rather
+        than marked accepted with a shared ``clip_key`` but no offset window,
+        which a client would misread as "this shot IS the whole clip".
+        """
+        offsets = {
+            seg.shot_id: (seg.video_start_s, seg.video_end_s) for seg in result.sync_map.segments
+        }
+        degraded_segments = {r.shot_id for r in result.rendered if r.degraded}
+
+        for row in shot_rows:
+            segment_id = beat_to_segment.get(row.beat_id or "")
+            if segment_id is None:
+                logger.warning(
+                    "worker.event_shot_unresolved_segment", shot_id=row.id, beat_id=row.beat_id
+                )
+                continue
+            fields: dict[str, Any] = {
+                "output": {
+                    "clip_key": result.clip_key,
+                    # Not result.clip_url: that presigned URL's TTL may have
+                    # lapsed by the time a client reads the shot list, and
+                    # _shot_response() already re-presigns from clip_key.
+                    "clip_url": None,
+                    "last_frame_key": result.last_frame_keys.get(segment_id),
+                }
+            }
+            window = offsets.get(segment_id)
+            if window is not None:
+                fields["clip_start_s"], fields["clip_end_s"] = window
+            await shots_repo.update(row.id, **fields)
+            if segment_id in degraded_segments:
+                await shots_repo.set_status(row.id, ShotStatus.DEGRADED)
+            else:
+                await shots_repo.mark_accepted(row.id)
+
+    def _to_event_render_result(self, job: QueuedJob, result: EventRenderResult) -> RenderResult:
+        """Adapt ``EventDirector``'s ONE merged-clip result to this worker's
+        per-job ``RenderResult`` shape (§5.6 ``clip_ready`` / logging) — a
+        summary of the whole batch, not any one original shot (each shot's own
+        outcome is what :meth:`_persist_event_shots` just wrote to its row)."""
+        any_degraded = any(r.degraded for r in result.rendered)
+        return RenderResult(
+            shot_id=job.shot_id or result.event_id,
+            status=ShotStatus.DEGRADED if any_degraded else ShotStatus.ACCEPTED,
+            rung="event_degraded" if any_degraded else "full_video",
+            clip_key=result.clip_key,
+            clip_url=result.clip_url,
+            last_frame_key=next(iter(result.last_frame_keys.values()), None),
+            video_seconds=0.0 if any_degraded else result.duration_s,
+            attempts=1,
+        )
 
     # -- events -------------------------------------------------------------- #
 
@@ -552,6 +723,31 @@ class RenderWorker:
     def _far_future() -> int:
         # Force immediate dead-letter on permanent errors by exhausting backoff.
         return 2**62
+
+
+def _to_agent_beat(beat: Any) -> Any:
+    """ORM ``Beat`` -> ``agents.contracts.Beat``, for ``_run_event_job``'s beat
+    cluster (Task 9). Mirrors ``RenderPipeline._to_agent_beat`` exactly;
+    duplicated locally per this codebase's existing convention for small
+    cross-module conversions rather than reaching into another module's
+    private method (cf. the three copies of ``_mean_vector`` already living in
+    pipeline.py / critic.py / live_event_renderer.py). Local imports keep this
+    module's own import graph cheap when the event path is never exercised.
+    """
+    from app.agents.contracts import Beat as AgentBeat
+    from app.agents.contracts import SourceSpan
+
+    span = beat.source_span or {}
+    return AgentBeat(
+        beat_id=beat.id,
+        scene_id=beat.scene_id,
+        beat_index=beat.beat_index,
+        summary=beat.summary,
+        entities=list(beat.entities or []),
+        described_visuals=beat.described_visuals,
+        mood=beat.mood,
+        source_span=SourceSpan.model_validate(span) if span else SourceSpan(),
+    )
 
 
 def _queue_backoff_from_settings(settings: Settings) -> Any | None:

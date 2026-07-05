@@ -52,23 +52,40 @@ async def _check_video_model(
     *,
     submit_probe: bool,
 ) -> Check:
-    profile = providers.video.profile_for_model(model)
+    """Check one video model/role against whatever backend is actually wired.
+
+    Since Tasks 2/3, ``providers.video`` may be a single non-Wan backend
+    (``MiniMaxVideoProvider``, ``ModelScopeVideoProvider``) or a
+    ``VideoRouter`` wrapping several — none of which have Wan's
+    ``profile_for_model``/``verify_model_available``. Every backend (and the
+    router itself) is guaranteed only the generic ``VideoBackend`` contract
+    (``name`` + ``healthy()``), so that's the fallback when the richer,
+    Wan-specific detail isn't available.
+    """
+    backend = providers.video
+    profile_detail = ""
+    if hasattr(backend, "profile_for_model"):
+        profile = backend.profile_for_model(model)
+        profile_detail = f" protocol={profile.protocol.value}"
     if not submit_probe:
         return Check(
             name,
             True,
-            f"model={profile.model} protocol={profile.protocol.value} submit_probe=skipped",
+            f"backend={backend.name} model={model}{profile_detail} submit_probe=skipped",
         )
     try:
-        ok = await providers.video.verify_model_available(model)
+        if hasattr(backend, "verify_model_available"):
+            ok = await backend.verify_model_available(model)
+        else:
+            ok = await backend.healthy()
     except ProviderError as exc:
         return Check(name, False, f"{type(exc).__name__}: {exc}")
     return Check(
         name,
         ok,
-        f"model={profile.model} protocol={profile.protocol.value}"
+        f"backend={backend.name} model={model}{profile_detail}"
         if ok
-        else f"model unavailable: {model}",
+        else f"backend={backend.name} unavailable: {model}",
     )
 
 
@@ -100,7 +117,7 @@ async def _spend_smoke(settings: Settings, providers: Any) -> list[Check]:
     try:
         images = await providers.image.generate(
             "A tiny gold book icon on a plain dark background",
-            size="512*512",
+            size="1328*1328",  # qwen-image-plus's allowed sizes exclude 512*512
             n=1,
             model=settings.image_model,
         )

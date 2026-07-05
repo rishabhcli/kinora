@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.repositories.beat import BeatRepo
 from app.db.repositories.book import BookRepo
+from app.db.repositories.scene import SceneRepo
 from app.ingest.analyze import AnalyzedEntity, AnalyzedState, PageAnalysis
 from app.ingest.canon_build import STYLE_ENTITY_KEY, build_canon, entity_key_for, normalize_name
 from app.memory.canon_service import CanonService
@@ -89,6 +91,53 @@ async def test_dedup_style_node_and_initial_state(session: AsyncSession) -> None
     assert located and located[0].subject_entity_key == "char_fox"
     # The object resolved to the canon location key (not the raw word).
     assert located[0].object_value == "loc_field"
+
+
+async def test_genesis_canon_visible_at_the_real_first_beat(
+    session: AsyncSession,  # noqa: F811
+) -> None:
+    """Regression: the real first beat of every book gets ``beat_index=0`` (a
+    0-based ordinal — see ``app/ingest/shot_plan.py``'s ``beat_index = 0`` seed
+    and ``app/agents/adapter.py``'s ``index = beat_index_start + offset``), so
+    genesis canon must be valid *as of* beat 0.
+
+    ``CanonService.query()`` sets ``ordinal = beat.beat_index`` and resolves
+    canon with ``Entity.valid_from_beat <= ordinal`` (``app/db/repositories/
+    entity.py``). If genesis entities/states are stamped ``valid_from_beat=1``
+    instead of ``0``, that filter silently excludes every character, location,
+    and style token from the opening beat of every book.
+    """
+    canon = CanonService(session, embedder=FakeEmbedder())
+    book = await BookRepo(session).create(title="The Fox", art_direction="anime watercolor")
+
+    await build_canon(
+        canon, book_id=book.id, analyses=_analyses(), art_direction="anime watercolor"
+    )
+
+    scene = await SceneRepo(session).create(
+        book_id=book.id,
+        scene_index=1,
+        page_start=1,
+        page_end=2,
+        style_entity_key=STYLE_ENTITY_KEY,
+    )
+    # The Adapter's beat_index is 0-based; the real first beat of the book is 0.
+    beat = await BeatRepo(session).create(
+        book_id=book.id,
+        scene_id=scene.id,
+        beat_index=0,
+        summary="the fox stands in the field",
+        entities=["char_fox", "loc_field"],
+    )
+
+    canon_slice = await canon.query(book.id, beat.id)
+
+    assert [c.entity_key for c in canon_slice.characters] == ["char_fox"]
+    assert canon_slice.location is not None
+    assert canon_slice.location.entity_key == "loc_field"
+    assert canon_slice.style is not None
+    assert canon_slice.style.entity_key == STYLE_ENTITY_KEY
+    assert canon_slice.active_states, "the initial 'fox located_in field' state must be active"
 
 
 async def test_known_names_cover_aliases(session: AsyncSession) -> None:  # noqa: F811

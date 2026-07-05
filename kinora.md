@@ -656,7 +656,7 @@ Runs once when a book is added; spends **zero video-seconds.**
 
 1. **Extract.** PDF → page images + text + layout (PyMuPDF). Pages stream to Qwen3-VL.
 2. **Analyse.** Qwen3-VL reads text, layout, **and any illustrations or manga panels**, emitting narrative beats, entities, and described visuals per page.
-3. **Populate the canon.** Characters, locations, props, style tokens, initial continuity states — all versioned from beat 1.
+3. **Populate the canon.** Characters, locations, props, style tokens, initial continuity states — all versioned from beat 0 (the book's real first beat; `beat_index` is 0-based throughout, and canon queries filter on `valid_from_beat <= beat_index`, so genesis canon must be stamped at 0 to be visible from the very first beat — a "beat 1" off-by-one here silently hid all genesis canon from the opening beat of every book; fixed 2026-07-04, commit `a46ca92`).
 4. **Build the shot list + source-span index.** Adapter decomposes beats → shots, each with its source span and duration/cost estimate. This index (§4.2) is what lets scroll position resolve to a shot instantly.
 5. **Lock identity (one-time).** For each principal character, the Cinematographer generates canonical keyframes (image-gen, not video) and the system clones a CosyVoice voice from a short reference. These become the locked references reused by *every* later shot — paid for once, amortised across the whole book.
 6. **Pre-render speculative keyframes lazily** as the reader approaches (this part is continuous, but it is image-gen on the cheap lane — still no video-seconds).

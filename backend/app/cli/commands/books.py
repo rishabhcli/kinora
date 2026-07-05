@@ -25,7 +25,9 @@ async def _set_status(ctx: CliContext, args: argparse.Namespace) -> Renderable:
 
 
 async def _reingest(ctx: CliContext, args: argparse.Namespace) -> Renderable:
-    return await actions.reingest_book(ctx.container, args.book_id, reset_status=not args.no_reset)
+    return await actions.reingest_book(
+        ctx.container, args.book_id, reset_status=not args.no_reset, force=args.force
+    )
 
 
 async def _delete(ctx: CliContext, args: argparse.Namespace) -> Renderable:
@@ -67,6 +69,15 @@ def add_parser(subparsers: argparse._SubParsersAction) -> None:
     p_reingest.add_argument("book_id")
     p_reingest.add_argument(
         "--no-reset", action="store_true", help="do not flip status back to importing first"
+    )
+    p_reingest.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "force-clear an active ingest lock (no heartbeat exists to tell a stale lock "
+            "apart from a genuinely in-progress ingest — only pass this once you've "
+            "confirmed the original process is dead, e.g. the api container restarted)"
+        ),
     )
     p_reingest.set_defaults(func=_reingest)
 

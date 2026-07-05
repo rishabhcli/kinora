@@ -7,13 +7,14 @@ From the per-page VL analyses this:
   merging the appearance descriptions and union-ing aliases — so the same
   character named on three pages becomes ONE versioned canon node;
 * writes every entity to the versioned canon via
-  :meth:`app.memory.canon_service.CanonService.upsert_entity`, **from beat 1**
-  (characters, locations, props);
+  :meth:`app.memory.canon_service.CanonService.upsert_entity`, **from beat 0**
+  (characters, locations, props) — ``beat_index`` is 0-based
+  (:mod:`app.ingest.shot_plan`), so beat 0 is the book's real first beat;
 * creates a **Style** node carrying the book's art-direction / palette / lens
   tokens (default from ``book.art_direction``), which every scene is conditioned
   on so the look is a retrieved constant (§8.1);
 * asserts the **initial continuity states** the text establishes (possessions,
-  locations) via :meth:`CanonService.assert_state`, valid from beat 1 (§8.5).
+  locations) via :meth:`CanonService.assert_state`, valid from beat 0 (§8.5).
 
 It returns a :class:`CanonBuildResult` whose alias index + known-name set are the
 seam the Adapter step (:mod:`app.ingest.shot_plan`) uses to resolve a beat's
@@ -232,7 +233,7 @@ async def build_canon(
             entity_key=agg.entity_key,
             entity_type=EntityType(agg.kind),
             name=agg.name,
-            valid_from_beat=1,
+            valid_from_beat=0,
             aliases=sorted(agg.aliases) or None,
             description=agg.description or None,
             appearance={"description": agg.description, "locked": False},
@@ -257,12 +258,12 @@ async def build_canon(
         entity_key=STYLE_ENTITY_KEY,
         entity_type=EntityType.STYLE,
         name="Storybook style",
-        valid_from_beat=1,
+        valid_from_beat=0,
         description=art,
         style_tokens={"art_direction": art, "palette": DEFAULT_PALETTE, "lens": DEFAULT_LENS},
     )
 
-    # Initial continuity states (versioned from beat 1, §8.5).
+    # Initial continuity states (versioned from beat 0, §8.5).
     states = _dedup_states(analyses, alias_index)
     for subject_key, predicate, object_value, page in states:
         await canon.assert_state(
@@ -270,7 +271,7 @@ async def build_canon(
             subject_entity_key=subject_key,
             predicate=predicate,
             object_value=object_value,
-            valid_from_beat=1,
+            valid_from_beat=0,
             source_span={"page": page},
         )
 

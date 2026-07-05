@@ -163,14 +163,14 @@ def _canon_slice(*, beat_id: str, beat_index: int) -> CanonSlice:
         description="a steady girl carrying a lantern",
         voice={"cosyvoice_voice_id": CHAR_VOICE},
         reference_images=[RefImage(key=REF_KEY, url=None, pose="front", locked=True)],
-        valid_from_beat=1,
+        valid_from_beat=0,
     )
     state = StateSlice(
         state_id=STATE_ID,
         subject_entity_key=CHAR_KEY,
         predicate="carries",
         object_value="lantern",
-        valid_from_beat=1,
+        valid_from_beat=0,
         valid_to_beat=None,
     )
     style = CanonEntitySlice(
@@ -180,7 +180,7 @@ def _canon_slice(*, beat_id: str, beat_index: int) -> CanonSlice:
         version=1,
         style_tokens={"palette": "cool", "lens": "wide"},
         reference_images=[RefImage(key=STYLE_REF_KEY, url=None, pose="key", locked=True)],
-        valid_from_beat=1,
+        valid_from_beat=0,
     )
     return CanonSlice(
         book_id=BOOK_ID,

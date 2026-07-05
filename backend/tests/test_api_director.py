@@ -306,6 +306,68 @@ async def test_conflict_choice_evolve_writes_canon_and_regenerates(
     assert any(s.predicate == "canon_evolved" for s in states), states
 
 
+async def test_conflict_choice_evolve_does_not_reassert_the_contradicted_states_old_value(
+    api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
+) -> None:
+    """Regression (independent review, 2026-07-05 — the same bug found and
+    fixed in ConflictResolver._evolve_canon, duplicated here in the
+    director-facing evolve path): when contradicting_state_id DOES match a
+    real, currently-active canon fact, the write must NOT reuse that fact's
+    own (subject, predicate, object_value) — that's the OLD value being
+    contradicted, not the new one the director is establishing."""
+    book_id = await seed_owned_book(api_client, container, auth_headers)
+    session_id = await _create_session(api_client, auth_headers, book_id)
+    await _seed_shot(container, book_id, "shot_78", [])
+
+    async with container.session_factory() as session:
+        canon = CanonService(
+            session, embedder=container._embedder(), blob_store=container.object_store
+        )
+        old_state_id = await canon.assert_state(
+            book_id=book_id,
+            subject_entity_key="char_hero",
+            predicate="located_in",
+            object_value="loc_forest",
+            valid_from_beat=0,
+        )
+
+    await container.redis.set_json(
+        conflict_object_key(session_id, "cf_shot_78"),
+        {
+            "conflict_id": "cf_shot_78",
+            "shot_id": "shot_78",
+            "claim": "the hero now stands in the castle courtyard",
+            "canon_fact": "char_hero located_in loc_forest",
+            "current_beat": None,
+            "contradicting_state_id": old_state_id,
+            "options": [],
+        },
+    )
+    async with container.redis.subscribe(session_channel(session_id)) as pubsub:
+        resp = await api_client.post(
+            f"/api/sessions/{session_id}/conflict_choice",
+            headers=auth_headers,
+            json={"conflict_id": "cf_shot_78", "option": "evolve_canon"},
+        )
+        assert resp.status_code == 200, resp.text
+        await _collect(container, pubsub, until="regen_done")
+    await _drain_bg(container)
+
+    async with container.session_factory() as session:
+        canon = CanonService(
+            session, embedder=container._embedder(), blob_store=container.object_store
+        )
+        states = await canon.active_states_at_beat(book_id, 0)
+    evolved = [s for s in states if s.predicate == "canon_evolved"]
+    assert len(evolved) == 1, states
+    # Never the old, contradicted fact's own fields.
+    assert (evolved[0].subject_entity_key, evolved[0].object_value) != (
+        "char_hero",
+        "loc_forest",
+    )
+    assert evolved[0].object_value == "the hero now stands in the castle courtyard"
+
+
 async def test_conflict_choice_is_idempotent(
     api_client: AsyncClient, container: Container, auth_headers: dict[str, str]
 ) -> None:

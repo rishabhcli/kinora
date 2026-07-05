@@ -25,13 +25,26 @@ PASSWORD = os.environ.get("KINORA_DEMO_PASSWORD", "demo-password-123")
 # (gutenberg_id, title, author, art_direction) — shortest complete works first
 # so at least the early ones finish quickly even if the image quota throttles.
 BOOKS = [
-    (1952, "The Yellow Wallpaper", "Charlotte Perkins Gilman",
-     "painterly gothic, muted candlelight"),
-    (5200, "The Metamorphosis", "Franz Kafka", "surreal muted, uneasy shadows"),
-    (43, "The Strange Case of Dr Jekyll and Mr Hyde", "Robert Louis Stevenson",
-     "victorian noir, gaslit fog"),
-    (46, "A Christmas Carol", "Charles Dickens", "warm victorian, snow and hearthlight"),
-    (11, "Alice's Adventures in Wonderland", "Lewis Carroll", "whimsical storybook, dreamlike"),
+    (11, "Alice's Adventures in Wonderland", "Lewis Carroll",
+     "whimsical storybook, dreamlike"),
+    (1342, "Pride and Prejudice", "Jane Austen",
+     "warm regency drawing-room, soft daylight"),
+    (2701, "Moby Dick; Or, The Whale", "Herman Melville",
+     "nautical, stormy grays and whale-bone white"),
+    (84, "Frankenstein; or, the modern prometheus", "Mary Wollstonecraft Shelley",
+     "gothic, moody candlelight and alpine ice"),
+    (2554, "Crime and Punishment", "Fyodor Dostoyevsky",
+     "grim St. Petersburg, desaturated ochre"),
+    (1184, "The Count of Monte Cristo", "Alexandre Dumas",
+     "lavish period adventure, gold and shadow"),
+    (345, "Dracula", "Bram Stoker",
+     "victorian gothic horror, candlelit fog"),
+    (2852, "The Hound of the Baskervilles", "Arthur Conan Doyle",
+     "atmospheric moorland mystery, cold mist"),
+    (55, "The Wonderful Wizard of Oz", "L. Frank Baum",
+     "vivid storybook fantasy, color-coded regions"),
+    (120, "Treasure Island", "Robert Louis Stevenson",
+     "swashbuckling adventure, sun-bleached sails"),
 ]
 DEST = Path(__file__).resolve().parents[2] / "assets" / "books" / "public-domain"
 

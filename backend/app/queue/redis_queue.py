@@ -269,6 +269,12 @@ class QueuedJob:
     cancelled: bool = False
     provider_task_id: str | None = None
     error: str | None = None
+    #: The full group of original ``shots`` rows this job renders as ONE merged
+    #: clip (Task 9, ``render_granularity="event"``); ``None`` for an ordinary
+    #: shot-granularity job (today's unchanged default). ``shot_id`` above still
+    #: carries the group's first shot id for backward-compatible dedup-key/
+    #: logging purposes.
+    shot_ids: list[str] | None = None
 
     @classmethod
     def from_hash(cls, data: dict[str, Any]) -> QueuedJob:
@@ -298,6 +304,7 @@ class QueuedJob:
             cancelled=data.get("cancelled", "0") == "1",
             provider_task_id=_opt("provider_task_id"),
             error=_opt("error"),
+            shot_ids=json.loads(data["shot_ids"]) if data.get("shot_ids") else None,
         )
 
 
@@ -429,6 +436,7 @@ class RedisRenderQueue:
         target_duration_s: float = 5.0,
         target_word: int = 0,
         prompt: str | None = None,
+        shot_ids: list[str] | None = None,
         now_ms: int | None = None,
     ) -> EnqueueResult:
         """Atomically admit a job (or return the existing one / drop it).
@@ -459,6 +467,7 @@ class RedisRenderQueue:
         _put_optional(fields, "cancel_token", cancel_token)
         _put_optional(fields, "reservation_id", reservation_id)
         _put_optional(fields, "prompt", prompt)
+        _put_optional(fields, "shot_ids", json.dumps(shot_ids) if shot_ids else None)
 
         keys = [
             self._shot_key(shot_hash),

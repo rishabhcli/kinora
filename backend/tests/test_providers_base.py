@@ -190,6 +190,53 @@ async def test_circuit_opens_after_repeated_failures() -> None:
     await client.aclose()
 
 
+async def test_circuit_breaker_isolated_per_capability() -> None:
+    """Regression (kinora QA-campaign finding, 2026-07-05): ProviderClient
+    used to share ONE circuit breaker across every op — a sustained failure
+    burst on one capability (observed live: qwen-vl-max's free-tier
+    exhaustion) tripped it and then rejected every OTHER capability's calls
+    too via CircuitOpenError, even though they were healthy (observed live:
+    a keyframe job calling qwen-image-plus on the same client dead-lettered
+    with "circuit breaker open", not the account error that actually caused
+    it). Each capability must have its own breaker so one's outage cannot
+    reject another's healthy calls."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/vl" in str(request.url):
+            return httpx.Response(500, json={"message": "vl is down"})
+        return httpx.Response(200, json={"ok": True})
+
+    client = make_client(handler)  # threshold=3, max_attempts=3 -> one call trips "vl"
+    with pytest.raises(TransientProviderError):
+        await client.request_json("GET", "https://x.test/vl", op="vl", model="m")
+    # "vl"'s breaker is open: a further "vl" call is rejected without attempting.
+    with pytest.raises(CircuitOpenError):
+        await client.request_json("GET", "https://x.test/vl", op="vl", model="m")
+    # A DIFFERENT capability on the SAME client must still be attempted, not
+    # rejected by vl's open breaker.
+    body = await client.request_json("GET", "https://x.test/image", op="image", model="m")
+    assert body == {"ok": True}
+    await client.aclose()
+
+
+async def test_circuit_breaker_shared_within_one_multi_step_capability() -> None:
+    """image/image_edit (and, analogously, every video_* op and tts/tts_clone/
+    asr) are different steps of the SAME backend call, not independent
+    capabilities — a submit failure and a poll failure share one backend's
+    fate, so they must share one breaker rather than each getting its own
+    (which would let a truly broken backend keep being retried indefinitely
+    under a different op label)."""
+    counter = _Counter([httpx.Response(500, json={"message": "down"})])
+    client = make_client(counter)  # threshold=3, max_attempts=3 -> one call trips it
+    with pytest.raises(TransientProviderError):
+        await client.request_json("GET", "https://x.test/v", op="image", model="m")
+    calls_before = counter.calls
+    with pytest.raises(CircuitOpenError):
+        await client.request_json("GET", "https://x.test/v", op="image_edit", model="m")
+    assert counter.calls == calls_before  # rejected without attempting -> shared breaker
+    await client.aclose()
+
+
 # --------------------------------------------------------------------------- #
 # Cost accounting
 # --------------------------------------------------------------------------- #

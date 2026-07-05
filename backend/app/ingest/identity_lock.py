@@ -235,7 +235,7 @@ async def lock_identities(
             entity_key=entity.entity_key,
             entity_type=EntityType.CHARACTER,
             name=entity.name,
-            valid_from_beat=1,
+            valid_from_beat=0,
             aliases=entity.aliases or None,
             description=entity.description or None,
             appearance={
@@ -255,7 +255,7 @@ async def lock_identities(
         entity_key=NARRATOR_ENTITY_KEY,
         entity_type=EntityType.CHARACTER,
         name="Narrator",
-        valid_from_beat=1,
+        valid_from_beat=0,
         voice=_voice_record(NARRATOR_VOICE.voice_id, role="narrator"),
     )
     voices[NARRATOR_ENTITY_KEY] = NARRATOR_VOICE.voice_id

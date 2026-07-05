@@ -93,6 +93,53 @@ async def test_watermark_sawtooth_hysteresis() -> None:
         RenderPriority.COMMITTED))
 
 
+async def test_watermark_sawtooth_hysteresis_event_mode_does_not_overshoot_h() -> None:
+    """Regression (independent Scheduler audit, 2026-07-05): under
+    render_granularity="event" (the current deployed pilot config), a ready
+    shot's seconds only land in committed_seconds_ahead once its batch is
+    FLUSHED (_flush_event_batch) — folding a shot into the pending batch does
+    not update it. The burst loop's own guard used to read only
+    committed_seconds_ahead, a stale value while a batch is accumulating, and
+    kept pulling more shots in well past H — over-filling by up to one whole
+    batch's worth of video-seconds (observed live with these exact watermark
+    settings: 95.0s reserved against H=75.0s, a 27% overshoot) before the
+    unconditional post-loop flush committed them. Same shots/watermarks as
+    test_watermark_sawtooth_hysteresis (shot mode); this is the event-mode
+    twin that must fill to the same H, not past it."""
+    from app.core.config import Settings
+
+    event_settings = Settings(
+        dashscope_api_key="test",
+        watermark_low_s=_L,
+        watermark_high_s=_H,
+        commit_horizon_s=_C,
+        spec_horizon_s=_SPEC,
+        render_granularity="event",
+    )
+    from tests.test_scheduler_support import FakeShots
+
+    # All default to scene_001 (build_shots), so they batch freely and can
+    # actually reach MAX_EVENT_SHOTS before a scene-boundary flush.
+    shots = build_shots(80, spacing=10, duration_s=5.0)
+    queue = FakeQueue()
+    budget = FakeBudget()
+    keyframes = FakeKeyframes()
+    svc = SchedulerService(
+        queue=queue,
+        budget=budget,
+        shots=FakeShots(shots),
+        keyframes=keyframes,
+        settings=event_settings,
+    )
+    session = _session(focus_word=0, velocity_wps=4.0, raw_velocity_wps=4.0)
+
+    first = await svc.on_event(session, allow_promotion=True)
+
+    assert first.committed_seconds_ahead == _H  # filled exactly to H, never past it
+    assert session.committed_seconds_ahead == _H
+    assert session.bursting is False  # burst-off latched at H
+
+
 async def test_idle_band_does_not_generate() -> None:
     svc, queue, _, _ = _service(build_shots(80, spacing=10, duration_s=5.0))
     session = _session(focus_word=0, velocity_wps=4.0, raw_velocity_wps=4.0)

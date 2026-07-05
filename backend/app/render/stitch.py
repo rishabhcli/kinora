@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +72,27 @@ class StitchResult(BaseModel):
     sync_map: SceneSyncMap
     duration_s: float
     shot_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ConcatResult:
+    """``concat_clips``'s stitched mp4 + the REAL per-clip durations it used.
+
+    A caller must feed ``durations``/``crossfade_s`` — never its own
+    pre-normalization estimates — into :func:`merge_sync_segments`. Re-encoding
+    a clip to the common geometry/fps/audio layout (:func:`_normalize_segment`)
+    can shift its real duration slightly from whatever the caller measured
+    beforehand (fps conversion, the silent-audio ``-shortest`` pad, etc.); if
+    the sync map is built from a different duration source than the video
+    actually used, the drift is small per shot but cumulative across a
+    multi-shot scene/event, and it also skews the per-shot
+    ``clip_start_s``/``clip_end_s`` seek windows derived from the sync map
+    (kinora QA-campaign finding, 2026-07-05).
+    """
+
+    clip_bytes: bytes
+    durations: list[float]
+    crossfade_s: float
 
 
 # --------------------------------------------------------------------------- #
@@ -359,7 +381,8 @@ def concat_clips(
     fps: int = DEFAULT_FPS,
     crossfade_s: float = 0.0,
     color_match: bool = False,
-) -> bytes:
+    expected_durations: Sequence[float] | None = None,
+) -> ConcatResult:
     """Concatenate clips into one mp4, normalising then re-encoding (§9.6).
 
     Args:
@@ -378,6 +401,14 @@ def concat_clips(
             per-clip normalisation, so a degraded rung and a full Wan clip read as
             one continuous look across the cut (§9.6 shot-to-shot match). Off by
             default — it adds a probe pass, so the render pipeline opts in.
+        expected_durations: the caller's own pre-normalization duration estimate
+            per clip (e.g. a shot's reported/planned duration) — used ONLY to
+            fill in :attr:`ConcatResult.durations` for a clip whose real
+            post-normalization duration can't be probed (no ffprobe binary, a
+            malformed clip). Never used to decide or place the actual xfade: that
+            always uses the real probe (or falls back to a hard concat when it
+            fails), so a bad estimate here can never mis-place a dissolve in the
+            real video — see :class:`ConcatResult`.
 
     Raises:
         ValueError: when ``clips`` is empty.
@@ -391,15 +422,27 @@ def concat_clips(
         _normalize_segment(clip, size=out_size, fps=fps, grade=grade)
         for clip, grade in zip(clips, grades, strict=True)
     ]
+    probed = [_safe_duration(c) for c in normalized]
+    fallback = list(expected_durations) if expected_durations is not None else []
+    # The REAL probed duration whenever available; the caller's own estimate
+    # only papers over a probe failure (0) so a hiccup doesn't zero out a
+    # shot's window in the returned durations — never fed into the actual
+    # xfade math below (see the docstring / ConcatResult).
+    reported = [
+        p if p > 0 else (fallback[i] if i < len(fallback) else 0.0) for i, p in enumerate(probed)
+    ]
     if len(normalized) == 1:
-        return normalized[0]
+        return ConcatResult(clip_bytes=normalized[0], durations=reported, crossfade_s=0.0)
 
-    durs = [_safe_duration(c) for c in normalized]
-    crossfade = effective_crossfade(durs, crossfade_s)
-    # Only dissolve when every clip's duration probed cleanly; a 0 (probe failure)
-    # would mis-place the xfade offsets, so fall back to the robust hard concat.
-    if crossfade > 0 and all(d > 0 for d in durs):
-        return _xfade_concat(normalized, durs, size=out_size, fps=fps, crossfade_s=crossfade)
+    crossfade = effective_crossfade(probed, crossfade_s)
+    # Only dissolve when every clip's REAL duration probed cleanly; a 0 (probe
+    # failure) would mis-place the xfade offsets in the actual video, so fall
+    # back to the robust hard concat rather than guess with expected_durations.
+    if crossfade > 0 and all(d > 0 for d in probed):
+        clip_bytes = _xfade_concat(
+            normalized, probed, size=out_size, fps=fps, crossfade_s=crossfade
+        )
+        return ConcatResult(clip_bytes=clip_bytes, durations=reported, crossfade_s=crossfade)
 
     ffmpeg = get_ffmpeg_exe()
     with tempfile.TemporaryDirectory(prefix="kinora_concat_") as tmp:
@@ -446,7 +489,7 @@ def concat_clips(
         bytes=len(scene),
         size=f"{out_size[0]}x{out_size[1]}",
     )
-    return scene
+    return ConcatResult(clip_bytes=scene, durations=reported, crossfade_s=0.0)
 
 
 # --------------------------------------------------------------------------- #
@@ -505,23 +548,27 @@ class SceneStitcher:
         if not clips:
             raise ValueError(f"scene {scene_id} has no accepted shots with clips to stitch")
 
-        scene_clip = await anyio.to_thread.run_sync(
+        result = await anyio.to_thread.run_sync(
             lambda: concat_clips(
                 clips,
                 fps=self._fps,
                 crossfade_s=self._crossfade_s,
                 color_match=self._color_match,
+                expected_durations=durations,
             )
         )
-        # The merged sync timeline must account for any crossfade overlap so the
-        # karaoke/page-turn timecodes match the xfade'd clip the client plays.
-        overlap = effective_crossfade(durations, self._crossfade_s) if self._crossfade_s else 0.0
+        # Built from concat_clips' OWN real (post-normalization) durations and
+        # crossfade — not the pre-normalization `durations` collected above —
+        # so the sync map's per-shot boundaries (and the clip_start_s/clip_end_s
+        # seek windows derived from them) match what the video actually contains.
         sync_map = merge_sync_segments(
-            segments, scene_id=scene_id, durations=durations, overlap_s=overlap
+            segments, scene_id=scene_id, durations=result.durations, overlap_s=result.crossfade_s
         )
 
         clip_key = keys.clip(scene.book_id, scene_id)
-        await anyio.to_thread.run_sync(self._store.put_bytes, clip_key, scene_clip, "video/mp4")
+        await anyio.to_thread.run_sync(
+            self._store.put_bytes, clip_key, result.clip_bytes, "video/mp4"
+        )
         clip_url = await anyio.to_thread.run_sync(
             lambda: self._store.presigned_get_url(clip_key, ttl=self._ttl)
         )
@@ -576,6 +623,7 @@ class SceneStitcher:
 
 
 __all__ = [
+    "ConcatResult",
     "SceneStitcher",
     "SceneSyncMap",
     "StitchResult",

@@ -579,32 +579,27 @@ async def _apply_conflict_choice(
 async def _evolve_canon_for_choice(
     container: Container, *, book_id: str, conflict: dict[str, Any]
 ) -> str:
-    """Write the §8.5 canon evolution for an ``evolve_canon`` pick: re-assert the
-    contradicting fact from the current beat when identifiable, else record a typed
-    ``canon_evolved`` fact carrying the claim — either way a real versioned write."""
+    """Write the §8.5 canon evolution for a director's ``evolve_canon`` pick.
+
+    Always records a typed ``canon_evolved`` fact carrying the claim — never a
+    precise ``(subject, predicate, object)`` re-assertion of the *contradicting*
+    fact. This mirrors :class:`~app.render.conflict.ConflictResolver._evolve_canon`
+    (same duplicated bug, found and fixed there first, 2026-07-05):
+    ``contradicting_state_id`` only ever resolves against
+    ``active_states_at_beat`` — a retired fact structurally cannot appear there
+    (§8.4) — so it only ever resolves for a currently-ACTIVE fact, and
+    re-asserting THAT fact's own value would write the OLD, just-contradicted
+    value forward, not the new one the director is actually establishing.
+    """
     claim = str(conflict.get("claim") or "the story changed")
     current_beat = conflict.get("current_beat")
-    contradicting = conflict.get("contradicting_state_id")
     async with container.session_factory() as session:
         canon = CanonService(
             session, embedder=container._embedder(), blob_store=container.object_store
         )
         beat = await BeatRepo(session).get(str(current_beat)) if current_beat else None
         at = beat.beat_index if beat is not None else 0
-        cited = None
-        if contradicting:
-            states = await canon.active_states_at_beat(book_id, at)
-            cited = next((s for s in states if s.state_id == contradicting), None)
         source_span = {"note": claim[:200]}
-        if cited is not None:
-            return await canon.assert_state(
-                book_id=book_id,
-                subject_entity_key=cited.subject_entity_key,
-                predicate=cited.predicate,
-                object_value=cited.object_value,
-                valid_from_beat=at,
-                source_span=source_span,
-            )
         return await canon.assert_state(
             book_id=book_id,
             subject_entity_key="story",

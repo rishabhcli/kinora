@@ -7,11 +7,12 @@ from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from app.agents.base import BaseAgent
 from app.agents.prompts import VersionedPrompt
 from app.providers import ChatResult, Providers, ToolCall
+from app.providers.errors import ProviderError, ResponseParseError
 from tests.test_agents_support import FakeSkills, JsonSequencer, make_providers
 
 PROMPT = VersionedPrompt(version="test@v1", system="be a test agent")
@@ -53,11 +54,22 @@ async def test_run_json_repairs_once_then_succeeds(providers: Providers) -> None
     assert seq.calls == 2  # original + exactly one repair round-trip
 
 
-async def test_run_json_propagates_second_validation_failure(providers: Providers) -> None:  # noqa: F811
+async def test_run_json_wraps_second_validation_failure_as_provider_error(
+    providers: Providers,  # noqa: F811
+) -> None:
+    """Regression (resilience audit Finding 2 — same shape found in
+    run_json_vl, fixed here too): a bare ValidationError from the repair
+    round-trip isn't a ProviderError, so it skips every caller's
+    `except (LiveVideoDisabled, ProviderError)` guard and hard-crashes
+    instead of degrading. It must be classified as ResponseParseError
+    (this codebase's existing "provider responded, wrong shape" type) —
+    a ProviderError subclass, non-retryable."""
     seq = JsonSequencer({"y": 1}, {"z": 2})  # both invalid
     providers.chat.chat_json = seq  # type: ignore[method-assign]
-    with pytest.raises(ValidationError):  # the failed repair propagates
+    with pytest.raises(ResponseParseError) as excinfo:
         await _agent(providers).run_json({}, Out)
+    assert isinstance(excinfo.value, ProviderError)
+    assert excinfo.value.retryable is False
     assert seq.calls == 2
 
 
@@ -83,6 +95,32 @@ async def test_run_json_vl_validates_multimodal_reply(providers: Providers) -> N
     out = await _agent(providers).run_json_vl([b"\x89PNG"], {"q": "?"}, Out)
     assert out == Out(x=3)
     assert seq.calls == 1
+
+
+async def test_run_json_vl_repairs_once_then_succeeds(providers: Providers) -> None:  # noqa: F811
+    seq = JsonSequencer({"y": 99}, {"x": 7})
+    providers.vl.analyze_json = seq  # type: ignore[method-assign]
+    out = await _agent(providers).run_json_vl([b"\x89PNG"], {"q": "?"}, Out)
+    assert out == Out(x=7)
+    assert seq.calls == 2  # original + exactly one repair round-trip
+
+
+async def test_run_json_vl_wraps_second_validation_failure_as_provider_error(
+    providers: Providers,  # noqa: F811
+) -> None:
+    """Resilience audit Finding 2: run_json_vl's repair round-trip validation
+    failure used to propagate as a bare ValidationError — not a
+    ProviderError, so Critic.score's own
+    `except (LiveVideoDisabled, ProviderError)` guard (and every other
+    caller's identical guard) never caught it, hard-crashing the render
+    instead of degrading it. Must now be a ResponseParseError."""
+    seq = JsonSequencer({"y": 1}, {"z": 2})  # both invalid
+    providers.vl.analyze_json = seq  # type: ignore[method-assign]
+    with pytest.raises(ResponseParseError) as excinfo:
+        await _agent(providers).run_json_vl([b"\x89PNG"], {"q": "?"}, Out)
+    assert isinstance(excinfo.value, ProviderError)
+    assert excinfo.value.retryable is False
+    assert seq.calls == 2
 
 
 async def test_run_tool_loop_dispatches_then_parses(providers: Providers) -> None:  # noqa: F811

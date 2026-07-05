@@ -54,8 +54,15 @@ class ContinuityStateRepo(BaseRepository):
     async def retire_state(self, state_id: str, valid_to_beat: int) -> None:
         """Forgetting: close a fact's validity interval at ``valid_to_beat``.
 
-        The row is preserved (for backward/time-travel reads) but drops out of
-        the active set for any beat after ``valid_to_beat``.
+        Half-open, matching :class:`~app.render.continuity_reasoning.intervals.BeatInterval`
+        and the bitemporal engine (:meth:`BitemporalRepo` — ``valid_from_beat <= beat
+        < valid_to_beat``): the row is preserved (for backward/time-travel reads) but
+        drops out of the active set starting AT ``valid_to_beat`` itself, not just
+        strictly after it. This must match :meth:`active_states_at_beat`'s own
+        comparison exactly, or a fact and its superseding successor both read as
+        active at the exact beat the reasoning engine intended to be the clean
+        handoff point (found by independent review, 2026-07-05 — the two used to
+        disagree, closed vs. half-open).
         """
         await self.session.execute(
             update(ContinuityState)
@@ -78,7 +85,12 @@ class ContinuityStateRepo(BaseRepository):
     async def active_states_at_beat(
         self, book_id: str, beat: int, *, subject_entity_key: str | None = None
     ) -> list[ContinuityState]:
-        """Return only the facts whose interval contains ``beat`` (retired ones excluded)."""
+        """Return only the facts whose interval contains ``beat`` (retired ones excluded).
+
+        Half-open (``valid_from_beat <= beat < valid_to_beat``) — see
+        :meth:`retire_state`'s docstring for why this must match its own
+        comparison exactly.
+        """
         stmt = (
             select(ContinuityState)
             .where(
@@ -86,7 +98,7 @@ class ContinuityStateRepo(BaseRepository):
                 ContinuityState.valid_from_beat <= beat,
                 or_(
                     ContinuityState.valid_to_beat.is_(None),
-                    ContinuityState.valid_to_beat >= beat,
+                    ContinuityState.valid_to_beat > beat,
                 ),
             )
             .order_by(ContinuityState.valid_from_beat, ContinuityState.version)

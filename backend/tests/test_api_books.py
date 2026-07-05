@@ -14,6 +14,7 @@ from app.api.routes import books as books_module
 from app.composition import Container
 from app.db.base import new_id
 from app.db.models.enums import BookStatus, EntityType, ShotStatus
+from app.db.models.shot import Shot
 from app.db.repositories.book import BookRepo, PageRepo
 from app.db.repositories.shot import ShotRepo
 from app.memory.canon_service import CanonService
@@ -297,6 +298,42 @@ async def test_list_shots(
     assert shots[0]["source_span"] == {"page": 1, "para": 1, "word_range": [0, 9]}
     assert shots[0]["qa"]["verdict"] == "pass"
     assert shots[0]["clip_url"] and shots[0]["clip_url"].startswith("http")
+
+
+def test_shot_response_exposes_task8_clip_offsets() -> None:
+    """Task 9 Step 9b: ``_shot_response()`` must actually pass ``clip_start_s``/
+    ``clip_end_s`` through. Task 8 added the fields to ``ShotResponse``, but
+    ``_shot_response`` builds it via explicit kwargs (not ``model_validate``/
+    ``from_attributes``), so a field existing on the Pydantic model alone does
+    nothing — this calls the real function directly (no DB/API infra needed)
+    to prove the wiring itself, not just that the DB column exists.
+    """
+    from types import SimpleNamespace
+
+    shot = Shot(
+        id="shot_evt_02",
+        book_id="book_1",
+        beat_id="beat_2",
+        scene_id="scene_1",
+        source_span={"page": 1, "para": 1, "word_range": [10, 19]},
+        status=ShotStatus.ACCEPTED,
+        duration_s=5.0,
+        output={"clip_key": "clips/book_1/event_x.mp4"},
+        clip_start_s=5.0,
+        clip_end_s=10.0,
+    )
+    fake_container = cast(
+        Container,
+        SimpleNamespace(
+            object_store=SimpleNamespace(presigned_get_url=lambda key: f"https://oss.test/{key}")
+        ),
+    )
+
+    response = books_module._shot_response(fake_container, shot)
+
+    assert response.clip_start_s == 5.0
+    assert response.clip_end_s == 10.0
+    assert response.clip_url == "https://oss.test/clips/book_1/event_x.mp4"
 
 
 async def test_book_not_owned_is_404(

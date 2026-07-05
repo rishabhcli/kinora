@@ -36,6 +36,7 @@ from app.db.session import get_session
 from app.memory.interfaces import ShotPlanner
 from app.memory.interfaces import ShotSpec as RenderShotSpec
 from app.providers import Providers
+from app.providers.errors import ProviderError
 
 from .base import BaseAgent
 from .comprehension import (
@@ -217,7 +218,12 @@ class Adapter(BaseAgent):
                 max_tokens=max_tokens,
                 system=ADAPTER_COMPREHEND.system,
             )
-        except (ValidationError, ValueError):
+        except (ValidationError, ValueError, ProviderError):
+            # ProviderError (e.g. ResponseParseError from run_json's own
+            # repair round-trip failing validation a second time) must fall
+            # back here too — the docstring's "any model/validation failure"
+            # contract otherwise breaks for that one specific failure shape
+            # (independent review finding, 2026-07-05).
             return floor
         return merge_comprehension(floor, refined, known_entities=known_entities)
 

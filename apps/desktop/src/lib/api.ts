@@ -182,6 +182,10 @@ export interface ShotResponse {
   source_span: SourceSpan | null;
   scene_id?: string | null;
   beat_id?: string | null;
+  /** This shot's [start, end) offset in seconds within a merged multi-shot
+   *  event clip; null for a normal single-shot clip (the common case). */
+  clip_start_s?: number | null;
+  clip_end_s?: number | null;
 }
 export interface WordBox {
   word_index: number; // global across the whole book

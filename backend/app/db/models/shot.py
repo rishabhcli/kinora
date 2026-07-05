@@ -73,6 +73,13 @@ class Shot(StrIdMixin, TimestampMixin, Base):
     narration: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # {"ccs", "style_drift", "timeline_ok", "motion_artifact", "score", "verdict", "reason"}
     qa: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # {"wardrobe", "setting", "lighting", "time_of_day", "camera_logic",
+    #  "screen_direction", "motion_reversal", "hand_off", "continues_from_shot_id",
+    #  "last_frame_key"} — a snapshot of this shot's planning-time
+    # ContinuityDirective (event_director.py §9.6), when the shot was planned via
+    # the event-granularity path. None for a shot planned via the default
+    # single-shot path, which computes no such directive today.
+    continuity_directive: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # {"video_seconds", "tokens"}
     cost: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
@@ -82,6 +89,12 @@ class Shot(StrIdMixin, TimestampMixin, Base):
         String(128), unique=True, index=True, nullable=True
     )
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # This shot's [start, end) offset within a merged multi-shot event clip
+    # (single take covering several packed beats/shots), in seconds into that
+    # clip. None for a normal single-shot clip, which is still the common case.
+    clip_start_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    clip_end_s: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class SourceSpanIndex(StrIdMixin, CreatedAtMixin, Base):

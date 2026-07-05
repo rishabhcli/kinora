@@ -19,11 +19,12 @@ from app.db.repositories.book import BookRepo, PageRepo
 from app.db.repositories.scene import SceneRepo
 from app.db.repositories.shot import ShotRepo, SourceSpanRepo
 from app.ingest.canon_build import CanonBuildResult, CanonEntity
-from app.ingest.pdf_extract import extract_pdf
+from app.ingest.pdf_extract import PageExtract, extract_pdf
 from app.ingest.shot_plan import (
     BeatSpanInput,
     PageWords,
     group_scenes,
+    gutenberg_content_page_range,
     plan_and_persist,
     reconcile_beat_word_ranges,
     scope_id,
@@ -50,6 +51,70 @@ def test_group_scenes_by_pages() -> None:
     ]
     two = group_scenes([1, 2, 3, 4], pages_per_scene=2)
     assert [(g.page_start, g.page_end) for g in two] == [(1, 2), (3, 4)]
+
+
+def _boilerplate_page(n: int, text: str) -> PageExtract:
+    return PageExtract(
+        page_number=n,
+        image_key=f"pages/{n}.png",
+        text=text,
+        word_boxes=[],
+        word_index_start=0,
+        word_index_end=0,
+    )
+
+
+def test_gutenberg_content_page_range_excludes_boilerplate() -> None:
+    """Regression: observed live — beats 0-10 of a real ingest were "The eBook
+    opens with a Project Gutenberg notice...", "Chapter X is introduced..."
+    (a table-of-contents entry, not the chapter) — Gutenberg's boilerplate was
+    being shot-planned as if it were the story.
+    """
+    pages = [
+        _boilerplate_page(1, ""),
+        _boilerplate_page(2, "The Project Gutenberg eBook of Alice's Adventures..."),
+        _boilerplate_page(
+            3, "Credits *** START OF THE PROJECT GUTENBERG EBOOK ALICE *** Contents"
+        ),
+        _boilerplate_page(4, "CHAPTER I. Alice was beginning to get very tired..."),
+        _boilerplate_page(5, "*** END OF THE PROJECT GUTENBERG EBOOK ALICE ***"),
+        _boilerplate_page(6, "Section 1. General Terms of Use... donations..."),
+    ]
+    assert gutenberg_content_page_range(pages) == (3, 5)
+
+
+def test_gutenberg_content_page_range_defaults_to_full_book_without_markers() -> None:
+    pages = [_boilerplate_page(1, "Chapter one text."), _boilerplate_page(2, "Chapter two text.")]
+    assert gutenberg_content_page_range(pages) == (1, 2)
+
+
+def test_gutenberg_content_page_range_handles_missing_end_marker() -> None:
+    pages = [
+        _boilerplate_page(1, "License notice."),
+        _boilerplate_page(2, "*** START OF THE PROJECT GUTENBERG EBOOK ALICE ***"),
+        _boilerplate_page(3, "The real story."),
+    ]
+    assert gutenberg_content_page_range(pages) == (2, 3)
+
+
+def test_gutenberg_content_page_range_guards_against_inverted_markers() -> None:
+    """Regression: found by independent review. An END match earlier than the
+    first START match (e.g. the marker text quoted out of order, or a
+    malformed extraction) used to return (start > end) — an impossible
+    range that plan_and_persist's inclusive filter turns into ZERO matching
+    pages, silently zeroing every scene/beat/shot for the whole book. The
+    docstring's own promise is "never narrow a book it can't confidently
+    bound"; an inverted range must fall back to the full page range, same as
+    the no-markers-found case.
+    """
+    pages = [
+        _boilerplate_page(1, "Preamble."),
+        _boilerplate_page(2, "*** END OF THE PROJECT GUTENBERG EBOOK ALICE ***"),
+        _boilerplate_page(3, "Some middle content."),
+        _boilerplate_page(4, "Some more content."),
+        _boilerplate_page(5, "*** START OF THE PROJECT GUTENBERG EBOOK ALICE ***"),
+    ]
+    assert gutenberg_content_page_range(pages) == (1, 5)
 
 
 def test_reconcile_proportional_split_when_no_phrase_matches() -> None:

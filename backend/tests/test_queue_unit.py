@@ -80,6 +80,23 @@ async def test_lookup_returns_indexed_job(queue: RedisRenderQueue) -> None:
     assert await queue.lookup("absent") is None
 
 
+# --- grouped event jobs (Task 9: shot_ids round-trip) ------------------------ #
+
+
+async def test_shot_ids_round_trip_through_the_hash(queue: RedisRenderQueue) -> None:
+    await _enqueue(queue, "evt_hash", job_id="job_evt", shot_ids=["s1", "s2", "s3"])
+    job = await queue.get_job("job_evt")
+    assert job is not None
+    assert job.shot_ids == ["s1", "s2", "s3"]
+
+
+async def test_shot_ids_defaults_to_none_when_absent(queue: RedisRenderQueue) -> None:
+    await _enqueue(queue, "shot_hash_only", job_id="job_shot")
+    job = await queue.get_job("job_shot")
+    assert job is not None
+    assert job.shot_ids is None
+
+
 async def test_cancel_token_set_carries_ttl(client: FakeRedisClient) -> None:
     q = RedisRenderQueue(client, namespace="ns", token_ttl_s=120)
     await _enqueue(q, "ht", RenderPriority.SPECULATIVE, job_id="jt", cancel_token="traj_1")

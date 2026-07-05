@@ -31,7 +31,8 @@ from app.db.base import new_id
 from app.db.models.enums import RenderPriority
 from app.memory.budget_service import BudgetExceeded, Reservation
 from app.observability import metrics
-from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult
+from app.queue.redis_queue import PREEMPTIBLE_LANES, EnqueueResult, QueuedJob
+from app.render.event_director import MAX_EVENT_SHOTS
 from app.scheduler.events import SessionEventPublisher
 from app.scheduler.model import BufferedShot, SchedulerSession, SchedulerStore
 from app.scheduler.zones import Zone, eta_seconds, trajectory_is_stable, viewer_zone
@@ -113,8 +114,11 @@ class RenderQueue(Protocol):
         target_duration_s: float = 5.0,
         target_word: int = 0,
         prompt: str | None = None,
+        shot_ids: list[str] | None = None,
         now_ms: int | None = None,
     ) -> EnqueueResult: ...
+
+    async def get_job(self, job_id: str) -> QueuedJob | None: ...
 
     async def cancel_by_token(
         self, token: str, *, lanes: Sequence[RenderPriority] | None = None
@@ -162,6 +166,20 @@ class SchedulerTick:
     bursting: bool = False
 
 
+@dataclass(slots=True)
+class _PendingShot:
+    """One ready-but-not-yet-enqueued shot inside an accumulating event batch
+    (``render_granularity="event"`` only, Task 9). Holds exactly what
+    :meth:`SchedulerService._flush_event_batch` needs once the batch closes —
+    the readiness gates (eta/stability/budget) have already been evaluated by
+    the time a shot lands here, so this is pure bookkeeping, not another gate.
+    """
+
+    shot: SchedulerShot
+    est: float
+    start: int
+
+
 # --------------------------------------------------------------------------- #
 # Service
 # --------------------------------------------------------------------------- #
@@ -190,6 +208,7 @@ class SchedulerService:
         self._store = store
         self._events = events
         settings = settings or get_settings()
+        self._settings = settings
         self._low = settings.watermark_low_s
         self._high = settings.watermark_high_s
         self._commit_horizon = settings.commit_horizon_s
@@ -380,6 +399,15 @@ class SchedulerService:
 
         ``budget_low`` is the tick's budget snapshot; omitted only by direct
         callers (tests), in which case it is queried once.
+
+        When ``render_granularity="event"`` (Task 9), the exact same per-shot
+        readiness gates below decide which shots are ready — nothing about that
+        logic changes — but a ready shot is no longer enqueued immediately.
+        Instead consecutive ready shots sharing one ``scene_id`` accumulate into
+        a batch (:class:`_PendingShot`), closed by a scene change, a failed
+        readiness gate, or :data:`MAX_EVENT_SHOTS`, and the whole batch is
+        reserved + enqueued as ONE job by :meth:`_flush_event_batch` (the worker
+        then turns it back into a beat cluster and renders one merged clip).
         """
         # Hysteresis state machine.
         if session.committed_seconds_ahead < self._low:
@@ -406,7 +434,18 @@ class SchedulerService:
             else await self._budget.remaining()
         )
 
-        while session.committed_seconds_ahead < self._high:
+        event_mode = self._settings.render_granularity == "event"
+        batch: list[_PendingShot] = []
+
+        # In event mode a ready shot's seconds only land in
+        # committed_seconds_ahead once its batch is FLUSHED (_flush_event_batch),
+        # not when it's folded into `batch` below — so the loop guard must add
+        # the pending batch's own running total, or it keeps reading a stale,
+        # lagging value and over-fills by up to one whole batch before the
+        # unconditional post-loop flush commits it (kinora QA-campaign
+        # finding, 2026-07-05: a live-spending overshoot of the watermark that
+        # exists specifically to cap how many video-seconds a burst commits).
+        while session.committed_seconds_ahead + sum(p.est for p in batch) < self._high:
             shot = await self._shots.next_uncommitted_shot(session.book_id, cursor)
             if shot is None:
                 break
@@ -422,6 +461,26 @@ class SchedulerService:
             est = _shot_duration(shot)
             if not can_promote or remaining_s < est:
                 break  # cannot spend video-seconds -> ride the keyframe ladder
+
+            if event_mode:
+                # A scene change (or a batch with no scene_id to group by, which
+                # is never allowed to grow past one shot) closes the batch; so
+                # does MAX_EVENT_SHOTS. Flush before folding this shot in so no
+                # job's shot_ids ever spans two scenes.
+                if batch and (
+                    batch[0].shot.scene_id is None
+                    or shot.scene_id != batch[0].shot.scene_id
+                    or len(batch) >= MAX_EVENT_SHOTS
+                ):
+                    kept_going = await self._flush_event_batch(
+                        session, batch, buffered_ids, promoted
+                    )
+                    batch = []
+                    if not kept_going:
+                        break  # a cap was hit -> stop promoting entirely
+                batch.append(_PendingShot(shot=shot, est=est, start=start))
+                remaining_s -= est
+                continue
 
             reservation = await self._reserve(session, shot, est)
             if reservation is None:
@@ -467,9 +526,121 @@ class SchedulerService:
             remaining_s -= est  # this reservation stands until the worker releases it
             promoted.append(shot.id)
 
+        if event_mode:
+            # Flush whatever's still pending: the loop can exit (shot exhausted,
+            # eta/budget gate failed, or the high watermark was just crossed by a
+            # mid-loop flush) with a batch that was never a scene boundary/cap.
+            await self._flush_event_batch(session, batch, buffered_ids, promoted)
+
         if session.committed_seconds_ahead >= self._high:
             session.bursting = False
         return promoted
+
+    async def _flush_event_batch(
+        self,
+        session: SchedulerSession,
+        batch: list[_PendingShot],
+        buffered_ids: set[str],
+        promoted: list[str],
+    ) -> bool:
+        """Reserve + enqueue ``batch`` as ONE event job; ``False`` stops promoting.
+
+        A single aggregate reservation covers the whole batch rather than one
+        per shot. The worker releases exactly ``job.reservation_id`` before
+        rendering (``RenderWorker._release_earmark``, unconditional for every
+        job — event or shot), so a job can only ever hand back the ONE
+        reservation it carries; splitting this into N per-shot reservations
+        would leak N-1 of them (never committed, never released, permanently
+        outstanding against the budget ceiling). Mutates ``session``/
+        ``buffered_ids``/``promoted`` in place exactly like the per-shot loop
+        body does, so callers keep reading them the same way afterwards.
+        """
+        if not batch:
+            return True
+        first = batch[0].shot
+        total_est = sum(item.est for item in batch)
+
+        reservation = await self._reserve(session, first, total_est)
+        if reservation is None:
+            return False  # a cap was hit -> stop promoting
+
+        result = await self._queue.enqueue(
+            shot_hash=_dedup_key(session.book_id, first),
+            priority=RenderPriority.COMMITTED,
+            book_id=session.book_id,
+            job_id=new_id(),
+            session_id=session.session_id,
+            shot_id=first.id,
+            shot_ids=[item.shot.id for item in batch],
+            beat_id=first.beat_id,
+            scene_id=first.scene_id,
+            cancel_token=session.trajectory_token,
+            reservation_id=reservation.id,
+            reserved_video_s=total_est,
+            target_duration_s=total_est,
+            target_word=batch[0].start,
+        )
+        if not result.admitted:
+            # Committed is always admitted; defensively release on a drop.
+            await self._budget.release(reservation, note="committed dropped")
+            return False
+        if not result.created:
+            # Already in-flight/known (idempotent): don't double-reserve. The
+            # dedup key only identifies the batch's FIRST shot (Step 1's
+            # backward-compatible convention), so the WINNING job — enqueued by
+            # some other tick/session — may cover a differently-sized batch
+            # than this one (their readiness gates can diverge: same first
+            # shot, different focus_word/velocity => a different eta/budget
+            # cutoff). Only mark shots the winning job actually lists as
+            # buffered; any of THIS batch's shots it does NOT cover are left
+            # alone so a later tick's next_uncommitted_shot naturally offers
+            # them again instead of silently losing them.
+            await self._budget.release(reservation, note="dedup")
+            winning_ids = await self._covered_shot_ids(result.job_id, first.id)
+            for item in batch:
+                if item.shot.id not in winning_ids:
+                    continue
+                if item.shot.id not in buffered_ids:
+                    session.committed_buffer.append(
+                        BufferedShot(
+                            shot_id=item.shot.id,
+                            word_index_start=item.start,
+                            est_duration_s=item.est,
+                        )
+                    )
+                    buffered_ids.add(item.shot.id)
+                    session.committed_seconds_ahead += item.est
+            return True
+
+        for item in batch:
+            session.committed_buffer.append(
+                BufferedShot(
+                    shot_id=item.shot.id, word_index_start=item.start, est_duration_s=item.est
+                )
+            )
+            buffered_ids.add(item.shot.id)
+            session.committed_seconds_ahead += item.est
+            promoted.append(item.shot.id)
+        return True
+
+    async def _covered_shot_ids(self, job_id: str | None, fallback_shot_id: str) -> set[str]:
+        """The shot ids an existing (deduped-onto) job actually covers.
+
+        Looks the winning job up by id to read its real ``shot_ids``; falls
+        back to just ``fallback_shot_id`` (the one identity the dedup key
+        itself guarantees is covered) if the job can't be read back or never
+        recorded a group — conservative either way, since under-counting here
+        only means a shot gets re-offered by ``next_uncommitted_shot`` next
+        tick, never that it's wrongly presumed already handled.
+        """
+        if job_id is not None:
+            try:
+                job = await self._queue.get_job(job_id)
+            except Exception:  # the read-back is advisory; never fail promotion on it
+                job = None
+            if job is not None:
+                return set(job.shot_ids) if job.shot_ids else {job.shot_id or fallback_shot_id}
+        return {fallback_shot_id}
 
     async def _reserve(
         self, session: SchedulerSession, shot: SchedulerShot, est: float

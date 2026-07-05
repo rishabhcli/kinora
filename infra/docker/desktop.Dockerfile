@@ -39,5 +39,8 @@ COPY --from=build /app/apps/desktop/dist /usr/share/nginx/html
 EXPOSE 80
 
 # A lightweight liveness check (frontend has no app backend; just serve the SPA).
+# Use 127.0.0.1, not localhost: this image's /etc/hosts resolves localhost to
+# ::1 first, but nginx only binds 0.0.0.0:80 (IPv4), so "localhost" resolved
+# unhealthy for hours while the service was actually fine (verified 2026-07-04).
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:80/ >/dev/null 2>&1 || exit 1
+  CMD wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1

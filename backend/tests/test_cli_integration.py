@@ -166,6 +166,175 @@ async def test_books_reingest_requires_source(cli_container: Container) -> None:
         await actions.reingest_book(cli_container, b1)
 
 
+async def test_run_ingest_returns_false_when_lock_already_held(
+    cli_container: Container,
+) -> None:
+    """A crashed process's un-released single-flight lock (no heartbeat; see
+    INGEST_RECOVERY_LOCK_TTL_MS) must make run_ingest report that it did NOT
+    run, not silently succeed having done nothing.
+    """
+    from app.composition import ingest_active_lock_key
+
+    book_id = new_id()
+    stale = cli_container.redis.lock(ingest_active_lock_key(book_id), ttl_ms=60_000)
+    assert await stale.acquire()  # simulates a crashed process's un-released lock
+
+    ran = await cli_container.run_ingest(book_id, b"%PDF-1.4 fake", None)
+
+    assert ran is False
+
+
+async def test_books_reingest_force_clears_stale_lock(
+    cli_container: Container, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: a container restart mid-ingest can orphan the per-book
+    single-flight lock. Before this fix, reingest_book called run_ingest,
+    silently no-opped against the still-held lock, and reported ok=True
+    anyway — exactly what happened live to a real campaign book after an api
+    container restart. reingest_book is an explicit single-book admin
+    override, so passing force=True (once you've confirmed the lock really
+    is orphaned, e.g. the process that held it is gone) must clear it and
+    actually run.
+    """
+    from app.cli.actions import books as actions
+    from app.composition import ingest_active_lock_key
+
+    pdf_key = "pdfs/reingest-lock-test.pdf"
+    cli_container.object_store.put_bytes(pdf_key, b"%PDF-1.4 fake")
+    book_id = await _make_book(cli_container, source_pdf_key=pdf_key)
+
+    stale = cli_container.redis.lock(ingest_active_lock_key(book_id), ttl_ms=60_000)
+    assert await stale.acquire()  # simulates the crashed original ingest's lock
+
+    calls: list[str] = []
+
+    async def fake_default_run_ingest(
+        book_id_: str, pdf_bytes: bytes, session_id: str | None
+    ) -> None:
+        calls.append(book_id_)
+
+    monkeypatch.setattr(cli_container, "_default_run_ingest", fake_default_run_ingest)
+
+    result = await actions.reingest_book(cli_container, book_id, force=True)
+
+    assert result.ok is True
+    assert calls == [book_id]
+
+
+async def test_books_reingest_refuses_active_lock_without_force(
+    cli_container: Container, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression (independent review finding): reingest_book force-cleared the
+    single-flight lock unconditionally, with no way to tell a stale lock (a
+    crashed process) apart from a genuinely still-running ingest (no
+    heartbeat exists either way) — an operator reingesting a DIFFERENT book
+    moments after a real one started could silently race it into a second,
+    concurrent ingest and corrupt its scenes/shots. Without force=True, an
+    active (non-expired) lock must refuse with a conflict, and must NOT run
+    ingest or touch the book's status."""
+    from app.cli.actions import books as actions
+    from app.cli.errors import CliError
+    from app.composition import ingest_active_lock_key
+    from app.db.repositories.book import BookRepo
+
+    pdf_key = "pdfs/reingest-active-lock-test.pdf"
+    cli_container.object_store.put_bytes(pdf_key, b"%PDF-1.4 fake")
+    book_id = await _make_book(
+        cli_container, source_pdf_key=pdf_key, status=BookStatus.READY
+    )
+
+    active = cli_container.redis.lock(ingest_active_lock_key(book_id), ttl_ms=60_000)
+    assert await active.acquire()  # simulates a genuinely in-progress ingest
+
+    calls: list[str] = []
+
+    async def fake_default_run_ingest(
+        book_id_: str, pdf_bytes: bytes, session_id: str | None
+    ) -> None:
+        calls.append(book_id_)
+
+    monkeypatch.setattr(cli_container, "_default_run_ingest", fake_default_run_ingest)
+
+    with pytest.raises(CliError):
+        await actions.reingest_book(cli_container, book_id)
+
+    assert calls == []  # never raced into a second concurrent ingest
+    async with cli_container.session_factory() as db:
+        book = await BookRepo(db).get(book_id)
+    assert book is not None and book.status is BookStatus.READY  # untouched
+
+
+async def test_books_reingest_without_force_proceeds_when_no_lock_held(
+    cli_container: Container, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The common case (no active lock at all) must be unaffected by the new
+    safety check — force is only required when a lock is genuinely active."""
+    from app.cli.actions import books as actions
+
+    pdf_key = "pdfs/reingest-no-lock-test.pdf"
+    cli_container.object_store.put_bytes(pdf_key, b"%PDF-1.4 fake")
+    book_id = await _make_book(
+        cli_container, source_pdf_key=pdf_key, status=BookStatus.READY
+    )
+
+    calls: list[str] = []
+
+    async def fake_default_run_ingest(
+        book_id_: str, pdf_bytes: bytes, session_id: str | None
+    ) -> None:
+        calls.append(book_id_)
+
+    monkeypatch.setattr(cli_container, "_default_run_ingest", fake_default_run_ingest)
+
+    result = await actions.reingest_book(cli_container, book_id)
+
+    assert result.ok is True
+    assert calls == [book_id]
+
+
+async def test_books_reingest_without_force_never_deletes_the_lock_key(
+    cli_container: Container, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression (independent review finding, 2026-07-05): the non-force path
+    used to unconditionally redis.delete the lock key even after its own pttl
+    check found nothing active to clear — a TOCTOU gap where a lock a
+    DIFFERENT process (a fresh upload, the recovery worker) legitimately
+    acquires between the check and the delete would get silently stomped,
+    letting a second, concurrent ingest start. The non-force path must never
+    call delete at all; run_ingest's own atomic SET NX is the correct arbiter
+    for that race, exactly like every non-admin ingest path already relies on."""
+    from app.cli.actions import books as actions
+    from app.composition import ingest_active_lock_key
+    from app.redis.client import RedisClient
+
+    pdf_key = "pdfs/reingest-no-delete-test.pdf"
+    cli_container.object_store.put_bytes(pdf_key, b"%PDF-1.4 fake")
+    book_id = await _make_book(
+        cli_container, source_pdf_key=pdf_key, status=BookStatus.READY
+    )
+
+    deleted_keys: list[str] = []
+    real_delete = RedisClient.delete
+
+    async def recording_delete(self: RedisClient, *keys: str) -> int:
+        deleted_keys.extend(keys)
+        return await real_delete(self, *keys)
+
+    monkeypatch.setattr(RedisClient, "delete", recording_delete)
+
+    async def fake_default_run_ingest(
+        book_id_: str, pdf_bytes: bytes, session_id: str | None
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(cli_container, "_default_run_ingest", fake_default_run_ingest)
+
+    result = await actions.reingest_book(cli_container, book_id)
+
+    assert result.ok is True
+    assert ingest_active_lock_key(book_id) not in deleted_keys
+
+
 # --------------------------------------------------------------------------- #
 # budget
 # --------------------------------------------------------------------------- #
@@ -587,3 +756,181 @@ async def test_books_export_review_not_found(cli_container: Container, tmp_path:
 
     with pytest.raises(CliError):
         await actions.export_book_review(cli_container, "nope", str(tmp_path))
+
+
+# --------------------------------------------------------------------------- #
+# books export-review — (Shot, Beat) -> ShotLike adapter (Task 4's continuity
+# audit protocol), pure/no-DB
+# --------------------------------------------------------------------------- #
+
+
+def test_shot_continuity_view_adapts_persisted_directive() -> None:
+    """A Shot with a populated ``continuity_directive`` + its Beat adapt to
+    Task 4's ``ShotLike`` shape with every field read from real persisted data."""
+    from app.cli.actions.review_export import _shot_continuity_view
+    from app.db.models.beat import Beat
+    from app.db.models.enums import ShotStatus
+    from app.db.models.shot import Shot
+
+    shot = Shot(
+        id="shot-1",
+        book_id="b1",
+        beat_id="beat-1",
+        status=ShotStatus.PLANNED,
+        continuity_directive={
+            "wardrobe": "blue coat",
+            "setting": "tower",
+            "lighting": "dim",
+            "time_of_day": "dusk",
+            "hand_off": "faces the window",
+        },
+    )
+    beat = Beat(
+        id="beat-1",
+        book_id="b1",
+        scene_id="scene-1",
+        beat_index=4,
+        summary="Elsa stands at the frozen window.",
+        entities=[],
+    )
+
+    view = _shot_continuity_view(shot, beat)
+
+    assert view.shot_id == "shot-1"
+    assert view.beat_index == 4
+    assert view.wardrobe == "blue coat"
+    assert view.setting == "tower"
+    assert view.lighting == "dim"
+    assert view.time_of_day == "dusk"
+    assert view.hand_off == "faces the window"
+    assert view.summary == "Elsa stands at the frozen window."
+
+
+def test_shot_continuity_view_defaults_when_directive_missing() -> None:
+    """A shot with no ``continuity_directive`` (the default single-shot render
+    path today) adapts to all-unset dimensions rather than raising."""
+    from app.cli.actions.review_export import _shot_continuity_view
+    from app.db.models.beat import Beat
+    from app.db.models.enums import ShotStatus
+    from app.db.models.shot import Shot
+
+    shot = Shot(id="shot-2", book_id="b1", beat_id="beat-1", status=ShotStatus.PLANNED)
+    beat = Beat(
+        id="beat-1", book_id="b1", scene_id="scene-1", beat_index=1, summary="", entities=[]
+    )
+
+    view = _shot_continuity_view(shot, beat)
+
+    assert view.shot_id == "shot-2"
+    assert view.beat_index == 1
+    assert view.wardrobe is None
+    assert view.setting is None
+    assert view.lighting is None
+    assert view.time_of_day is None
+    assert view.hand_off == ""
+    assert view.summary == ""
+
+
+# --------------------------------------------------------------------------- #
+# books export-review — numeric QA scores, repair actions, long-range findings
+# --------------------------------------------------------------------------- #
+
+
+async def test_export_review_includes_numeric_qa_and_repair_action(
+    cli_container: Container, tmp_path: Path
+) -> None:
+    """The manifest surfaces numeric QA scores + a persisted seam-repair action
+    per shot, and a top-level ``long_range_findings`` list from a REAL call into
+    Task 4's ``audit_book_continuity`` — not just present-but-empty keys."""
+    from app.cli.actions import review_export as actions
+    from app.db.repositories.beat import BeatRepo
+    from app.db.repositories.defect import DefectRepo
+    from app.db.repositories.scene import SceneRepo
+    from app.db.repositories.shot import ShotRepo
+
+    book_id = await _make_book(cli_container, title="Continuity Book", status=BookStatus.READY)
+    async with cli_container.session_factory() as db:
+        scene = await SceneRepo(db).create(
+            book_id=book_id, scene_index=0, page_start=1, page_end=2
+        )
+        beat0 = await BeatRepo(db).create(
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_index=0,
+            summary="Elsa stands at the frozen window.",
+            entities=["char_elsa"],
+            source_span={"page": 1, "word_range": [0, 10]},
+        )
+        beat1 = await BeatRepo(db).create(
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_index=1,
+            summary="She walks away down the hall.",
+            entities=["char_elsa"],
+            source_span={"page": 1, "word_range": [10, 20]},
+        )
+        shot0 = await ShotRepo(db).create(
+            id=new_id(),
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_id=beat0.id,
+            source_span={"page": 1, "word_range": [0, 10]},
+            status=ShotStatus.ACCEPTED,
+            render_mode="reference_to_video",
+            duration_s=5.0,
+            qa={"verdict": "pass", "ccs": 0.95, "style_drift": 0.05},
+            continuity_directive={"wardrobe": "blue coat", "hand_off": "faces the window"},
+        )
+        shot1 = await ShotRepo(db).create(
+            id=new_id(),
+            book_id=book_id,
+            scene_id=scene.id,
+            beat_id=beat1.id,
+            source_span={"page": 1, "word_range": [10, 20]},
+            status=ShotStatus.ACCEPTED,
+            render_mode="reference_to_video",
+            duration_s=5.0,
+            qa={"verdict": "pass", "ccs": 0.4, "style_drift": 0.3},
+            continuity_directive={"wardrobe": "red cloak", "hand_off": ""},
+        )
+        await DefectRepo(db).log(
+            book_id=book_id,
+            kind="seam_repair",
+            shot_id=shot1.id,
+            detail={"action": "insert_supplemental"},
+        )
+
+    out_dir = str(tmp_path / "review")
+    await actions.export_book_review(cli_container, book_id, out_dir)
+
+    manifest = json.loads((Path(out_dir) / "manifest.json").read_text())
+    by_id = {s["shot_id"]: s for s in manifest["shots"]}
+
+    shot0_entry = by_id[shot0.id]
+    assert shot0_entry["qa_ccs"] == pytest.approx(0.95)
+    assert shot0_entry["qa_style_drift"] == pytest.approx(0.05)
+    assert shot0_entry["seam_repair_action"] is None
+
+    shot1_entry = by_id[shot1.id]
+    assert shot1_entry["qa_ccs"] == pytest.approx(0.4)
+    assert shot1_entry["qa_style_drift"] == pytest.approx(0.3)
+    assert shot1_entry["seam_repair_action"] == "insert_supplemental"
+
+    # A real, unmotivated wardrobe change one beat apart — audit_book_continuity
+    # must actually flag it, not just leave the key present-but-empty.
+    assert "long_range_findings" in manifest
+    findings = manifest["long_range_findings"]
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding["dimension"] == "wardrobe"
+    assert finding["from_value"] == "blue coat"
+    assert finding["to_value"] == "red cloak"
+    assert finding["confidence"] == "high"
+    assert finding["from_shot_id"] == shot0.id
+    assert finding["to_shot_id"] == shot1.id
+    assert "description" in finding
+
+    viewer = (Path(out_dir) / "index.html").read_text()
+    assert "0.95" in viewer  # numeric qa_ccs rendered, not only the pass/fail badge
+    assert "insert_supplemental" in viewer
+    assert "wardrobe" in viewer  # the long-range finding surfaced on the page

@@ -55,6 +55,7 @@ from app.render.degrade import (
     ken_burns_over_image,
     zoom_for_camera,
 )
+from app.render.pipeline import DefectOps
 from app.render.segment_packer import MAX_SEGMENT_S, pack_segments
 from app.render.shot_grammar import (
     is_motion_reversal,
@@ -64,14 +65,13 @@ from app.render.shot_grammar import (
 from app.render.stitch import (
     SceneSyncMap,
     concat_clips,
-    effective_crossfade,
     merge_sync_segments,
 )
 from app.render.sync_map import SyncSegment, build_sync_segment
 from app.storage.object_store import keys
 
 if TYPE_CHECKING:
-    from app.render.continuity_qa import EventContinuityReport
+    from app.render.continuity_qa import EventContinuityReport, PersistenceReport, SeamRepair
 
 logger = get_logger("app.render.event_director")
 
@@ -271,13 +271,13 @@ def _lighting_from(canon: CanonSlice | None, beat: Beat) -> str | None:
             value = canon.style.style_tokens.get(key)
             if value:
                 return str(value)
-    return beat.mood or None
+    return None
 
 
 def _setting_from(canon: CanonSlice | None, beat: Beat) -> str | None:
     if canon is not None and canon.location is not None:
         return canon.location.description or canon.location.name
-    return beat.described_visuals or None
+    return None
 
 
 def _hand_off_for(beat: Beat) -> str:
@@ -508,6 +508,10 @@ class RenderedShot:
     word_timestamps: list[Any] = field(default_factory=list)
     started_at: float = 0.0
     finished_at: float = 0.0
+    #: Set by a live renderer (e.g. LiveEventShotRenderer) when the per-shot
+    #: Critic gate never passed and this shot fell back to the Ken-Burns /
+    #: audio-text-card degrade rung instead of shipping an unverified clip.
+    degraded: bool = False
 
 
 @dataclass(slots=True)
@@ -594,6 +598,13 @@ class EventDirector:
     is given the event film is persisted at ``clips/{book}/{event}`` and every
     shot's last frame at ``lastframes/{book}/{shot}.png`` (the §9.6 continuation
     anchors the next event opens on).
+
+    When the stitched event fails its continuity QA (:meth:`render_event`), the
+    repair is *acted on*, not just logged: a bad seam is bridged/re-rendered/
+    degraded (:meth:`_repair`). When a ``defect_repo`` (the ``DefectRepo.log``
+    seam) is given, every repair is also recorded in the campaign's defect log;
+    ``None`` (the default) keeps this a silent no-op for existing off-gate/test
+    callers that don't wire one in.
     """
 
     def __init__(
@@ -601,6 +612,7 @@ class EventDirector:
         renderer: EventShotRenderer | None = None,
         *,
         store: BlobStore | None = None,
+        defect_repo: DefectOps | None = None,
         film_size: tuple[int, int] = FILM_SIZE,
         fps: int = DEFAULT_FPS,
         crossfade_s: float = DEFAULT_CROSSFADE_S,
@@ -608,6 +620,7 @@ class EventDirector:
     ) -> None:
         self._renderer = renderer or KenBurnsEventRenderer(film_size=film_size, fps=fps)
         self._store = store
+        self._defect_repo = defect_repo
         self._film_size = film_size
         self._fps = fps
         self._crossfade_s = crossfade_s
@@ -624,6 +637,15 @@ class EventDirector:
     ) -> EventRenderResult:
         """Fan the shots out concurrently, stitch into one vertical film + sync map.
 
+        The stitched event is then checked against TWO repair gates — the
+        geometry/mode/hand-off/180° seam score (:meth:`_score_continuity`) and
+        the narrative wardrobe/setting/lighting/time-of-day persistence check
+        (:meth:`_check_persistence`, §8.5) — and the worse of the two is acted
+        on once (:meth:`_repair`: bridge with a supplemental shot, re-render the
+        offending shot, or degrade the whole event to Ken-Burns), never just
+        logged. A repair re-stitches and re-scores before shipping, so the
+        returned result reflects the corrected event, not the original.
+
         Raises:
             ValueError: when the script has no shots.
         """
@@ -633,43 +655,49 @@ class EventDirector:
         audio = audio or {}
 
         # Fan-out: every shot render starts before any finishes (asyncio.gather).
-        rendered: list[RenderedShot] = list(
-            await asyncio.gather(
-                *(
-                    self._renderer.render_shot(
-                        shot, still=stills.get(shot.shot_id), audio=audio.get(shot.shot_id)
-                    )
-                    for shot in script.shots
+        # return_exceptions=True is defense-in-depth: an EventShotRenderer's
+        # contract is "never raise for a known provider issue — degrade
+        # internally instead" (see LiveEventShotRenderer's module docstring),
+        # but a bug or an unclassified exception (e.g. Finding 2's bare
+        # ValidationError, which no `except (LiveVideoDisabled, ProviderError)`
+        # guard catches) must still cost only the ONE shot it hit — a bare
+        # gather would otherwise cancel every sibling shot's already-in-flight
+        # render and crash the whole event.
+        raw_results = await asyncio.gather(
+            *(
+                self._renderer.render_shot(
+                    shot, still=stills.get(shot.shot_id), audio=audio.get(shot.shot_id)
                 )
-            )
+                for shot in script.shots
+            ),
+            return_exceptions=True,
         )
-
-        segments: list[SyncSegment] = []
-        durations: list[float] = []
-        for shot, shot_result in zip(script.shots, rendered, strict=True):
-            segments.append(
-                build_sync_segment(
-                    shot_id=shot_result.shot_id,
-                    word_timestamps=(word_timestamps or {}).get(shot_result.shot_id)
-                    or shot_result.word_timestamps,
-                    source_span=shot.source_span.model_dump(mode="json"),
-                    page_word_boxes=(page_boxes or {}).get(shot_result.shot_id),
-                    duration_s=shot_result.duration_s,
-                )
+        rendered: list[RenderedShot] = [
+            result
+            if isinstance(result, RenderedShot)
+            else await self._fallback_rendered_shot(
+                shot, result, still=stills.get(shot.shot_id), audio=audio.get(shot.shot_id)
             )
-            durations.append(shot_result.duration_s)
+            for shot, result in zip(script.shots, raw_results, strict=True)
+        ]
 
-        # Cinematic stitch: dissolve each seam (video xfade + audio crossfade); the
-        # sync map merges on the SAME overlap so its timecodes match the played film.
-        overlap = effective_crossfade(durations, self._crossfade_s)
-        clips = [r.clip_bytes for r in rendered]
-        clip_bytes = await anyio.to_thread.run_sync(
-            lambda: concat_clips(clips, size=self._film_size, fps=self._fps, crossfade_s=overlap)
-        )
-        sync_map = merge_sync_segments(
-            segments, scene_id=script.event_id, durations=durations, overlap_s=overlap
+        clip_bytes, sync_map = await self._stitch(
+            script, rendered, page_boxes=page_boxes, word_timestamps=word_timestamps
         )
         continuity = await self._score_continuity(script, rendered)
+        persistence = self._check_persistence(script)
+
+        if not continuity.ok or not persistence.ok:
+            script, rendered = await self._repair(
+                script, rendered, continuity, persistence, stills=stills, audio=audio
+            )
+            # Re-stitch and re-score after repair so the shipped result reflects
+            # the corrected event, not the originally-failing one — never a
+            # sync map / clip gone stale against the repaired shot list.
+            clip_bytes, sync_map = await self._stitch(
+                script, rendered, page_boxes=page_boxes, word_timestamps=word_timestamps
+            )
+            continuity = await self._score_continuity(script, rendered)
 
         clip_key, clip_url, last_frame_keys = await self._persist(script, clip_bytes, rendered)
 
@@ -697,6 +725,91 @@ class EventDirector:
             continuity=continuity,
         )
 
+    async def _fallback_rendered_shot(
+        self,
+        shot: EventShot,
+        exc: BaseException,
+        *,
+        still: bytes | None,
+        audio: bytes | None,
+    ) -> RenderedShot:
+        """Degrade ONE shot whose renderer raised instead of returning.
+
+        This is the ``render_event`` gather's own safety net (see its call
+        site), not the renderer's normal degrade path — it only runs when a
+        renderer's own internal handling missed something (a bug, or an
+        exception type its ``except`` clauses don't list). Falls back to the
+        same real off-gate Ken-Burns / audio-text-card rung
+        :class:`KenBurnsEventRenderer` already produces, so a raising shot
+        still ships a real, playable clip rather than losing the whole event.
+        """
+        logger.warning(
+            "event.shot_render_raised",
+            shot_id=shot.shot_id,
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        fallback_renderer = KenBurnsEventRenderer(film_size=self._film_size, fps=self._fps)
+        fallback = await fallback_renderer.render_shot(shot, still=still, audio=audio)
+        fallback.degraded = True
+        return fallback
+
+    async def _stitch(
+        self,
+        script: EventScript,
+        rendered: Sequence[RenderedShot],
+        *,
+        page_boxes: Mapping[str, Sequence[Mapping[str, Any]]] | None,
+        word_timestamps: Mapping[str, Sequence[Any]] | None,
+    ) -> tuple[bytes, SceneSyncMap]:
+        """Stitch ``rendered``'s clips into one film + merge their sync segments.
+
+        Pulled out of :meth:`render_event` so a post-repair re-stitch (against a
+        corrected ``script``/``rendered`` pair) reuses the exact same geometry +
+        timeline math a first pass does, instead of re-deriving it and risking
+        the sync map going stale against the repaired shot list (a different
+        shot count and/or different per-shot durations than the first pass).
+        """
+        segments: list[SyncSegment] = []
+        durations: list[float] = []
+        for shot, shot_result in zip(script.shots, rendered, strict=True):
+            segments.append(
+                build_sync_segment(
+                    shot_id=shot_result.shot_id,
+                    word_timestamps=(word_timestamps or {}).get(shot_result.shot_id)
+                    or shot_result.word_timestamps,
+                    source_span=shot.source_span.model_dump(mode="json"),
+                    page_word_boxes=(page_boxes or {}).get(shot_result.shot_id),
+                    duration_s=shot_result.duration_s,
+                )
+            )
+            durations.append(shot_result.duration_s)
+
+        # Cinematic stitch: dissolve each seam (video xfade + audio crossfade).
+        # Let concat_clips pick the real crossfade from its OWN post-
+        # normalization probe rather than pre-computing one here from
+        # pre-normalization estimates — the sync map must be built from
+        # exactly the numbers concat_clips actually used, or its per-shot
+        # boundaries (and the clip_start_s/clip_end_s seek windows derived
+        # from them, Task 8) drift from what the real video contains.
+        clips = [r.clip_bytes for r in rendered]
+        result = await anyio.to_thread.run_sync(
+            lambda: concat_clips(
+                clips,
+                size=self._film_size,
+                fps=self._fps,
+                crossfade_s=self._crossfade_s,
+                expected_durations=durations,
+            )
+        )
+        sync_map = merge_sync_segments(
+            segments,
+            scene_id=script.event_id,
+            durations=result.durations,
+            overlap_s=result.crossfade_s,
+        )
+        return result.clip_bytes, sync_map
+
     async def _score_continuity(
         self, script: EventScript, rendered: Sequence[RenderedShot]
     ) -> EventContinuityReport:
@@ -716,6 +829,132 @@ class EventDirector:
                 )
             )
         return score_event_continuity(script, geometries, film_size=self._film_size)
+
+    def _check_persistence(self, script: EventScript) -> PersistenceReport:
+        """The narrative persistence gate (§8.5): wardrobe/setting/lighting/
+        time-of-day must hold across a chained seam unless a beat motivates the
+        change. A SECOND repair gate alongside :meth:`_score_continuity` — pure
+        and synchronous (no ffmpeg probing needed, unlike the geometry score).
+        """
+        # Local import breaks the cycle (continuity_qa builds on this module's
+        # models), matching _score_continuity's own local import above.
+        from app.render.continuity_qa import detect_persistence_drift
+
+        return detect_persistence_drift(script)
+
+    async def _repair(
+        self,
+        script: EventScript,
+        rendered: list[RenderedShot],
+        report: EventContinuityReport,
+        persistence: PersistenceReport,
+        *,
+        stills: Mapping[str, bytes],
+        audio: Mapping[str, bytes],
+    ) -> tuple[EventScript, list[RenderedShot]]:
+        """Act on the worse of the geometry continuity report and the narrative
+        persistence gate (§9.5-style routing, kinora.md) instead of merely
+        logging it: insert a bridging shot, re-render the offending shot, or
+        degrade the whole event to Ken-Burns. Every repair is recorded via the
+        existing ``DefectRepo.log`` pattern when a repo is wired (a silent
+        no-op otherwise, so existing off-gate/test callers are unaffected).
+        """
+        from app.render.continuity_qa import SeamRepair, propose_supplemental_shot
+
+        action, from_shot_id, to_shot_id = self._route_repair(report, persistence)
+        if action == SeamRepair.ACCEPT or from_shot_id is None or to_shot_id is None:
+            return script, rendered
+        prev_shot = next(s for s in script.shots if s.shot_id == from_shot_id)
+        next_shot = next(s for s in script.shots if s.shot_id == to_shot_id)
+
+        if self._defect_repo is not None:
+            await self._defect_repo.log(
+                book_id=script.book_id,
+                kind="seam_repair",
+                shot_id=to_shot_id,
+                detail={"action": action.value},
+            )
+        logger.info(
+            "event.seam_repair",
+            event_id=script.event_id,
+            action=action.value,
+            from_shot_id=from_shot_id,
+            to_shot_id=to_shot_id,
+        )
+
+        if action == SeamRepair.INSERT_SUPPLEMENTAL:
+            supplemental = propose_supplemental_shot(
+                prev_shot, next_shot, book_id=script.book_id, event_id=script.event_id
+            )
+            insert_at = script.shots.index(prev_shot) + 1
+            new_shots = list(script.shots)
+            new_shots.insert(insert_at, supplemental)
+            new_script = script.model_copy(update={"shots": new_shots})
+            supplemental_result = await self._renderer.render_shot(
+                supplemental, still=stills.get(prev_shot.shot_id), audio=None
+            )
+            new_rendered = list(rendered)
+            new_rendered.insert(insert_at, supplemental_result)
+            return new_script, new_rendered
+
+        if action == SeamRepair.REGEN_CONTINUATION:
+            idx = script.shots.index(next_shot)
+            re_rendered = await self._renderer.render_shot(
+                next_shot,
+                still=stills.get(prev_shot.shot_id),
+                audio=audio.get(next_shot.shot_id),
+            )
+            new_rendered = list(rendered)
+            new_rendered[idx] = re_rendered
+            return script, new_rendered
+
+        # DEGRADE: fall back to Ken-Burns for every shot in this event rather
+        # than ship a known-bad seam.
+        fallback = KenBurnsEventRenderer(film_size=self._film_size, fps=self._fps)
+        new_rendered = [
+            await fallback.render_shot(s, still=stills.get(s.shot_id), audio=audio.get(s.shot_id))
+            for s in script.shots
+        ]
+        return script, new_rendered
+
+    @staticmethod
+    def _route_repair(
+        report: EventContinuityReport, persistence: PersistenceReport
+    ) -> tuple[SeamRepair, str | None, str | None]:
+        """Combine the geometry continuity verdict with the persistence gate.
+
+        The worse of the two wins outright: a persistence drift is never
+        allowed to weaken a geometry-driven DEGRADE, and a geometry ACCEPT
+        never masks a real persistence drift — "take the max severity of the
+        two checks". Geometry identifies its own failing seam from the
+        already-scored ``report``; a persistence-only trigger identifies the
+        drifting seam straight from the first drift.
+        """
+        from app.render.continuity_qa import SeamRepair
+
+        # Mirrors continuity_qa._SEVERITY, duplicated locally (a local import
+        # sidesteps the event_director <-> continuity_qa cycle, so a
+        # module-level dict keyed on the real enum isn't an option here)
+        # rather than reaching into that module's private namespace — the same
+        # convention app.render.live_event_renderer._mean_vector follows.
+        severity = {
+            SeamRepair.ACCEPT: 0,
+            SeamRepair.INSERT_SUPPLEMENTAL: 1,
+            SeamRepair.REGEN_CONTINUATION: 2,
+            SeamRepair.DEGRADE: 3,
+        }
+        geometry_action = report.action
+        geometry_seam = next((s for s in report.seams if not s.ok), None)
+        drift = persistence.drifts[0] if persistence.drifts else None
+
+        if (
+            drift is not None
+            and severity[SeamRepair.REGEN_CONTINUATION] > severity[geometry_action]
+        ):
+            return SeamRepair.REGEN_CONTINUATION, drift.from_shot_id, drift.to_shot_id
+        if geometry_seam is not None:
+            return geometry_action, geometry_seam.from_shot_id, geometry_seam.to_shot_id
+        return geometry_action, None, None
 
     async def _persist(
         self, script: EventScript, clip_bytes: bytes, rendered: Sequence[RenderedShot]

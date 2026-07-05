@@ -20,12 +20,18 @@ pytestmark = pytest.mark.skipif(not degrade.ffmpeg_available(), reason="no ffmpe
 def test_concat_two_clips_into_one_valid_mp4() -> None:
     clip_a = degrade.ken_burns_over_image(png_bytes(640, 360), 1.0, audio_bytes=wav_bytes(1.0))
     clip_b = degrade.ken_burns_over_image(png_bytes(640, 360), 1.5)  # no audio → silence padded
-    scene = concat_clips([clip_a, clip_b], size=(640, 360))
-    info = degrade.probe(scene)
+    result = concat_clips([clip_a, clip_b], size=(640, 360))
+    info = degrade.probe(result.clip_bytes)
     assert info.has_video is True
     assert info.has_audio is True  # uniform audio layout (silence where missing)
     assert abs(info.duration_s - 2.5) < 0.4
-    assert degrade.verify_playable(scene) is True
+    assert degrade.verify_playable(result.clip_bytes) is True
+    # The reported durations are the REAL post-normalization probe, not the
+    # (absent, here) caller estimate — must feed merge_sync_segments, not a
+    # separately re-derived guess (kinora QA-campaign finding, 2026-07-05).
+    assert len(result.durations) == 2
+    assert all(d > 0 for d in result.durations)
+    assert result.crossfade_s == 0.0  # no crossfade requested
 
 
 def test_concat_enforces_vertical_film_geometry() -> None:
@@ -44,13 +50,13 @@ def test_concat_enforces_vertical_film_geometry() -> None:
     shot_b = degrade.ken_burns_over_image(png_bytes(640, 360), 3.0)  # silence-padded
 
     # No size override → the stitcher's production path (now vertical, not inferred).
-    scene = concat_clips([shot_a, shot_b])
+    result = concat_clips([shot_a, shot_b])
 
-    info = degrade.probe(scene)
+    info = degrade.probe(result.clip_bytes)
     assert (info.width, info.height) == (720, 1280)  # vertical 720x1280, NOT 1920x1080
     assert info.has_video is True and info.has_audio is True
     assert abs(info.duration_s - 5.0) < 0.4  # 2s + 3s combined
-    assert degrade.verify_playable(scene) is True
+    assert degrade.verify_playable(result.clip_bytes) is True
 
 
 def test_concat_keeps_full_duration_when_audio_shorter_and_no_ffprobe(
@@ -67,10 +73,10 @@ def test_concat_keeps_full_duration_when_audio_shorter_and_no_ffprobe(
     clip_b = degrade.ken_burns_over_image(png_bytes(640, 360), 4.0, audio_bytes=wav_bytes(2.0))
 
     monkeypatch.setattr(degrade, "get_ffprobe_exe", lambda: None)  # the prod container
-    scene = concat_clips([clip_a, clip_b], size=(640, 360))
+    result = concat_clips([clip_a, clip_b], size=(640, 360))
 
-    assert degrade.verify_playable(scene) is True
-    info = degrade.inspect(scene)
+    assert degrade.verify_playable(result.clip_bytes) is True
+    info = degrade.inspect(result.clip_bytes)
     assert info.has_video is True and info.has_audio is True
     assert abs(info.duration_s - 8.0) < 0.5  # full 4+4, not a truncated 0.2s
 
@@ -155,9 +161,45 @@ def test_concat_with_crossfade_overlaps_and_stays_vertical() -> None:
         )
         for _ in range(3)
     ]
-    scene = concat_clips(clips, crossfade_s=0.5)
-    info = degrade.probe(scene)
+    result = concat_clips(clips, crossfade_s=0.5)
+    info = degrade.probe(result.clip_bytes)
     assert (info.width, info.height) == (720, 1280)
     assert info.has_video is True and info.has_audio is True
     assert abs(info.duration_s - 8.0) < 0.5  # 9s − 2×0.5s crossfade
-    assert degrade.verify_playable(scene) is True
+    assert degrade.verify_playable(result.clip_bytes) is True
+    # The reported crossfade is what was ACTUALLY applied (the real thing a
+    # caller must feed merge_sync_segments' overlap_s), not the raw request.
+    assert result.crossfade_s == pytest.approx(0.5)
+    assert len(result.durations) == 3
+    assert all(d > 0 for d in result.durations)
+
+
+def test_concat_falls_back_to_expected_duration_on_probe_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression (kinora QA-campaign finding, 2026-07-05): when the real
+    post-normalization probe fails for a clip, the reported duration must
+    fall back to the caller's own expected_durations estimate (matching
+    today's behavior for that shot) rather than silently reporting 0 and
+    collapsing that shot's window in the merged sync map."""
+    from app.render import stitch as stitch_module
+
+    clip_a = degrade.ken_burns_over_image(png_bytes(640, 360), 2.0, audio_bytes=wav_bytes(2.0))
+    clip_b = degrade.ken_burns_over_image(png_bytes(640, 360), 3.0, audio_bytes=wav_bytes(3.0))
+
+    real_safe_duration = stitch_module._safe_duration
+    calls = {"n": 0}
+
+    def flaky_safe_duration(clip: bytes) -> float:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return 0.0  # simulate a probe failure for the first clip only
+        return real_safe_duration(clip)
+
+    monkeypatch.setattr(stitch_module, "_safe_duration", flaky_safe_duration)
+
+    result = concat_clips([clip_a, clip_b], size=(640, 360), expected_durations=[2.0, 3.0])
+
+    assert result.durations[0] == 2.0  # fell back to the caller's estimate
+    assert result.durations[1] > 0  # the second clip's real probe succeeded
+    assert degrade.verify_playable(result.clip_bytes) is True

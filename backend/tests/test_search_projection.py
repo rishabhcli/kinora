@@ -108,3 +108,12 @@ def test_project_shot() -> None:
     assert doc.facets["render_mode"] == "reference_to_video"
     assert doc.numbers["duration_s"] == 5.0
     assert doc.numbers["score"] == 0.9
+
+
+def test_shot_defaults_clip_offsets_to_none() -> None:
+    # A normal single-shot clip has no in-merged-clip offset (§ merged-event-clip
+    # playback): both fields must default to None so existing shot rows are
+    # unaffected.
+    shot = Shot(book_id="b1", status=ShotStatus.PLANNED)
+    assert shot.clip_start_s is None
+    assert shot.clip_end_s is None

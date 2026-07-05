@@ -46,6 +46,7 @@ from .errors import (
 )
 from .image import ImageProvider
 from .minimax import MiniMaxBudgetExceeded, MiniMaxVideoProvider, RedisSpendStore
+from .modelscope import ModelScopeVideoProvider, build_modelscope_video_provider
 from .tts import TtsProvider
 from .types import (
     ChatResult,
@@ -86,7 +87,11 @@ class Providers:
     vl: VLProvider
     image: ImageProvider
     tts: TtsProvider
-    video: VideoProvider | MiniMaxVideoProvider
+    # The single hosted Wan provider by default; a MiniMax or ModelScope backend
+    # when selected via their API keys; or a cost-aware VideoRouter chaining more
+    # than one, per create_providers(). VideoBackend is the common structural
+    # contract (name/render/healthy) all of these satisfy.
+    video: VideoBackend
     embeddings: EmbeddingProvider
     # Set only when ``reasoning_provider="openai"``: the second transport that
     # backs ``chat`` (OpenAI), sharing the main client's usage sink.
@@ -145,11 +150,33 @@ def create_providers(
         )
     else:
         chat = ChatProvider(client)
-    video: VideoProvider | MiniMaxVideoProvider
-    if resolved.video_backend.lower() == "minimax" and resolved.minimax_api_key:
-        # Share the main client's usage sink so MiniMax video-seconds land in the
-        # same budget accounting as everything else.
-        video = build_minimax_video_provider(resolved, usage_sink=client.usage_sink)
+    # Video backend selection is now key-presence-driven rather than a single
+    # `video_backend` switch: any configured non-DashScope backend (ModelScope
+    # free tier, MiniMax paid gap-filler) is wired in, and when more than one is
+    # present they're chained behind a cost-aware VideoRouter (free tried first)
+    # instead of one replacing the other. With zero or one configured, behavior
+    # is exactly what it was before (a bare provider, never a router).
+    # VideoBackend (not the narrower concrete union) because a single configured
+    # backend is stored as whatever `video_backends[0]` is — a VideoBackend, not
+    # provably one specific member of the union — and VideoBackend is exactly the
+    # structural contract every branch below already satisfies.
+    video: VideoBackend
+    video_backends: list[VideoBackend] = []
+    if resolved.modelscope_api_key:
+        # Share the main client's usage sink so ModelScope video-seconds land in
+        # the same budget accounting as everything else.
+        video_backends.append(
+            build_modelscope_video_provider(resolved, usage_sink=client.usage_sink)
+        )
+    if resolved.minimax_api_key:
+        video_backends.append(build_minimax_video_provider(resolved, usage_sink=client.usage_sink))
+    if len(video_backends) > 1:
+        # COST_AWARE with no explicit tiers degrades to plain priority-order
+        # failover (see order_for_budget) — construction order already puts the
+        # free ModelScope backend before the paid MiniMax one.
+        video = VideoRouter(video_backends, policy=RouterPolicy(mode=RouteMode.COST_AWARE))
+    elif len(video_backends) == 1:
+        video = video_backends[0]
     else:
         video = VideoProvider(client)
     gateway: ResilientGateway | None = None
@@ -243,6 +270,7 @@ __all__ = [
     "MiniMaxBudgetExceeded",
     "MiniMaxVideoProvider",
     "ModelNotAvailable",
+    "ModelScopeVideoProvider",
     "OpenAIChatProvider",
     "ProviderBadRequest",
     "ProviderClient",
@@ -273,6 +301,7 @@ __all__ = [
     "WanSpec",
     "RedisSpendStore",
     "build_minimax_video_provider",
+    "build_modelscope_video_provider",
     "classify_status",
     "cosine",
     "create_providers",

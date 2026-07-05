@@ -569,6 +569,66 @@ async def test_tts_provider_error_in_degrade_yields_silent_playable_clip() -> No
     assert degrade.verify_playable(clip) is True
 
 
+async def test_cinematographer_provider_error_during_repair_degrades_instead_of_dlq() -> None:
+    """Regression (found by independent resilience audit): unlike the Critic
+    call above, the QA-FAIL repair path's redesign call to the Cinematographer
+    (_apply_repair -> _redesign -> designer.design_shot) was NOT wrapped in
+    (LiveVideoDisabled, ProviderError). attempt-1's render+QA had already
+    committed real budget before the repair ran, so an uncaught ProviderError
+    here used to propagate out of render_shot with no degrade — violating
+    queue/worker.py's own documented invariant that a dead-lettered job has
+    "already degraded... so the film never hard-stops" — leaving the shot
+    stuck mid-repair with spend already made and no playable clip.
+    """
+    from app.providers.errors import ProviderError
+
+    bundle = make_bundle(
+        critic_metrics=[_IDENTITY_FAIL],  # attempt 1: identity drift -> REGEN_TIGHTEN_REFS
+        budget_live=True,
+        seed_store={REF_KEY: png_bytes(640, 360)},
+    )
+    bundle.designer.raises = ProviderError("Cinematographer is down")
+
+    result = await bundle.pipeline.render_shot(BOOK_ID, SHOT_ID)
+
+    assert result.status is ShotStatus.DEGRADED
+    assert bundle.designer.calls == 2  # initial design (ok) + the failed redesign
+    assert bundle.generator.calls == 1  # attempt-1 rendered once; no retry storm
+    assert len(bundle.budget.committed) == 1  # attempt-1's real spend was charged
+    clip = bundle.store.store[keys.clip(BOOK_ID, SHOT_ID)]
+    assert degrade.probe(clip).has_video is True
+    assert bundle.defects.logged[0]["detail"]["reason"].startswith("repair_")
+
+
+async def test_showrunner_provider_error_during_conflict_degrades_instead_of_dlq() -> None:
+    """Regression (found by independent resilience audit): same gap as above,
+    for the OTHER unguarded repair branch — _handle_conflict -> the real
+    Continuity/Showrunner chat calls (here: FakeShowrunner.arbitrate, standing
+    in for the Showrunner's real arbitration call after Continuity flags a
+    timeline conflict)."""
+    from app.providers.errors import ProviderError
+
+    bundle = make_bundle(
+        critic_metrics=[_TIMELINE_FAIL],  # attempt 1: timeline clash -> RAISE_CONFLICT
+        budget_live=True,
+        seed_store={REF_KEY: png_bytes(640, 360)},
+        conflict=True,
+    )
+    assert bundle.showrunner is not None
+    bundle.showrunner.raises = ProviderError("Showrunner is down")
+
+    result = await bundle.pipeline.render_shot(BOOK_ID, SHOT_ID)
+
+    assert result.status is ShotStatus.DEGRADED
+    assert bundle.continuity is not None
+    assert bundle.continuity.calls == 1  # continuity flagged the conflict once
+    assert bundle.showrunner.calls == 1  # arbitration was attempted once, then failed
+    assert len(bundle.budget.committed) == 1  # attempt-1's real spend was charged
+    clip = bundle.store.store[keys.clip(BOOK_ID, SHOT_ID)]
+    assert degrade.probe(clip).has_video is True
+    assert bundle.defects.logged[0]["detail"]["reason"].startswith("conflict_")
+
+
 # --------------------------------------------------------------------------- #
 # Guarded live smoke — NOT run (would spend real Wan video-seconds)
 # --------------------------------------------------------------------------- #

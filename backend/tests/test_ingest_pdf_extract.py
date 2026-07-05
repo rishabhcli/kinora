@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import fitz
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.book import BookRepo, PageRepo
-from app.ingest.pdf_extract import extract_pdf, page_image_key
+from app.ingest.pdf_extract import _extract_page_words, extract_pdf, page_image_key
 from tests.test_ingest_support import (
     MemoryBlobStore,
     build_test_pdf,
@@ -13,7 +15,30 @@ from tests.test_ingest_support import (
     session,  # noqa: F401  (pytest fixture)
 )
 
-pytestmark = requires_db
+
+def test_extract_page_words_normalizes_typographic_ligatures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: real Gutenberg-derived PDFs carry ligatures ("ﬁrst", "oﬀ") as
+    single glyphs in their text layer — observed live in Alice's Adventures in
+    Wonderland's real narration ("Alice's ﬁrst thought", "hurried oﬀ"). Base-14
+    test fonts can't reproduce real ligature glyph rendering, so this feeds a
+    raw PyMuPDF word row directly (matching real ``get_text("words")`` shape)
+    rather than round-tripping through a rendered PDF.
+    """
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    monkeypatch.setattr(
+        page,
+        "get_text",
+        lambda *a, **kw: [(72.0, 72.0, 100.0, 90.0, "ﬁrst", 0, 0, 0)],
+    )
+
+    extract, _png = _extract_page_words(page, page_number=1, book_id="b1", dpi=72, word_offset=0)
+
+    assert extract.text == "first"
+    assert [w.text for w in extract.word_boxes] == ["first"]
+    doc.close()
 
 _PAGES = [
     "Once upon a time a small red fox ran across the wide green field at dawn.",
@@ -22,6 +47,7 @@ _PAGES = [
 ]
 
 
+@requires_db
 async def test_extract_persists_pages_words_and_uploads_images(
     session: AsyncSession,  # noqa: F811
 ) -> None:
@@ -69,6 +95,7 @@ async def test_extract_persists_pages_words_and_uploads_images(
         assert store.get_bytes(key)[:8] == b"\x89PNG\r\n\x1a\n"  # real PNG bytes
 
 
+@requires_db
 async def test_extract_is_idempotent_on_rerun(session: AsyncSession) -> None:  # noqa: F811
     store = MemoryBlobStore()
     book = await BookRepo(session).create(title="Rerun")

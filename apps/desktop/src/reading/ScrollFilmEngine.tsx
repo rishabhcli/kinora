@@ -67,8 +67,9 @@ const PLACEHOLDER = [
 
 /** Build the scrubbing timeline from props. Live → one segment per shot (word
  *  range → its clip); no backend → a single segment spanning the whole bundled
- *  film. `buildTimeline` makes it contiguous so scrubbing never hits a dead zone. */
-function timelineFromProps(
+ *  film. `buildTimeline` makes it contiguous so scrubbing never hits a dead zone.
+ *  Exported for unit testing (see `ScrollFilmEngine.test.ts`). */
+export function timelineFromProps(
   shots: ShotResponse[],
   clips: Record<string, string>,
   live: boolean,
@@ -92,6 +93,12 @@ function timelineFromProps(
           wordEnd: s.source_span!.word_range[1],
           src: cache.resolve(url),
           duration: s.duration_s ?? undefined,
+          // A shot inside a merged multi-shot event clip (render_granularity
+          // "event") carries its own [start, end) offset into the shared `src`;
+          // a normal single-shot clip has both null, which reproduces today's
+          // [0, duration] window.
+          clipStart: s.clip_start_s ?? 0,
+          clipEnd: s.clip_end_s ?? s.duration_s ?? undefined,
         };
       });
     if (segs.length > 0) {

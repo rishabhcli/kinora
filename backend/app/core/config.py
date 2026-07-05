@@ -116,6 +116,24 @@ class Settings(BaseSettings):
     minimax_duration_s: int = 6
     minimax_cost_per_clip_usd: float = 0.19
 
+    # --- ModelScope (Alibaba open model hub) hosted video provider ---
+    # Free recurring daily quota (verified 2026-07-04: ~2,000 calls/day across
+    # all models, resets 00:00 UTC+8; the video-specific limit is unconfirmed —
+    # see backend/scripts/probe_modelscope_video.py). Primary free-tier video
+    # path for the 10-book QA campaign, tried before the paid MiniMax provider.
+    modelscope_api_key: str | None = None
+    modelscope_base_url: str = "https://api-inference.modelscope.cn/v1"
+    modelscope_video_model: str = "Wan-AI/Wan2.2-T2V-A14B"
+
+    # --- Live render granularity (additive; default is today's unchanged behavior) ---
+    # "shot": the Scheduler promotes and renders one shot at a time (unchanged).
+    # "event": the Scheduler groups a scene's ready shots into packed segments
+    # (app.render.segment_packer.pack_segments) and renders each group as one
+    # continuous multi-shot event via EventDirector, with seam-continuity
+    # scoring and repair (kinora.md's dormant event_director/continuity_qa,
+    # promoted live for the 10-book QA campaign).
+    render_granularity: str = "shot"  # "shot" | "event"
+
     # --- Frontier hosted video adapters (additive; app/video/adapters/frontier) ---
     # Concrete adapters for Runway / Luma / Pika / Kling / Veo / Sora behind one
     # UniversalVideoProvider interface. EVERY real network call is gated by BOTH the

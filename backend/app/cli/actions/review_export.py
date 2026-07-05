@@ -33,6 +33,7 @@ from app.db.models.book import Book
 from app.db.models.defect import Defect
 from app.db.models.scene import Scene
 from app.db.models.shot import Shot
+from app.render.book_continuity_audit import LongRangeDrift, audit_book_continuity
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +85,68 @@ def _shot_sort_key(shot: Shot, beat_order: dict[str, int]) -> tuple[int, int, st
     return (beat_order.get(shot.beat_id or "", 0), start, shot.id)
 
 
+@dataclass(slots=True)
+class _ContinuityShotView:
+    """Adapts a persisted ``(Shot, Beat)`` pair to ``book_continuity_audit``'s
+    ``ShotLike`` protocol, so the whole-book long-range continuity audit (§9.6,
+    Task 4) can run against real DB rows instead of only the in-memory planning
+    objects it was originally designed against.
+
+    Deliberately NOT frozen: ``ShotLike``'s plain (non-property) attribute
+    declarations make it a read-write structural protocol, so mypy requires an
+    assignable attribute of matching type to consider this class compatible —
+    a frozen dataclass's read-only attributes fail that check even though
+    ``audit_book_continuity`` only ever reads them.
+    """
+
+    shot_id: str
+    beat_index: int
+    wardrobe: str | None
+    setting: str | None
+    lighting: str | None
+    time_of_day: str | None
+    hand_off: str
+    summary: str
+
+
+def _shot_continuity_view(shot: Shot, beat: Beat) -> _ContinuityShotView:
+    """Build a ``ShotLike`` view from a shot's persisted ``continuity_directive``.
+
+    ``continuity_directive`` is only populated for shots planned through the
+    event-granularity path (a snapshot of that shot's planning-time
+    ``ContinuityDirective``, event_director.py §9.6); for the default
+    single-shot path it is ``None`` today, in which case every dimension below
+    reads back unset and the audit simply has nothing to compare for this shot
+    — not a crash, not a false positive.
+    """
+    directive = shot.continuity_directive or {}
+    return _ContinuityShotView(
+        shot_id=shot.id,
+        beat_index=beat.beat_index,
+        wardrobe=directive.get("wardrobe"),
+        setting=directive.get("setting"),
+        lighting=directive.get("lighting"),
+        time_of_day=directive.get("time_of_day"),
+        hand_off=directive.get("hand_off", ""),
+        summary=beat.summary or "",
+    )
+
+
+def _describe_drift(drift: LongRangeDrift) -> dict[str, Any]:
+    """Render one ``LongRangeDrift`` as a manifest-friendly dict (kept
+    structured — not just ``.describe()``'s prose — so the HTML viewer and the
+    cross-book aggregator can group/count by dimension or confidence later)."""
+    return {
+        "from_shot_id": drift.from_shot_id,
+        "to_shot_id": drift.to_shot_id,
+        "dimension": drift.dimension,
+        "from_value": drift.from_value,
+        "to_value": drift.to_value,
+        "confidence": drift.confidence,
+        "description": drift.describe(),
+    }
+
+
 async def export_book_review(
     container: Container,
     book_id: str,
@@ -129,16 +192,32 @@ async def export_book_review(
             (await db.execute(select(Shot).where(Shot.book_id == book_id))).scalars().all()
         )
         defects = list(
-            (await db.execute(select(Defect).where(Defect.book_id == book_id))).scalars().all()
+            (
+                await db.execute(
+                    select(Defect)
+                    .where(Defect.book_id == book_id)
+                    .order_by(Defect.created_at.desc())
+                )
+            )
+            .scalars()
+            .all()
         )
 
     beat_by_id = {b.id: b for b in beats}
     beat_order = {b.id: b.beat_index for b in beats}
     scene_by_id = {s.id: s for s in scenes}
     defects_by_shot: dict[str, list[Defect]] = {}
+    # Newest-first (the query above orders by created_at desc), so the first
+    # seam_repair defect found per shot below is that shot's MOST RECENT
+    # repair action — the one that reflects what actually shipped.
+    seam_repair_by_shot: dict[str, str] = {}
     for defect in defects:
         if defect.shot_id:
             defects_by_shot.setdefault(defect.shot_id, []).append(defect)
+            if defect.kind == "seam_repair" and defect.shot_id not in seam_repair_by_shot:
+                action = (defect.detail or {}).get("action")
+                if action:
+                    seam_repair_by_shot[defect.shot_id] = action
 
     ordered_shots = sorted(shots, key=lambda s: _shot_sort_key(s, beat_order))
     if max_shots is not None:
@@ -169,6 +248,7 @@ async def export_book_review(
                 (root / clip_rel).write_bytes(data_bytes)
                 clips_downloaded += 1
 
+        qa = shot.qa or {}
         entries.append(
             {
                 "shot_id": shot.id,
@@ -183,6 +263,9 @@ async def export_book_review(
                 "described_visuals": beat.described_visuals if beat else None,
                 "mood": beat.mood if beat else None,
                 "qa": shot.qa,
+                "qa_ccs": qa.get("ccs"),
+                "qa_style_drift": qa.get("style_drift"),
+                "seam_repair_action": seam_repair_by_shot.get(shot.id),
                 "clip_key": clip_key,
                 "clip_file": clip_rel,
                 "defects": [
@@ -191,16 +274,30 @@ async def export_book_review(
             }
         )
 
+    # Whole-book long-range continuity audit (Task 4, §9.6): walk the same
+    # reading-order shot list through the (Shot, Beat) -> ShotLike adapter and
+    # flag unmotivated persistence drift a human reviewer should double check.
+    # Shots with no resolvable beat are skipped — beat_index (the audit's
+    # ordering key) has no meaning for them.
+    adapted_shots = [
+        _shot_continuity_view(shot, beat)
+        for shot in ordered_shots
+        if (beat := beat_by_id.get(shot.beat_id or "")) is not None
+    ]
+    continuity_report = audit_book_continuity(book_id, adapted_shots)
+    long_range_findings = [_describe_drift(d) for d in continuity_report.drifts]
+
     manifest = {
         "book_id": book_id,
         "title": book.title,
         "author": book.author,
         "exported_shots": len(entries),
         "shots": entries,
+        "long_range_findings": long_range_findings,
     }
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
     (root / "script.md").write_text(_render_script_markdown(book, entries))
-    (root / "index.html").write_text(_render_html_viewer(book, entries))
+    (root / "index.html").write_text(_render_html_viewer(book, entries, long_range_findings))
 
     return ReviewExportResult(
         book_id=book_id,
@@ -242,7 +339,11 @@ def _render_script_markdown(book: Book, entries: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _render_html_viewer(book: Book, entries: list[dict[str, Any]]) -> str:
+def _render_html_viewer(
+    book: Book,
+    entries: list[dict[str, Any]],
+    long_range_findings: list[dict[str, Any]] | None = None,
+) -> str:
     rows: list[str] = []
     current_scene: int | None = None
     for entry in entries:
@@ -258,6 +359,20 @@ def _render_html_viewer(book: Book, entries: list[dict[str, Any]]) -> str:
             if clip_file
             else '<div class="no-clip">no clip yet</div>'
         )
+        ccs = entry.get("qa_ccs")
+        style_drift = entry.get("qa_style_drift")
+        ccs_text = f"{ccs:.2f}" if isinstance(ccs, (int, float)) else "-"
+        drift_text = f"{style_drift:.2f}" if isinstance(style_drift, (int, float)) else "-"
+        scores_html = (
+            f'&middot; <span class="scores">ccs {_html.escape(ccs_text)} '
+            f"&middot; drift {_html.escape(drift_text)}</span>"
+        )
+        repair_action = entry.get("seam_repair_action")
+        repair_html = (
+            f'<div class="repair">repair action: {_html.escape(str(repair_action))}</div>'
+            if repair_action
+            else ""
+        )
         defect_html = "".join(
             f'<div class="defect">⚠ {_html.escape(d["kind"])}</div>'
             for d in entry["defects"]
@@ -272,15 +387,30 @@ def _render_html_viewer(book: Book, entries: list[dict[str, Any]]) -> str:
               &middot; {_html.escape(entry['render_mode'] or 'planned')}
               &middot; status {_html.escape(entry['status'])}
               &middot; <span class="badge {badge_class}">QA: {_html.escape(verdict)}</span>
+              {scores_html}
             </div>
             <p class="narration">{_html.escape(entry['narration_text'] or '')}</p>
             <p class="visual"><em>{_html.escape(entry['described_visuals'] or '')}</em></p>
+            {repair_html}
             {defect_html}
           </div>
         </div>
         """
         )
     body = "\n".join(rows)
+    findings_html = ""
+    if long_range_findings:
+        items = "".join(
+            f'<li><strong>{_html.escape(f["dimension"])}</strong>: '
+            f'{_html.escape(str(f["description"]))}</li>'
+            for f in long_range_findings
+        )
+        findings_html = f"""
+    <div class="findings">
+      <h2>Long-range continuity findings ({len(long_range_findings)})</h2>
+      <ul>{items}</ul>
+    </div>
+        """
     title = _html.escape(book.title)
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>{title} — review</title>
@@ -302,10 +432,17 @@ video {{ width: 320px; border-radius: 8px; background: #000; }}
 .narration {{ font-size: 1.05rem; line-height: 1.5; }}
 .visual {{ color: #aaa; }}
 .defect {{ color: #e78787; font-size: 0.85rem; margin-top: 0.4rem; }}
+.scores {{ color: #8ab4f8; }}
+.repair {{ color: #f0c674; font-size: 0.85rem; margin-top: 0.4rem; }}
+.findings {{ margin-bottom: 2rem; padding: 1rem; background: #1a1420;
+  border: 1px solid #4a2f5f; border-radius: 8px; }}
+.findings h2 {{ margin-top: 0; color: #d8b4fe; }}
+.findings li {{ margin-bottom: 0.4rem; }}
 </style>
 </head>
 <body>
 <h1>{title}</h1>
+{findings_html}
 {body}
 </body></html>"""
 

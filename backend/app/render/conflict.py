@@ -37,7 +37,7 @@ from app.agents.contracts import (
     TextualSupport,
 )
 from app.core.logging import get_logger
-from app.memory.interfaces import CanonSlice, StateSlice
+from app.memory.interfaces import CanonSlice
 
 logger = get_logger("app.render.conflict")
 
@@ -244,25 +244,34 @@ class ConflictResolver:
         at_beat: int,
         source_span_text: str,
     ) -> str:
-        """Write the evolution into canon (§8.5): re-assert the fact from this beat.
+        """Write the evolution into canon (§8.5): record a new, versioned fact.
 
-        When the contradicting state is identifiable, re-assert its
-        ``(subject, predicate, object)`` from the current beat (e.g. "sword
-        reacquired"). Otherwise record a typed ``canon_evolved`` fact carrying the
-        claim — either way a real, versioned ``assert_state`` write.
+        Always records the typed ``canon_evolved`` marker carrying the claim —
+        never a precise ``(subject, predicate, object)`` re-assertion of the
+        *cited* state.
+
+        That precise form existed before (re-asserting
+        ``contradicting_state_id``'s own object value) but was always wrong:
+        that id only ever resolves to something in ``canon_slice.active_states``
+        (§8.4 — a retired fact structurally cannot appear in an active-states
+        slice), which means it only ever resolves for the "an active fact is
+        being contradicted" case — and re-asserting *that* fact's own value
+        writes the OLD, just-contradicted value forward, not the new one the
+        shot depicts (confirmed bug, independent review 2026-07-05: "evolving"
+        forest→castle re-wrote "forest"). Recording the generic marker is
+        honest about what's actually known — that canon evolved, and to what
+        claim — instead of fabricating a structured re-assertion this seam
+        can't actually derive.
+
+        Known gap (follow-up, not a data guess): the §7.2 "sword reacquired"
+        headline case — re-depicting a value that was RETIRED, not one that's
+        currently active — could genuinely resolve to a precise re-assertion
+        using the retired fact's own pre-retirement value, but that needs a
+        retired-state-by-id lookup :class:`CanonEvolver` doesn't expose today
+        (only the active slice is available here). Needs a widened read seam.
         """
-        cited = self._find_state(canon_slice, conflict.contradicting_state_id)
-        source_span = {"page": 0, "note": source_span_text[:200]} if source_span_text else None
-        if cited is not None:
-            return await self._canon.assert_state(
-                book_id=book_id,
-                subject_entity_key=cited.subject_entity_key,
-                predicate=cited.predicate,
-                object_value=cited.object_value,
-                valid_from_beat=at_beat,
-                source_span=source_span,
-            )
         subject = canon_slice.characters[0].entity_key if canon_slice.characters else "story"
+        source_span = {"page": 0, "note": source_span_text[:200]} if source_span_text else None
         return await self._canon.assert_state(
             book_id=book_id,
             subject_entity_key=subject,
@@ -271,12 +280,6 @@ class ConflictResolver:
             valid_from_beat=at_beat,
             source_span=source_span,
         )
-
-    @staticmethod
-    def _find_state(canon_slice: CanonSlice, state_id: str | None) -> StateSlice | None:
-        if state_id is None:
-            return None
-        return next((s for s in canon_slice.active_states if s.state_id == state_id), None)
 
 
 # --------------------------------------------------------------------------- #

@@ -352,6 +352,15 @@ async def test_forgetting_scopes_a_fact_to_its_interval(session: AsyncSession) -
     assert any(s.state_id == state_id for s in await canon.active_states_at_beat(book.id, 20))
     assert all(s.state_id != state_id for s in await canon.active_states_at_beat(book.id, 50))
 
+    # Regression (independent review, 2026-07-05): the retirement boundary
+    # itself (valid_to_beat=34) must be excluded, not included — half-open
+    # [12, 34), matching BeatInterval.contains_beat and the bitemporal engine
+    # exactly. The read used to be closed ([12, 34]), so a fact and its
+    # superseding successor could both read as active at this exact beat.
+    assert all(s.state_id != state_id for s in await canon.active_states_at_beat(book.id, 34))
+    # One beat earlier is still inside the interval.
+    assert any(s.state_id == state_id for s in await canon.active_states_at_beat(book.id, 33))
+
     # Entity history is preserved across versions (time-travel reads).
     early = await canon.get_entity(book.id, "char_hero", at_beat=5)
     late = await canon.get_entity(book.id, "char_hero", at_beat=40)

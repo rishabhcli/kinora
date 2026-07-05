@@ -131,3 +131,45 @@ async def test_identity_lock_keyframes_and_distinct_voices(
     assert narrator.voice["role"] == "narrator"
     # The stored voice is a preset (never a clone of nonexistent audio).
     assert fox.voice is not None and fox.voice["preset"] is True
+
+
+async def test_locked_identity_visible_at_the_real_first_beat(
+    session: AsyncSession,  # noqa: F811
+    providers: Providers,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: locking re-upserts a NEW version of the principal, which
+    closes the prior (unlocked) version's interval at the new version's
+    ``valid_from_beat`` (``EntityRepo.upsert_new_version``). If canon_build's
+    genesis upsert and identity_lock's re-upsert ever disagree on that genesis
+    beat number, the two versions no longer tie at beat 0 and the locked,
+    embedded identity — the only version with a reference image + appearance
+    embedding — silently stops resolving at the book's real first beat
+    (``beat_index=0``, 0-based).
+    """
+    store = MemoryBlobStore()
+    book_id, canon, build_result = await _seed_canon_and_beats(session, store)
+    characters = build_result.characters()
+
+    async def fake_generate(prompt: str, **kwargs: object) -> list[bytes]:
+        return [_PNG]
+
+    monkeypatch.setattr(providers.image, "generate", fake_generate)
+
+    await lock_identities(
+        book_id=book_id,
+        canon=canon,
+        characters=characters,
+        providers=providers,
+        blob_store=store,
+        style_tokens={"art_direction": "storybook", "palette": "warm", "lens": "35mm"},
+        min_beats=2,
+    )
+
+    # beat_0000 (created by _seed_canon_and_beats) IS the book's real first beat
+    # (beat_index=0) and already carries char_fox.
+    fox_at_first_beat = await EntityRepo(session).get_as_of_beat(book_id, "char_fox", 0)
+    assert fox_at_first_beat is not None, "genesis entity must resolve as of beat 0"
+    assert fox_at_first_beat.appearance is not None
+    assert fox_at_first_beat.appearance.get("locked") is True
+    assert fox_at_first_beat.embedding is not None

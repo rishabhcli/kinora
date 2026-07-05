@@ -128,6 +128,36 @@ class BreakerState(StrEnum):
     HALF_OPEN = "half_open"
 
 
+def _breaker_key(op: str) -> str:
+    """Normalize an ``_execute`` ``op`` tag to the capability its circuit
+    breaker should be scoped to.
+
+    ``ProviderClient`` is shared by several DashScope capabilities (chat,
+    vl, image, tts, embeddings) that ride the same transport but are, from
+    the account's perspective, independent services — one being throttled
+    or quota-exhausted says nothing about the others' health. Before this,
+    one client-wide breaker meant a sustained failure burst on any op (e.g.
+    ``qwen-vl-max`` free-tier exhaustion) tripped once and then rejected
+    every OTHER op's calls too via ``CircuitOpenError`` — including healthy
+    ``qwen-image-plus`` keyframe calls sharing the same client (confirmed
+    live: a keyframe job's dead-letter reason was literally "circuit
+    breaker open", not the account error that started it).
+
+    Multi-step ops for the *same* backend call share one breaker (a submit
+    failure and a poll failure are the same backend's fate, not independent
+    capabilities) — ``image``/``image_edit``, every ``video*`` op, and
+    ``tts``/``tts_clone``/``asr``. Anything else (``chat``, ``vl``,
+    ``embedding``, ...) gets its own key unchanged.
+    """
+    if op.startswith(("video", "minimax_video", "modelscope_video")):
+        return "video"
+    if op in ("tts", "tts_clone", "asr"):
+        return "tts"
+    if op in ("image", "image_edit"):
+        return "image"
+    return op
+
+
 class CircuitBreaker:
     """Trips open after N consecutive failures; probes once after a cool-down."""
 
@@ -278,10 +308,10 @@ class ProviderClient:
         self._default_sink = LoggingUsageSink()
         self.usage_sink: UsageSink = usage_sink or self._default_sink
         self._rate = TokenBucket(self.config.rate_per_s, self.config.rate_burst)
-        self._breaker = CircuitBreaker(
-            self.config.breaker_failure_threshold,
-            self.config.breaker_recovery_s,
-        )
+        # One breaker per capability (see _breaker_key), not one for the whole
+        # client — lazily built so a client that only ever calls one or two
+        # ops doesn't pre-allocate breakers for the rest.
+        self._breakers: dict[str, CircuitBreaker] = {}
         self._http = httpx.AsyncClient(
             transport=transport,
             timeout=httpx.Timeout(self.config.default_timeout_s),
@@ -372,9 +402,21 @@ class ProviderClient:
 
     # -- Core resilient executor ------------------------------------------ #
 
+    def _breaker_for(self, op: str) -> CircuitBreaker:
+        """The breaker for ``op``'s capability, building it on first use."""
+        key = _breaker_key(op)
+        breaker = self._breakers.get(key)
+        if breaker is None:
+            breaker = CircuitBreaker(
+                self.config.breaker_failure_threshold, self.config.breaker_recovery_s
+            )
+            self._breakers[key] = breaker
+        return breaker
+
     async def _execute(self, attempt: Callable[[], Awaitable[T]], *, op: str, model: str) -> T:
         """Run ``attempt`` under rate-limit + breaker + retry, logging the call."""
-        await self._breaker.before_call()
+        breaker = self._breaker_for(op)
+        await breaker.before_call()
         started = time.perf_counter()
         retrying = AsyncRetrying(
             stop=stop_after_attempt(self.config.max_attempts),
@@ -395,7 +437,7 @@ class ProviderClient:
                     try:
                         result = await attempt()
                     except TransientProviderError as exc:
-                        await self._breaker.record_failure()
+                        await breaker.record_failure()
                         logger.warning(
                             "provider.call_retryable_error",
                             op=op,
@@ -410,7 +452,7 @@ class ProviderClient:
                         # Non-retryable (4xx/auth): caller's problem, not a fault
                         # the breaker should count. Surface immediately.
                         raise
-                    await self._breaker.record_success()
+                    await breaker.record_success()
                     latency_s = time.perf_counter() - started
                     logger.info(
                         "provider.call_ok",

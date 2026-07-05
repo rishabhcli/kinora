@@ -16,9 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.db.models.enums import RenderPriority
+from app.db.models.enums import RenderJobStatus, RenderPriority
 from app.memory.budget_service import Reservation
-from app.queue.redis_queue import EnqueueResult, EnqueueStatus
+from app.queue.redis_queue import EnqueueResult, EnqueueStatus, QueuedJob
 
 BOOK_ID = "book_demo"
 
@@ -138,6 +138,7 @@ class FakeQueue:
         self.cancel_token_calls: list[tuple[str, Any]] = []
         self.cancel_distant_calls: list[dict[str, Any]] = []
         self._known: dict[str, str] = {}
+        self._jobs: dict[str, QueuedJob] = {}
 
     async def enqueue(
         self, *, shot_hash: str, priority: RenderPriority, **kw: Any
@@ -147,7 +148,29 @@ class FakeQueue:
         job_id = str(kw.get("job_id"))
         self._known[shot_hash] = job_id
         self.enqueued.append({"shot_hash": shot_hash, "priority": priority, **kw})
+        # A real QueuedJob (not just the recorded dict above) so get_job below
+        # can stand in for RedisRenderQueue's own read-back, e.g. the Scheduler's
+        # cross-session dedup-mismatch guard (_covered_shot_ids).
+        self._jobs[job_id] = QueuedJob(
+            id=job_id,
+            shot_hash=shot_hash,
+            priority=priority,
+            status=RenderJobStatus.QUEUED,
+            book_id=str(kw.get("book_id", "")),
+            session_id=kw.get("session_id"),
+            shot_id=kw.get("shot_id"),
+            beat_id=kw.get("beat_id"),
+            scene_id=kw.get("scene_id"),
+            reservation_id=kw.get("reservation_id"),
+            reserved_video_s=float(kw.get("reserved_video_s", 0.0) or 0.0),
+            target_duration_s=float(kw.get("target_duration_s", 5.0) or 5.0),
+            target_word=int(kw.get("target_word", 0) or 0),
+            shot_ids=kw.get("shot_ids"),
+        )
         return EnqueueResult(status=EnqueueStatus.ENQUEUED, job_id=job_id)
+
+    async def get_job(self, job_id: str) -> QueuedJob | None:
+        return self._jobs.get(job_id)
 
     async def cancel_by_token(self, token: str, *, lanes: Any = None) -> int:
         self.cancel_token_calls.append((token, lanes))

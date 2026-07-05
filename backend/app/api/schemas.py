@@ -193,6 +193,10 @@ class ShotResponse(BaseModel):
     qa: dict[str, Any] | None = None
     clip_url: str | None = None
     reference_image_ids: list[str] = Field(default_factory=list)
+    #: This shot's [start, end) offset in seconds within a merged multi-shot
+    #: event clip; None for a normal single-shot clip (the common case).
+    clip_start_s: float | None = None
+    clip_end_s: float | None = None
 
 
 # --------------------------------------------------------------------------- #

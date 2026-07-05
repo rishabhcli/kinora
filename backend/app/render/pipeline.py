@@ -716,7 +716,20 @@ class RenderPipeline:
                 return await self._degrade(ctx, cur_spec, reason="retries_exhausted", qa=qa_record)
 
             if action in (RepairAction.RAISE_CONFLICT, RepairAction.EVOLVE_CANON):
-                outcome = await self._handle_conflict(ctx, cur_spec, qa_record, output)
+                try:
+                    outcome = await self._handle_conflict(ctx, cur_spec, qa_record, output)
+                except (LiveVideoDisabled, ProviderError) as exc:
+                    # Continuity/Showrunner (conflict resolution) is unavailable.
+                    # This attempt's render+QA already committed real budget above
+                    # — without a degrade here, the exception would propagate past
+                    # this loop uncaught, leaving the shot stuck mid-repair with no
+                    # clip (violating the worker's documented invariant that a
+                    # dead-lettered job has "already degraded... so the film never
+                    # hard-stops", queue/worker.py's module docstring).
+                    logger.warning("conflict.unavailable", shot_id=ctx.shot_id, error=str(exc))
+                    return await self._degrade(
+                        ctx, cur_spec, reason=f"conflict_{type(exc).__name__}", qa=qa_record
+                    )
                 if outcome.terminal is not None:
                     return outcome.terminal
                 if outcome.next_spec is not None:
@@ -725,7 +738,14 @@ class RenderPipeline:
                     cur_notes = outcome.next_notes
                 continue
 
-            cur_spec, cur_notes = await self._apply_repair(ctx, action, cur_spec, cur_notes)
+            try:
+                cur_spec, cur_notes = await self._apply_repair(ctx, action, cur_spec, cur_notes)
+            except (LiveVideoDisabled, ProviderError) as exc:
+                # Cinematographer (redesign) is unavailable — same reasoning as above.
+                logger.warning("repair.unavailable", shot_id=ctx.shot_id, error=str(exc))
+                return await self._degrade(
+                    ctx, cur_spec, reason=f"repair_{type(exc).__name__}", qa=qa_record
+                )
 
         # Defensive: decide_qa's retries_exhausted branch on the final attempt
         # always routes to DEGRADE above, so this is unreachable in practice.

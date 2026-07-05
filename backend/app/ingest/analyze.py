@@ -39,6 +39,7 @@ from app.providers import Providers
 logger = get_logger("app.ingest.analyze")
 
 EntityKind = Literal["character", "location", "prop"]
+_VALID_ENTITY_KINDS = {"character", "location", "prop"}
 
 #: Default bound on simultaneous in-flight VL calls (real parallelism).
 DEFAULT_CONCURRENCY = 4
@@ -120,6 +121,75 @@ class PageAnalysis(BaseModel):
     illustrations: list[DetectedIllustration] = Field(default_factory=list)
 
 
+def _drop_invalid_entities(payload: dict[str, object], *, page_number: int) -> None:
+    """Drop entities that can't cleanly validate, in place.
+
+    ``PageAnalysis`` validates ``entities`` as a single nested list, so any
+    one malformed entity used to raise a ``ValidationError`` that discarded
+    the *whole page* — summary, visuals, every other entity, every state —
+    instead of just the one entity that can't be used. Three observed shapes,
+    all handled the same way (drop just that entity):
+
+    * ``kind`` outside the closed ``character | location | prop`` vocabulary
+      (observed live: "organization") — the VL model is prompted with a
+      closed enum but occasionally emits something else;
+    * ``kind`` explicitly ``null`` — ``ent.get("kind")`` alone can't tell
+      "key absent" (fine; ``AnalyzedEntity.kind`` defaults to "character")
+      from "key present but null" (still fails validation), so this checks
+      ``"kind" in ent`` to only treat the latter as drop-worthy;
+    * a missing/empty ``name`` (required, no default) or a non-dict entry
+      (e.g. the model emits a bare string in the list).
+    """
+    entities = payload.get("entities")
+    if not isinstance(entities, list):
+        return
+    kept = []
+    for ent in entities:
+        if not isinstance(ent, dict) or not ent.get("name"):
+            logger.info(
+                "ingest.analyze.entity_dropped",
+                page_number=page_number,
+                reason="unnamed_or_malformed",
+            )
+            continue
+        kind = ent.get("kind")
+        if "kind" in ent and (kind is None or kind not in _VALID_ENTITY_KINDS):
+            logger.info(
+                "ingest.analyze.entity_kind_dropped",
+                page_number=page_number,
+                name=ent.get("name"),
+                kind=kind,
+            )
+            continue
+        kept.append(ent)
+    payload["entities"] = kept
+
+
+def _drop_invalid_states(payload: dict[str, object], *, page_number: int) -> None:
+    """Drop states missing a required subject/predicate/object, in place.
+
+    ``AnalyzedState`` requires all three as strings with no defaults, and the
+    VL model emits states heavily on real prose — at least as likely to be
+    malformed (a missing field, or a nested object instead of a string) as a
+    bad entity ``kind``, and it nukes the whole page the same way.
+    """
+    states = payload.get("states")
+    if not isinstance(states, list):
+        return
+    kept = []
+    for st in states:
+        if (
+            isinstance(st, dict)
+            and isinstance(st.get("subject"), str)
+            and isinstance(st.get("predicate"), str)
+            and isinstance(st.get("object"), str)
+        ):
+            kept.append(st)
+        else:
+            logger.info("ingest.analyze.state_dropped", page_number=page_number)
+    payload["states"] = kept
+
+
 async def _analyze_one(
     page: PageExtract,
     *,
@@ -159,6 +229,8 @@ async def _analyze_one(
             )
             payload = raw if isinstance(raw, dict) else {}
             payload["page_number"] = page.page_number
+            _drop_invalid_entities(payload, page_number=page.page_number)
+            _drop_invalid_states(payload, page_number=page.page_number)
             return PageAnalysis.model_validate(payload)
         except (ValidationError, ValueError, KeyError) as exc:
             logger.warning(

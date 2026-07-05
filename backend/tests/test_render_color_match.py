@@ -111,7 +111,7 @@ def test_concat_with_color_match_is_playable() -> None:
         png_bytes(360, 640), 1.0, audio_bytes=wav_bytes(1.0), size=(360, 640)
     )
     bright = degrade.audio_text_card(1.2, audio_bytes=wav_bytes(1.2), bg_color="white")
-    scene = concat_clips([dark, bright], color_match=True)
-    info = degrade.inspect(scene)
+    result = concat_clips([dark, bright], color_match=True)
+    info = degrade.inspect(result.clip_bytes)
     assert info.has_video is True and info.has_audio is True
-    assert degrade.verify_playable(scene) is True
+    assert degrade.verify_playable(result.clip_bytes) is True

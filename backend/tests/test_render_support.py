@@ -469,10 +469,15 @@ class FakeObjectStore:
 
 
 class FakeDesigner:
-    def __init__(self) -> None:
+    """Set ``raises`` to make *redesign* calls (repair/conflict, calls > 1)
+    fail — the initial design (call 1) always succeeds, since a repair can't
+    be exercised without a shot that rendered in the first place."""
+
+    def __init__(self, *, raises: Exception | None = None) -> None:
         self.calls = 0
         self.last_notes: list[Any] | None = None
         self.last_priors: Any = None
+        self.raises: Exception | None = raises
 
     async def design_shot(
         self,
@@ -487,6 +492,8 @@ class FakeDesigner:
         self.calls += 1
         self.last_notes = director_notes
         self.last_priors = priors
+        if self.raises is not None and self.calls > 1:
+            raise self.raises
         return AgentShotSpec(
             shot_id=shot_id or SHOT_ID,
             beat_id=beat.beat_id or None,
@@ -629,9 +636,10 @@ class FakeContinuity:
 class FakeShowrunner:
     """Applies the REAL §7.2 policy (``decide_arbitration``) with injected support."""
 
-    def __init__(self, *, supported: bool = False) -> None:
+    def __init__(self, *, supported: bool = False, raises: Exception | None = None) -> None:
         self._supported = supported
         self.calls = 0
+        self.raises: Exception | None = raises
 
     async def arbitrate(
         self,
@@ -642,6 +650,8 @@ class FakeShowrunner:
         textual_support: TextualSupport | None = None,
     ) -> DecisionRecord:
         self.calls += 1
+        if self.raises is not None:
+            raise self.raises
         supported = textual_support.supported if textual_support is not None else self._supported
         chosen, evolved = decide_arbitration(
             conflict, textual_support=supported, director_present=director_present

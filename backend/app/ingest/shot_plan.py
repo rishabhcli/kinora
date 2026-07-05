@@ -50,6 +50,56 @@ from app.ingest.ratelimit import retrying
 
 logger = get_logger("app.ingest.shot_plan")
 
+# Project Gutenberg wraps every plain-text release in standardized
+# boilerplate — a license/bibliographic header and, at the end, a lengthy
+# donation/license appendix — delimited by these fixed markers.
+_GUTENBERG_START_RE = re.compile(
+    r"\*\*\*\s*START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK", re.IGNORECASE
+)
+_GUTENBERG_END_RE = re.compile(
+    r"\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK", re.IGNORECASE
+)
+
+
+def gutenberg_content_page_range(pages: Sequence[PageExtract]) -> tuple[int, int]:
+    """The inclusive page range holding real narrative content.
+
+    Without this, the Adapter treats Gutenberg's boilerplate as narrative
+    beats — observed live: "The eBook opens with a Project Gutenberg
+    notice...", and "Chapter X is introduced..." for a TABLE-OF-CONTENTS
+    ENTRY, not the chapter itself — wasting real shot-planning, and (once
+    rendered) real video spend, on content that was never part of the story.
+    Every campaign book shares this source, so the waste compounds per book.
+
+    The marker's own page is kept on both ends (real content sometimes
+    starts/ends on the same page as the marker); only pages strictly outside
+    the marker pair are excluded. Absent markers (a non-Gutenberg source, or
+    an extraction that dropped them) returns the full page range untouched —
+    this must never narrow a book it can't confidently bound.
+    """
+    if not pages:
+        return 1, 1
+    start_page = pages[0].page_number
+    end_page = pages[-1].page_number
+    for page in pages:
+        if _GUTENBERG_START_RE.search(page.text):
+            start_page = page.page_number
+            break
+    for page in reversed(pages):
+        if _GUTENBERG_END_RE.search(page.text):
+            end_page = page.page_number
+            break
+    if start_page > end_page:
+        # A malformed/pathological END-before-START pairing (e.g. the END
+        # marker's own page also happens to match the START regex earlier in
+        # the scan). The docstring's own promise is "never narrow a book it
+        # can't confidently bound" — an inverted range is exactly that, and
+        # plan_and_persist's inclusive-range filter would otherwise keep ZERO
+        # pages, silently zeroing every scene/beat/shot for the whole book.
+        return pages[0].page_number, pages[-1].page_number
+    return start_page, end_page
+
+
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 _MIN_TOKEN_LEN = 3
 _STOPWORDS = frozenset({
@@ -365,7 +415,12 @@ async def plan_and_persist(
     await repos.shots.delete_for_book(book_id)
     await repos.scenes.delete_for_book(book_id)
 
-    page_numbers = [p.page_number for p in extract.pages if p.num_words > 0]
+    content_start, content_end = gutenberg_content_page_range(extract.pages)
+    page_numbers = [
+        p.page_number
+        for p in extract.pages
+        if p.num_words > 0 and content_start <= p.page_number <= content_end
+    ]
     groups = group_scenes(page_numbers, pages_per_scene=pages_per_scene)
     # Book-scope every plan id (§4.2): the stored scene/beat/shot ids carry the
     # book id so the global PKs never collide across books, and a re-ingest is
@@ -390,7 +445,7 @@ async def plan_and_persist(
     all_beats: list[Beat] = []
     beat_index = 0
     for page in extract.pages:
-        if page.num_words == 0:
+        if page.num_words == 0 or page.page_number not in page_to_scene:
             continue
         scene_id = page_to_scene[page.page_number]
 

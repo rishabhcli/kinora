@@ -30,6 +30,7 @@ from pydantic import BaseModel, ValidationError
 from app.core.logging import get_logger
 from app.providers import Providers
 from app.providers.chat import extract_json
+from app.providers.errors import ResponseParseError
 
 from .prompts import VersionedPrompt
 
@@ -136,7 +137,22 @@ class BaseAgent:
             raw2 = await self._providers.vl.analyze_json(
                 images, reminder, model=self.model, temperature=temperature, max_tokens=max_tokens
             )
-            model = response_model.model_validate(raw2)
+            try:
+                model = response_model.model_validate(raw2)
+            except ValidationError as exc2:
+                # A bare ValidationError here isn't a ProviderError, so it
+                # would skip every `except (LiveVideoDisabled, ProviderError)`
+                # guard a caller (e.g. Critic.score) wraps this call in and
+                # hard-crash instead of degrading (resilience audit Finding 2).
+                # ResponseParseError is this codebase's existing classification
+                # for "the provider responded, but not in the expected shape"
+                # (see providers/{chat,vl,image,embeddings,tts}.py) — the
+                # repair round-trip already gave the model one corrective
+                # chance, so this is non-retryable, same as those call sites.
+                raise ResponseParseError(
+                    f"VL repair round-trip still failed validation: "
+                    f"{_format_validation_errors(exc2)}"
+                ) from exc2
         self._log_call(response_model, before, repaired=repaired, modality="vl")
         return model
 
@@ -226,7 +242,21 @@ class BaseAgent:
             max_tokens=max_tokens,
             tools=tools,
         )
-        return response_model.model_validate(raw)
+        try:
+            return response_model.model_validate(raw)
+        except ValidationError as exc2:
+            # Same gap as run_json_vl (resilience audit Finding 2): a bare
+            # ValidationError out of the repair round-trip isn't a
+            # ProviderError, so it skips every caller's
+            # `except (LiveVideoDisabled, ProviderError)` guard and hard-
+            # crashes instead of degrading. ResponseParseError is this
+            # codebase's existing classification for this exact shape (see
+            # providers/{chat,vl,image,embeddings,tts}.py); non-retryable,
+            # since the repair round-trip already gave the model one
+            # corrective chance.
+            raise ResponseParseError(
+                f"repair round-trip still failed validation: {_format_validation_errors(exc2)}"
+            ) from exc2
 
     @staticmethod
     def _assistant_tool_turn(tool_calls: list[Any], text: str) -> dict[str, Any]:

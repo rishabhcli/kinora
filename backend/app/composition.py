@@ -32,7 +32,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -90,6 +90,8 @@ else:
     SearchIndexProto = object
 
 logger = get_logger("app.composition")
+
+_T = TypeVar("_T")
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 INGEST_RECOVERY_LIMIT = 25
@@ -321,7 +323,7 @@ class Container:
     #: by default, so building it spends no credits (KINORA_LIVE_VIDEO stays OFF).
     #: Nothing else in the container depends on it; see :meth:`inference_router`.
     _inference_router: Any = field(default=None, repr=False)
-    _bg_tasks: set[asyncio.Task[None]] = field(default_factory=set, repr=False)
+    _bg_tasks: set[asyncio.Task[Any]] = field(default_factory=set, repr=False)
 
     # -- providers (lazy; constructing them needs the key but no network) ---- #
 
@@ -1156,7 +1158,7 @@ class Container:
 
     async def run_ingest(
         self, book_id: str, pdf_bytes: bytes, session_id: str | None = None
-    ) -> None:
+    ) -> bool:
         """Run Phase A ingest for a book, publishing progress events (or the seam).
 
         Single-flight per book: the upload path ingests in-process while the
@@ -1164,10 +1166,16 @@ class Container:
         shared lock both can ingest the same book at once and collide on the
         scenes/shots primary keys (UniqueViolation -> the book is marked failed).
         A Redis ``SET NX`` lock makes the two paths mutually exclusive.
+
+        Returns whether ingest actually ran — ``False`` means another holder
+        (or a crashed process's not-yet-expired lock, see
+        :data:`INGEST_RECOVERY_LOCK_TTL_MS`) still holds the single-flight
+        lock, so callers that report a definitive outcome (e.g. the
+        ``reingest`` CLI action) don't claim success for a silent no-op.
         """
         if self.ingest_runner is not None:
             await self.ingest_runner(book_id, pdf_bytes, session_id)
-            return
+            return True
         lock = self.redis.lock(
             ingest_active_lock_key(book_id),
             ttl_ms=INGEST_RECOVERY_LOCK_TTL_MS,
@@ -1175,12 +1183,13 @@ class Container:
         )
         if not await lock.acquire():
             logger.info("ingest.skip_active", book_id=book_id)
-            return
+            return False
         try:
             await self._default_run_ingest(book_id, pdf_bytes, session_id)
         finally:
             with suppress(Exception):
                 await lock.release()
+        return True
 
     async def _default_run_ingest(
         self, book_id: str, pdf_bytes: bytes, session_id: str | None
@@ -1365,9 +1374,9 @@ class Container:
 
     # -- background tasks (ingest / regen fan-out) --------------------------- #
 
-    def spawn(self, coro: Awaitable[None]) -> asyncio.Task[None]:
+    def spawn(self, coro: Awaitable[_T]) -> asyncio.Task[_T]:
         """Run ``coro`` as a tracked background task (awaited/cancelled on shutdown)."""
-        task: asyncio.Task[None] = asyncio.ensure_future(coro)
+        task: asyncio.Task[_T] = asyncio.ensure_future(coro)
         self._bg_tasks.add(task)
         task.add_done_callback(self._bg_tasks.discard)
         return task

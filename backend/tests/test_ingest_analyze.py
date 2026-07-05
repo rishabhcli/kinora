@@ -103,6 +103,137 @@ async def test_analyze_pages_one_bad_page_does_not_fail_batch(
     assert analyses[1].summary == ""  # the failed page is empty, not missing
 
 
+async def test_analyze_pages_invalid_entity_kind_drops_entity_not_page(
+    providers: Providers,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: Qwen-VL emitting an out-of-vocabulary entity kind (e.g.
+    "organization", observed live for Alice's Adventures in Wonderland page 2)
+    used to fail PageAnalysis validation for the ENTIRE page. Only the bad
+    entity should be dropped — everything else on the page must survive.
+    """
+    pages = [_page(1)]
+    store = _store_for(pages)
+
+    async def with_bad_entity_kind(images: list[Any], prompt: str, **kw: Any) -> dict[str, Any]:
+        return {
+            "summary": "Alice follows the White Rabbit.",
+            "described_visuals": "A girl chases a rabbit in a waistcoat.",
+            "entities": [
+                {"name": "Alice", "kind": "character", "appearance": "young girl"},
+                {"name": "The Committee", "kind": "organization", "appearance": "a group"},
+                {"name": "White Rabbit", "kind": "character", "appearance": "a rabbit"},
+            ],
+            "states": [{"subject": "Alice", "predicate": "located_in", "object": "the hall"}],
+        }
+
+    monkeypatch.setattr(providers.vl, "analyze_json", with_bad_entity_kind)
+    analyses = await analyze_pages(pages, providers=providers, blob_store=store)
+
+    assert len(analyses) == 1
+    page = analyses[0]
+    assert page.summary == "Alice follows the White Rabbit."
+    assert page.described_visuals == "A girl chases a rabbit in a waistcoat."
+    assert [e.name for e in page.entities] == ["Alice", "White Rabbit"]
+
+
+async def test_analyze_pages_null_entity_kind_drops_entity_not_page(
+    providers: Providers,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression (found by independent review): ``ent.get("kind")`` alone
+    can't tell "kind key absent" (fine — AnalyzedEntity defaults to
+    "character") from "kind key present but explicitly null" (still fails
+    Pydantic validation the same way an out-of-vocabulary literal does) —
+    the original fix's ``if kind is not None`` guard let an explicit null
+    straight through to nuke the whole page again.
+    """
+    pages = [_page(1)]
+    store = _store_for(pages)
+
+    async def with_null_kind(images: list[Any], prompt: str, **kw: Any) -> dict[str, Any]:
+        return {
+            "summary": "Alice follows the White Rabbit.",
+            "entities": [
+                {"name": "Alice", "kind": "character"},
+                {"name": "A Mystery Thing", "kind": None},
+            ],
+        }
+
+    monkeypatch.setattr(providers.vl, "analyze_json", with_null_kind)
+    analyses = await analyze_pages(pages, providers=providers, blob_store=store)
+
+    assert len(analyses) == 1
+    page = analyses[0]
+    assert page.summary == "Alice follows the White Rabbit."
+    assert [e.name for e in page.entities] == ["Alice"]
+
+
+async def test_analyze_pages_unnamed_entity_drops_entity_not_page(
+    providers: Providers,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression (found by independent review): a missing/empty ``name``
+    (required, no default) or a non-dict entry (a bare string) used to nuke
+    the whole page the same way a bad ``kind`` did.
+    """
+    pages = [_page(1)]
+    store = _store_for(pages)
+
+    async def with_bad_entities(images: list[Any], prompt: str, **kw: Any) -> dict[str, Any]:
+        return {
+            "summary": "Alice follows the White Rabbit.",
+            "entities": [
+                {"name": "Alice", "kind": "character"},
+                {"kind": "character"},  # missing name
+                {"name": "", "kind": "character"},  # empty name
+                "White Rabbit",  # not even a dict
+            ],
+        }
+
+    monkeypatch.setattr(providers.vl, "analyze_json", with_bad_entities)
+    analyses = await analyze_pages(pages, providers=providers, blob_store=store)
+
+    assert len(analyses) == 1
+    page = analyses[0]
+    assert page.summary == "Alice follows the White Rabbit."
+    assert [e.name for e in page.entities] == ["Alice"]
+
+
+async def test_analyze_pages_malformed_state_drops_state_not_page(
+    providers: Providers,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression (found by independent review): AnalyzedState requires
+    subject/predicate/object as strings with no defaults — a missing field
+    or a non-string value is at least as likely as a bad entity kind (the VL
+    model emits states heavily on real prose) and used to nuke the whole
+    page the same way.
+    """
+    pages = [_page(1)]
+    store = _store_for(pages)
+
+    async def with_bad_states(images: list[Any], prompt: str, **kw: Any) -> dict[str, Any]:
+        return {
+            "summary": "Alice follows the White Rabbit.",
+            "states": [
+                {"subject": "Alice", "predicate": "located_in", "object": "the hall"},
+                {"subject": "Alice", "predicate": "wears"},  # missing object
+                {"subject": "Alice", "predicate": "holds", "object": {"nested": "dict"}},
+            ],
+        }
+
+    monkeypatch.setattr(providers.vl, "analyze_json", with_bad_states)
+    analyses = await analyze_pages(pages, providers=providers, blob_store=store)
+
+    assert len(analyses) == 1
+    page = analyses[0]
+    assert page.summary == "Alice follows the White Rabbit."
+    assert len(page.states) == 1
+    assert page.states[0].object == "the hall"
+    assert len(page.states) == 1
+
+
 async def test_analyze_pages_rate_limit_does_not_deadlock(
     providers: Providers,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,

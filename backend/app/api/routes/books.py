@@ -536,6 +536,8 @@ def _shot_response(container: Container, shot: Shot) -> ShotResponse:
         qa=shot.qa,
         clip_url=clip_url,
         reference_image_ids=list(shot.reference_image_ids or []),
+        clip_start_s=shot.clip_start_s,
+        clip_end_s=shot.clip_end_s,
     )
 
 

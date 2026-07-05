@@ -33,6 +33,7 @@ Note: page PNG keys use :meth:`app.storage.object_store.Keys.page_image`.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Awaitable, Callable
 
 import anyio
@@ -169,7 +170,12 @@ def _extract_page_words(
     boxes: list[WordBox] = [
         WordBox(
             word_index=word_offset + i,
-            text=word.text,
+            # NFKC decomposes typographic ligatures ("ﬁrst" -> "first", "oﬀ" ->
+            # "off") that PDF text layers commonly carry as single glyphs —
+            # observed live in real narration text. Word count is unaffected
+            # (one ligature-bearing word normalizes to one plain word), so the
+            # book-global word index this feeds is unaffected too.
+            text=unicodedata.normalize("NFKC", word.text),
             bbox=_normalise_bbox(word.x0, word.y0, word.x1, word.y1, width, height),
         )
         for i, word in enumerate(ordered)
