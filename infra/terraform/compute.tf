@@ -31,7 +31,8 @@ locals {
   # MCP_AUTH_TOKEN are shared across roles (the api verifies JWTs and calls MCP;
   # the mcp node requires the bearer; workers may call MCP too) — every node runs
   # the same image, matching docker-compose's shared x-backend env. CORS only
-  # affects the api but is harmless elsewhere; it's rendered as a comma list.
+  # affects the api but is harmless elsewhere; render it as JSON because Pydantic
+  # parses list env vars as JSON, not comma-separated strings.
   cloud_init_common = {
     image              = var.container_image
     build_from_source  = var.build_images_on_instance ? "true" : "false"
@@ -53,7 +54,7 @@ locals {
     video_model_r2v    = var.video_model_r2v
     jwt_secret         = local.jwt_secret
     mcp_auth_token     = local.mcp_auth_token
-    cors_origins       = join(",", var.cors_origins)
+    cors_origins       = jsonencode(var.cors_origins)
   }
 }
 
