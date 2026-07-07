@@ -90,8 +90,9 @@ output "mcp_auth_token" {
 output "next_steps" {
   description = "Post-apply checklist."
   value = join("\n", [
-    "1. Build + push the backend image to var.container_image (ACR).",
-    "2. Build + push the renderer image to var.frontend_container_image with VITE_KINORA_API_URL=http://<api_public_ip>:8000.",
+    "1. If build_images_on_instance=false, build + push the backend image to var.container_image (ACR).",
+    "2. If build_images_on_instance=false, build + push the renderer image to var.frontend_container_image.",
+    "   If build_images_on_instance=true, cloud-init cloned source_repo_url/source_ref and built both images on ECS.",
     "3. SSH to the API node and confirm the container is up: curl http://localhost:8000/health",
     "4. Run migrations once: docker exec kinora-api alembic -c alembic.ini upgrade head",
     "   (this also runs CREATE EXTENSION vector on RDS PostgreSQL).",

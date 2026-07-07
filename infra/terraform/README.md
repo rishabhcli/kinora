@@ -32,6 +32,9 @@ locally against MinIO). This is the cloud form of the §12.6 proof artifact in
 - An Alibaba Cloud account + an access key (ideally a scoped RAM user)
 - Backend and frontend images pushed to a registry the ECS nodes can pull
   (e.g. ACR); set `container_image` and `frontend_container_image`
+  - Hackathon shortcut: set `build_images_on_instance=true` plus
+    `source_repo_url`/`source_ref` to have cloud-init clone the public repo and
+    build the same Dockerfiles directly on ECS before ACR exists.
 - A DashScope intl API key (`dashscope_api_key`)
 - **Required, no-default network/auth inputs** (fail-closed — `apply` won't run
   without them): `admin_cidr` (who can reach the API), `ssh_cidr` (who can SSH),

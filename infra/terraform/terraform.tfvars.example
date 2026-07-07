@@ -34,13 +34,13 @@ cors_origins = ["https://kinora.example.com"]
 oss_bucket_name = "kinora-assets-yourorg"
 
 # --- RDS PostgreSQL (region-specific class; >= 14 for pgvector) ---
-rds_engine_version   = "16.0"
+rds_engine_version   = "15.0"
 rds_instance_type    = "pg.n2.small.1"
 rds_instance_storage = 50
 # db_account_password = ""   # leave empty to auto-generate a strong one
 
 # --- Tair / Redis (region-specific class) ---
-redis_instance_class = "redis.master.small.default"
+redis_instance_class = "redis.shard.micro.ce"
 redis_engine_version = "7.0"
 # redis_password      = ""   # leave empty to auto-generate
 
@@ -53,6 +53,9 @@ render_worker_count = 2
 # --- Application runtime ---
 container_image          = "registry.ap-southeast-1.aliyuncs.com/kinora/backend:latest"
 frontend_container_image = "registry.ap-southeast-1.aliyuncs.com/kinora/frontend:latest"
+build_images_on_instance = false # true lets ECS clone source_repo_url/source_ref and build before ACR exists
+source_repo_url          = "https://github.com/rishabhcli/kinora.git"
+source_ref               = "main"
 dashscope_api_key        = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 kinora_live_video        = false # flip to true only when you intend to spend Wan video-seconds
 

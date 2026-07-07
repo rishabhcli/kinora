@@ -119,14 +119,14 @@ resource "alicloud_security_group_rule" "app_api" {
 }
 
 resource "alicloud_security_group_rule" "app_api_internal" {
-  type                     = "ingress"
-  ip_protocol              = "tcp"
-  port_range               = "8000/8000"
-  security_group_id        = alicloud_security_group.app.id
-  source_security_group_id = alicloud_security_group.app.id
-  nic_type                 = "intranet"
-  policy                   = "accept"
-  priority                 = 1
+  type              = "ingress"
+  ip_protocol       = "tcp"
+  port_range        = "8000/8000"
+  security_group_id = alicloud_security_group.app.id
+  cidr_ip           = var.vpc_cidr
+  nic_type          = "intranet"
+  policy            = "accept"
+  priority          = 1
 }
 
 resource "alicloud_security_group_rule" "app_frontend" {
@@ -143,14 +143,14 @@ resource "alicloud_security_group_rule" "app_frontend" {
 # MCP is reachable only from other app-tier nodes (api/render-worker), never the
 # internet — same source-security-group pattern as the RDS/Tair data tier.
 resource "alicloud_security_group_rule" "app_mcp" {
-  type                     = "ingress"
-  ip_protocol              = "tcp"
-  port_range               = "8765/8765"
-  security_group_id        = alicloud_security_group.app.id
-  source_security_group_id = alicloud_security_group.app.id
-  nic_type                 = "intranet"
-  policy                   = "accept"
-  priority                 = 1
+  type              = "ingress"
+  ip_protocol       = "tcp"
+  port_range        = "8765/8765"
+  security_group_id = alicloud_security_group.app.id
+  cidr_ip           = var.vpc_cidr
+  nic_type          = "intranet"
+  policy            = "accept"
+  priority          = 1
 }
 
 resource "alicloud_security_group_rule" "app_ssh" {

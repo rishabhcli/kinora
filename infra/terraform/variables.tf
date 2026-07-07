@@ -114,7 +114,7 @@ variable "oss_bucket_name" {
 variable "rds_engine_version" {
   description = "PostgreSQL major version (>= 14 supports the pgvector extension)."
   type        = string
-  default     = "16.0"
+  default     = "15.0"
 }
 
 variable "rds_instance_type" {
@@ -161,7 +161,7 @@ variable "db_account_password" {
 variable "redis_instance_class" {
   description = "Tair/Redis instance class (region-specific; e.g. redis.master.small.default)."
   type        = string
-  default     = "redis.master.small.default"
+  default     = "redis.shard.micro.ce"
 }
 
 variable "redis_engine_version" {
