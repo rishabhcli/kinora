@@ -93,7 +93,7 @@ resource "alicloud_instance" "frontend" {
     build_from_source = var.build_images_on_instance ? "true" : "false"
     source_repo_url   = var.source_repo_url
     source_ref        = var.source_ref
-    api_url           = "http://${alicloud_instance.api.public_ip}:8000"
+    api_url           = "http://${alicloud_instance.api.private_ip}:8000"
   }))
 
   tags = merge(local.common_tags, { Role = "frontend" })

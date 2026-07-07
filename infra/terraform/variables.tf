@@ -91,6 +91,12 @@ variable "ssh_cidr" {
   }
 }
 
+variable "frontend_cidr" {
+  description = "CIDR allowed to reach the public frontend (80). Defaults open for hackathon/demo sharing; tighten behind a CDN/LB for production."
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
 # ---------------------------------------------------------------------------- #
 # OSS object storage (clips, keyframes, audio, refs, canon vault)
 # ---------------------------------------------------------------------------- #

@@ -15,15 +15,47 @@ if [ "${build_from_source}" = "true" ]; then
   git checkout "${source_ref}"
   docker build \
     -f infra/docker/desktop.Dockerfile \
-    --build-arg VITE_KINORA_API_URL="${api_url}" \
+    --build-arg VITE_KINORA_API_URL="" \
     -t kinora-frontend:cloud .
   IMAGE="kinora-frontend:cloud"
 else
   docker pull "$IMAGE"
 fi
 
+install -d -m 0755 /etc/kinora
+cat > /etc/kinora/frontend.nginx.conf <<'NGINX'
+server {
+  listen 80;
+  server_name _;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location /api/ {
+    proxy_pass ${api_url};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 600s;
+  }
+
+  location /assets/ {
+    try_files $uri =404;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;
+    add_header Cache-Control "no-store";
+  }
+}
+NGINX
+
 docker rm -f kinora-frontend 2>/dev/null || true
 docker run -d --name kinora-frontend \
   --restart always \
   -p 80:80 \
+  -v /etc/kinora/frontend.nginx.conf:/etc/nginx/conf.d/default.conf:ro \
   "$IMAGE"
