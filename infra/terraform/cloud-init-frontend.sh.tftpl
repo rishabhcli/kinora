@@ -2,12 +2,28 @@
 # Kinora frontend ECS node bootstrap. Serves the Vite renderer via Nginx.
 set -euo pipefail
 
-dnf install -y docker || yum install -y docker
+dnf install -y docker git || yum install -y docker git
 systemctl enable --now docker
 
-docker pull "${image}"
+IMAGE="${image}"
+if [ "${build_from_source}" = "true" ]; then
+  install -d -m 0755 /opt/kinora
+  rm -rf /opt/kinora/source
+  git clone --depth 1 "${source_repo_url}" /opt/kinora/source
+  cd /opt/kinora/source
+  git fetch --depth 1 origin "${source_ref}" || true
+  git checkout "${source_ref}"
+  docker build \
+    -f infra/docker/desktop.Dockerfile \
+    --build-arg VITE_KINORA_API_URL="${api_url}" \
+    -t kinora-frontend:cloud .
+  IMAGE="kinora-frontend:cloud"
+else
+  docker pull "$IMAGE"
+fi
+
 docker rm -f kinora-frontend 2>/dev/null || true
 docker run -d --name kinora-frontend \
   --restart always \
   -p 80:80 \
-  "${image}"
+  "$IMAGE"

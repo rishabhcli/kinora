@@ -15,7 +15,7 @@
 set -euo pipefail
 
 # --- Docker (Aliyun Linux 3 / dnf) ---
-dnf install -y docker || yum install -y docker
+dnf install -y docker git || yum install -y docker git
 systemctl enable --now docker
 
 # --- Runtime environment (no secrets are committed; injected at apply time) ---
@@ -43,13 +43,29 @@ CORS_ORIGINS=${cors_origins}
 ENV
 chmod 0640 /etc/kinora/kinora.env
 
-# --- Pull + run the backend image with this node's command ---
-# If the image lives in a private ACR, add a `docker login` here (or attach a RAM
-# role + use the ACR credential helper) before the pull.
-docker pull "${image}"
+# --- Pull/build + run the backend image with this node's command ---
+# The normal production path is to pull a pre-pushed ACR image. For hackathon
+# proof deployments before ACR is provisioned, build_from_source=true clones the
+# public repo and builds the exact same Dockerfile on the ECS node.
+IMAGE="${image}"
+if [ "${build_from_source}" = "true" ]; then
+  install -d -m 0755 /opt/kinora
+  rm -rf /opt/kinora/source
+  git clone --depth 1 "${source_repo_url}" /opt/kinora/source
+  cd /opt/kinora/source
+  git fetch --depth 1 origin "${source_ref}" || true
+  git checkout "${source_ref}"
+  docker build -f infra/docker/backend.Dockerfile -t kinora-backend:cloud .
+  IMAGE="kinora-backend:cloud"
+else
+  # If the image lives in a private ACR, add a `docker login` here (or attach a RAM
+  # role + use the ACR credential helper) before the pull.
+  docker pull "$IMAGE"
+fi
+
 docker rm -f kinora-${role} 2>/dev/null || true
 docker run -d --name kinora-${role} \
   --restart always \
   --env-file /etc/kinora/kinora.env \
   ${publish} \
-  "${image}" ${command}
+  "$IMAGE" ${command}

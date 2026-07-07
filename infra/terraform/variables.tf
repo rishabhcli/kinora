@@ -229,6 +229,24 @@ variable "frontend_container_image" {
   default     = "registry.ap-southeast-1.aliyuncs.com/kinora/frontend:latest"
 }
 
+variable "build_images_on_instance" {
+  description = "When true, ECS cloud-init clones source_repo_url/source_ref and builds the backend/frontend Docker images locally instead of pulling pre-pushed registry images. Useful for hackathon proof deployments before ACR is provisioned."
+  type        = bool
+  default     = false
+}
+
+variable "source_repo_url" {
+  description = "Public Git repository cloned by cloud-init when build_images_on_instance is true."
+  type        = string
+  default     = "https://github.com/rishabhcli/kinora.git"
+}
+
+variable "source_ref" {
+  description = "Branch, tag, or commit SHA checked out by cloud-init when build_images_on_instance is true."
+  type        = string
+  default     = "main"
+}
+
 variable "dashscope_api_key" {
   description = "DashScope (Model Studio) intl API key. Injected into the app env; never commit it."
   type        = string

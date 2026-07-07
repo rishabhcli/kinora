@@ -34,6 +34,9 @@ locals {
   # affects the api but is harmless elsewhere; it's rendered as a comma list.
   cloud_init_common = {
     image              = var.container_image
+    build_from_source  = var.build_images_on_instance ? "true" : "false"
+    source_repo_url    = var.source_repo_url
+    source_ref         = var.source_ref
     app_env            = var.environment
     database_url       = local.database_url
     redis_url          = local.redis_url
@@ -86,7 +89,11 @@ resource "alicloud_instance" "frontend" {
   internet_max_bandwidth_out = var.ecs_internet_bandwidth_out
 
   user_data = base64encode(templatefile("${path.module}/cloud-init-frontend.sh.tftpl", {
-    image = var.frontend_container_image
+    image             = var.frontend_container_image
+    build_from_source = var.build_images_on_instance ? "true" : "false"
+    source_repo_url   = var.source_repo_url
+    source_ref        = var.source_ref
+    api_url           = "http://${alicloud_instance.api.public_ip}:8000"
   }))
 
   tags = merge(local.common_tags, { Role = "frontend" })
