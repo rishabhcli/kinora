@@ -255,7 +255,20 @@ The budget service enforces the ceiling with a real append-only ledger and a tra
 
 ## Deploy to Alibaba Cloud
 
-`infra/terraform/` is ready-to-apply IaC (validated with `terraform validate` + `terraform fmt`; **not** applied — it needs your credentials). It provisions VPC + security groups, **OSS** (object storage), **ApsaraDB RDS for PostgreSQL** (pgvector), **Tair/Redis**, and **ECS** nodes for `frontend`, `api`, `ingest-worker`, `render-worker`, and `mcp`.
+**Live hackathon deployment:** [http://47.84.34.158](http://47.84.34.158) runs on
+an Alibaba Cloud ECS `ecs.g8y.small` ARM instance in Singapore. The
+[`deploy/alibaba_single_node.sh`](./deploy/alibaba_single_node.sh) bootstrap is
+the exact deployment path: it installs Docker on Alibaba Cloud Linux, builds the
+pinned repository revision, starts Postgres/pgvector, Redis, MinIO, FastAPI,
+ingest and render workers, MCP, and the browser renderer, then seeds five
+openable public-domain books. Only Nginx is internet-facing; the API and data
+services stay on the private Docker network.
+
+The larger `infra/terraform/` topology remains ready-to-apply IaC (validated
+with `terraform validate` + `terraform fmt`). It provisions VPC + security
+groups, **OSS** (object storage), **ApsaraDB RDS for PostgreSQL** (pgvector),
+**Tair/Redis**, and separate **ECS** nodes for `frontend`, `api`,
+`ingest-worker`, `render-worker`, and `mcp`.
 
 ```bash
 cd infra/terraform
