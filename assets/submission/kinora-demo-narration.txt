@@ -1,10 +1,10 @@
 Kinora turns reading into a living, cinematic experience without taking the book away.
 
-The library starts with real, openable public-domain titles. Open Alice in Wonderland and the source text stays at the center of the experience. AI Film is enabled in the reading toolbar, and the vertical film pane sits beside the words it is adapting.
+The library starts with real, openable public-domain titles. Open Alice in Wonderland and the source text stays at the center of the experience. The vertical film pane appears automatically beside the words it is adapting, with no mode switch to manage.
 
 As the reader scrolls, Kinora sends position and reading velocity to a live scheduler. The Qwen agent crew reads the next source span, plans continuity-aware shots, creates keyframes, and submits committed work to Alibaba's hosted Wan video model. The status changes from generating ahead to a playable buffer as clips arrive.
 
-Watch the film pane as the text moves. The generated shot changes with the passage rather than playing an unrelated trailer. Character references, source-word ranges, and scene state keep each clip attached to the book.
+Watch the film pane as the text moves. Only critic-accepted hosted video appears there, and the shot changes with the passage rather than playing an unrelated trailer. Character references, source-word ranges, and scene state keep each clip attached to the book.
 
 Behind the interface, FastAPI, PostgreSQL with pgvector, Redis queues, MinIO, and dedicated ingest and render workers run together on Alibaba Cloud ECS. Provider results are downloaded into persistent storage before their temporary URLs expire.
 

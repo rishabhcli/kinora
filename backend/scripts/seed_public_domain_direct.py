@@ -190,25 +190,23 @@ async def build_book(
     num_pages: int, cover_png: bytes | None = None, cover_source: str = "generated",
     max_shots: int = MAX_SHOTS,
 ) -> dict[str, Any] | None:
-    """Write one ready, span-indexed, playable book directly (no model spend).
+    """Write one ready, span-indexed book directly without pre-rendering film.
 
     Sets ``Book.cover_key`` to ``covers/{book_id}`` (a real shelf cover) in addition
     to seeding page 1's image, so the library shelf renders a designed/HD cover.
     """
     from app.api.security import hash_password
     from app.core.config import get_settings
-    from app.db.hashing import compute_shot_hash
     from app.db.models.enums import BookStatus, EntityType, ShotStatus
     from app.db.repositories.beat import BeatRepo
     from app.db.repositories.book import BookRepo, PageRepo
     from app.db.repositories.entity import EntityRepo
     from app.db.repositories.scene import SceneRepo
-    from app.db.repositories.shot import ShotCacheRepo, ShotRepo, SourceSpanRepo
+    from app.db.repositories.shot import ShotRepo, SourceSpanRepo
     from app.db.repositories.user import UserRepo
     from app.db.session import get_session
     from app.memory.cache_service import CacheService
     from app.redis.client import RedisClient
-    from app.render.degrade import ken_burns_over_image
     from app.storage.object_store import ObjectStore, keys
 
     settings = get_settings()
@@ -237,7 +235,8 @@ async def build_book(
             await session.delete(existing)
 
     # The designed/HD cover: a real shelf cover (covers/{book_id}, Book.cover_key),
-    # also reused as page 1's image, the film poster, and the locked char ref.
+    # also reused as page 1's image and the locked character reference. It is not
+    # promoted into the film timeline; only hosted video may become playable.
     cover_key = keys.cover(book_id)
     page_image_key = f"pages/{book_id}/1.png"
     store.put_bytes(cover_key, cover, "image/png")
@@ -311,24 +310,14 @@ async def build_book(
                 beat_ids.append(bid)
                 beat_index += 1
 
-    clip_bytes = ken_burns_over_image(cover, duration_s=2.5, size=(540, 960), fps=24)
-    accepted = f"{tag}sh0000"
-    clip_key = keys.clip(book_id, accepted)
-    store.put_bytes(clip_key, clip_bytes, "video/mp4")
-    last_frame_key = keys.lastframe(book_id, accepted)
-    store.put_bytes(last_frame_key, cover, "image/png")
-
     # Bounded shot grid: at most ``max_shots`` shots, contiguous spans covering
     # every word (coarser than 1-shot-per-12-words, but the index stays complete).
     num_shots = min(max_shots, max(2, (total_words + WORD_STEP - 1) // WORD_STEP))
     step = max(WORD_STEP, (total_words + num_shots - 1) // num_shots)
-    accepted_refs = [f"{CHAR}@v1", f"{STYLE}@v1"]
-    ref_hash = CacheService.reference_set_hash(accepted_refs)
 
     spans: list[dict[str, Any]] = []
     async with get_session() as session:
         shot_repo = ShotRepo(session)
-        cache = ShotCacheRepo(session)
         for i in range(num_shots):
             sid = f"{tag}sh{i:04d}"
             start = i * step
@@ -341,42 +330,16 @@ async def build_book(
             snippet = " ".join(words[start:end + 1])[:160]
             source_span = {"page": page_no, "para": 1, "word_range": [start, end]}
             prompt = f"{art}. {snippet}"
-            if i == 0:
-                shot_hash = compute_shot_hash(
-                    book_id=book_id, beat_id=beat_id, canon_version_at_render=1,
-                    render_mode="ken_burns_keyframe", seed=88123, reference_set_hash=ref_hash,
-                )
-                await shot_repo.create(
-                    id=sid, book_id=book_id, scene_id=scene_id, beat_id=beat_id,
-                    source_span=source_span, status=ShotStatus.ACCEPTED,
-                    render_mode="ken_burns_keyframe", prompt=prompt,
-                    negative_prompt="extra fingers, warped face, modern objects", seed=88123,
-                    reference_set_hash=ref_hash, reference_image_ids=accepted_refs,
-                    duration_s=SHOT_DURATION_S,
-                    output={"clip_key": clip_key, "last_frame_key": last_frame_key},
-                    narration={"text": snippet, "word_timestamps": []},
-                    qa={"ccs": 0.92, "style_drift": 0.04, "timeline_ok": True,
-                        "motion_artifact": 0.08, "score": 0.9, "verdict": "pass",
-                        "reason": "seed"},
-                    cost={"video_seconds": 0.0, "tokens": 0},
-                    shot_hash=shot_hash, canon_version_at_render=1,
-                )
-                await cache.put(
-                    shot_hash=shot_hash, book_id=book_id, clip_key=clip_key,
-                    last_frame_key=last_frame_key, qa={"verdict": "pass", "ccs": 0.92},
-                    video_seconds=0.0,
-                )
-            else:
-                await shot_repo.create(
-                    id=sid, book_id=book_id, scene_id=scene_id, beat_id=beat_id,
-                    source_span=source_span, status=ShotStatus.PLANNED,
-                    render_mode="reference_to_video", prompt=prompt,
-                    negative_prompt="extra fingers, warped face, modern objects",
-                    seed=88123 + i,
-                    reference_set_hash=CacheService.reference_set_hash([f"{STYLE}@v1"]),
-                    reference_image_ids=[f"{STYLE}@v1"], duration_s=SHOT_DURATION_S,
-                    canon_version_at_render=1,
-                )
+            await shot_repo.create(
+                id=sid, book_id=book_id, scene_id=scene_id, beat_id=beat_id,
+                source_span=source_span, status=ShotStatus.PLANNED,
+                render_mode="reference_to_video", prompt=prompt,
+                negative_prompt="extra fingers, warped face, modern objects",
+                seed=88123 + i,
+                reference_set_hash=CacheService.reference_set_hash([f"{STYLE}@v1"]),
+                reference_image_ids=[f"{STYLE}@v1"], duration_s=SHOT_DURATION_S,
+                canon_version_at_render=1,
+            )
             spans.append({
                 "book_id": book_id, "word_index_start": start, "word_index_end": end,
                 "shot_id": sid, "scene_id": scene_id, "beat_id": beat_id,

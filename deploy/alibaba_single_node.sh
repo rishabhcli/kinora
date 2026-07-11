@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SOURCE_REPO_URL="${SOURCE_REPO_URL:-https://github.com/rishabhcli/kinora.git}"
-SOURCE_REF="${SOURCE_REF:-bbe24b5a3afa0a7b54ae084c61da9d1bde3909ed}"
+SOURCE_REF="${SOURCE_REF:-main}"
 PUBLIC_HOST="${PUBLIC_HOST:?Set PUBLIC_HOST to the ECS public IPv4 address}"
 ENV_SOURCE="${ENV_SOURCE:-/root/kinora-backend.env.source}"
 INSTALL_ROOT="${INSTALL_ROOT:-/opt/kinora}"
@@ -83,10 +83,10 @@ install -m 0600 "$ENV_SOURCE" backend/.env
   echo 'VIDEO_MODEL_R2V=wan2.1-i2v-turbo'
   echo 'KINORA_LIVE_VIDEO=true'
   echo 'KINORA_PROD_LIVE_VIDEO_OK=1'
-  echo 'BUDGET_CEILING_VIDEO_S=300'
-  echo 'BUDGET_PER_SESSION_S=120'
-  echo 'BUDGET_PER_SCENE_S=45'
-  echo 'BUDGET_LOW_FLOOR_S=30'
+  echo 'BUDGET_CEILING_VIDEO_S=3000'
+  echo 'BUDGET_PER_SESSION_S=600'
+  echo 'BUDGET_PER_SCENE_S=120'
+  echo 'BUDGET_LOW_FLOOR_S=60'
   echo 'DATABASE_URL=postgresql+asyncpg://kinora:kinora@postgres:5432/kinora'
   echo 'REDIS_URL=redis://redis:6379/0'
   echo 'S3_ENDPOINT_URL=http://minio:9000'
