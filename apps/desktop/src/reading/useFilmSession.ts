@@ -1,16 +1,16 @@
 // Drives the open-state machine through the data load and the live session:
 //   meta → pages(≤60) → shots → createSession → openSessionEvents(SSE) →
 //   postIntent(0) (prime the scheduler) → clips/buffer/crew stream in.
-// Every failure path dispatches FALLBACK so the room degrades to the bundled film
-// instead of erroring. Tears down the SSE on unmount/book-change (EventSource
+// Every failure path keeps the text reader available without substituting a fake
+// film. Tears down the SSE on unmount/book-change (EventSource
 // auto-reconnects across transient drops on its own).
 // This hook treats the cinematic layer as a reliability problem: use the live
 // path when it is available, and keep the reader moving when it is not.
 import { useEffect, useRef, useState } from "react";
 import { api, toBrowserUrl, type SessionEvent, type ShotResponse } from "../lib/api";
 import type { Book } from "../data/books";
-import { fallbackFilmFor } from "./fallback";
 import type { MachineEvent } from "./machine";
+import { isPlayableShot } from "./playableShot";
 import type { PageText } from "./slots";
 
 export interface CrewActivity {
@@ -49,10 +49,6 @@ interface AgentActivityMsg {
 export function useFilmSession(
   book: Book | null,
   dispatch: (e: MachineEvent) => void,
-  /** When false, skip the SSE/createSession live path and stay on the bundled
-   *  fallback film. The reader can flip this on at any time from the top bar to
-   *  start AI generation (gives users explicit control over generation spend). */
-  generateVideo: boolean = true,
 ): FilmSession {
   const [pages, setPages] = useState<PageText[]>([]);
   const [shots, setShots] = useState<ShotResponse[]>([]);
@@ -65,12 +61,9 @@ export function useFilmSession(
   const [zone, setZone] = useState<string | null>(null);
   const [crew, setCrew] = useState<CrewActivity[]>([]);
   const crewId = useRef(0);
-  // Coalesce bursty clip_ready events into one state commit per frame, so the
-  // timeline (rebuilt from clipByShot) recomputes at most once per frame [D6].
-  const pendingClips = useRef<Record<string, string>>({});
-  const clipFlush = useRef<number | null>(null);
-
-  const fallbackFilm = fallbackFilmFor(book?.id ?? "");
+  // Retained for the stable slot contract. An empty value deliberately prevents
+  // bundled preview footage from being presented as generated film.
+  const fallbackFilm = "";
 
   useEffect(() => {
     if (!book) return;
@@ -86,17 +79,9 @@ export function useFilmSession(
     setZone(null);
     setCrew([]);
 
-    // No auth → no backend session at all → straight to the bundled film.
+    // No auth means the text reader remains available with an empty film surface.
     if (!api.isAuthed()) {
-      dispatch({ type: "FALLBACK", message: "Offline preview" });
-      return;
-    }
-
-    // Generation gated OFF → show the bundled fallback film immediately and skip
-    // all token-spending live calls. Flipping the toggle ON re-runs this effect
-    // (generateVideo is in the dep array) and kicks off the live session.
-    if (!generateVideo) {
-      dispatch({ type: "FALLBACK", message: "AI film is off — turn it on in the top bar to generate" });
+      dispatch({ type: "FALLBACK", message: "Film generation is unavailable" });
       return;
     }
 
@@ -134,9 +119,10 @@ export function useFilmSession(
         ps.sort((a, b) => a.n - b.n); // batches preserve order, but be defensive
         dispatch({ type: "PAGES" });
 
-        const sh = (await api.getShots(book.id))
+        const sortShots = (incoming: ShotResponse[]) => incoming
           .filter((s) => s.source_span)
           .sort((a, b) => a.source_span!.word_range[0] - b.source_span!.word_range[0]);
+        const sh = sortShots(await api.getShots(book.id));
         if (!alive) return;
 
         // Backend reachable but the book isn't analysed yet → preview now, not an error.
@@ -148,9 +134,28 @@ export function useFilmSession(
         setPages(ps);
         setShots(sh);
         const seed: Record<string, string> = {};
-        for (const s of sh) if (s.clip_url) seed[s.shot_id] = toBrowserUrl(s.clip_url);
+        for (const s of sh) {
+          if (isPlayableShot(s) && s.clip_url) seed[s.shot_id] = toBrowserUrl(s.clip_url);
+        }
         setClipByShot(seed);
         setLive(true);
+
+        const refreshAcceptedShots = async () => {
+          try {
+            const latest = sortShots(await api.getShots(book.id));
+            if (!alive) return;
+            const accepted: Record<string, string> = {};
+            for (const shot of latest) {
+              if (isPlayableShot(shot) && shot.clip_url) {
+                accepted[shot.shot_id] = toBrowserUrl(shot.clip_url);
+              }
+            }
+            setShots(latest);
+            setClipByShot(accepted);
+          } catch {
+            // A transient metadata refresh must not admit the unverified SSE URL.
+          }
+        };
 
         const sess = await api.createSession(book.id, 0);
         if (!alive) return;
@@ -161,18 +166,9 @@ export function useFilmSession(
           if (!alive) return;
           switch (e.event) {
             case "clip_ready": {
-              const c = e as unknown as { shot_id: string; oss_url: string };
-              if (c.oss_url) {
-                pendingClips.current[c.shot_id] = toBrowserUrl(c.oss_url);
-                if (clipFlush.current == null) {
-                  clipFlush.current = requestAnimationFrame(() => {
-                    clipFlush.current = null;
-                    const batch = pendingClips.current;
-                    pendingClips.current = {};
-                    setClipByShot((m) => ({ ...m, ...batch }));
-                  });
-                }
-              }
+              // SSE URLs are intentionally untrusted. Re-read persisted metadata
+              // and only expose clips whose critic verdict is `accepted`.
+              void refreshAcceptedShots();
               break;
             }
             case "buffer_state": {
@@ -206,21 +202,16 @@ export function useFilmSession(
         });
         api.postIntent(sess.session_id, 0, 4).catch(() => {}); // prime the scheduler
       } catch {
-        if (alive) dispatch({ type: "FALLBACK", message: "Showing a preview film" });
+        if (alive) dispatch({ type: "FALLBACK", message: "Film generation is unavailable" });
       }
     })();
 
     return () => {
       alive = false;
       closeEvents?.();
-      if (clipFlush.current != null) {
-        cancelAnimationFrame(clipFlush.current);
-        clipFlush.current = null;
-      }
-      pendingClips.current = {};
       setSessionId(null);
     };
-  }, [book, dispatch, generateVideo]);
+  }, [book, dispatch]);
 
   return { pages, shots, clipByShot, sessionId, live, fallbackFilm, bufferAhead, bursting, inflight, zone, crew };
 }

@@ -147,7 +147,10 @@ export default function HomePage({ onLogout }: { onLogout: () => void }) {
           books.filter((b) => b.status === "ready").map(async (b) => {
             let cover = "";
             try {
-              cover = toBrowserUrl((await api.getPageCached(b.id, 1)).image_url);
+              const pageImage = toBrowserUrl((await api.getPageCached(b.id, 1)).image_url);
+              cover = pageImage
+                ? `${pageImage}?v=cover-3-${encodeURIComponent(b.created_at ?? "1")}`
+                : "";
             } catch {
               /* no page image yet */
             }

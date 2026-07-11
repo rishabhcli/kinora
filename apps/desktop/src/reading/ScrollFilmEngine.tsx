@@ -21,6 +21,7 @@ import { useScrollFilm, type ScrollFrame } from "./useScrollFilm";
 import { activeParagraphIndex, focusContentY, focusOpacity } from "./focusModel";
 import { ClipCache } from "./clipCache";
 import { useReducedMotionPref } from "../a11y/useReducedMotionPref";
+import { isPlayableShot } from "./playableShot";
 
 // How far ahead/behind (in words) to keep neighbour clips warm so a cut in either
 // direction is instant. Scroll-BACK is the priority: the previous shot's element
@@ -41,8 +42,6 @@ export interface ScrollFilmEngineProps {
   clips?: Record<string, string>;
   sessionId?: string | null;
   live?: boolean;
-  /** bundled mp4 for the no-backend path; defaults to one chosen from book.id */
-  fallbackFilm?: string;
   prefs: ReadingPrefs;
   effectiveTheme?: ReadingTheme;
   /** default: Kinora's app-wide reduced-motion preference. */
@@ -52,13 +51,6 @@ export interface ScrollFilmEngineProps {
   onProgress?: (fraction: number, focusWord: number) => void;
 }
 
-const FALLBACK_FILMS = [
-  "/generated/film-01.mp4",
-  "/generated/film-02.mp4",
-  "/generated/film-03.mp4",
-  "/generated/film-04.mp4",
-];
-
 const PLACEHOLDER = [
   "The first page felt heavy in her hands, as if the weight of every possible life pressed against her fingertips.",
   "Each book was a door, and each door led to a different version of the story — paths not taken, words not yet spoken.",
@@ -67,13 +59,13 @@ const PLACEHOLDER = [
 
 /** Build the scrubbing timeline from props. Live → one segment per shot (word
  *  range → its clip); no backend → a single segment spanning the whole bundled
- *  film. `buildTimeline` makes it contiguous so scrubbing never hits a dead zone.
+ *  film. Rejected shots remain explicit blank segments so they cannot inherit a
+ *  prior clip or a bundled preview.
  *  Exported for unit testing (see `ScrollFilmEngine.test.ts`). */
 export function timelineFromProps(
   shots: ShotResponse[],
   clips: Record<string, string>,
   live: boolean,
-  fallbackFilm: string,
   cache: ClipCache,
 ): Timeline {
   if (live) {
@@ -86,7 +78,7 @@ export function timelineFromProps(
         // are already in memory plays back from its stable blob URL — instant
         // replay on scroll-back, no network round-trip — while an uncached clip
         // keeps its network URL (and the cache warms it in the background).
-        const url = clips[s.shot_id] ?? toBrowserUrl(s.clip_url) ?? "";
+        const url = isPlayableShot(s) ? clips[s.shot_id] ?? toBrowserUrl(s.clip_url) ?? "" : "";
         return {
           id: s.shot_id,
           wordStart: s.source_span!.word_range[0],
@@ -102,19 +94,10 @@ export function timelineFromProps(
         };
       });
     if (segs.length > 0) {
-      // Seeded public-domain books ship one Ken-Burns clip on shot 0; forward-fill
-      // so scroll-scrubbing keeps the film visible instead of blank segments.
-      let carry = "";
-      for (const seg of segs) {
-        if (seg.src) carry = seg.src;
-        else if (carry) seg.src = carry;
-      }
       return buildTimeline(segs);
     }
   }
-  // Fallback (or live with no shots yet): one continuous film. totalWords cancels
-  // out of the time mapping (localFraction === scroll fraction), so 1000 is fine.
-  return buildTimeline([{ id: "fallback", wordStart: 0, wordEnd: 1000, src: fallbackFilm }]);
+  return buildTimeline([]);
 }
 
 /** The Scroll Film Engine: scrolling the book scrubs one continuous film. Owns the
@@ -128,7 +111,6 @@ export function ScrollFilmEngine({
   clips = {},
   sessionId,
   live = false,
-  fallbackFilm,
   prefs,
   effectiveTheme,
   reducedMotion: reducedMotionProp,
@@ -177,10 +159,6 @@ export function ScrollFilmEngine({
     };
   }, []);
 
-  const film =
-    fallbackFilm ??
-    FALLBACK_FILMS[[...book.id].reduce((a, c) => a + c.charCodeAt(0), 0) % FALLBACK_FILMS.length];
-
   // Per-mount clip cache: holds each shot's mp4 bytes as a stable blob URL so a
   // scroll-BACK to an earlier shot replays the same clip instantly. Lives for the
   // engine's lifetime; cleared (blob URLs revoked) on unmount/book-change.
@@ -200,8 +178,8 @@ export function ScrollFilmEngine({
   }, [book.id, cache]);
 
   const timeline = useMemo(
-    () => timelineFromProps(shots, clips, live, film, cache),
-    [shots, clips, live, film, cache, cacheVersion],
+    () => timelineFromProps(shots, clips, live, cache),
+    [shots, clips, live, cache, cacheVersion],
   );
 
   const themeKey = effectiveTheme ?? resolveEffectiveTheme(prefs);
@@ -212,7 +190,7 @@ export function ScrollFilmEngine({
   // shell has none (mock books with no backend). `live` gates session behaviour,
   // not text rendering.
   const paragraphs = pages.length ? pages.map((p) => p.text) : PLACEHOLDER;
-  const generating = live && Object.keys(clips).length === 0 && shots.length > 0;
+  const generating = live && shots.length > 0 && !timeline.segments.some((segment) => segment.src);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const filmRef = useRef<FilmPaneHandle>(null);
@@ -220,7 +198,6 @@ export function ScrollFilmEngine({
   const railFillRef = useRef<HTMLDivElement>(null);
   const railLeadRef = useRef<HTMLDivElement>(null);
   const railDotRef = useRef<HTMLDivElement>(null);
-  const scrubRef = useRef<HTMLDivElement>(null);
   const paraAt = useRef(0);
   const preloadAt = useRef(0);
   const restored = useRef(false);
@@ -341,9 +318,6 @@ export function ScrollFilmEngine({
         ? "none"
         : `translate3d(0, ${(frame.fraction - 0.5) * PARALLAX_PX}px, 0)`;
     }
-    if (scrubRef.current) {
-      scrubRef.current.style.opacity = frame.mode === "scrub" && !reduce ? "1" : "0";
-    }
     const now = performance.now();
     if (now - paraAt.current >= PARA_THROTTLE_MS) {
       paraAt.current = now;
@@ -413,41 +387,12 @@ export function ScrollFilmEngine({
           >
             <FilmPane
               ref={filmRef}
-              poster={book.coverImage}
               reducedMotion={reduce}
               generating={generating}
               className="absolute inset-0"
             />
           </div>
-          <div
-            className="absolute left-3 top-3 flex items-center gap-1.5 rounded-md px-2 py-0.5"
-            style={{ background: "rgba(0,0,0,0.55)" }}
-          >
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/85">FILM</span>
-          </div>
-          {/* Scrub indicator — fades in only while actively scrubbing */}
-          <div
-            ref={scrubRef}
-            aria-hidden
-            data-testid="scrub-indicator"
-            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3 py-1"
-            style={{
-              opacity: 0,
-              transition: reduce ? "none" : "opacity 0.18s ease",
-              background: "rgba(0,0,0,0.5)",
-              backdropFilter: "blur(8px)",
-              willChange: "opacity",
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e8e2d8" strokeWidth={2} strokeLinecap="round">
-              <path d="M8 5v14M16 5v14M3 12h18" />
-            </svg>
-            <span className="text-[9px] font-semibold tracking-wide text-white/90">SCRUBBING</span>
-          </div>
         </div>
-        <p className="mt-2.5 text-center text-[10px] text-kinora-muted">
-          {live ? "Generated as you read · Wan" : "Generated with Wan · vertical short film"}
-        </p>
       </div>
 
       {/* Draggable splitter — drag right to expand film, left to shrink */}
@@ -461,12 +406,6 @@ export function ScrollFilmEngine({
       >
         <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200" style={{ background: "rgba(255,255,255,0.08)" }} />
         <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full transition-colors duration-200 group-hover:bg-kinora-gold/40" style={{ background: "transparent" }} />
-        {/* Grip dots */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-[3px]">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[3px] w-[3px] rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
-          ))}
-        </div>
       </div>
 
       {/* Scrolling book text + reading-progress rail — now on the RIGHT */}

@@ -139,7 +139,6 @@ export function BuiltinScrollFilmEngine({
         >
           <CrossfadeFilm
             src={src}
-            poster={book.coverImage}
             reduce={reduce}
             generating={generating}
             onShown={() => {
@@ -147,17 +146,7 @@ export function BuiltinScrollFilmEngine({
               onFirstFrame?.();
             }}
           />
-          <div
-            className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1"
-            style={{ background: "rgba(0,0,0,0.42)", backdropFilter: "blur(10px)" }}
-          >
-            <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
-            <span className="text-[9px] font-semibold tracking-wide text-white/90">AI FILM</span>
-          </div>
         </div>
-        <p className="mt-2.5 text-center text-[10px] text-kinora-muted">
-          {live ? "Generated as you read · Wan" : "Generated with Wan · vertical short film"}
-        </p>
       </div>
 
       {/* Scrolling book text */}

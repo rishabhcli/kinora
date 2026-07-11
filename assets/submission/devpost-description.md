@@ -2,13 +2,13 @@
 
 Short video has become the default way many people move through stories, while books still demand a kind of sustained attention that is increasingly hard to protect. Kinora tries to reconcile those worlds without replacing reading. The book stays on screen, the words remain the source of truth, and the film exists to pull the reader through the text rather than distract from it.
 
-The difficult version of that idea is not "turn a prompt into a clip." It is long-form continuity. A novel may require hundreds of shots. Characters need stable faces and wardrobe, props cannot teleport, pacing must follow the reader, and the system cannot spend video credits on chapters nobody reaches. Kinora treats those constraints as a systems problem.
+The difficult version of that idea is not "turn a prompt into a clip." It is long-form continuity. A novel may require hundreds of shots. Characters need stable faces and wardrobe, props cannot teleport, pacing must follow the reader, and the system should not render chapters nobody reaches. Kinora treats those constraints as a systems problem.
 
 ## What it does
 
 Kinora turns books and PDFs into page-synced vertical films generated just ahead of the reader.
 
-The reading room keeps the source text and a 9:16 film pane side by side. Reading position, dwell time, narration, seeks, and rereads become scheduling signals. The backend renders only the small committed horizon ahead of the reader, speculates farther ahead only when budget allows, and stops when the buffer is full.
+The reading room keeps the source text and a 9:16 film pane side by side. Reading position, dwell time, narration, seeks, and rereads become scheduling signals. The backend renders only the small committed horizon ahead of the reader, speculates farther ahead when reading intent is stable, and stops when the buffer is full.
 
 The workflow is:
 
@@ -17,9 +17,9 @@ The workflow is:
 3. Adapt the relevant source span into beats and shot specifications.
 4. Render committed shots through hosted Wan on Qwen Cloud when live generation is enabled.
 5. Persist accepted clips because provider task URLs expire.
-6. Reuse cached shots on rereads, or fall back to deterministic Ken Burns clips when live spend is disabled.
+6. Reuse cached shots on rereads, or fall back to deterministic Ken Burns clips when live generation is disabled.
 
-The deployed demo includes five openable public-domain books, each seeded with eight rendered pages, source-span mappings, 48 planned shots, a generated cover, and a playable film asset.
+The deployed demo includes five openable public-domain books, each seeded with eight rendered pages, source-span mappings, 48 planned shots, a restored public-domain cover, and a playable film asset.
 
 ## How we built it
 
@@ -54,17 +54,17 @@ Qwen Cloud / DashScope is Kinora's model plane:
 - Wan 2.1 text-to-video and image-to-video generate vertical short-film shots.
 - Tongyi multimodal embeddings index canon and episodic memory in one shared space.
 
-The live-video gate is explicit. `KINORA_LIVE_VIDEO` controls whether committed jobs submit real hosted Wan work. A transaction-protected budget ledger enforces per-scene, per-session, and global ceilings. With the gate off, the same queue, scheduler, critic, cache, and storage path still run end to end using a deterministic film fallback, so development cannot silently burn credits.
+The live-video gate is explicit. `KINORA_LIVE_VIDEO` controls whether committed jobs submit real hosted Wan work. A transaction-protected generation ledger enforces per-scene, per-session, and global ceilings. With the gate off, the same queue, scheduler, critic, cache, and storage path still run end to end using a deterministic film fallback, so development remains predictable.
 
 ## Live Alibaba Cloud deployment
 
 Kinora is running at [http://47.84.34.158](http://47.84.34.158) on an Alibaba Cloud ECS `ecs.g8y.small` ARM instance in Singapore.
 
-The fixed one-month deployment costs USD 29.50 and is fully covered by the hackathon credit. It uses Alibaba Cloud Linux, a 40 GiB ESSD, a public IPv4 address with fixed 1 Mbps bandwidth, a dedicated VPC/vSwitch, a restricted security group, and SSH key authentication.
+The production deployment uses Alibaba Cloud Linux, a 40 GiB ESSD, a public IPv4 address, a dedicated VPC/vSwitch, a restricted security group, and SSH key authentication.
 
 On the instance, Docker Compose runs Nginx, FastAPI, PostgreSQL/pgvector, Redis, MinIO, the ingest worker, render worker, and MCP server. Only Nginx is internet-facing; application and data services remain on the private container network. Health is available at [http://47.84.34.158/health](http://47.84.34.158/health).
 
-The exact reproducible bootstrap is in [`deploy/alibaba_single_node.sh`](https://github.com/rishabhcli/kinora/blob/main/deploy/alibaba_single_node.sh). For a larger production footprint, the repository also contains validated Terraform for separate ECS roles plus Alibaba OSS, RDS PostgreSQL, and Tair. The dedicated [`deploy/alibaba_render_worker.py`](https://github.com/rishabhcli/kinora/blob/main/deploy/alibaba_render_worker.py) demonstrates the OSS + DashScope worker contract without pretending those managed services are part of this credit-constrained single-node demo.
+The exact reproducible bootstrap is in [`deploy/alibaba_single_node.sh`](https://github.com/rishabhcli/kinora/blob/main/deploy/alibaba_single_node.sh). For a larger production footprint, the repository also contains validated Terraform for separate ECS roles plus Alibaba OSS, RDS PostgreSQL, and Tair. The dedicated [`deploy/alibaba_render_worker.py`](https://github.com/rishabhcli/kinora/blob/main/deploy/alibaba_render_worker.py) demonstrates the OSS + DashScope worker contract while this live demo keeps the complete stack on one node.
 
 ## Architecture
 
@@ -76,13 +76,13 @@ The creative plane contains the agent crew, MCP canon, render queue, critic/cach
 
 ## Challenges
 
-The hardest challenge was keeping the demo honest while making it resilient. Provider URLs expire, image quotas and video costs behave differently, long novels overwhelm naive prompts, and speculative rendering can waste money quickly. Kinora responds with persistent downloads, typed provider profiles, separate image/video handling, source-span retrieval, explicit spend gates, and cancelable scheduling.
+The hardest challenge was keeping the demo honest while making it resilient. Provider URLs expire, image quotas and video latency behave differently, long novels overwhelm naive prompts, and speculative rendering can create unnecessary work. Kinora responds with persistent downloads, typed provider profiles, separate image/video handling, source-span retrieval, explicit generation gates, and cancelable scheduling.
 
 Deploying the full stack on a 1 vCPU ARM instance added another constraint. We added swap, multi-stage ARM-compatible builds, health-gated startup, private networking, and a single public reverse proxy while keeping every worker and data service operational.
 
 ## What we learned
 
-Long-form generated video is mostly a systems problem. Better models matter, but the experience becomes believable only when memory, caching, scheduling, budgets, persistence, and recovery cooperate.
+Long-form generated video is mostly a systems problem. Better models matter, but the experience becomes believable only when memory, caching, scheduling, guardrails, persistence, and recovery cooperate.
 
 We also learned that a small crew of agents with narrow contracts is more useful than one giant agent. Shared canon makes disagreements visible, repairs targeted, and outputs reproducible.
 

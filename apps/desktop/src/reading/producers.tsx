@@ -28,7 +28,6 @@ export const ScrollFilmEngine: ScrollFilmEngineComponent = (props) => (
     shots={props.shots}
     sessionId={props.sessionId}
     live={props.live}
-    fallbackFilm={props.fallbackFilm}
     prefs={props.prefs}
     clips={props.clipByShot}
     reducedMotion={props.reduce}

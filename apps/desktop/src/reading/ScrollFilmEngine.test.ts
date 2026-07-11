@@ -26,7 +26,8 @@ const noNetworkFetch = (() => Promise.reject(new Error("no network in tests"))) 
 
 function shot(over: Partial<ShotResponse> & Pick<ShotResponse, "shot_id" | "clip_url">): ShotResponse {
   return {
-    status: "ready",
+    status: "accepted",
+    render_mode: "text_to_video",
     duration_s: 5,
     source_span: { word_range: [0, 10] },
     clip_start_s: null,
@@ -36,7 +37,7 @@ function shot(over: Partial<ShotResponse> & Pick<ShotResponse, "shot_id" | "clip
 }
 
 function timeline(shots: ShotResponse[]) {
-  return timelineFromProps(shots, {}, true, "fallback.mp4", new ClipCache(12, noNetworkFetch));
+  return timelineFromProps(shots, {}, true, new ClipCache(12, noNetworkFetch));
 }
 
 describe("timelineFromProps merged-clip grouping", () => {
@@ -103,5 +104,30 @@ describe("timelineFromProps merged-clip grouping", () => {
     const tl = timeline(shots);
     expect(tl.segments[0].clipStart).toBe(4);
     expect(tl.segments[0].clipEnd).toBe(12);
+  });
+});
+
+describe("timelineFromProps playback admission", () => {
+  it("keeps degraded shots blank instead of presenting their clip", () => {
+    const tl = timeline([
+      shot({ shot_id: "rejected", status: "degraded", clip_url: "http://x/fake.mp4" }),
+    ]);
+    expect(tl.segments[0].src).toBe("");
+  });
+
+  it("does not forward-fill an accepted clip into a later pending shot", () => {
+    const tl = timeline([
+      shot({ shot_id: "accepted", clip_url: "http://x/real.mp4", source_span: { word_range: [0, 10] } }),
+      shot({ shot_id: "pending", status: "planned", clip_url: null, source_span: { word_range: [10, 20] } }),
+    ]);
+    expect(tl.segments[0].src).toBe("http://x/real.mp4");
+    expect(tl.segments[1].src).toBe("");
+  });
+
+  it("rejects synthetic render modes even if their status is accepted", () => {
+    const tl = timeline([
+      shot({ shot_id: "still", status: "accepted", render_mode: "ken_burns_keyframe", clip_url: "http://x/still.mp4" }),
+    ]);
+    expect(tl.segments[0].src).toBe("");
   });
 });

@@ -12,8 +12,8 @@ import {
  *  every frame but only re-renders when the *film* (src) changes. */
 export interface FilmPaneHandle {
   /** Show `src` at `time` seconds. `scrub` pins `currentTime` (the video is a
-   *  scrubber); otherwise the clip plays forward (ambient scene motion). `src===""`
-   *  holds the last frame (live clip still generating — never blank the pane). */
+   *  scrubber); otherwise the clip plays forward. `src===""` deliberately blanks
+   *  the pane while the real scene is still rendering. */
   setPlayhead(src: string, time: number, scrub: boolean): void;
   /** The active `<video>`'s duration (s), once known — for the unknown-length
    *  bundled fallback film. 0 until metadata loads. */
@@ -25,7 +25,6 @@ export interface FilmPaneHandle {
 }
 
 interface FilmPaneProps {
-  poster?: string;
   reducedMotion: boolean;
   /** live mode, no clip yet → show the generating spinner instead of nothing */
   generating?: boolean;
@@ -60,7 +59,7 @@ const DEFAULT_POOL = 4; // active 2 + ~2 neighbours kept warm for scroll-back
  *  re-create, no re-fetch, no flash of empty video. The pool is an LRU capped at
  *  `poolSize`; the oldest non-visible element is dropped when it overflows. */
 export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmPane(
-  { poster, reducedMotion, generating, className, style, poolSize = DEFAULT_POOL },
+  { reducedMotion, generating, className, style, poolSize = DEFAULT_POOL },
   ref,
 ) {
   // The mounted set: 2 active crossfade layers + warm (hidden) neighbours, all
@@ -146,7 +145,13 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
     ref,
     (): FilmPaneHandle => ({
       setPlayhead(src, time, scrub) {
-        if (!src) return; // generating the next clip — keep the last frame on screen
+        if (!src) {
+          activeEl()?.pause();
+          targetSrc.current = "";
+          setRevealKey(-1);
+          setFadingKey(-1);
+          return;
+        }
         if (src === targetSrc.current) {
           // A flick that interrupts a settle-crossfade hard-cuts to the active layer
           // (scrubbing shows frames, not fades).
@@ -238,27 +243,28 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
   };
 
   if (slots.length === 0) {
-    return generating ? (
-      <div className={className} style={style}>
-        <div className="absolute inset-0 grid place-items-center bg-black/60">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/15 border-t-white/60" />
-            <p className="text-[11px] text-white/60">Generating your film…</p>
+    return (
+      <div className={className} style={{ ...style, background: "#080808" }}>
+        {generating && (
+          <div className="absolute inset-0 grid place-items-center">
+            <div className="h-px w-10 animate-pulse bg-white/30" aria-label="Rendering scene" />
           </div>
-        </div>
+        )}
       </div>
-    ) : (
-      <div className={className} style={style} />
     );
   }
 
   // A layer is visible iff it's the revealed one or the one currently fading out
   // under it. Everything else is a warm pool member, mounted at opacity 0 so it
   // stays decoded for instant scroll-back without painting over the film.
-  // Fallback: if the revealed key somehow isn't mounted (rapid src churn), reveal
-  // the newest slot so a layer is ALWAYS visible — never a blank/black pane.
+  // If rapid source churn leaves the revealed key unmounted, use the newest slot
+  // only when there is still a real target source. Empty targets remain blank.
   const revealedMounted = slots.some((s) => s.key === revealKey);
-  const shownKey = revealedMounted ? revealKey : slots[slots.length - 1]?.key;
+  const shownKey = targetSrc.current
+    ? revealedMounted
+      ? revealKey
+      : slots[slots.length - 1]?.key
+    : undefined;
 
   return (
     <div className={className} style={style}>
@@ -272,7 +278,6 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
               else els.current.delete(s.key);
             }}
             src={s.src}
-            poster={poster}
             autoPlay
             muted
             loop
@@ -296,6 +301,11 @@ export const FilmPane = forwardRef<FilmPaneHandle, FilmPaneProps>(function FilmP
           />
         );
       })}
+      {shownKey == null && (
+        <div className="absolute inset-0 grid place-items-center bg-[#080808]">
+          <div className="h-px w-10 animate-pulse bg-white/30" aria-label="Rendering scene" />
+        </div>
+      )}
     </div>
   );
 });

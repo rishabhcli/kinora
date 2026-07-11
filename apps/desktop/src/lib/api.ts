@@ -177,6 +177,7 @@ export interface SourceSpan {
 export interface ShotResponse {
   shot_id: string;
   status: string;
+  render_mode?: string | null;
   duration_s: number | null;
   clip_url: string | null;
   source_span: SourceSpan | null;
