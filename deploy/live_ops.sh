@@ -36,7 +36,40 @@ diag() {
   publish "$OUT" "debug/kops.txt"
 }
 
+apply() {
+  {
+    echo "=== APPLY  $(date -u +%FT%TZ) ==="
+    cd "$SRC" || exit 3
+    echo "--- pull latest main (untracked deploy files are preserved) ---"
+    git fetch origin main && git reset --hard origin/main
+    echo "HEAD now: $(git rev-parse --short HEAD)  $(git log --oneline -1)"
+    cd "$INFRA" || exit 3
+    echo "--- build api + render-worker ---"; $C build api render-worker
+    echo "--- recreate api + render-worker ---"; $C up -d --no-deps api render-worker
+    sleep 10
+    echo "--- reset demo book: text_to_video, planned, clear jobs/cache/ledger/outputs ---"
+    $C exec -T postgres psql -v ON_ERROR_STOP=1 -U kinora -d kinora -c \
+      "BEGIN; \
+       DELETE FROM render_jobs r USING shots s WHERE r.shot_id=s.id AND s.book_id='$BID'; \
+       DELETE FROM shot_cache WHERE book_id='$BID'; \
+       DELETE FROM budget_ledger WHERE book_id='$BID'; \
+       UPDATE shots SET status='planned', render_mode='text_to_video', duration_s=5.0, \
+         output=NULL, qa=NULL, cost=NULL, accepted_at=NULL, clip_start_s=NULL, clip_end_s=NULL \
+       WHERE book_id='$BID'; \
+       COMMIT;"
+    echo "--- restart render-worker ---"; $C restart render-worker
+    sleep 6
+    echo "--- health ---"; curl -fsS http://127.0.0.1/health; echo
+    echo "--- shot status after apply ---"
+    $C exec -T postgres psql -U kinora -d kinora -Atc \
+      "SELECT status, render_mode, count(*) FROM shots WHERE book_id='$BID' GROUP BY status, render_mode ORDER BY status, render_mode"
+    echo "APPLY_COMPLETE"
+  } 2>&1 | tee "$OUT"
+  publish "$OUT" "debug/kops.txt"
+}
+
 case "$MODE" in
   diag) diag ;;
+  apply) apply ;;
   *) echo "unknown MODE=$MODE" ;;
 esac
