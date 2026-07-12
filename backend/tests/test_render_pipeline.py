@@ -599,9 +599,11 @@ def _identity_pipeline(critic: LockedRefSpyCritic, *, render_mode: RenderMode) -
     )
 
 
-def test_enforces_reference_identity_scoped_to_reference_mode() -> None:
-    assert enforces_reference_identity(RenderMode.REFERENCE_TO_VIDEO) is True
+def test_identity_ccs_gate_disabled_for_all_modes() -> None:
+    """The whole-frame-vs-crop CCS is an invalid identity measure, so it is
+    disabled for every mode until a comparable crop is available."""
     for mode in (
+        RenderMode.REFERENCE_TO_VIDEO,
         RenderMode.TEXT_TO_VIDEO,
         RenderMode.IMAGE_TO_VIDEO,
         RenderMode.FIRST_LAST_FRAME,
@@ -612,10 +614,8 @@ def test_enforces_reference_identity_scoped_to_reference_mode() -> None:
 
 
 async def test_text_to_video_shot_skips_identity_and_accepts() -> None:
-    """Regression: a text_to_video shot has no character reference to verify, so
-    the pipeline must hand the Critic no locked ref (identity N/A). Otherwise the
-    Critic embeds the whole clip frame against a tight character crop, scores a
-    spurious ~0.15 CCS, and degrades every real clip to the Ken-Burns fallback."""
+    """A text_to_video shot has no character reference to verify: the pipeline
+    hands the Critic no locked ref (identity N/A) and the real clip is admitted."""
     spy = LockedRefSpyCritic()
     pipeline = _identity_pipeline(spy, render_mode=RenderMode.TEXT_TO_VIDEO)
     result = await pipeline.render_shot(BOOK_ID, SHOT_ID)
@@ -623,13 +623,16 @@ async def test_text_to_video_shot_skips_identity_and_accepts() -> None:
     assert result.status is ShotStatus.ACCEPTED
 
 
-async def test_reference_to_video_shot_still_verifies_identity() -> None:
-    """The reference-conditioned mode keeps its §9.5 identity gate: the pipeline
-    hands the Critic the locked character reference from canon."""
+async def test_reference_to_video_shot_no_longer_fails_on_broken_identity() -> None:
+    """Regression: the reference-conditioned mode used to embed the whole clip
+    frame against a tight character crop, score a spurious ~0.15 CCS, and degrade
+    every real clip. With the invalid gate disabled, the pipeline hands the Critic
+    no locked ref (identity N/A) and the on-model clip is admitted on the style /
+    timeline / motion gates."""
     spy = LockedRefSpyCritic()
     pipeline = _identity_pipeline(spy, render_mode=RenderMode.REFERENCE_TO_VIDEO)
     result = await pipeline.render_shot(BOOK_ID, SHOT_ID)
-    assert spy.locked_refs and spy.locked_refs[0] is not None
+    assert spy.locked_refs and all(ref is None for ref in spy.locked_refs)
     assert result.status is ShotStatus.ACCEPTED
 
 

@@ -79,18 +79,28 @@ logger = get_logger("app.render.pipeline")
 
 
 def enforces_reference_identity(render_mode: RenderMode) -> bool:
-    """Whether the §9.5 identity CCS gate applies to a shot of ``render_mode``.
+    """Whether to run the §9.5 identity CCS gate for a shot of ``render_mode``.
 
-    The identity check scores a rendered frame against the *locked character
-    reference the render was conditioned on*, so it is only meaningful for the
-    reference-conditioned mode. For text/image/continuation modes there is no
-    character reference to verify against: the Critic is given no locked ref and
-    returns CCS = 1.0 (N/A). This avoids embedding a whole clip frame against a
-    tight character crop — a framing mismatch that yields a spurious ~0.15 cosine
-    that no real clip can clear, which otherwise degrades every such shot to the
-    Ken-Burns fallback regardless of its actual fidelity.
+    Currently ``False`` for every mode. The identity CCS the pipeline can compute
+    embeds the *whole first clip frame* and compares it to a *tight locked
+    character crop* (``character_crop=frames[0]`` vs ``locked_ref``). Those are
+    different framings — a full scene vs a face crop — so their cosine is a
+    category mismatch (~0.15 in practice), far below the 0.85 gate. That is not a
+    real identity measurement: it fails every clip that has a locked character in
+    canon regardless of fidelity, routing genuine on-model Wan renders into the
+    ``regen_tighten_refs`` repair loop until they exhaust retries and degrade to
+    the Ken-Burns still.
+
+    Until the check extracts a comparable character region from the frame (or
+    compares against the scene keyframe rather than the character crop), it is not
+    a trustworthy gate, so it is disabled: the Critic is given no locked reference
+    and treats identity as N/A (CCS = 1.0). Continuity is still pursued where it
+    is real — the reference-conditioned render is still handed the locked
+    references at generation time — and clips remain gated on style drift,
+    timeline coherence, and motion artifacts. ``render_mode`` is retained so the
+    gate can be re-enabled per mode once a valid crop is available.
     """
-    return render_mode is RenderMode.REFERENCE_TO_VIDEO
+    return False
 
 
 # --------------------------------------------------------------------------- #
