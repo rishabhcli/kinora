@@ -6,7 +6,7 @@ from __future__ import annotations
 from app.agents.contracts import RepairAction, Verdict
 from app.agents.critic import Critic, decide_qa
 from app.memory.interfaces import CanonSlice
-from app.providers import Providers
+from app.providers import Providers, ProviderTimeout
 from tests.test_agents_support import (
     JsonSequencer,
     OneHotEmbedder,
@@ -126,3 +126,30 @@ async def test_score_style_drift_fails_gate(providers: Providers) -> None:  # no
     assert record.style_drift > 0.08
     assert record.verdict is Verdict.FAIL
     assert record.repair_action is RepairAction.REPROMPT_STYLE
+
+
+async def test_score_uses_deterministic_qa_when_vision_times_out(
+    providers: Providers,  # noqa: F811
+) -> None:
+    providers.embeddings.embed_images = OneHotEmbedder()  # type: ignore[method-assign]
+
+    async def _timeout(*args: object, **kwargs: object) -> object:
+        raise ProviderTimeout("vision timed out")
+
+    providers.vl.analyze_json = _timeout  # type: ignore[method-assign]
+    frame = b"\x89PNG-frame"
+
+    record = await Critic(providers).score(
+        shot_id="shot_timeout",
+        clip_frames=[frame],
+        canon_slice=_empty_slice(),
+        character_crop=b"same",
+        locked_ref_image=b"same",
+        scene_style_centroid=one_hot(frame),
+    )
+
+    assert record.verdict is Verdict.PASS
+    assert record.repair_action is RepairAction.ACCEPT
+    assert record.timeline_ok is True
+    assert record.flagged_for_review is True
+    assert record.reason == "vision unavailable: ProviderTimeout; deterministic QA used"

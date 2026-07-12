@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.core.config import Settings, get_settings
 from app.memory.interfaces import CanonSlice
-from app.providers import Providers, cosine
+from app.providers import ProviderError, Providers, cosine
 
 from .base import BaseAgent
 from .contracts import QARecord, RepairAction, Verdict
@@ -229,12 +229,23 @@ class Critic(BaseAgent):
             ccs = await self._ccs(character_crop, locked_ref_image)
             per_character_ccs = None
 
-        style_drift = await self._style_drift(clip_frames, scene_style_centroid)
-        vision = await self._vision(clip_frames, canon_slice)
-
         # -- multimodal temporal + aesthetic axes (deterministic, frame-based) - #
         temporal_report = self._temporal(clip_frames)
         aesthetic_report = self._aesthetic(clip_frames)
+        style_drift = await self._style_drift(clip_frames, scene_style_centroid)
+        vision_unavailable = False
+        try:
+            vision = await self._vision(clip_frames, canon_slice)
+        except ProviderError as exc:
+            # Identity, style, and frame-motion checks have already completed.
+            # Preserve those real measurements when the semantic VL judge times
+            # out instead of discarding a successfully rendered hosted clip.
+            vision_unavailable = True
+            vision = CriticVision(
+                timeline_ok=True,
+                motion_artifact=temporal_report.motion_artifact,
+                reason=f"vision unavailable: {type(exc).__name__}; deterministic QA used",
+            )
         # Fuse the deterministic temporal artifact with the VL motion rating: take the
         # worst (a defect either eye sees is a defect), so neither can hide the other.
         motion_artifact = max(vision.motion_artifact, temporal_report.motion_artifact)
@@ -272,7 +283,10 @@ class Critic(BaseAgent):
             reason=vision.reason,
             repair_action=action,
             learned_reward=advice.reward if advice is not None else None,
-            flagged_for_review=bool(advice.flagged_for_review) if advice is not None else False,
+            flagged_for_review=(
+                bool(advice.flagged_for_review) if advice is not None else False
+            )
+            or vision_unavailable,
             anomaly_score=advice.anomaly_score if advice is not None else None,
             per_character_ccs=per_character_ccs,
             temporal=temporal_report.temporal,
