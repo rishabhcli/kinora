@@ -15,14 +15,14 @@ from dataclasses import dataclass
 
 import pytest
 
-from app.agents.contracts import QARecord
+from app.agents.contracts import QARecord, RenderMode
 from app.agents.critic import decide_qa
 from app.core.config import Settings
 from app.db.models.enums import ShotStatus
 from app.memory.interfaces import CanonSlice
 from app.render import degrade
 from app.render.conflict import ConflictResolver
-from app.render.pipeline import RenderPipeline, RenderResult
+from app.render.pipeline import RenderPipeline, RenderResult, enforces_reference_identity
 from app.storage.object_store import keys
 from tests.conftest import FakeEmbedder
 from tests.test_render_support import (
@@ -519,6 +519,118 @@ async def test_pipeline_computes_real_style_centroid_and_drives_the_gate() -> No
     assert spy.received_centroids[0] == expected
     # The live gate now has teeth: a divergent clip degrades (was silently accepted).
     assert result.status is ShotStatus.DEGRADED
+
+
+# --------------------------------------------------------------------------- #
+# Identity gate scope (§9.5) — only reference-conditioned renders are verified
+# --------------------------------------------------------------------------- #
+
+
+class LockedRefSpyCritic:
+    """Records the locked character reference the pipeline hands the Critic and
+    always passes, so we can assert *which* renders get an identity comparison."""
+
+    def __init__(self) -> None:
+        self.locked_refs: list[bytes | None] = []
+        self.crops: list[bytes | None] = []
+
+    async def score(
+        self,
+        *,
+        shot_id: str,
+        clip_frames: list[bytes],
+        canon_slice: CanonSlice,
+        character_crop: bytes | None = None,
+        locked_ref_image: bytes | None = None,
+        scene_style_centroid: list[float] | None = None,
+        textual_evolution_supported: bool = False,
+        retries_exhausted: bool = False,
+    ) -> QARecord:
+        self.locked_refs.append(locked_ref_image)
+        self.crops.append(character_crop)
+        verdict, action, score = decide_qa(
+            1.0, 0.0, True, 0.05, retries_exhausted=retries_exhausted
+        )
+        return QARecord(
+            shot_id=shot_id,
+            ccs=1.0,
+            style_drift=0.0,
+            timeline_ok=True,
+            contradicting_state_id=None,
+            motion_artifact=0.05,
+            score=score,
+            verdict=verdict,
+            reason="lockedref-spy",
+            repair_action=action,
+        )
+
+
+def _identity_pipeline(critic: LockedRefSpyCritic, *, render_mode: RenderMode) -> RenderPipeline:
+    shot = FakeShot(
+        id=SHOT_ID, book_id=BOOK_ID, beat_id=BEAT_ID, scene_id=SCENE_ID,
+        source_span=dict(_SPAN), duration_s=5.0,
+    )
+    beat = FakeBeat(
+        id=BEAT_ID, book_id=BOOK_ID, scene_id=SCENE_ID, beat_index=7,
+        summary="X stands at the window.", entities=["char_x"],
+        described_visuals="a quiet figure at a frosted window", mood="still",
+        source_span=dict(_SPAN),
+    )
+    page = FakePage(word_boxes=word_boxes(), image_key=None, text="She stood still")
+    # The locked character reference exists in the store, so an identity check
+    # *could* run — the point of the test is that it only does so for R2V.
+    store = FakeObjectStore({REF_KEY: png_bytes(640, 360)})
+    return RenderPipeline(
+        canon=FakeCanon(make_slice()),
+        episodic=FakeEpisodic(),
+        cache=FakeCache(),
+        budget=FakeBudget(live=True),
+        object_store=store,
+        shots=FakeShotRepo(shot),
+        beats=FakeBeatRepoFor(beat),
+        pages=FakePageRepoFor(page),
+        defects=FakeDefectRepo(),
+        designer=FakeDesigner(render_mode=render_mode),
+        generator=FakeGenerator(),
+        critic=critic,
+        narrator=FakeNarrator(),
+        embedder=FakeEmbedder(),
+        settings=Settings(dashscope_api_key="test"),
+    )
+
+
+def test_enforces_reference_identity_scoped_to_reference_mode() -> None:
+    assert enforces_reference_identity(RenderMode.REFERENCE_TO_VIDEO) is True
+    for mode in (
+        RenderMode.TEXT_TO_VIDEO,
+        RenderMode.IMAGE_TO_VIDEO,
+        RenderMode.FIRST_LAST_FRAME,
+        RenderMode.VIDEO_CONTINUATION,
+        RenderMode.INSTRUCTION_EDIT,
+    ):
+        assert enforces_reference_identity(mode) is False
+
+
+async def test_text_to_video_shot_skips_identity_and_accepts() -> None:
+    """Regression: a text_to_video shot has no character reference to verify, so
+    the pipeline must hand the Critic no locked ref (identity N/A). Otherwise the
+    Critic embeds the whole clip frame against a tight character crop, scores a
+    spurious ~0.15 CCS, and degrades every real clip to the Ken-Burns fallback."""
+    spy = LockedRefSpyCritic()
+    pipeline = _identity_pipeline(spy, render_mode=RenderMode.TEXT_TO_VIDEO)
+    result = await pipeline.render_shot(BOOK_ID, SHOT_ID)
+    assert spy.locked_refs and all(ref is None for ref in spy.locked_refs)
+    assert result.status is ShotStatus.ACCEPTED
+
+
+async def test_reference_to_video_shot_still_verifies_identity() -> None:
+    """The reference-conditioned mode keeps its §9.5 identity gate: the pipeline
+    hands the Critic the locked character reference from canon."""
+    spy = LockedRefSpyCritic()
+    pipeline = _identity_pipeline(spy, render_mode=RenderMode.REFERENCE_TO_VIDEO)
+    result = await pipeline.render_shot(BOOK_ID, SHOT_ID)
+    assert spy.locked_refs and spy.locked_refs[0] is not None
+    assert result.status is ShotStatus.ACCEPTED
 
 
 # --------------------------------------------------------------------------- #

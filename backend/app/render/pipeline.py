@@ -39,6 +39,7 @@ from app.agents.contracts import (
     ConflictObject,
     DirectorNote,
     QARecord,
+    RenderMode,
     RepairAction,
     SourceSpan,
     Verdict,
@@ -75,6 +76,21 @@ from app.render.sync_map import build_sync_segment
 from app.storage.object_store import keys
 
 logger = get_logger("app.render.pipeline")
+
+
+def enforces_reference_identity(render_mode: RenderMode) -> bool:
+    """Whether the §9.5 identity CCS gate applies to a shot of ``render_mode``.
+
+    The identity check scores a rendered frame against the *locked character
+    reference the render was conditioned on*, so it is only meaningful for the
+    reference-conditioned mode. For text/image/continuation modes there is no
+    character reference to verify against: the Critic is given no locked ref and
+    returns CCS = 1.0 (N/A). This avoids embedding a whole clip frame against a
+    tight character crop — a framing mismatch that yields a spurious ~0.15 cosine
+    that no real clip can clear, which otherwise degrades every such shot to the
+    Ken-Burns fallback regardless of its actual fidelity.
+    """
+    return render_mode is RenderMode.REFERENCE_TO_VIDEO
 
 
 # --------------------------------------------------------------------------- #
@@ -638,7 +654,15 @@ class RenderPipeline:
         """Reserve → render → QA → (accept | repair | conflict | degrade), retry ≤ cap."""
         ref_bytes = await self._reference_bytes(ctx.canon_slice, spec)
         prev_frame = await self._prev_last_frame(ctx.canon_slice)
-        locked_ref = await self._first_locked_ref_bytes(ctx.canon_slice)
+        # Identity CCS only applies to reference-conditioned renders (§9.5); for
+        # other modes there is no locked character reference to verify against, so
+        # the Critic treats identity as N/A instead of scoring the whole frame
+        # against a tight character crop (see ``enforces_reference_identity``).
+        locked_ref = (
+            await self._first_locked_ref_bytes(ctx.canon_slice)
+            if enforces_reference_identity(spec.render_mode)
+            else None
+        )
         # §9.5 style gate: a real scene style centroid (the Style node's locked
         # reference embedding) so the Critic measures style_drift, not a no-op None.
         style_centroid = await self._scene_style_centroid(ctx.canon_slice)

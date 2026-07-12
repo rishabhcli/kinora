@@ -473,11 +473,17 @@ class FakeDesigner:
     fail — the initial design (call 1) always succeeds, since a repair can't
     be exercised without a shot that rendered in the first place."""
 
-    def __init__(self, *, raises: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        raises: Exception | None = None,
+        render_mode: RenderMode = RenderMode.REFERENCE_TO_VIDEO,
+    ) -> None:
         self.calls = 0
         self.last_notes: list[Any] | None = None
         self.last_priors: Any = None
         self.raises: Exception | None = raises
+        self._render_mode = render_mode
 
     async def design_shot(
         self,
@@ -498,7 +504,7 @@ class FakeDesigner:
             shot_id=shot_id or SHOT_ID,
             beat_id=beat.beat_id or None,
             scene_id=beat.scene_id,
-            render_mode=RenderMode.REFERENCE_TO_VIDEO,
+            render_mode=self._render_mode,
             prompt="X stands quietly at the window.",
             negative_prompt="warped face",
             reference_image_ids=["char_x@v1"],
