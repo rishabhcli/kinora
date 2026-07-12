@@ -148,9 +148,24 @@ class VideoProvider:
         protocol = VideoProtocol.MEDIA if model.startswith("wan2.7-") else VideoProtocol.LEGACY
         return VideoModelProfile(model=model, protocol=protocol)
 
-    def _parameters(self, spec: WanSpec) -> dict[str, Any]:
+    @staticmethod
+    def _effective_duration(spec: WanSpec, profile: VideoModelProfile) -> int | float:
+        """Return a duration accepted by the selected hosted model.
+
+        DashScope's Wan 2.1 endpoint accepts a discrete duration menu instead
+        of an arbitrary number of seconds. Keep this compatibility rule at the
+        provider boundary so longer narrative beats cannot create doomed tasks.
+        """
+        requested = float(spec.duration_s)
+        if profile.model.startswith("wan2.1-"):
+            return min((3, 4, 5), key=lambda option: (abs(option - requested), option))
+        if profile.model.startswith("wan2.7-"):
+            return max(2, min(15, int(round(requested))))
+        return spec.duration_s
+
+    def _parameters(self, spec: WanSpec, profile: VideoModelProfile) -> dict[str, Any]:
         params: dict[str, Any] = {
-            "duration": spec.duration_s,
+            "duration": self._effective_duration(spec, profile),
             "resolution": spec.resolution,
             "watermark": spec.watermark,
             "prompt_extend": spec.prompt_extend,
@@ -170,7 +185,11 @@ class VideoProvider:
                 input_body["media"] = media
         else:
             self._fill_legacy_inputs(input_body, spec)
-        return {"model": profile.model, "input": input_body, "parameters": self._parameters(spec)}
+        return {
+            "model": profile.model,
+            "input": input_body,
+            "parameters": self._parameters(spec, profile),
+        }
 
     def _media_items(self, spec: WanSpec) -> list[dict[str, str]]:
         media: list[dict[str, str]] = []
@@ -254,7 +273,7 @@ class VideoProvider:
 
         video_url = await self._poll_to_completion(str(task_id), profile.model)
         clip_bytes = await self._client.download(video_url, op="video")
-        duration = float(spec.duration_s)
+        duration = float(self._effective_duration(spec, profile))
         self._client.record_usage(
             Usage(
                 model=profile.model,

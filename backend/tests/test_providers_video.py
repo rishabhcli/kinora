@@ -4,6 +4,8 @@ submit→poll→download success path."""
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 
@@ -155,6 +157,37 @@ def test_submit_body_per_mode_media_profile() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [(1, 3), (2, 3), (3, 3), (4, 4), (5, 5), (6, 5), (38, 5)],
+)
+def test_wan21_duration_is_snapped_to_supported_menu(
+    requested: int, expected: int
+) -> None:
+    client = _client(_ok, live=True)
+    provider = VideoProvider(client)
+    profile = VideoModelProfile("wan2.1-i2v-turbo", VideoProtocol.LEGACY)
+
+    body = provider._submit_body(
+        WanSpec(mode=WanMode.IMAGE_TO_VIDEO, image_url="https://x/first.png", duration_s=requested),
+        profile,
+    )
+
+    assert body["parameters"]["duration"] == expected
+
+
+def test_wan27_duration_is_clamped_to_supported_range() -> None:
+    client = _client(_ok, live=True)
+    provider = VideoProvider(client)
+    profile = VideoModelProfile("wan2.7-i2v", VideoProtocol.MEDIA)
+
+    low = provider._submit_body(WanSpec(mode=WanMode.TEXT_TO_VIDEO, duration_s=1), profile)
+    high = provider._submit_body(WanSpec(mode=WanMode.TEXT_TO_VIDEO, duration_s=38), profile)
+
+    assert low["parameters"]["duration"] == 2
+    assert high["parameters"]["duration"] == 15
+
+
 # --------------------------------------------------------------------------- #
 # verify_model_available (NO render)
 # --------------------------------------------------------------------------- #
@@ -239,4 +272,44 @@ async def test_render_success_path() -> None:
     assert result.duration_s == 5.0
     totals = client.usage_totals
     assert totals is not None and totals.video_seconds == 5.0
+    await client.aclose()
+
+
+async def test_render_reports_effective_wan21_duration() -> None:
+    submitted: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/video-synthesis"):
+            submitted.update(json.loads(request.content))
+            return httpx.Response(200, json={"output": {"task_id": "task-long"}})
+        if request.url.path.endswith("/tasks/task-long"):
+            return httpx.Response(
+                200,
+                json={
+                    "output": {
+                        "task_status": "SUCCEEDED",
+                        "video_url": "https://assets.test/clip.mp4",
+                    }
+                },
+            )
+        if request.url.host == "assets.test":
+            return httpx.Response(200, content=b"MP4")
+        return httpx.Response(200, json={})
+
+    client = ProviderClient(
+        _settings(live=True),
+        transport=httpx.MockTransport(handler),
+        resilience=ResilienceConfig(rate_per_s=1000, rate_burst=1000, backoff_base_s=0.0),
+    )
+    provider = VideoProvider(
+        client, poll=VideoPollConfig(timeout_s=5, interval_s=0.0, max_interval_s=0.0)
+    )
+
+    result = await provider.render(
+        WanSpec(mode=WanMode.TEXT_TO_VIDEO, prompt="long beat", duration_s=38)
+    )
+
+    assert submitted["parameters"]["duration"] == 5  # type: ignore[index]
+    assert result.duration_s == 5.0
+    assert client.usage_totals is not None and client.usage_totals.video_seconds == 5.0
     await client.aclose()
