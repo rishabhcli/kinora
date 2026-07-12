@@ -78,7 +78,6 @@ reset_demo() {
     echo "=== RESET  $(date -u +%FT%TZ) ==="
     cd "$INFRA" || exit 3
     echo "--- stop render-worker (release row locks) ---"; $C stop -t 20 render-worker
-    echo "--- flush redis (clear stale queue/session/progress) ---"; $C exec -T redis redis-cli FLUSHALL
     $C exec -T postgres psql -v ON_ERROR_STOP=1 -U kinora -d kinora -c \
       "SET lock_timeout='8s'; BEGIN; \
        DELETE FROM render_jobs r USING shots s WHERE r.shot_id=s.id AND s.book_id='$BID'; \
