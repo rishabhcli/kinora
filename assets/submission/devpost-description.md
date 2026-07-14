@@ -19,7 +19,7 @@ The workflow is:
 5. Normalize accepted provider clips to stream-ready H.264/AAC with the MP4 index at the front, then persist them because provider task URLs expire.
 6. Reuse cached shots on rereads. If a hosted render is unavailable, keep the book readable and show generation state instead of presenting a still image as generated film.
 
-The deployed demo includes five openable public-domain books with restored covers and rendered source pages. Alice in Wonderland has 48 source-mapped shots in its production plan; 11 hosted Wan renders have passed the critic, been persisted, and are playable in the live reader today.
+The deployed demo includes five openable public-domain books with restored covers and rendered source pages. Alice in Wonderland has 48 source-mapped shots in its production plan. At final verification, 19 hosted Wan renders had passed the critic, been persisted, and were playable in the live reader, with no shots left queued or rendering.
 
 ## How we built it
 
