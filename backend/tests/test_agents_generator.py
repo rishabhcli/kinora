@@ -4,14 +4,54 @@ real video."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.agents.contracts import RenderMode, ShotSpec
 from app.agents.generator import Generator, build_wan_spec, wan_mode_for
-from app.providers import LiveVideoDisabled, WanMode
+from app.providers import LiveVideoDisabled, TtsResult, VideoResult, WanMode
 from tests.test_agents_support import make_providers
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+
+
+class _VideoBackend:
+    name = "video:test"
+
+    async def healthy(self) -> bool:
+        return True
+
+    async def render(self, spec: object) -> VideoResult:
+        return VideoResult(
+            duration_s=5,
+            model="test-video",
+            mode=WanMode.TEXT_TO_VIDEO,
+            clip_bytes=b"provider-mp4",
+        )
+
+
+class _TtsBackend:
+    async def synthesize(self, text: str, *, voice_id: str) -> TtsResult:
+        return TtsResult(
+            audio_bytes=b"wav",
+            sample_rate=24000,
+            duration_s=1,
+            model="test-tts",
+            voice_id=voice_id,
+        )
+
+
+class _Normalizer:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.seen: list[bytes] = []
+
+    async def normalize_bytes_async(self, data: bytes) -> object:
+        self.seen.append(data)
+        if self.fail:
+            raise RuntimeError("ffmpeg unavailable")
+        return SimpleNamespace(clip_bytes=b"streaming-mp4")
 
 
 def test_wan_mode_for_maps_every_render_mode() -> None:
@@ -102,3 +142,32 @@ async def test_video_provider_satisfies_video_backend_protocol() -> None:
         assert await gated.video.healthy() is True  # gated-off probe is a no-op True
     finally:
         await gated.aclose()
+
+
+async def test_render_normalizes_provider_clip_before_returning() -> None:
+    normalizer = _Normalizer()
+    providers = SimpleNamespace(video=_VideoBackend(), tts=_TtsBackend())
+    generator = Generator(providers, normalizer=normalizer)  # type: ignore[arg-type]
+
+    result = await generator.render(
+        ShotSpec(shot_id="s7", render_mode=RenderMode.TEXT_TO_VIDEO, prompt="a meadow"),
+        narration_text="A quiet meadow.",
+        voice_id="Cherry",
+    )
+
+    assert normalizer.seen == [b"provider-mp4"]
+    assert result.clip_bytes == b"streaming-mp4"
+
+
+async def test_render_keeps_real_provider_clip_when_normalization_fails() -> None:
+    normalizer = _Normalizer(fail=True)
+    providers = SimpleNamespace(video=_VideoBackend(), tts=_TtsBackend())
+    generator = Generator(providers, normalizer=normalizer)  # type: ignore[arg-type]
+
+    result = await generator.render(
+        ShotSpec(shot_id="s8", render_mode=RenderMode.TEXT_TO_VIDEO, prompt="a meadow"),
+        narration_text="A quiet meadow.",
+        voice_id="Cherry",
+    )
+
+    assert result.clip_bytes == b"provider-mp4"

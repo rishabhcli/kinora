@@ -1374,6 +1374,7 @@ def build_render_pipeline(
     from app.memory.episodic_service import EpisodicService
     from app.memory.prefs_service import PrefsService
     from app.render.conflict import ConflictResolver
+    from app.video.normalize import Normalizer
 
     shots = ShotRepo(session)
     embedder = providers.embeddings
@@ -1399,7 +1400,7 @@ def build_render_pipeline(
         pages=PageRepo(session),
         defects=DefectRepo(session),
         designer=Cinematographer(providers, settings=settings),
-        generator=Generator(providers),
+        generator=Generator(providers, normalizer=Normalizer.from_settings(settings)),
         critic=Critic(providers, settings=settings),
         narrator=providers.tts,
         conflict_resolver=resolver,

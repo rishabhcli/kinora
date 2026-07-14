@@ -17,8 +17,11 @@ around this bridge.
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.logging import get_logger
 from app.providers import Providers, WanMode, WanSpec, data_uri
 from app.providers.types import TtsWord
 from app.providers.video_router import VideoBackend
@@ -81,6 +84,8 @@ _CINEMATIC_FINISH = (
     "fluid lifelike motion, atmospheric detail, film grain"
 )
 
+logger = get_logger("app.agents.generator")
+
 
 def _norm(value: str) -> str:
     return value.strip().lower().replace("-", "_").replace(" ", "_")
@@ -119,6 +124,12 @@ class GeneratorOutput(BaseModel):
     sample_rate: int = 0
     word_timestamps: list[TtsWord] = Field(default_factory=list)
     provider_task_id: str | None = None
+
+
+class ClipNormalizer(Protocol):
+    """The async output-normalization seam used before clips reach QA/storage."""
+
+    async def normalize_bytes_async(self, data: bytes) -> object: ...
 
 
 def wan_mode_for(render_mode: RenderMode) -> WanMode:
@@ -186,11 +197,18 @@ class Generator:
     ``providers.tts``.
     """
 
-    def __init__(self, providers: Providers, *, video_backend: VideoBackend | None = None) -> None:
+    def __init__(
+        self,
+        providers: Providers,
+        *,
+        video_backend: VideoBackend | None = None,
+        normalizer: ClipNormalizer | None = None,
+    ) -> None:
         self._providers = providers
         #: The video render seam — the injected backend (e.g. a router) or, by
         #: default, the providers' single hosted Wan provider.
         self._video: VideoBackend = video_backend or providers.video
+        self._normalizer = normalizer
 
     async def render(
         self,
@@ -217,6 +235,15 @@ class Generator:
             prev_last_frame_bytes=prev_last_frame_bytes,
         )
         video = await self._video.render(wan_spec)
+        clip_bytes = video.clip_bytes
+        if clip_bytes and self._normalizer is not None:
+            try:
+                normalized = await self._normalizer.normalize_bytes_async(clip_bytes)
+                candidate = getattr(normalized, "clip_bytes", None)
+                if isinstance(candidate, bytes) and candidate:
+                    clip_bytes = candidate
+            except Exception as exc:  # noqa: BLE001 - keep the real provider clip
+                logger.warning("generator.normalize_failed", error=type(exc).__name__)
         # Narration is best-effort: a real AI video must NEVER be discarded (and
         # degraded to Ken-Burns) just because TTS failed — e.g. a provider quota
         # /403 on the narration model. Ship the clip silent; the sync map simply
@@ -232,7 +259,7 @@ class Generator:
         except Exception:  # noqa: BLE001 — narration failure must not sink a good video
             pass
         return GeneratorOutput(
-            clip_bytes=video.clip_bytes,
+            clip_bytes=clip_bytes,
             clip_url=video.clip_url,
             last_frame_bytes=video.last_frame_bytes,
             duration_s=video.duration_s,
@@ -244,6 +271,7 @@ class Generator:
 
 
 __all__ = [
+    "ClipNormalizer",
     "Generator",
     "GeneratorOutput",
     "build_wan_spec",

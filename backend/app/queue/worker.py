@@ -378,7 +378,13 @@ class RenderWorker:
         }
 
         critic = self._critic or Critic(self._providers, settings=self._settings)
-        generator = Generator(self._providers, video_backend=self._providers.video)
+        from app.video.normalize import Normalizer
+
+        generator = Generator(
+            self._providers,
+            video_backend=self._providers.video,
+            normalizer=Normalizer.from_settings(self._settings),
+        )
         # Same BudgetService build_render_pipeline wires for the shot-granularity
         # path — without it, event-granularity renders spend real provider
         # seconds with zero accounting against the Scheduler's ledger/live-gate
