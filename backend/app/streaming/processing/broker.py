@@ -1,14 +1,9 @@
 """The :class:`Broker` boundary to facet A, with an in-memory fallback.
 
-Facet A (``app.streaming.log``) owns the partitioned, append-only event log and
-is expected to expose a :class:`Broker` protocol — publish to a topic, subscribe
-from an offset, commit offsets. This module:
-
-* **imports that protocol if facet A is on disk**, so the two facets share one
-  contract once both land; and
-* **defines a minimal, structurally-identical fallback** otherwise, so facet B
-  is independently buildable and testable today (the marathon runs ~29 agents in
-  parallel; we can't block on a sibling).
+This module defines the small synchronous broker contract used by the in-process
+processing engine. The production streaming log has a broader asynchronous
+broker contract; adapters between the two should be explicit rather than
+changing this module's exported protocol at import time.
 
 The fallback :class:`InMemoryBroker` is an offset-addressed, partition-aware log
 sufficient for the deterministic test driver and local pipeline runs. Source and
@@ -64,22 +59,6 @@ class Broker(Protocol):
     def commit(self, group: str, topic: str, partition: int, offset: int) -> None: ...
 
     def committed(self, group: str, topic: str, partition: int) -> int: ...
-
-
-def _resolve_facet_a_broker() -> type | None:
-    """Import facet A's :class:`Broker` if its package is present.
-
-    Returns the class object or ``None``. Kept import-error-tolerant so facet B
-    builds whether or not the sibling has landed; when facet A exists, its
-    protocol takes precedence and our fallback impl is structurally compatible.
-    """
-
-    try:  # pragma: no cover - depends on sibling facet presence
-        from app.streaming.log import Broker as FacetABroker
-
-        return FacetABroker
-    except Exception:  # noqa: BLE001 - any import failure means "not present yet"
-        return None
 
 
 @dataclass
@@ -214,9 +193,3 @@ class BrokerSink(Generic[T]):
         return self.broker.publish(
             self.topic, record.value, timestamp_ms=record.timestamp, key=key
         )
-
-
-# Re-export facet A's Broker when present so importers get the canonical type.
-_FACET_A = _resolve_facet_a_broker()
-if _FACET_A is not None:  # pragma: no cover - sibling-dependent
-    Broker = _FACET_A  # type: ignore[assignment,misc]

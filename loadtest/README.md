@@ -67,5 +67,4 @@ The whole toolkit is unit-tested under `backend/tests/reliability/`:
 cd backend && .venv/bin/pytest tests/reliability -q
 ```
 
-`make lint` (ruff + mypy) and `make test` stay green. See `DESIGN.md` for the
-roadmap and the additive `core/config.py` changes.
+`make lint` (ruff + mypy) and `make test` include this toolkit.

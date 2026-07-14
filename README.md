@@ -6,10 +6,10 @@ The book stays on screen. As the film plays, a narrator reads the text aloud, th
 
 |  |  |
 |---|---|
-| **Deployment** | Alibaba Cloud — ECS / Function Compute · OSS · DashScope / Model Studio |
-| **Status** | **Built and runnable** — full backend + Electron desktop, a native macOS **Liquid Glass** shell, and a browser-served renderer; real Qwen/Wan/Qwen3-TTS, persistence, queue, budget, and recovery workers. Bring up the stack with `docker compose`; deploy with `infra/terraform`. |
+| **Live deployment** | Alibaba Cloud ECS (ARM, Singapore) · Docker Compose · DashScope / Model Studio |
+| **Status** | **Built and runnable** — FastAPI backend, Electron desktop app, browser renderer, native macOS showcase, Qwen/Wan/Qwen3-TTS integrations, persistent media, queues, budgets, and recovery workers. |
 
-> **Run it in 4 commands:** `cp .env.example backend/.env` (add your DashScope key) → `make stack-up` → `make seed-demo` → `make app-desktop-dev`. See [Run it locally](#run-it-locally).
+> **Run it locally:** copy `.env.example` to `backend/.env`, add a DashScope key, then run `make install`, `make stack-up`, `make seed-demo`, and `make app-desktop-dev`. See [Run it locally](#run-it-locally).
 
 ---
 
@@ -110,10 +110,10 @@ flowchart TB
         EPI["Episodic / vector store"]
         CACHE["Shot cache (hash-keyed)"]
     end
-    subgraph INFRA["Alibaba Cloud"]
+    subgraph INFRA["Runtime services"]
         DS["DashScope / Model Studio"]
-        OSS["OSS object storage"]
-        Q["Render queue + workers"]
+        OSS["S3-compatible object storage<br/>MinIO locally · OSS in the larger topology"]
+        Q["Redis queue + render workers"]
     end
     SE -->|"intent / seek"| SCHED
     SCHED <-->|"reserve seconds"| BUD
@@ -136,7 +136,7 @@ The full diagram, the per-shot state machine, and the end-to-end sequence are in
 
 - **Frontend** — two-pane workspace; PDF rendered with PyMuPDF (virtualised pages); a `SyncEngine` that bidirectionally binds scroll ↔ video ↔ word; events over SSE/WebSocket.
 - **Models (Qwen Cloud / DashScope)** — Qwen3.7-Max (orchestration), Qwen3.7-Plus / Qwen3.5-Plus (high-volume agents), Qwen3-VL (page reading + QA), hosted Wan (`wan2.1-t2v-turbo` / `wan2.1-i2v-turbo` demo defaults, `wan2.5-t2v-preview` / `wan2.2-i2v-plus` quality overrides), and Qwen3-TTS narration.
-- **Backend (Alibaba Cloud)** — API, ingest recovery worker, render worker, MCP, and browser renderer on ECS; clips, frames, audio, and the canon vault in OSS; idempotent Redis/Tair queues and locks.
+- **Backend** — FastAPI, ingest recovery worker, render worker, MCP, PostgreSQL/pgvector, Redis, and S3-compatible object storage. The live single-node deployment runs these services on ECS; the larger Terraform topology replaces local data services with OSS, RDS, and Tair.
 
 ## Project layout
 
@@ -146,10 +146,12 @@ backend/        FastAPI app, six-agent crew, MCP canon-memory server, render pip
 apps/desktop/   Electron + Vite renderer (React + Tailwind) — the two-pane reading room
 apps/desktop-native/ native macOS Liquid Glass shell (showcase; separate from Electron)
 infra/          docker-compose.yml (the backend stack) + terraform/ (Alibaba Cloud IaC)
-deploy/         alibaba_render_worker.py — the §12.6 OSS + DashScope proof artifact
-assets/books/ the bundled public-domain demo book + its PyMuPDF build script
-Makefile      install / stack-up / migrate / worker / ingest-worker / mcp / provider-preflight / seed-demo / test / …
-kinora.md     the full technical design (architecture, agents, pipeline, memory, budget)
+deploy/         reproducible single-node bootstrap + Alibaba render-worker entrypoint
+assets/books/   bundled public-domain demo books and catalog metadata
+clients/        Python and TypeScript SDKs plus the generated documentation portal
+docs/           production architecture, technical spec, model notes, and design records
+Makefile        install / stack-up / worker / mcp / seed-demo / lint / test / app targets
+kinora.md       the full technical design (architecture, agents, pipeline, memory, budget)
 ```
 
 ## The real process model
@@ -172,25 +174,46 @@ restart/recovery loop for interrupted imports.
 
 ## Run it locally
 
-**Prerequisites:** Docker + Docker Compose, and a DashScope (Model Studio, intl) API key.
+**Prerequisites:** Docker with Compose, Python 3.11+, Node 20+, `pnpm`, and a
+DashScope (Model Studio, international endpoint) API key.
 
 ```bash
 # 1. Configure secrets (backend/.env is gitignored; .env.example is the template).
 cp .env.example backend/.env
 #    edit backend/.env: set DASHSCOPE_API_KEY=sk-...   (KINORA_LIVE_VIDEO stays false)
-#    and set TTS_MODEL=qwen3-tts-flash  (preset-voice narration; see Configuration)
+#    TTS_MODEL already defaults to qwen3-tts-flash for preset-voice narration.
 
-# 2. Build + bring up the stack (data plane, migrate, api, ingest/render workers, mcp, frontend).
+# 2. Install the local backend tooling used by seed, lint, and test targets.
+make install
+
+# 3. Build + bring up the stack (data plane, migrate, api, workers, MCP, frontend).
 make stack-up                 # == cd infra && docker compose up -d --build
 #    migrations run automatically via the one-shot `migrate` service.
 
-# 3. Seed the bundled public-domain demo book through the REAL flow (register → upload → ingest).
+# 4. Seed the bundled public-domain demo book through the real HTTP ingest flow.
 make seed-demo                # == python backend/scripts/seed_demo.py --via api
 
-# 4. Run the desktop app (it connects to the API at http://localhost:8000).
+# 5. Run the desktop app (it connects to the API at http://localhost:8000).
 make app-install              # pnpm install (first run only)
 make app-desktop-dev          # launches the Electron reading room
-#    Browser renderer: http://localhost:5173 · API docs: http://localhost:8000/docs · Prometheus: http://localhost:9090
+#    Browser: http://localhost:5173 · API docs: http://localhost:8000/docs
+```
+
+The seeded account is `demo@kinora.local` / `demo-password-123`. Stop the stack
+with `make stack-down`; Docker volumes preserve the database and media between runs.
+
+### Verify the installation
+
+These checks do not enable live video or spend Wan credits:
+
+```bash
+curl -fsS http://localhost:8000/health
+curl -fsS http://localhost:5173 >/dev/null
+make lint
+make test
+make app-typecheck
+make app-test
+make app-desktop-build
 ```
 
 ### Local dev without Docker (venv)
@@ -225,7 +248,7 @@ docker build -f infra/docker/desktop.Dockerfile \
   -t kinora-frontend:local .
 ```
 
-## Verify the end-to-end loop
+## Understand the end-to-end loop
 
 With `KINORA_LIVE_VIDEO` **off** (the default — no Wan spend), the full loop still runs end to end:
 
@@ -255,7 +278,9 @@ The budget service enforces the ceiling with a real append-only ledger and a tra
 
 ## Deploy to Alibaba Cloud
 
-**Live hackathon deployment:** [http://47.84.34.158](http://47.84.34.158) runs on
+### Live single-node deployment
+
+[http://47.84.34.158](http://47.84.34.158) runs on
 an Alibaba Cloud ECS `ecs.g8y.small` ARM instance in Singapore. The
 [`deploy/alibaba_single_node.sh`](./deploy/alibaba_single_node.sh) bootstrap is
 the exact deployment path: it installs Docker on Alibaba Cloud Linux, builds the
@@ -263,6 +288,15 @@ pinned repository revision, starts Postgres/pgvector, Redis, MinIO, FastAPI,
 ingest and render workers, MCP, and the browser renderer, then seeds five
 openable public-domain books. Only Nginx is internet-facing; the API and data
 services stay on the private Docker network.
+
+Verify the deployed app and health endpoint:
+
+```bash
+curl -fsS http://47.84.34.158/health
+open http://47.84.34.158
+```
+
+### Larger managed-service topology
 
 The larger `infra/terraform/` topology remains ready-to-apply IaC (validated
 with `terraform validate` + `terraform fmt`). It provisions VPC + security
@@ -290,14 +324,18 @@ The **MCP port (8765) is intra-VPC only** (never internet-facing); the bearer to
 
 The **Electron app** ([`apps/desktop`](./apps/desktop)) is the primary local product. For browser deployment, build the renderer image from [`infra/docker/desktop.Dockerfile`](./infra/docker/desktop.Dockerfile) with `VITE_KINORA_API_URL` pointed at the deployed API and push it to `frontend_container_image`.
 
-The **proof-of-deployment artifact** ([`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py), kinora.md §12.6) is a real render worker that demonstrably uses **OSS** + **DashScope** — it reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than duplicating logic. See [`deploy/README.md`](./deploy/README.md) and [`infra/terraform/README.md`](./infra/terraform/README.md).
+The standalone [`deploy/alibaba_render_worker.py`](./deploy/alibaba_render_worker.py)
+entrypoint runs the same render pipeline against Alibaba OSS and DashScope. It
+reuses the app's `ObjectStore`, `VideoProvider`, and queue worker rather than
+duplicating production logic. See [`deploy/README.md`](./deploy/README.md) and
+[`infra/terraform/README.md`](./infra/terraform/README.md).
 
 ## Repository contents
 
 | Path | What it is |
 |---|---|
 | [`backend/`](./backend) · [`apps/desktop`](./apps/desktop) · [`apps/desktop-native`](./apps/desktop-native) | The built application (FastAPI backend · Electron/Vite renderer · native macOS showcase). |
-| [`infra/`](./infra) · [`deploy/`](./deploy) · [`assets/`](./assets) | Local stack + Alibaba IaC · §12.6 proof artifact · demo book. |
+| [`infra/`](./infra) · [`deploy/`](./deploy) · [`assets/`](./assets) | Local stack, Alibaba deployment assets, and the bundled demo book. |
 | [`kinora.md`](./kinora.md) | The full technical design — architecture, agents, pipeline, memory, budget. |
 | [`what-is-kinora.md`](./what-is-kinora.md) | Plain-English explainer. **Start here if you're non-technical.** |
 

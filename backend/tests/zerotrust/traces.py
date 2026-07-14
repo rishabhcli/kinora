@@ -82,7 +82,9 @@ def credential_stuffing(
     t = start
     for i, name in enumerate(names):
         outcome = (
-            AuthOutcome.SUCCESS if success_at is not None and i == success_at else AuthOutcome.FAILURE
+            AuthOutcome.SUCCESS
+            if success_at is not None and i == success_at
+            else AuthOutcome.FAILURE
         )
         out.append(
             SecurityEvent.auth(

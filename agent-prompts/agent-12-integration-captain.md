@@ -1,1 +1,0 @@
-/ralph-loop:ralph-loop "Kinora Agent 12. Run bash agent-prompts/arm-ralph.sh 12 from repo root, then read agent-prompts/.missions/agent-12-integration-captain.md and execute fully on branch overnight/integration in the main repo." --completion-promise "AGENT 12 COMPLETE" --max-iterations 500

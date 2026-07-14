@@ -1,9 +1,9 @@
-"""The Agent-03 film contract: wire models + pure builders (no DB / network).
+"""Film API wire models and pure builders (no DB / network).
 
 This is the authoritative shape of the **event/scene film** HTTP responses, the
-**sync map** (CONTRACTS.md §Agent-03), and the ``event_stitched`` /
+**sync map**, and the ``event_stitched`` /
 ``scene_stitched`` SSE payloads (§5.6). It mirrors — but does not import —
-Agent 1's ``app.render.sync_map`` / ``app.render.stitch`` models, so this module
+the ``app.render.sync_map`` / ``app.render.stitch`` models, so this module
 is self-contained and stays green while ``render/`` churns in parallel.
 
 Key shapes:
@@ -13,11 +13,11 @@ Key shapes:
   always present; ``{page, page_turn_at_s, words}`` are the §9.4 enrichment.
   ``t_start_s``/``t_end_s`` are the canonical names for render's
   ``video_start_s``/``video_end_s``.
-* :func:`merge_and_build_film_sync_map` — fold Agent 1's *per-shot* (0-based)
+* :func:`merge_and_build_film_sync_map` — fold render's *per-shot* (0-based)
   segments into one scene/event map with cumulative timestamps (§9.6) and the
   canonical field names. Mirrors ``app.render.stitch.merge_sync_segments``.
 * :func:`film_sync_map_from_merged` — convert an *already-merged* render scene
-  map to the canonical shape without re-shifting (for Agent 1's SSE emit).
+  map to the canonical shape without re-shifting for SSE emission.
 """
 
 from __future__ import annotations

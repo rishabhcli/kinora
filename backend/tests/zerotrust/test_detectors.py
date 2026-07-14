@@ -216,17 +216,22 @@ def test_sequence_anomaly_flags_unusual_order() -> None:
     for _ in range(60):
         clk.at(t)
         det.observe(
-            SecurityEvent.access(ts=t, source_ip="10.0.0.5", principal="frank", target="x", action="read")
+            SecurityEvent.access(
+                ts=t, source_ip="10.0.0.5", principal="frank", target="x", action="read"
+            )
         )
         t += 1.0
     # Now a wildly out-of-distribution burst of never-seen privileged actions.
     alerts = []
-    for action in ["export_all", "change_email", "delete_account", "payout", "export_all", "payout"]:
+    actions = ["export_all", "change_email", "delete_account", "payout", "export_all", "payout"]
+    for action in actions:
         clk.at(t)
         alerts.extend(
             list(
                 det.observe(
-                    SecurityEvent.audit(ts=t, source_ip="10.0.0.5", principal="frank", action=action)
+                    SecurityEvent.audit(
+                        ts=t, source_ip="10.0.0.5", principal="frank", action=action
+                    )
                 )
             )
         )
@@ -290,7 +295,13 @@ def test_behavioral_unfitted_is_silent() -> None:
     for _ in range(30):
         clk.at(t)
         out.extend(
-            list(det.observe(SecurityEvent.access(ts=t, source_ip="1.1.1.1", principal="h", target="x")))
+            list(
+                det.observe(
+                    SecurityEvent.access(
+                        ts=t, source_ip="1.1.1.1", principal="h", target="x"
+                    )
+                )
+            )
         )
         t += 1.0
     assert out == []  # never fits implicitly

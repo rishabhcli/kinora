@@ -1,9 +1,6 @@
 /* ============================================================
-   styles/login.css — OWNER: Agent 11 (login experience)
-   Login + BookWall + hero (CONTRACTS §5/§11). Includes feature-local reduced-motion guards.
-   Split verbatim from the monolithic index.css by the Captain (A12)
-   at t0 so owners stop colliding on one file. Rules are byte-exact;
-   edit only within your lane (see coordination/OWNERSHIP.md).
+   styles/login.css — login experience
+   Login + BookWall + hero. Includes feature-local reduced-motion guards.
    ============================================================ */
 
 /* ===== Login book shelves — books gliding on glass ===== */

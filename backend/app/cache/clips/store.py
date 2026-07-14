@@ -3,7 +3,7 @@
 The L1 (in-process) and L2 (Redis) tiers are *fast* but *ephemeral relative to a
 clip's lifetime*: a process restart empties L1, and L2 entries expire. The clip
 bytes, however, live forever in object storage (the render pipeline persists them
-there because provider task URLs expire — see CLAUDE.md). This module makes
+there because provider task URLs expire — see AGENTS.md). This module makes
 object storage itself the **L3 cache tier**: a tiny JSON *sidecar* per render key
 records the :class:`~app.cache.clips.record.ClipRecord`, so even a cold fleet that
 has never seen a render key can discover that the clip already exists and serve it

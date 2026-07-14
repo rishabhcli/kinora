@@ -1,1 +1,0 @@
-/ralph-loop:ralph-loop "Kinora Agent 08. Run bash agent-prompts/arm-ralph.sh 08 from repo root, then read agent-prompts/.missions/agent-08-color-depth-typography.md and execute fully in worktree ../kinora-a08." --completion-promise "AGENT 08 COMPLETE" --max-iterations 500

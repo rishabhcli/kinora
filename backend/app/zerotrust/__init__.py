@@ -1,4 +1,7 @@
-"""Zero-trust security: workload identity + KMS, data-at-rest field encryption + tokenization vault, and threat detection + supply-chain defense.
+"""Zero-trust security platform.
+
+Includes workload identity, KMS, field encryption, a tokenization vault, threat
+detection, and supply-chain defense.
 
 Self-contained, additive subpackages; importing this namespace is side-effect free.
 """

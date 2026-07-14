@@ -7,6 +7,7 @@ in-network service hostnames. The DashScope API key is the only required value.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import model_validator
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     """Strongly-typed Kinora configuration."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.environ.get("KINORA_ENV_FILE", ".env"),
         env_prefix="",
         case_sensitive=False,
         extra="ignore",
@@ -685,8 +686,7 @@ class Settings(BaseSettings):
 
     # --- Reliability / load-test / SLO (app.reliability + loadtest) ---
     # Defaults consumed by the reliability toolkit (load runner, canaries, SLO
-    # gating); the CLI overrides them per-run. Additive-only — nothing above is
-    # changed. See loadtest/DESIGN.md.
+    # gating); the CLI overrides them per-run. See loadtest/README.md.
     load_default_users: int = 16
     load_default_duration_s: float = 60.0
     load_default_target_rps: float = 0.0  # 0 => closed model (think-time paced)

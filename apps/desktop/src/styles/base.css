@@ -1,9 +1,6 @@
 /* ============================================================
-   styles/base.css — OWNER: Agent 8 (color/depth/typography)
+   styles/base.css — base visual system
    Base resets, background, native-shell glass, shelf/book/footer components, ambient magic layer.
-   Split verbatim from the monolithic index.css by the Captain (A12)
-   at t0 so owners stop colliding on one file. Rules are byte-exact;
-   edit only within your lane (see coordination/OWNERSHIP.md).
    ============================================================ */
 
 * {

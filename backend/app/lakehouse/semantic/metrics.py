@@ -88,7 +88,7 @@ class SimpleMetric(_MetricBase):
     kind: MetricKind = field(default=MetricKind.SIMPLE, init=False)
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        _MetricBase.__post_init__(self)
         if not self.measure:
             raise ValueError(f"simple metric {self.name!r} requires a measure")
         validate_identifier(self.measure, what="measure reference")
@@ -105,7 +105,7 @@ class RatioMetric(_MetricBase):
     kind: MetricKind = field(default=MetricKind.RATIO, init=False)
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        _MetricBase.__post_init__(self)
         if not self.numerator or not self.denominator:
             raise ValueError(f"ratio metric {self.name!r} requires numerator + denominator")
         validate_identifier(self.numerator, what="ratio numerator")
@@ -128,7 +128,7 @@ class DerivedMetric(_MetricBase):
     kind: MetricKind = field(default=MetricKind.DERIVED, init=False)
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        _MetricBase.__post_init__(self)
         if not self.expr:
             raise ValueError(f"derived metric {self.name!r} requires an expr")
         if not self.inputs:
@@ -156,7 +156,7 @@ class CumulativeMetric(_MetricBase):
     kind: MetricKind = field(default=MetricKind.CUMULATIVE, init=False)
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        _MetricBase.__post_init__(self)
         if not self.base:
             raise ValueError(f"cumulative metric {self.name!r} requires a base metric")
         validate_identifier(self.base, what="cumulative base")
@@ -187,7 +187,7 @@ class TimeComparisonMetric(_MetricBase):
     kind: MetricKind = field(default=MetricKind.TIME_COMPARISON, init=False)
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        _MetricBase.__post_init__(self)
         if not self.base:
             raise ValueError(f"time-comparison metric {self.name!r} requires a base metric")
         validate_identifier(self.base, what="time-comparison base")

@@ -1,12 +1,11 @@
-"""Film API — the §9.6 *stitch + ship* boundary over HTTP (Agent 03).
+"""Film API — the §9.6 *stitch + ship* boundary over HTTP.
 
 Two read routes project a book's stitched **event/scene films** + sync maps for
-the client (the contract is published in ``coordination/CONTRACTS.md`` and the
-wire models live in :mod:`app.films.contract`):
+the client (wire models live in :mod:`app.films.contract`):
 
 * ``GET /api/books/{book_id}/events`` — every event (== scene today) with its
   stitched-film URL + merged sync map, plus the open-book ``restore`` state so
-  Agent 12 can reopen a book where the reader left off (§5.2).
+  the reader can reopen a book where they left off (§5.2).
 * ``GET /api/books/{book_id}/scenes/{scene_id}/film`` — one scene's film, for a
   partial load.
 
@@ -14,7 +13,6 @@ The sync map is built **on read** from the scene's accepted shots (§9.6), so th
 endpoints work with ``KINORA_LIVE_VIDEO`` off and never block on rendering — an
 unstitched film simply reports ``stitched: false`` with a ``null`` URL.
 
-This module is registered by Agent 12 (see ``coordination/requests/agent-03.md``).
 """
 
 from __future__ import annotations

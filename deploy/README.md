@@ -1,15 +1,14 @@
-# Kinora render worker on Alibaba Cloud (§12.6 proof-of-deployment)
+# Kinora deployment on Alibaba Cloud
 
-`alibaba_render_worker.py` is Kinora's **proof-of-deployment artifact**
-(kinora.md §12.6): a real, runnable render worker that demonstrably uses
-**Alibaba OSS** (object storage) and **DashScope / Model Studio** (hosted Wan
-video synthesis + the Qwen crew), designed to run on **ECS or Function Compute** as a
-queue worker.
+The live submission uses [`alibaba_single_node.sh`](./alibaba_single_node.sh) to
+bootstrap the full application on one ARM ECS instance. It installs Docker,
+checks out a pinned revision, starts the application and data services, waits for
+health, and seeds the public-domain demo library.
 
-This worker is the proof layer: hosted model call in, OSS object out, queue
-semantics around it, and logs that make the flow auditable. When this runs,
-Kinora is carrying the render loop into the same surface it would use in
-production.
+`alibaba_render_worker.py` is the standalone worker entrypoint for the larger
+managed-service topology. It uses **Alibaba OSS** for object storage and
+**DashScope / Model Studio** for hosted Wan video generation, and can run on ECS
+or Function Compute as a queue consumer.
 
 It does **not** reimplement the pipeline — it reuses the application's real
 modules so the proof is honest:
@@ -20,7 +19,7 @@ modules so the proof is honest:
 | **DashScope** (Model Studio) | `app.providers.video.VideoProvider` → hosted Wan async video-synthesis; the rest of the Qwen crew | `render_shot_to_oss()` + the pipeline inside `build_worker()` |
 | **ECS / Function Compute** | runs `main()` (`build_worker().run()`) as a long-lived Redis-queue consumer | `deploy/Dockerfile`, `infra/terraform` |
 
-## Two entrypoints
+## Render-worker entrypoints
 
 - **`main()`** — the deployable worker. Drains the Redis priority queue and runs
   the full per-shot pipeline (DashScope render → Critic → OSS persist, or the
@@ -92,13 +91,12 @@ event, calling `render_shot_to_oss(spec)` per message (or run `main()` as an FC
 custom-runtime long task). ECS is the default here because it maps 1:1 to the
 local `docker-compose.yml` process model.
 
-## Recording the proof (§17)
+## Live provider smoke test
 
 Run the provider preflight first, then flip `KINORA_LIVE_VIDEO=1`, enqueue one
-shot, and record the worker rendering a real hosted Wan clip through DashScope
-and writing it to OSS. The proof should show the safe model diagnostics, one
-`clip_ready` event, the OSS object URL, and worker logs with the model id plus
-object key — then keep this recording as deployment proof (kinora.md §12.6 / §17).
+shot, and verify the worker renders a hosted Wan clip through DashScope, persists
+it to object storage, and emits one `clip_ready` event. Keep the gate off for
+normal development so local work cannot spend video credits silently.
 
 ## Deployment orchestration (`orchestrator/`)
 
@@ -116,7 +114,7 @@ health probe, metric scrape, secret fetch, queue drain) is a tiny typed
 Tair adapters; the tests and the simulator fill them with in-memory fakes. The
 package imports **no** `oss2` / `dashscope` / `boto3`, so the entire
 rollout/rollback decision logic is unit-testable with zero credits and zero
-network. See [`DESIGN.md`](DESIGN.md) for the architecture and roadmap.
+network.
 
 ```bash
 # Watch the rollout/rollback logic prove itself, offline (virtual clock, no cloud):

@@ -24,10 +24,10 @@ export default defineConfig({
       "src/lib/{appearance,settings}.test.ts",
       "src/reading/__tests__/**/*.test.ts",
       "src/reading/{crossfade,fallback,machine,warmupModel}.test.ts",
-      // Next-gen playback (Agent: reading-room) pure cores use node:test (DOM-free,
+      // Playback pure cores use node:test (DOM-free,
       // self-contained, fast); they run via run-node-tests.mjs, not jsdom/vitest.
       // Tests that import sibling *source* modules (extensionless) or touch the DOM
-      // stay on vitest (e.g. webglCompositor.test.ts). See DESIGN.md.
+      // stay on vitest (e.g. webglCompositor.test.ts).
       "src/reading/perf/{frameStats,decodeStats,observability}.test.ts",
       "src/reading/streaming/{bandwidth,qualityLadder,instrumentedFetch}.test.ts",
       "src/reading/gl/{grade,capabilities}.test.ts",

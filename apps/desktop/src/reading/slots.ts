@@ -1,7 +1,6 @@
-// The reading-room slot contract. The shell composes three producer components
-// behind these stable interfaces; built-in stand-ins (reading/builtin/) satisfy
-// them today, and Agent 12 swaps in the real Agent 2/4/6 components at
-// integration (see coordination/CONTRACTS.md). Types only — no runtime.
+// The reading-room slot contract. The shell composes three components behind
+// these stable interfaces; built-in implementations under reading/builtin/
+// satisfy the same types. Types only — no runtime.
 import type { ComponentType, ReactNode } from "react";
 import type { Book } from "../data/books";
 import type { ShotResponse } from "../lib/api";
@@ -13,7 +12,7 @@ export interface PageText {
   text: string;
 }
 
-/** Slot — Agent 2 `<ScrollFilmEngine>`: the vertical film (never-black crossfade)
+/** Slot — `<ScrollFilmEngine>`: the vertical film (never-black crossfade)
  *  + the scrolling text column + scroll→focus-word→scheduler wiring. */
 export interface ScrollFilmEngineProps {
   book: Book;
@@ -32,7 +31,7 @@ export interface ScrollFilmEngineProps {
 }
 export type ScrollFilmEngineComponent = ComponentType<ScrollFilmEngineProps>;
 
-/** Slot — Agent 6 `<ReadingControls prefs onChange />`: controlled by the shell's
+/** Slot — `<ReadingControls prefs onChange />`: controlled by the shell's
  *  single useReadingPrefs() instance (so the engine + controls stay in sync —
  *  separate hook instances would not). Mounted in the top bar. */
 export interface ReadingControlsProps {
@@ -43,7 +42,7 @@ export interface ReadingControlsProps {
 }
 export type ReadingControlsComponent = ComponentType<ReadingControlsProps>;
 
-/** Wrapper — Agent 4 `<BookOpenTransition>`: the open/close choreography. */
+/** Wrapper — `<BookOpenTransition>`: the open/close choreography. */
 export interface BookOpenTransitionProps {
   /** The tapped cover's on-shelf rect (for the lift). Omit → animate from center. */
   originRect?: DOMRect | null;

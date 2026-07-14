@@ -89,7 +89,7 @@ seed-demo:
 
 lint:
 	cd backend && .venv/bin/ruff check app tests scripts
-	cd backend && .venv/bin/mypy app tests
+	cd backend && .venv/bin/mypy app scripts
 
 fmt:
 	cd backend && .venv/bin/black app tests

@@ -34,7 +34,6 @@ SITES: tuple[str, ...] = (
 
 #: A documented menu of candidate downshifts (cheaper model that *plausibly* holds quality for the
 #: site). NOT applied by default — opt in after the §13 eval confirms no quality regression.
-#: Rationale per entry lives in coordination/PERF.md (the routing-savings analysis).
 SUGGESTED_OVERRIDES: dict[str, str] = {
     # The cinematographer turns an already-structured beat into shot directions — a constrained,
     # template-shaped task the cheap adapter tier handles well. (It already uses the adapter model;

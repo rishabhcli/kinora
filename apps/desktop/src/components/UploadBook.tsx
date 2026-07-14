@@ -1,11 +1,9 @@
-// UploadBook (Agent 05, WS3) — first-class "upload your own EPUB/PDF": HTML5
+// First-class "upload your own EPUB/PDF": HTML5
 // drag-and-drop + click-to-pick, friendly validation, optimistic shelf
 // placeholder, and live ingest-status polling. Wires through `lib/api/library`.
 //
-// The native Electron Cmd+O picker (main.ts already filters PDF/EPUB) needs a
-// preload bridge to hand the renderer the file *bytes* — requested from Agent 12
-// (coordination/requests/agent-05.md). Drag-drop + the in-app picker below need
-// no Electron change and cover the flow end-to-end today.
+// Drag-drop and the in-app picker cover the flow end to end. Electron's native
+// Cmd+O picker still needs a preload bridge to hand the renderer the file bytes.
 import { useCallback, useId, useRef, useState } from "react";
 import { announce } from "../a11y/announce";
 import { ApiError } from "../lib/api";

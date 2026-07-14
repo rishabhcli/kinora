@@ -170,7 +170,7 @@ def merge_maps(*maps: DataMap | Iterable[PIIField]) -> DataMap:
 
 
 # --------------------------------------------------------------------------- #
-# Kinora's default data-map. Mirrors the real stores described in CLAUDE.md /  #
+# Kinora's default data-map. Mirrors the real stores described in AGENTS.md /  #
 # kinora.md: Postgres rows, MinIO blobs, the append-only event store, and the  #
 # hash-chained audit log. The map drives export + erasure, so adding a column  #
 # that holds PII is a one-line edit here.                                      #

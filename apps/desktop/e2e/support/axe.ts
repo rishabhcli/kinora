@@ -60,7 +60,7 @@ export function seriousOnly(report: AxeReport): AxeFinding[] {
   return report.violations.filter((v) => isSerious(v.impact));
 }
 
-/** Write the report as a CI artifact (attachment + shared artifacts dir). */
+/** Write the report as a CI attachment and a local artifact. */
 export function writeReport(testInfo: TestInfo, report: AxeReport): void {
   const body = Buffer.from(JSON.stringify(report, null, 2));
   testInfo.attachments.push({
@@ -69,7 +69,7 @@ export function writeReport(testInfo: TestInfo, report: AxeReport): void {
     body,
   });
   try {
-    const dir = path.resolve(process.cwd(), "../../coordination/artifacts/e2e-a11y");
+    const dir = path.resolve(process.cwd(), "../../artifacts/e2e-a11y");
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, `axe-${report.screen}.json`), body);
   } catch {

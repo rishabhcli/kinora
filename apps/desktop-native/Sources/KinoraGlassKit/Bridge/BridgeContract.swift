@@ -5,7 +5,7 @@ import Foundation
 /// Mirrors the Electron preload contract (`apps/desktop/electron/preload.ts`): the
 /// renderer (`apps/desktop/src/main.tsx`) reads `window.__KINORA_NATIVE__` to go
 /// translucent so the genuine `NSGlassEffectView` shows through. We set that *same*
-/// flag, and additionally expose the richer `window.kinora` object the CLAUDE.md
+/// flag, and additionally expose the richer `window.kinora` object the AGENTS.md
 /// native-shell note promises ("token bridge + openBook").
 ///
 /// The contract is **non-invasive**: the bridge never force-writes the page's auth

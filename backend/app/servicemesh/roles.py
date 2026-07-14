@@ -1,6 +1,6 @@
 """Producer roles, transport kinds, and content types for the mesh envelope.
 
-Kinora's backend image runs as several *roles* off one codebase (CLAUDE.md / §12
+Kinora's backend image runs as several *roles* off one codebase (AGENTS.md / §12
 process model): the ``api`` server, the ``ingest-worker``, the ``render-worker``,
 and the ``mcp`` canon server. Every message on an internal channel is stamped with
 the role that produced it so a consumer can attribute, route, and (for negotiation)

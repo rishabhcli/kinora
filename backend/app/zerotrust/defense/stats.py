@@ -378,14 +378,9 @@ class IsolationForestLite:
             if lo <= xf <= hi:
                 continue
             span = hi - lo
-            if span <= 1e-12:
-                # Constant training dimension: scale by the value's own magnitude
-                # (floored at 1.0) so a *gross* departure (e.g. 41 vs a constant 1)
-                # is large while a tiny ratio departure (0.05 vs a constant 0) is
-                # correctly negligible — boundary-grazing must not look anomalous.
-                scale = max(1.0, abs(lo), abs(hi))
-            else:
-                scale = span
+            # For a constant training dimension, use the value's magnitude so a
+            # gross departure is large while boundary-grazing stays negligible.
+            scale = max(1.0, abs(lo), abs(hi)) if span <= 1e-12 else span
             excursion = (lo - xf if xf < lo else xf - hi) / scale
             worst = max(worst, excursion)
         if worst <= 0.0:

@@ -58,7 +58,7 @@ class Provider(enum.StrEnum):
 def infer_provider(model: str) -> Provider:
     """Map a model id to its provider (deterministic, total — never raises).
 
-    Heuristic prefix match over the known fleet (CLAUDE.md): ``wan*`` is the Wan
+    Heuristic prefix match over the known fleet (AGENTS.md): ``wan*`` is the Wan
     video provider; ``qwen*`` / ``tongyi*`` is DashScope; ``minimax*`` /
     ``abab*`` / ``hailuo*`` is MiniMax; ``gpt*`` / ``o1`` / ``o3`` is OpenAI.
     Anything else is :attr:`Provider.UNKNOWN`.

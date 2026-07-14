@@ -31,7 +31,7 @@ export function collectionStore(): CollectionStore {
   return _collections;
 }
 
-/** CROSS-DOMAIN INTEGRATION SEAM (documented in DESIGN.md §5.3).
+/** Cross-domain integration point for reading analytics.
  *
  * The reading room (a different domain) should call this on each session tick
  * with the words advanced + wall-clock seconds spent, so the Director Studio's

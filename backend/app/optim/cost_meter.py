@@ -80,7 +80,7 @@ PRICING: dict[str, Price] = {
     "qwen3-asr-flash": Price(per_audio_second=_d("0.0004")),
     # embeddings (USD per 1k input tokens)
     "tongyi-embedding-vision-plus": Price(input_per_1k=_d("0.00007")),
-    # Wan video (USD per video-second) — config placeholders + the real intl ids (see CLAUDE.md)
+    # Wan video (USD per video-second) — config placeholders + the real intl ids (see AGENTS.md)
     "wan2.7-t2v": Price(per_video_second=_d("0.10")),
     "wan2.7-i2v": Price(per_video_second=_d("0.12")),
     "wan2.7-r2v": Price(per_video_second=_d("0.12")),

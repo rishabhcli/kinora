@@ -1,13 +1,11 @@
-// Film API — the typed client for Agent 1's stitched event/scene films + sync
-// maps (the §9.6 "stitch + ship" boundary). The contract is authoritative in
-// `coordination/CONTRACTS.md` §Agent-03.
+// Film API — typed client for stitched event/scene films and sync maps (the
+// §9.6 "stitch + ship" boundary).
 //
 // Every type mirrors the backend JSON 1:1 (snake_case), so the SAME objects
 // arriving via REST (`getEvents` / `getSceneFilm`) and via SSE
-// (`scene_stitched` / `event_stitched`) share one type set — Agent 2's
+// (`scene_stitched` / `event_stitched`) share one type set, so the
 // ScrollFilmEngine consumes them with no adapter.
-import { toBrowserUrl } from "../api";
-import { http } from "./http";
+import { http, toBrowserUrl } from "../api";
 
 /** One narrated word: film-timeline timing + page geometry for the karaoke highlight (§9.4). */
 export interface SyncWord {
@@ -119,11 +117,11 @@ export interface EventStitchedEvent {
 export const films = {
   /** All events (scenes) for a book + open-book restore state. */
   getEvents: (bookId: string): Promise<EventsResponse> =>
-    http.get<EventsResponse>(`/api/books/${encodeURIComponent(bookId)}/events`),
+    http<EventsResponse>(`/api/books/${encodeURIComponent(bookId)}/events`),
 
   /** One scene's film (partial load). */
   getSceneFilm: (bookId: string, sceneId: string): Promise<SceneFilm> =>
-    http.get<SceneFilm>(
+    http<SceneFilm>(
       `/api/books/${encodeURIComponent(bookId)}/scenes/${encodeURIComponent(sceneId)}/film`,
     ),
 

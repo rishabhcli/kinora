@@ -204,7 +204,7 @@ def _check_s3_coherence(s: Settings) -> list[ConfigFinding]:
 
     A missing public base URL outside ``local`` means browser-reachable media
     links fall back to the in-cluster endpoint, which is not reachable from a
-    browser — a real production foot-gun (the CLAUDE.md rewrite note). A blank
+    browser — a real production foot-gun (the AGENTS.md rewrite note). A blank
     bucket is always an error.
     """
     out: list[ConfigFinding] = []

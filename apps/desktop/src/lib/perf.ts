@@ -1,8 +1,7 @@
 /**
- * perf.ts — Agent 07's opt-in client performance helpers.
+ * Opt-in client performance helpers.
  *
- * Importing this module changes nothing; a component opts in. Published in
- * coordination/CONTRACTS.md for Agents 2/4/8/10 to adopt.
+ * Importing this module changes nothing; a component opts in explicitly.
  *
  * - `lazyImport` — `React.lazy` + a one-shot retry on a chunk-load error (a
  *   transient blip or a stale chunk after a redeploy) so a flaky dynamic import

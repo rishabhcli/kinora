@@ -4,7 +4,7 @@
 # loading it never renders and never spends (KINORA_LIVE_VIDEO is irrelevant
 # here). `cost_tier` is a *ref* into a sibling pricing table — this subsystem
 # does not own dollar amounts. Ids mirror the hosted models documented in
-# CLAUDE.md / app/core/config.py; capability envelopes are conservative.
+# AGENTS.md / app/core/config.py; capability envelopes are conservative.
 #
 # weight  : relative routing weight for the deterministic weighted picker.
 # rollout : ga | canary | preview | deprecated | disabled.

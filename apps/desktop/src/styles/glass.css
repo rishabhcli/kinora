@@ -1,9 +1,7 @@
 /* ============================================================
-   styles/glass.css — OWNER: Agent 8 (color/depth/typography)
-   Liquid Glass material (CONTRACTS §1). v1 then macOS-26 v2 — order preserved so v2 wins.
-   Split verbatim from the monolithic index.css by the Captain (A12)
-   at t0 so owners stop colliding on one file. Rules are byte-exact;
-   edit only within your lane (see coordination/OWNERSHIP.md).
+   styles/glass.css — translucent material and depth
+   CSS material styles for the Electron renderer. Native Liquid Glass lives in
+   apps/desktop-native.
    ============================================================ */
 
 /* ===== Liquid Glass — Apple-style (max realism) ===== */

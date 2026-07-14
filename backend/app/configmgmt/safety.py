@@ -52,7 +52,7 @@ __all__ = [
 
 _log = get_logger("configmgmt.safety")
 
-#: The demo credentials from CLAUDE.md — never valid in prod.
+#: The demo credentials from AGENTS.md — never valid in prod.
 DEMO_EMAIL = "demo@kinora.local"
 DEMO_PASSWORD = "demo-password-123"  # noqa: S105 - sentinel to refuse, not a credential
 

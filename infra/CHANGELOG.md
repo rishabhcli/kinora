@@ -5,7 +5,8 @@
 A decade-scale expansion of `infra/` from a single flat Alibaba Terraform root +
 two Dockerfiles + a basic Prometheus scrape into a full, multi-target,
 multi-environment IaC platform. **No application code touched; everything stays
-under `infra/` (+ additive `.github/workflows/`).** Nothing is `apply`-ed.
+under `infra/` plus the infrastructure workflows.** The Terraform topology has
+not been applied to the live single-node deployment.
 
 ### Terraform
 - **8 reusable Alibaba modules**: `network` (VPC, vswitches, optional NAT,
@@ -55,7 +56,7 @@ under `infra/` (+ additive `.github/workflows/`).** Nothing is `apply`-ed.
 
 ### Tooling
 - `infra/Makefile` validation harness mirroring CI; `scripts/gen-secrets.sh` +
-  `scripts/stack-smoke.sh`; `DESIGN.md` roadmap; per-area READMEs.
+  `scripts/stack-smoke.sh`; per-area READMEs.
 
 ### Verified locally
 `terraform validate` (all envs + AWS), `helm lint` + `kubeconform` (default/dev/prod

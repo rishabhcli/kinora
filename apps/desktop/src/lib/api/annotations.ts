@@ -3,7 +3,7 @@
 // resolvable threads. The backend has no annotation endpoint yet, so this is a
 // local-first store with a stable, portable JSON wire format designed to sync to
 // a future `/books/{id}/annotations` collection with no shape change (the
-// `author`, `at`, `id` fields are server-authoritative-ready). See DESIGN.md.
+// `author`, `at`, `id` fields are server-authoritative-ready).
 //
 // Pure model + injectable KV persistence (mirrors lib/settings.ts), so threads,
 // resolution, and the export/import round-trip are testable with no DOM.

@@ -2,7 +2,7 @@
 
 These are *declarative descriptions*, not live capability probes — a convenience
 so callers (and the tests) don't re-spell common envelopes. They intentionally
-mirror the real backends documented in ``CLAUDE.md`` / ``app.core.config`` without
+mirror the real backends documented in ``AGENTS.md`` / ``app.core.config`` without
 importing the provider layer (this package stays self-contained):
 
 * :func:`wan_profile` — the hosted DashScope Wan family: every render mode, short

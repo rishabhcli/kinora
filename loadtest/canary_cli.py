@@ -33,7 +33,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--email", default="demo@kinora.local", help="Login email.")
     parser.add_argument(
         "--password",
-        default="demo-password-123",  # noqa: S107 - demo creds (CLAUDE.md)
+        default="demo-password-123",  # noqa: S107 - demo creds (AGENTS.md)
         help="Login password.",
     )
     parser.add_argument("--book-id", default="book_demo", help="Book to open.")

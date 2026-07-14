@@ -41,7 +41,7 @@ All metric names map 1:1 to `backend/app/observability/metrics.py`.
 
 The `KinoraVideoSpendWithGateOff` alert fires if the budget ledger records any
 video-seconds while `kinora_live_video == 0` — a tripwire for the
-`KINORA_LIVE_VIDEO`-off invariant (§11.1, CLAUDE.md).
+`KINORA_LIVE_VIDEO`-off invariant (§11.1, AGENTS.md).
 
 ## Validation
 

@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import os
 
+# The developer's gitignored backend/.env can intentionally enable paid providers
+# and tune scheduler policy. Tests must exercise declared defaults instead.
+os.environ.setdefault("KINORA_ENV_FILE", os.devnull)
 os.environ.setdefault("DASHSCOPE_API_KEY", "test")
 os.environ.setdefault("APP_ENV", "local")
 # Keep the suite hermetic: pin the reasoning provider to DashScope so a real

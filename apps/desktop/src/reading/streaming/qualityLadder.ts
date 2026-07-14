@@ -1,5 +1,5 @@
 // The adaptive multi-quality ladder, pure half. Kinora's backend can render a
-// shot at more than one fidelity (CLAUDE.md: turbo defaults vs the plus/preview
+// shot at more than one fidelity (AGENTS.md: turbo defaults vs the plus/preview
 // quality overrides; §12.4's degradation ladder steps full-video → keyframe pan →
 // illustration → audio-only). On the *client* we mirror that as a set of quality
 // LEVELS the reader's pane can request, and an ABR-style controller that picks the

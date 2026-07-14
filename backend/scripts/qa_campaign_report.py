@@ -8,7 +8,7 @@ pulls the per-book shot/QA/long-range-findings numbers out of each manifest,
 and writes a single cross-book Markdown table next to them:
 
     backend/.venv/bin/python backend/scripts/qa_campaign_report.py \\
-        qa-runs/2026-07-04-10-book-campaign
+        artifacts/qa/10-book-campaign
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("qa-runs/2026-07-04-10-book-campaign")
+ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("artifacts/qa/10-book-campaign")
 
 
 def main() -> int:

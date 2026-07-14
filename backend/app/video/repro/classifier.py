@@ -149,7 +149,7 @@ class DeterminismClassification(BaseModel):
 # --------------------------------------------------------------------------- #
 #
 # Conservative, additive, data-only. Entries reflect this repo's documented
-# providers (CLAUDE.md): hosted Wan on DashScope, hosted MiniMax (Hailuo). Both
+# providers (AGENTS.md): hosted Wan on DashScope, hosted MiniMax (Hailuo). Both
 # are diffusion-family hosted models with no byte-stability promise; the seed is
 # accepted (DashScope forwards ``parameters.seed``) and pins the plan, so the
 # honest label is BEST_EFFORT. The local ffmpeg Ken-Burns degradation lane, by

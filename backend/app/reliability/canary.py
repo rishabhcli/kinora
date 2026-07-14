@@ -227,7 +227,7 @@ def _create_session_step(book_id: str, *, sla_ms: float) -> JourneyStep:
 def kinora_read_journey(
     *,
     email: str = "demo@kinora.local",
-    password: str = "demo-password-123",  # noqa: S107 - demo creds, documented in CLAUDE.md
+    password: str = "demo-password-123",  # noqa: S107 - demo creds, documented in AGENTS.md
     book_id: str = "book_demo",
     library_sla_ms: float = 800.0,
     intent_sla_ms: float = 250.0,

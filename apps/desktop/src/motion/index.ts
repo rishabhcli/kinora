@@ -1,11 +1,11 @@
 /**
- * @kinora motion system — the app-wide motion vocabulary (Agent 04).
+ * @kinora motion system — the app-wide motion vocabulary.
  *
  * Import primitives from here, not from individual files. Importing this
  * barrel also loads `motion.css` (the tokens + consolidated keyframes), so
  * any consumer of a primitive automatically gets the motion stylesheet.
  *
- * Public API (kept stable; documented in coordination/CONTRACTS.md):
+ * Public API:
  *   <MotionProvider>      reduced-motion + global speed + debug context
  *   useMotion()           the ergonomic hook (spring/tween/reduced/speed)
  *   <Reveal>              in-view entrance, optional stagger

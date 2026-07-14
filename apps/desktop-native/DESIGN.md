@@ -41,7 +41,7 @@ when no renderer is reachable, so the app is never left showing a blank window.
 The Electron preload (`apps/desktop/electron/preload.ts`) today exposes exactly one thing:
 `window.__KINORA_NATIVE__ = true` on macOS/Windows. The renderer (`apps/desktop/src/main.tsx`)
 reads it to add `html.kinora-native` and go translucent. Our shell **must** set the same flag,
-and goes further, delivering the richer `window.kinora` object the CLAUDE.md native-shell note
+and goes further, delivering the richer `window.kinora` object the AGENTS.md native-shell note
 promises ("`window.kinora` (token bridge + `openBook`) mirrors the Electron preload"). Because
 the renderer keeps its bearer token in `localStorage["kinora.token"]` (`api.ts`), the bridge is
 deliberately **non-invasive** and all the better for it: it never forces a token into the page;
@@ -127,7 +127,7 @@ shell over it.
 
 ## 4. Milestones
 
-- [x] **M0 — Recon & baseline.** Read CLAUDE.md + kinora.md §5; confirmed Swift 6.4 / macOS 27.0
+- [x] **M0 — Recon & baseline.** Read AGENTS.md + kinora.md §5; confirmed Swift 6.4 / macOS 27.0
       SDK under `/Applications/Xcode-beta.app`; baseline `swift build` is green.
 - [x] **M1 — Kit foundation.** Split `KinoraGlassKit` library target; Book model, endpoint
       resolver, shell settings, logging. Package.swift → 3 targets. Build green.

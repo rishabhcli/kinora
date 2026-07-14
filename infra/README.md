@@ -6,12 +6,11 @@ submission target, kinora.md §12.6) and a portable **AWS** mirror, a
 **Kubernetes/Helm** chart (+ Kustomize), hardened **Dockerfiles**, **CI/CD**
 workflows, and an **observability** stack.
 
-> **Nothing here is ever `terraform apply`-ed in this repo.** Everything is
-> validated with a local backend and no cloud credentials. The
-> `KINORA_LIVE_VIDEO` go-live gate stays **OFF** in every default (kinora.md §11.1).
-
-See **[DESIGN.md](./DESIGN.md)** for the full roadmap + per-phase status, and
-**[CHANGELOG.md](./CHANGELOG.md)** for what this iteration added.
+The live hackathon instance uses the separate single-node bootstrap in
+[`deploy/alibaba_single_node.sh`](../deploy/alibaba_single_node.sh). The larger
+Terraform roots in this directory are validated infrastructure definitions; they
+have not been applied to that instance. `KINORA_LIVE_VIDEO` stays **off** in every
+default (kinora.md §11.1).
 
 ## Layout
 
@@ -85,4 +84,4 @@ cd infra && make validate
 | Security | Checkov + Trivy (SARIF → Security tab) | `infra-security.yml` |
 
 The CI gate lives in `.github/workflows/infra-validate.yml`,
-`infra-security.yml`, and `infra-release.yml` (additive to the app `ci.yml`).
+`infra-security.yml`, and `infra-release.yml`.

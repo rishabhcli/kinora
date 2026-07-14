@@ -1,1 +1,0 @@
-/ralph-loop:ralph-loop "Kinora Agent 09. Run bash agent-prompts/arm-ralph.sh 09 from repo root, then read agent-prompts/.missions/agent-09-settings-sf-symbols.md and execute fully in worktree ../kinora-a09." --completion-promise "AGENT 09 COMPLETE" --max-iterations 500

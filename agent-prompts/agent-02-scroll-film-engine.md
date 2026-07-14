@@ -1,1 +1,0 @@
-/ralph-loop:ralph-loop "Kinora Agent 02. Run bash agent-prompts/arm-ralph.sh 02 from repo root, then read agent-prompts/.missions/agent-02-scroll-film-engine.md and execute fully in worktree ../kinora-a02." --completion-promise "AGENT 02 COMPLETE" --max-iterations 500

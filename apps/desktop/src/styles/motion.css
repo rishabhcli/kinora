@@ -1,9 +1,6 @@
 /* ============================================================
-   styles/motion.css — OWNER: Agent 4 (motion/animation)
-   Generic page/nav animations (CONTRACTS §2). Reduced-motion guards live in a11y.css.
-   Split verbatim from the monolithic index.css by the Captain (A12)
-   at t0 so owners stop colliding on one file. Rules are byte-exact;
-   edit only within your lane (see coordination/OWNERSHIP.md).
+   styles/motion.css — motion and animation
+   Generic page/nav animations. Reduced-motion guards live in a11y.css.
    ============================================================ */
 
 @keyframes fadeIn {

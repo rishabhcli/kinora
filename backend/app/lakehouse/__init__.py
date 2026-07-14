@@ -1,4 +1,7 @@
-"""Lakehouse data platform: a columnar store + incremental ELT + vectorized query engine, an online/offline feature store, and a governed semantic metrics layer.
+"""Lakehouse data platform.
+
+Includes a columnar store, incremental ELT, a vectorized query engine, an
+online/offline feature store, and a governed semantic metrics layer.
 
 Self-contained, additive subpackages; importing this namespace is side-effect free.
 """

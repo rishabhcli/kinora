@@ -18,7 +18,6 @@ clients/
   python/             kinora — sync + async Python SDK (httpx)
   contract-drift/     check_drift.py — flags when the SDKs lag the API
   examples/           runnable end-to-end scripts (mock by default)
-  DESIGN.md           the living roadmap
 ```
 
 ## Single source of truth

@@ -13,7 +13,7 @@ plus its object-store blobs, then drive **export → import** through the
 They also cover canon-only export/import, GDPR account export, right-to-erasure
 (dry-run + execute), backup create/restore, and archive inspection.
 
-Run against the isolated throwaway infra (see CLAUDE.md / conftest): a dedicated
+Run against the isolated throwaway infra (see AGENTS.md / conftest): a dedicated
 DB + redis db + MinIO. Skipped cleanly when that infra is not configured.
 """
 

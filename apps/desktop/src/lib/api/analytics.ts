@@ -5,7 +5,7 @@
 //      wall-clock seconds), since the backend exposes no per-reader analytics
 //      endpoint yet. The log is the honest first-class data source; when a
 //      backend `/me/analytics` lands, `summarize()` swaps its input with no UI
-//      change (see DESIGN.md cross-domain notes).
+//      change.
 //
 // All derivation is PURE. The event store is an injectable KV (mirrors
 // lib/settings.ts) so the math is testable with no DOM and no clock.

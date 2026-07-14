@@ -6,12 +6,10 @@ import path from "node:path";
 // Scans the REAL app screens the DoD names — login → library → reading room —
 // in demo mode (LoginPage enters even when the backend is unreachable; Home/Library
 // render static demo books; the reading room shows placeholder text). Full reports
-// are written for findings; the assertion is scoped to Agent 06's owned DOM on each
-// screen (the app-wide skip link), since library/reading-room chrome belongs to
-// Agents 5/10. Owned reading-room *surfaces* (ReadingControls/ReadAloudView) are
-// covered by a11y.spec.ts once Agent 10 mounts them.
+// are written for findings; assertions cover the shared accessibility surface
+// and dedicated reading-room controls.
 
-const ARTIFACTS = path.resolve(process.cwd(), "../../coordination/artifacts/agent-08");
+const ARTIFACTS = path.resolve(process.cwd(), "../../artifacts/e2e-screens");
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const isSerious = (i: string | null | undefined) => i === "serious" || i === "critical";
 

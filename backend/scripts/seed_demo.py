@@ -10,7 +10,7 @@ identity lock of keyframes + voices, kinora.md §9.1) with **no video spend**
   browser would — register a user, log in, ``POST /api/books`` with the demo
   PDF, then poll ``GET /api/books/{id}`` until the book is ``ready`` and print
   the projected shelf / shot / canon summary. Use this against the Docker
-  Compose stack (``make stack-up`` then ``make migrate``).
+  Compose stack (``make stack-up``; migrations run automatically).
 
 * ``--via direct``: skip the HTTP layer and call the ingest **service**
   in-process against the configured Postgres + object store + DashScope — handy

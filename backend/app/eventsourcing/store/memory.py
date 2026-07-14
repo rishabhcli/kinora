@@ -22,10 +22,10 @@ mutating any state.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast, overload
 
 from app.eventsourcing.store.contracts import (
     EventData,
@@ -38,6 +38,15 @@ from app.eventsourcing.store.contracts import (
     new_event_id,
 )
 from app.eventsourcing.store.errors import AppendError
+from app.eventsourcing.store.protocol import (
+    AppendResult as LegacyAppendResult,
+)
+from app.eventsourcing.store.protocol import (
+    ConcurrencyError as LegacyConcurrencyError,
+)
+from app.eventsourcing.store.protocol import (
+    StoredEvent as LegacyStoredEvent,
+)
 from app.eventsourcing.store.serialization import JsonEventSerializer
 from app.eventsourcing.store.versioning import (
     NO_EVENTS,
@@ -71,10 +80,15 @@ class InMemoryEventStore:
         self._outbox: dict[str, OutboxRecord] = {}
         # inbox: (consumer, message_id) -> result.
         self._inbox: dict[tuple[str, str], dict[str, Any] | None] = {}
+        # Compatibility log for the aggregate/repository facet, which predates
+        # EventData and uses 1-based stream versions plus serialized envelopes.
+        self._legacy_log: list[LegacyStoredEvent] = []
+        self._legacy_streams: dict[str, list[LegacyStoredEvent]] = {}
         self._lock = asyncio.Lock()
 
     # -- EventStore --------------------------------------------------------- #
 
+    @overload
     async def append(
         self,
         stream_id: str,
@@ -83,12 +97,45 @@ class InMemoryEventStore:
         expected_version: ExpectedVersion,
         publish_topic: str | None = None,
     ) -> tuple[RecordedEvent, ...]:
+        ...
+
+    @overload
+    async def append(
+        self,
+        stream_id: str,
+        events: Sequence[Mapping[str, object]],
+        *,
+        expected_version: int | None,
+        publish_topic: None = None,
+    ) -> LegacyAppendResult:
+        ...
+
+    async def append(
+        self,
+        stream_id: str,
+        events: Sequence[EventData] | Sequence[Mapping[str, object]],
+        *,
+        expected_version: ExpectedVersion | None,
+        publish_topic: str | None = None,
+    ) -> tuple[RecordedEvent, ...] | LegacyAppendResult:
         if not events:
             raise AppendError("cannot append an empty batch")
+        if isinstance(events[0], Mapping):
+            if publish_topic is not None:
+                raise AppendError("legacy envelope appends do not support publish_topic")
+            return await self._append_legacy(
+                stream_id,
+                cast(Sequence[Mapping[str, object]], events),
+                expected_version=expected_version if isinstance(expected_version, int) else None,
+            )
+
+        modern_events = cast(Sequence[EventData], events)
+        if expected_version is None:
+            raise AppendError("modern EventData appends require an ExpectedVersion")
         async with self._lock:
             # Idempotent re-append: if the *whole* batch is already stored under
             # its event_ids, return the stored events unchanged (a retried write).
-            stored = [self._by_event_id.get(e.event_id) for e in events]
+            stored = [self._by_event_id.get(e.event_id) for e in modern_events]
             if all(s is not None for s in stored):
                 same_stream = all(s is not None and s.stream_id == stream_id for s in stored)
                 if same_stream:
@@ -99,8 +146,8 @@ class InMemoryEventStore:
             check(stream_id, expected_version, current if stream else NO_EVENTS)
 
             # Validate / JSON-safety the whole batch *before* mutating anything.
-            serialized = [(e, self._serializer.serialize(e)) for e in events]
-            for e in events:
+            serialized = [(e, self._serializer.serialize(e)) for e in modern_events]
+            for e in modern_events:
                 if e.event_id in self._by_event_id:
                     # A partial-overlap batch is a programming error.
                     raise AppendError(f"event_id {e.event_id!r} already exists (partial re-append)")
@@ -148,6 +195,70 @@ class InMemoryEventStore:
                     )
                     self._outbox[ob.id] = ob
             return tuple(recorded)
+
+    async def _append_legacy(
+        self,
+        stream_id: str,
+        events: Sequence[Mapping[str, object]],
+        *,
+        expected_version: int | None,
+    ) -> LegacyAppendResult:
+        """Append serialized domain envelopes for the aggregate/repository facet."""
+        async with self._lock:
+            stream = self._legacy_streams.setdefault(stream_id, [])
+            current = len(stream)
+            if expected_version is not None and expected_version != current:
+                raise LegacyConcurrencyError(stream_id, expected_version, current)
+
+            first_version = current + 1
+            staged: list[LegacyStoredEvent] = []
+            for offset, envelope in enumerate(events):
+                event_type = envelope.get("type")
+                event_version = envelope.get("version", 1)
+                payload = envelope.get("data", {})
+                metadata = envelope.get("meta", {})
+                if not isinstance(event_type, str) or not isinstance(event_version, int):
+                    raise AppendError("legacy envelope requires string type and integer version")
+                if not isinstance(payload, Mapping) or not isinstance(metadata, Mapping):
+                    raise AppendError("legacy envelope data/meta must be mappings")
+                staged.append(
+                    LegacyStoredEvent(
+                        stream_id=stream_id,
+                        version=first_version + offset,
+                        event_type=event_type,
+                        event_version=event_version,
+                        payload=dict(payload),
+                        metadata=dict(metadata),
+                        global_position=len(self._legacy_log) + offset + 1,
+                    )
+                )
+
+            stream.extend(staged)
+            self._legacy_log.extend(staged)
+            return LegacyAppendResult(stream_id, first_version, staged[-1].version)
+
+    async def load(
+        self,
+        stream_id: str,
+        *,
+        from_version: int = 0,
+    ) -> list[LegacyStoredEvent]:
+        """Load legacy envelopes with versions strictly after ``from_version``."""
+        async with self._lock:
+            return [
+                event
+                for event in self._legacy_streams.get(stream_id, [])
+                if event.version > from_version
+            ]
+
+    async def current_version(self, stream_id: str) -> int:
+        """Return the legacy stream's 1-based current version, or zero."""
+        async with self._lock:
+            return len(self._legacy_streams.get(stream_id, []))
+
+    def all_events(self) -> list[LegacyStoredEvent]:
+        """Return the legacy global log for aggregate/projection tests."""
+        return list(self._legacy_log)
 
     async def read_stream(
         self,
@@ -221,7 +332,8 @@ class InMemoryEventStore:
             due = [
                 r
                 for r in self._outbox.values()
-                if r.status is OutboxStatus.PENDING and r.available_at <= now
+                if r.status is OutboxStatus.PENDING
+                and (r.attempts == 0 or r.available_at <= now)
             ]
             due.sort(key=lambda r: r.global_position)
             return due[:limit]

@@ -41,17 +41,20 @@ apps/desktop/dist-electron/
 # source tree at backend/app/storage/.
 /storage/
 
+# Generated QA, recordings, and local planning state.
+/artifacts/
+/qa-runs/
+/coordination/
+/agent-prompts/
+/docs/superpowers/
+
 # --- Logs ---
 *.log
 
 # --- OS ---
 .DS_Store
 
-# --- Claude Code local state ---
-# Per-worktree Ralph loop state + local session files must never be committed:
-# each agent worktree has its own .claude/ralph-loop.local.md and committing it
-# would clobber sibling agents' state on merge. (agent-prompts/ mission MD is
-# tracked; only the .claude/ inside any tree is ignored.)
+# --- Local agent/session state ---
 .claude/
 **/.claude/
-generated_videos/
+/generated_videos/

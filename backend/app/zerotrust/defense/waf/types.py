@@ -77,7 +77,7 @@ class HttpRequest:
         body: str = "",
         source_ip: str = "0.0.0.0",
         ts: float = 0.0,
-    ) -> "HttpRequest":
+    ) -> HttpRequest:
         parts = urlsplit(url)
         return cls(
             method=method.upper(),

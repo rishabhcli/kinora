@@ -1,7 +1,7 @@
 """Multi-cloud provider abstraction + capability negotiation.
 
 Kinora already speaks to more than one cloud: DashScope (chat/VL/image/TTS/Wan)
-and — for the reasoning brain — OpenAI (CLAUDE.md: ``REASONING_PROVIDER``). The
+and — for the reasoning brain — OpenAI (AGENTS.md: ``REASONING_PROVIDER``). The
 §12.6 Alibaba ``VideoSynthesis`` worker is a third lane, and a self-hosted fallback
 is plausible. Each cloud supports a *different subset* of capabilities (OpenAI does
 chat but not Wan video; the Alibaba worker does video but not chat).

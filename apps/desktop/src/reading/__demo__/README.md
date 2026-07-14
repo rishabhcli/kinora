@@ -1,4 +1,4 @@
-# Scroll Film Engine — dev-only harness (Agent 02)
+# Scroll Film Engine — dev-only harness
 
 Not part of the app. The production `index.html` never references these files, so
 `vite build` doesn't bundle them; `tsconfig` still typechecks the `.tsx`.
@@ -13,7 +13,7 @@ Not part of the app. The production `index.html` never references these files, s
   Electron's Chromium (real H.264 decode) and asserts scrub accuracy, 60fps frame
   cadence, segment handoff, crossfade, and reduced-motion instant cuts.
 
-Run (see `coordination/artifacts/agent-02/VERIFICATION.md`):
+Run from the repository root:
 
 ```bash
 pnpm --filter @kinora/desktop exec vite --port 5199 --strictPort &

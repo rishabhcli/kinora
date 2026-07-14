@@ -4,7 +4,7 @@
 because a large back-catalogue ingest can fire thousands of VL calls. Until the
 batch lane lands, we run real concurrent calls (a semaphore in
 :mod:`app.ingest.analyze`) — but raw concurrency on a hosted endpoint trips the
-``429 Throttling.RateQuota`` the design warns about (CLAUDE.md). Two primitives
+``429 Throttling.RateQuota`` the design warns about (AGENTS.md). Two primitives
 fix that:
 
 * :class:`TokenBucket` — an async, fair token bucket that smooths the *rate* of

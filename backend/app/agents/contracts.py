@@ -474,7 +474,7 @@ class QARecord(BaseModel):
     the learned reward, per-character identity, temporal/aesthetic axes and the
     anomaly score only *inform* (e.g. ``flagged_for_review`` surfaces a gate-passing
     but low-reward / out-of-distribution clip to the director feed). See
-    ``DESIGN.md`` §6 for the recorded cross-domain contract change.
+    ``docs/design/critic-reward-model.md`` for the QA design.
     """
 
     model_config = ConfigDict(extra="forbid")

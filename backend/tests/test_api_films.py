@@ -1,8 +1,7 @@
-"""Integration tests for the Agent-03 film routes (skip without throwaway infra).
+"""Integration tests for the film routes (skip without throwaway infra).
 
-The films router isn't in the shared ROUTERS list yet (registration is Agent 12's
-lane — see coordination/requests/agent-03.md), so these tests mount it on a fresh
-app, exactly as Agent 12 will at integration.
+The tests mount the router explicitly on a fresh app so the route behavior stays
+isolated from unrelated application wiring.
 """
 
 from __future__ import annotations
@@ -28,7 +27,7 @@ from tests.conftest import register_login, seed_owned_book
 
 @pytest_asyncio.fixture
 async def films_client(container: Container) -> AsyncIterator[AsyncClient]:
-    """A client over an app with the films router mounted (Agent 12 does this for real)."""
+    """A client over an app with the films router mounted."""
     from app.api.routes import films
 
     app = create_app()
@@ -143,7 +142,7 @@ async def test_stitched_event_presigns_url(
     headers = await register_login(films_client, "films3@example.com")
     book_id = await seed_owned_book(films_client, container, headers)
     await _seed_scene(container, book_id)
-    # Simulate Agent 1 having stitched the scene mp4 into the object store.
+    # Simulate the render pipeline having stitched the scene mp4 into object storage.
     clip_key = keys.clip(book_id, "scene_0")
     await anyio.to_thread.run_sync(
         container.object_store.put_bytes, clip_key, b"\x00\x00\x00", "video/mp4"

@@ -5,7 +5,7 @@ from any client-side discovery UI. It blends three signals — content similarit
 over the §8 shared embeddings, collaborative filtering, and a recency-decayed
 per-user taste vector — through a candidate-generation → scoring → re-ranking
 pipeline with MMR diversity, business-rule boosts, cold-start fallbacks, and
-explainable "because you read X" reasons. See ``DESIGN.md`` for the roadmap.
+explainable "because you read X" reasons.
 
 The math core is pure and deterministic (tested with fake/one-hot embeddings —
 zero credits). The async, DB-backed :class:`~app.recommendations.store.RecommendationService`

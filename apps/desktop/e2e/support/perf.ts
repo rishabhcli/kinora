@@ -112,9 +112,9 @@ export function writeMetrics(
     contentType: "application/json",
     body: Buffer.from(payload),
   });
-  // Also drop into the shared artifacts dir for cross-agent dashboards.
+  // Also write a local copy for manual inspection.
   try {
-    const dir = path.resolve(process.cwd(), "../../coordination/artifacts/e2e-perf");
+    const dir = path.resolve(process.cwd(), "../../artifacts/e2e-perf");
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, `perf-${name}.json`), payload);
   } catch {

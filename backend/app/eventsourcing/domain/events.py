@@ -96,7 +96,9 @@ class DomainEvent:
     schema_version: ClassVar[int] = 1
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        super().__init_subclass__(**kwargs)
+        # dataclass(slots=True) replaces the class object, so zero-argument
+        # super() would retain the pre-replacement __class__ cell.
+        super(DomainEvent, cls).__init_subclass__(**kwargs)
         # Default the discriminator to the class name unless explicitly set on the
         # subclass body (not merely inherited from a parent event class).
         if "event_type" not in cls.__dict__:

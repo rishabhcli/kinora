@@ -14,13 +14,11 @@ shelf read — ``... ORDER BY created_at DESC LIMIT k`` — as an ordered Index 
 
 So the win (~24×) is realized once the shelf query **paginates**; today's un-paginated
 ``list_for_user`` returns the whole shelf and the planner picks bitmap+sort either way, leaving
-this index unused for that exact statement. It is shipped as the *enabler* for the paginated /
-preloaded 100-book library, paired with a pagination proposal to the BookRepo owner (Agent 5) in
-``coordination/requests/agent-07.md`` (R6). Purely additive + reversible; book inserts are rare.
+this index unused for that exact statement. It is shipped as the *enabler* for a paginated or
+preloaded 100-book library. Purely additive and reversible; book inserts are rare.
 
 ``ix_books_user_id`` is left in place (FK + ``count_for_user``); a later cleanup could drop it once
-this composite is the canonical user-prefix index — flagged for Agent 12 (it belongs to the
-ownership migration), not dropped here.
+this composite is the canonical user-prefix index.
 """
 
 from __future__ import annotations
@@ -30,8 +28,8 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "d9e2f4a6b8c1"
-# Captain re-parented onto A5's cover migration to collapse the two-head fork
-# (was "c8f1a2b3d4e5", same as e843aa7682b2 → forked). Index + cover are independent.
+# Re-parented onto the cover migration to collapse a two-head fork. Index and
+# cover changes are independent.
 down_revision: str | None = "e843aa7682b2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

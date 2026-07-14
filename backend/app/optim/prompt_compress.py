@@ -8,7 +8,7 @@ Nothing here is applied automatically; an agent *chooses* to shrink what it send
 * :func:`compact_json_schema` — strip schema chrome (``description``/``title``/``examples``/…)
   before a structured-output call; schema-aware, so it never deletes a *property* named that.
 * :func:`estimate_tokens` / :func:`compression_ratio` — a deterministic estimator + savings
-  fraction for before/after measurement (see coordination/PERF.md). The estimator is the
+  fraction for before/after measurement. The estimator is the
   ~4-chars/token heuristic — model-exact counts differ, but it is stable, so *ratios* are valid.
 """
 

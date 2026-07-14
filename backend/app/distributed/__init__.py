@@ -1,4 +1,7 @@
-"""Distributed-systems platform: internal RPC / service mesh, multi-region active-active replication, and the saga / process-manager engine.
+"""Distributed-systems platform.
+
+Includes internal RPC, a service mesh, multi-region active-active replication,
+and the saga/process-manager engine.
 
 Self-contained, additive subpackages; importing this namespace is side-effect free.
 """

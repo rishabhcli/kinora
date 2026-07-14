@@ -4,7 +4,7 @@ A fingerprint records *what* produced a clip; a replay turns that record back
 into an actionable request. Two things make replay non-trivial:
 
 1. **Signed URLs expire.** The reference-image and source-clip URLs captured at
-   render time are short-lived (CLAUDE.md: "task URLs expire"). A faithful replay
+   render time are short-lived (AGENTS.md: "task URLs expire"). A faithful replay
    therefore cannot just reuse the recorded URL — it must *re-resolve* each
    reference identity (``char_elsa_001@v3``) to a fresh signed URL through a
    resolver seam. The locked reference *content* is immutable (§8.1), so a

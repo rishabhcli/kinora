@@ -7,7 +7,7 @@ Kinora's load on a provider must respect several limits *simultaneously*:
 * a **per-provider** cap (DashScope-intl's published RPS),
 * a **per-tenant / per-book** cap (no single book may monopolise the fleet),
 * a **per-endpoint** cap (image-gen is throttled separately from video — the
-  ``429 Throttling.RateQuota`` in CLAUDE.md is on the *image* model only).
+  ``429 Throttling.RateQuota`` in AGENTS.md is on the *image* model only).
 
 A request must satisfy **all** of them. The semantics are: try to consume from
 each limit; if *any* denies, the request is denied with the **largest** of the

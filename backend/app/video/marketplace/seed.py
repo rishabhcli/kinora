@@ -182,7 +182,7 @@ def _minimax_hailuo_fast() -> ModelListing:
 
 
 def _wan22_t2v_plus_deprecated() -> ModelListing:
-    # A real deprecation: wan2.2-t2v-plus "fails at render" per CLAUDE.md, so it
+    # A real deprecation: wan2.2-t2v-plus "fails at render" per AGENTS.md, so it
     # ships pre-deprecated with a migration pointer to the preview quality model.
     return ModelListing(
         key="dashscope/wan2.2-t2v-plus",

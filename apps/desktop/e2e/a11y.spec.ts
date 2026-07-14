@@ -7,7 +7,7 @@ import path from "node:path";
 // harness + the cheat-sheet) must report ZERO serious/critical. The real login
 // screen is scanned too; its full report is written for findings.
 
-const ARTIFACTS = path.resolve(process.cwd(), "../../coordination/artifacts/agent-08");
+const ARTIFACTS = path.resolve(process.cwd(), "../../artifacts/e2e-a11y");
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 type Impact = "minor" | "moderate" | "serious" | "critical";

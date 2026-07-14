@@ -1,9 +1,9 @@
 """Deterministic arc-beat inference from structured plan signals (§7, §8.4).
 
-The arc/pacing layer is a **read model** (DESIGN.md §2): it must be derivable from
-signals a scene plan / canon already expose, with *no new ingest*. This module is
-that derivation — pure heuristics that turn a beat's mood word, its narrative
-position, and its dramatic cues into an :class:`~app.agents.contracts.ArcBeat`
+The arc/pacing layer is a **read model** (``docs/design/showrunner-series.md``):
+it must be derivable from signals a scene plan / canon already expose, with *no
+new ingest*. This module is that derivation — pure heuristics that turn a beat's
+mood word, narrative position, and dramatic cues into an :class:`~app.agents.contracts.ArcBeat`
 (its arc stage + 0..1 intensity).
 
 The heuristics are intentionally simple, explainable, and pre-registered (like the

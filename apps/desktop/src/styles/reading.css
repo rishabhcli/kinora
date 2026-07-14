@@ -1,9 +1,6 @@
 /* ============================================================
-   styles/reading.css — OWNER: Agent 10 (book-open / film experience)
+   styles/reading.css — book-open and film experience
    Reading-room loaders (SkeletonShimmer). Scroll/film engine CSS may join here.
-   Split verbatim from the monolithic index.css by the Captain (A12)
-   at t0 so owners stop colliding on one file. Rules are byte-exact;
-   edit only within your lane (see coordination/OWNERSHIP.md).
    ============================================================ */
 
 /* ===== Skeleton shimmer ===== */

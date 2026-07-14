@@ -29,7 +29,7 @@ class _Counter(AggregateRoot):
     total: int = 0
 
     def __init__(self, aggregate_id: str) -> None:
-        super().__init__(aggregate_id)
+        AggregateRoot.__init__(self, aggregate_id)
         self.total = 0
 
     def increment(self, by: int = 1) -> None:

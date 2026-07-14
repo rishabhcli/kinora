@@ -126,7 +126,7 @@ class CanonEntityAggregate(AggregateRoot):
     reference_id: str = ""
 
     def __init__(self, aggregate_id: str) -> None:
-        super().__init__(aggregate_id)
+        AggregateRoot.__init__(self, aggregate_id)
         self.registered = False
         self.book_id = ""
         self.entity_type = EntityType.CHARACTER

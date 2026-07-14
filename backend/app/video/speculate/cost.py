@@ -63,7 +63,7 @@ class TieredCostModel:
         """A representative cheap/standard/premium table (relative units, no env).
 
         The ratios mirror the real Wan turbo↔quality split documented in
-        CLAUDE.md (turbo ids cheaper + faster; quality ids pricier + slower). Only
+        AGENTS.md (turbo ids cheaper + faster; quality ids pricier + slower). Only
         ratios matter to the planner, so absolute dollars are illustrative.
         """
         specs = {

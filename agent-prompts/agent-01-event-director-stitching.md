@@ -1,1 +1,0 @@
-/ralph-loop:ralph-loop "Kinora Agent 01. Run bash agent-prompts/arm-ralph.sh 01 from repo root, then read agent-prompts/.missions/agent-01-event-director-stitching.md and execute fully in worktree ../kinora-a01." --completion-promise "AGENT 01 COMPLETE" --max-iterations 500

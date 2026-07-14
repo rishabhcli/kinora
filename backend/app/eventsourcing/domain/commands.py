@@ -35,7 +35,9 @@ class Command:
     command_type: ClassVar[str] = "Command"
 
     def __init_subclass__(cls, **kwargs: object) -> None:
-        super().__init_subclass__(**kwargs)
+        # dataclass(slots=True) replaces the class object, so zero-argument
+        # super() would retain the pre-replacement __class__ cell.
+        super(Command, cls).__init_subclass__(**kwargs)
         if "command_type" not in cls.__dict__:
             cls.command_type = cls.__name__
 

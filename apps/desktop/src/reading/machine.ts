@@ -2,7 +2,7 @@
 // a revealable, playing film, no matter which async step fails. Pure and
 // framework-free (no React, no DOM) so it is exhaustively unit-tested.
 //
-// States (published in coordination/CONTRACTS.md):
+// States:
 //   idle → opening(anim) → loading(meta/pages/shots) → warming(session+first
 //   frame) → ready → reading → closing
 //

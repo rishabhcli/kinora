@@ -1,8 +1,8 @@
 // The book-open film experience — the reading-room SHELL entry point. Owns the
-// open-state machine and composes Agent 4's open transition, Agent 2's scroll
-// film engine, and Agent 6's reading controls (all via producers.tsx) into one
+// open-state machine and composes the open transition, scroll-film engine, and
+// reading controls (all via producers.tsx) into one
 // flawless open→read→close whole that is fully functional every time, even with
-// KINORA_LIVE_VIDEO OFF. See coordination/CONTRACTS.md.
+// KINORA_LIVE_VIDEO OFF.
 // This is the product promise in code: not "play a clip beside text", but a book
 // opening into a responsive film room while still behaving like a dependable
 // reader.

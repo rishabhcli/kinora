@@ -185,7 +185,7 @@ class RenderShotAggregate(AggregateRoot):
     shot_hash: str = ""
 
     def __init__(self, aggregate_id: str) -> None:
-        super().__init__(aggregate_id)
+        AggregateRoot.__init__(self, aggregate_id)
         self.planned = False
         self.state = RenderState.PLANNED
         self.repair_count = 0

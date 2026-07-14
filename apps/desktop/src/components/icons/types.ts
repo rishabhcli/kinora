@@ -6,7 +6,7 @@
 // Apple's SF Symbols assets — their license forbids redistribution and restricts
 // them to Apple-platform UI. Drawing our own SF-Symbols-*compatible* set keeps us
 // license-clean and renders identically on macOS / Windows / Linux (bundled SVG,
-// not an OS font lookup). See `migration-map.md`.
+// not an OS font lookup).
 
 /** SF Symbols weight semantics — drives stroke width for outline glyphs. */
 export type SymbolWeight =

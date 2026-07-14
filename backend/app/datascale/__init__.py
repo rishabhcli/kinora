@@ -1,4 +1,7 @@
-"""Database-at-scale: sharding + connection proxy, query optimization + materialized views, and a sharded ANN vector-search service.
+"""Database-at-scale platform.
+
+Includes sharding, connection proxying, query optimization, materialized views,
+and a sharded ANN vector-search service.
 
 Self-contained, additive subpackages; importing this namespace is side-effect free.
 """

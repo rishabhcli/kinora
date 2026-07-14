@@ -1,6 +1,6 @@
 # `app/servicemesh` — internal message/RPC contracts + schema versioning
 
-Kinora's backend image runs as several **roles** off one codebase (CLAUDE.md /
+Kinora's backend image runs as several **roles** off one codebase (AGENTS.md /
 kinora.md §12 process model): `api`, `ingest-worker`, `render-worker`, `mcp`. They
 communicate over three internal channels:
 

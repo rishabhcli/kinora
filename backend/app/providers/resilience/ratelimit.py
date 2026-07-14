@@ -2,7 +2,7 @@
 
 The round-1 :class:`~app.providers.base.TokenBucket` is a *static* limiter: a
 fixed refill rate, no feedback. The DashScope-intl free tier throttles the
-**image** model independently (``429 Throttling.RateQuota``, CLAUDE.md), so a
+**image** model independently (``429 Throttling.RateQuota``, AGENTS.md), so a
 static rate either runs too slow (wasting headroom) or too fast (eating 429s).
 
 :class:`AdaptiveTokenBucket` adds **AIMD** congestion control — the same idea TCP

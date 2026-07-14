@@ -1,7 +1,7 @@
 """Disaster recovery — consistent backup & restore for Kinora's state of record.
 
 Kinora's *state of record* is three stores, and losing any of them is
-catastrophic (CLAUDE.md): the **canon** (versioned entities + episodic shot
+catastrophic (AGENTS.md): the **canon** (versioned entities + episodic shot
 records, kinora.md §8), the **event store** (the append-only log of facts +
 projection checkpoints, kinora.md §6/§9.7), the materialised **read models** the
 event log folds into, and the **object-store assets** (rendered clips, narration

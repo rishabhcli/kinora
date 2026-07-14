@@ -27,16 +27,21 @@ from sqlalchemy import DateTime
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import DeclarativeBase
 
-# pgvector exposes the column type; we detect it structurally to avoid a hard
-# import dependency in case the type name shifts across versions.
-try:  # pragma: no cover - import guard
-    from pgvector.sqlalchemy import Vector as _Vector
-except Exception:  # pragma: no cover
-    _Vector = None
+
+def _load_vector_type() -> type[Any] | None:
+    """Load pgvector's SQLAlchemy type without making it a hard dependency."""
+    try:  # pragma: no cover - import guard
+        from pgvector.sqlalchemy import Vector
+    except Exception:  # pragma: no cover
+        return None
+    return Vector
+
+
+_VECTOR_TYPE = _load_vector_type()
 
 
 def _is_vector_column(column: Any) -> bool:
-    if _Vector is not None and isinstance(column.type, _Vector):
+    if _VECTOR_TYPE is not None and isinstance(column.type, _VECTOR_TYPE):
         return True
     # Fallback: structural sniff on the type's class name.
     return type(column.type).__name__.lower() == "vector"
